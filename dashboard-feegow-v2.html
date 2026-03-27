@@ -961,6 +961,11 @@
         .doa-select.cls-fiv-normal { border-color: #6366f1; color: #818cf8; }
         .doa-select.cls-fiv-comp { border-color: #f59e0b; color: #fbbf24; }
         .doa-select.cls-receptora { border-color: #ec4899; color: #f472b6; }
+        .doa-select.cls-investigando { border-color: #14b8a6; color: #2dd4bf; }
+        .doa-select.cls-coito { border-color: #8b5cf6; color: #a78bfa; }
+        .doa-select.cls-embriao { border-color: #f43f5e; color: #fb7185; }
+        .doa-select.cls-fiv-od { border-color: #0ea5e9; color: #38bdf8; }
+        .doa-select.cls-congelamento { border-color: #64748b; color: #94a3b8; }
         .doa-saving { opacity: 0.5; pointer-events: none; }
 
         @media (max-width: 768px) {
@@ -1246,6 +1251,261 @@
             .container { padding: 14px; }
             .header { padding: 12px 14px; }
         }
+
+        /* ===== FICHA PACIENTE ===== */
+        .fp-search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+            position: relative;
+        }
+        .fp-search-bar input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .fp-search-bar input:focus { border-color: var(--accent); }
+        .fp-search-bar button {
+            padding: 10px 22px;
+            background: var(--accent);
+            color: #080d1a;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity .2s;
+        }
+        .fp-search-bar button:hover { opacity: .85; }
+        .fp-search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 50;
+            display: none;
+            box-shadow: 0 8px 32px rgba(0,0,0,.4);
+        }
+        .fp-result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background .15s;
+            border-bottom: 1px solid var(--border);
+        }
+        .fp-result-item:last-child { border-bottom: none; }
+        .fp-result-item:hover { background: var(--surface2); }
+
+        .fp-loading {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: var(--muted);
+            gap: 10px;
+        }
+        .fp-loading .spinner {
+            width: 22px; height: 22px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .fp-form {
+            display: grid;
+            gap: 24px;
+        }
+        .fp-group {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+        }
+        .fp-group-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .fp-fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
+        }
+        .fp-field { display: flex; flex-direction: column; gap: 4px; }
+        .fp-field.full-width { grid-column: 1 / -1; }
+        .fp-field label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: var(--muted);
+        }
+        .fp-field input,
+        .fp-field textarea,
+        .fp-field select {
+            padding: 10px 12px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .fp-field input:focus,
+        .fp-field textarea:focus,
+        .fp-field select:focus { border-color: var(--accent); }
+        .fp-field textarea { resize: vertical; min-height: 60px; }
+        .fp-field input[readonly] {
+            background: rgba(0,212,170,0.05);
+            border-color: rgba(0,212,170,0.15);
+            color: var(--accent);
+            cursor: default;
+        }
+
+        .fp-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-top: 10px;
+        }
+        .fp-btn-save {
+            padding: 12px 32px;
+            background: var(--accent);
+            color: #080d1a;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity .2s;
+        }
+        .fp-btn-save:hover { opacity: .85; }
+        .fp-btn-save:disabled { opacity: .4; cursor: not-allowed; }
+        .fp-save-msg {
+            display: none;
+            color: var(--success);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .fp-btn-new {
+            padding: 8px 20px;
+            background: var(--accent2);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity .2s;
+        }
+        .fp-btn-new:hover { opacity: .85; }
+
+        .fp-btn-pdf {
+            padding: 4px 10px;
+            background: var(--accent2);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: opacity .2s;
+        }
+        .fp-btn-pdf:hover { opacity: .85; }
+
+        .fp-btn-edit {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: border-color .2s;
+        }
+        .fp-btn-edit:hover { border-color: var(--accent); }
+
+        .fp-exam-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: var(--surface2);
+            border-radius: 8px;
+            margin-bottom: 6px;
+        }
+
+        .fp-saved-section {
+            margin-top: 32px;
+        }
+        .fp-saved-section h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            color: var(--text);
+        }
+        .fp-saved-section table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .fp-saved-section th {
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: var(--muted);
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .fp-saved-section td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .fp-saved-section tr:hover td { background: var(--surface2); }
+        .fp-saved-section .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .fp-saved-section .badge-green { background: rgba(16,185,129,.15); color: #10b981; }
+        .fp-saved-section .badge-red { background: rgba(239,68,68,.15); color: #ef4444; }
+        .fp-saved-section .badge-orange { background: rgba(245,158,11,.15); color: #f59e0b; }
+
+        @media (max-width: 700px) {
+            .fp-fields { grid-template-columns: 1fr; }
+            .fp-search-bar { flex-direction: column; }
+            .fp-search-bar button { width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -1276,6 +1536,7 @@
         <button class="tab" onclick="showSection('sec-pend',this)">CRM Comercial</button>
         <button class="tab" onclick="showSection('sec-doadoras',this)">Doadoras/Receptoras</button>
         <button class="tab" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas</button>
+        <button class="tab" onclick="showSection('sec-ficha',this)">Ficha Paciente</button>
     </div>
 
     <div class="container">
@@ -1759,6 +2020,26 @@
                     <div class="value" style="color:#f472b6" id="doa-receptora">—</div>
                     <div class="label">Receptora</div>
                 </div>
+                <div class="kpi-card" style="border-color:#14b8a6">
+                    <div class="value" style="color:#2dd4bf" id="doa-investigando">—</div>
+                    <div class="label">Investigando</div>
+                </div>
+                <div class="kpi-card" style="border-color:#8b5cf6">
+                    <div class="value" style="color:#a78bfa" id="doa-coito">—</div>
+                    <div class="label">Coito Programado</div>
+                </div>
+                <div class="kpi-card" style="border-color:#f43f5e">
+                    <div class="value" style="color:#fb7185" id="doa-embriao">—</div>
+                    <div class="label">Embrião Doado</div>
+                </div>
+                <div class="kpi-card" style="border-color:#0ea5e9">
+                    <div class="value" style="color:#38bdf8" id="doa-fiv-od">—</div>
+                    <div class="label">FIV ou OD</div>
+                </div>
+                <div class="kpi-card" style="border-color:#64748b">
+                    <div class="value" style="color:#94a3b8" id="doa-congelamento">—</div>
+                    <div class="label">Congelamento</div>
+                </div>
                 <div class="kpi-card">
                     <div class="value" style="color:var(--muted)" id="doa-sem-class">—</div>
                     <div class="label">Sem Classificação</div>
@@ -1775,6 +2056,11 @@
                     <option value="FIV Normal">FIV Normal</option>
                     <option value="FIV Compartilhada">FIV Compartilhada</option>
                     <option value="Receptora">Receptora</option>
+                    <option value="Investigando">Investigando</option>
+                    <option value="Coito Programado">Coito Programado</option>
+                    <option value="Embrião Doado">Embrião Doado</option>
+                    <option value="FIV ou OD">FIV ou OD</option>
+                    <option value="Congelamento">Congelamento</option>
                     <option value="sem">Sem classificação</option>
                 </select>
             </div>
@@ -1793,6 +2079,627 @@
 
             <div id="dnCards" class="dn-cards"></div>
             <div id="dnFormWrap" style="display:none"></div>
+        </section>
+
+        <!-- FICHA PACIENTE -->
+        <section id="sec-ficha" class="section">
+            <p class="section-title">Ficha da Paciente — Integração Feegow</p>
+
+            <div class="fp-search-bar">
+                <input type="text" id="fpSearchInput" placeholder="Buscar paciente por nome ou código..." onkeydown="if(event.key==='Enter')fpSearchPatient()">
+                <button onclick="fpSearchPatient()">🔍 Buscar</button>
+                <div class="fp-search-results" id="fpSearchResults"></div>
+            </div>
+
+            <div id="fpFormWrap" style="display:none">
+                <div class="fp-loading" id="fpLoading"><div class="spinner"></div> Carregando dados do paciente...</div>
+                <div id="fpLoadStatus" style="display:none;padding:8px 14px;margin-bottom:12px;background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.2);border-radius:8px;font-size:12px;color:var(--accent)"></div>
+
+                <div class="fp-form">
+                    <!-- Grupo 1 - Dados da Consulta -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Dados da Consulta</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Data Consulta 1ª Vez</label>
+                                <input type="text" id="fpDataConsulta" readonly>
+                            </div>
+                            <div class="fp-field">
+                                <label>Médico</label>
+                                <input type="text" id="fpMedico" readonly>
+                            </div>
+                            <div class="fp-field">
+                                <label>Código da Paciente</label>
+                                <input type="text" id="fpCodigo" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 2 - Dados da Paciente -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Dados da Paciente</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Paciente — Nome</label>
+                                <input type="text" id="fpNome" readonly>
+                            </div>
+                            <div class="fp-field">
+                                <label>Nascimento</label>
+                                <input type="text" id="fpNascimento" readonly>
+                            </div>
+                            <div class="fp-field">
+                                <label>Idade</label>
+                                <input type="text" id="fpIdade" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 3 - Cônjuge -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Cônjuge</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Cônjuge</label>
+                                <input type="text" id="fpConjuge" placeholder="Nome do cônjuge">
+                            </div>
+                            <div class="fp-field">
+                                <label>Nascimento Cônjuge</label>
+                                <input type="date" id="fpNascConjuge" onchange="fpCalcIdadeConjuge()">
+                            </div>
+                            <div class="fp-field">
+                                <label>Idade Cônjuge</label>
+                                <input type="text" id="fpIdadeConjuge" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 4 - Tratamento -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Tratamento</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Data Máxima para Retorno</label>
+                                <input type="text" id="fpDataMaxRetorno" readonly>
+                            </div>
+                            <div class="fp-field">
+                                <label>Urologista</label>
+                                <input type="text" id="fpUrologista" placeholder="Nome do urologista">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Tratamento Proposto</label>
+                                <textarea id="fpTratamento" placeholder="Descreva o tratamento proposto..."></textarea>
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Obs sobre o Caso</label>
+                                <textarea id="fpObsCaso" placeholder="Observações sobre o caso..."></textarea>
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Avisos</label>
+                                <textarea id="fpAvisos1" placeholder="Avisos relevantes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Doadora / Status -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Doadora / Status</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Nº Registro Doadora / Embrião Doado</label>
+                                <input type="text" id="fpRegDoadora">
+                            </div>
+                            <div class="fp-field">
+                                <label>Status TTO</label>
+                                <select id="fpStatusTTO">
+                                    <option value="">—</option>
+                                    <option value="Em andamento">Em andamento</option>
+                                    <option value="Finalizado">Finalizado</option>
+                                    <option value="Cancelado">Cancelado</option>
+                                    <option value="Aguardando">Aguardando</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>AMH</label>
+                                <input type="text" id="fpAMH" placeholder="Valor AMH">
+                            </div>
+                            <div class="fp-field">
+                                <label>Algum Preparo Específico?</label>
+                                <input type="text" id="fpPreparoEsp" placeholder="Descrever preparo">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Sêmen -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Sêmen</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Sêmen</label>
+                                <select id="fpSemen">
+                                    <option value="">—</option>
+                                    <option value="Fresco">Fresco</option>
+                                    <option value="Congelado">Congelado</option>
+                                    <option value="Doador">Doador</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Tratamento com Urologista</label>
+                                <select id="fpTtoUrologista">
+                                    <option value="">—</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Fragmentação de DNA</label>
+                                <input type="text" id="fpFragDNA" placeholder="Resultado">
+                            </div>
+                            <div class="fp-field">
+                                <label>Data Exame Fragmentação</label>
+                                <input type="text" id="fpDataFragDNA" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Obs sobre o Sêmen</label>
+                                <textarea id="fpObsSemen"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Indução e Aspiração -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Indução e Aspiração</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Data Início Indução Ovulação</label>
+                                <input type="text" id="fpDataInducao" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field">
+                                <label>Medicação</label>
+                                <input type="text" id="fpMedicacao">
+                            </div>
+                            <div class="fp-field">
+                                <label>Folículos Previstos</label>
+                                <input type="text" id="fpFoliculos">
+                            </div>
+                            <div class="fp-field">
+                                <label>Nº Óvulos Aspirados</label>
+                                <input type="text" id="fpOvulosAspirados">
+                            </div>
+                            <div class="fp-field">
+                                <label>Nº Óvulos Maduros</label>
+                                <input type="text" id="fpOvulosMaduros">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Embriologia -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Embriologia</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Nº Óvulos Fertilizados</label>
+                                <input type="text" id="fpOvulosFertilizados">
+                            </div>
+                            <div class="fp-field">
+                                <label>Blastocistos</label>
+                                <input type="text" id="fpBlastocistos">
+                            </div>
+                            <div class="fp-field">
+                                <label>Classificação / Palhetas</label>
+                                <input type="text" id="fpClassPalhetas">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: PGT-A -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">PGT-A</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>PGT-A</label>
+                                <select id="fpPGTA">
+                                    <option value="">—</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                    <option value="Aguardando">Aguardando</option>
+                                </select>
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Resultado PGT-A</label>
+                                <textarea id="fpResultPGTA"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Hematologia -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Hematologia</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Hematologista</label>
+                                <input type="text" id="fpHemato">
+                            </div>
+                            <div class="fp-field">
+                                <label>Aviso Hemato</label>
+                                <input type="text" id="fpAvisoHemato">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Transferência Embrionária -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Transferência Embrionária</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Data da Transferência</label>
+                                <input type="text" id="fpDataTE" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field">
+                                <label>Tipo TE</label>
+                                <select id="fpTipoTE">
+                                    <option value="">—</option>
+                                    <option value="Fresco">Fresco</option>
+                                    <option value="Congelado">Congelado</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Blastos Transferidos</label>
+                                <input type="text" id="fpBlastosTransf">
+                            </div>
+                            <div class="fp-field">
+                                <label>Sobrou Blastos?</label>
+                                <select id="fpSobrouBlastos">
+                                    <option value="">—</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Blastos Sobrando</label>
+                                <input type="text" id="fpBlastosSobrando">
+                            </div>
+                            <div class="fp-field">
+                                <label>Laboratório</label>
+                                <input type="text" id="fpLaboratorio">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Medicação TE -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Medicação TE</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Injúria</label>
+                                <input type="text" id="fpInjuria">
+                            </div>
+                            <div class="fp-field">
+                                <label>Resultado Injúria</label>
+                                <input type="text" id="fpResultInjuria">
+                            </div>
+                            <div class="fp-field">
+                                <label>Filgastrim</label>
+                                <input type="text" id="fpFilgastrim">
+                            </div>
+                            <div class="fp-field">
+                                <label>Tractocile</label>
+                                <input type="text" id="fpTractocile">
+                            </div>
+                            <div class="fp-field">
+                                <label>Tipo Preparo</label>
+                                <input type="text" id="fpTipoPreparo">
+                            </div>
+                            <div class="fp-field">
+                                <label>Med. Preparo</label>
+                                <input type="text" id="fpMedPreparo">
+                            </div>
+                            <div class="fp-field">
+                                <label>Clexane</label>
+                                <input type="text" id="fpClexane">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Obs sobre TE</label>
+                                <textarea id="fpObsTE"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Beta HCG / Ultrassom -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Beta HCG / Ultrassom</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Data Beta HCG</label>
+                                <input type="text" id="fpDataBeta" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field">
+                                <label>Dosagens Beta</label>
+                                <input type="text" id="fpDosagensBeta">
+                            </div>
+                            <div class="fp-field">
+                                <label>SG</label>
+                                <input type="text" id="fpSG">
+                            </div>
+                            <div class="fp-field">
+                                <label>BCE</label>
+                                <input type="text" id="fpBCE">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Obs 1ª USG</label>
+                                <textarea id="fpObs1USG"></textarea>
+                            </div>
+                            <div class="fp-field">
+                                <label>Data 2ª USG Pós Beta</label>
+                                <input type="text" id="fpData2USG" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Obs 2ª USG</label>
+                                <textarea id="fpObs2USG"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Gestação / Parto -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Gestação / Parto</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Pré-Natal</label>
+                                <select id="fpPreNatal">
+                                    <option value="">—</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Tipo de Gravidez</label>
+                                <select id="fpTipoGravidez">
+                                    <option value="">—</option>
+                                    <option value="Única">Única</option>
+                                    <option value="Gemelar">Gemelar</option>
+                                    <option value="Trigemelar">Trigemelar</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Tipo de Aborto</label>
+                                <input type="text" id="fpTipoAborto">
+                            </div>
+                            <div class="fp-field">
+                                <label>Pré Natal na Paraser</label>
+                                <select id="fpPreNatalParaser">
+                                    <option value="">—</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Data Parto</label>
+                                <input type="text" id="fpDataParto" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field">
+                                <label>Tipo de Parto</label>
+                                <select id="fpTipoParto">
+                                    <option value="">—</option>
+                                    <option value="Normal">Normal</option>
+                                    <option value="Cesárea">Cesárea</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Idade Gestacional</label>
+                                <input type="text" id="fpIdadeGest">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Obs sobre Parto</label>
+                                <textarea id="fpObsParto"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Bebê(s) -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Bebê(s)</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Nasc. Vivos</label>
+                                <input type="text" id="fpNascVivos">
+                            </div>
+                            <div class="fp-field">
+                                <label>Gênero Bebê 1</label>
+                                <select id="fpGeneroBebe1">
+                                    <option value="">—</option>
+                                    <option value="Masculino">Masculino</option>
+                                    <option value="Feminino">Feminino</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Estatura Bebê 1</label>
+                                <input type="text" id="fpEstaturaBebe1" placeholder="cm">
+                            </div>
+                            <div class="fp-field">
+                                <label>Peso Bebê 1</label>
+                                <input type="text" id="fpPesoBebe1" placeholder="g">
+                            </div>
+                            <div class="fp-field">
+                                <label>Nome Bebê 1</label>
+                                <input type="text" id="fpNomeBebe1">
+                            </div>
+                            <div class="fp-field">
+                                <label>Gênero Bebê 2</label>
+                                <select id="fpGeneroBebe2">
+                                    <option value="">—</option>
+                                    <option value="Masculino">Masculino</option>
+                                    <option value="Feminino">Feminino</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Estatura Bebê 2</label>
+                                <input type="text" id="fpEstaturaBebe2" placeholder="cm">
+                            </div>
+                            <div class="fp-field">
+                                <label>Peso Bebê 2</label>
+                                <input type="text" id="fpPesoBebe2" placeholder="g">
+                            </div>
+                            <div class="fp-field">
+                                <label>Nome Bebê 2</label>
+                                <input type="text" id="fpNomeBebe2">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Observações Bebê</label>
+                                <textarea id="fpObsBebe"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Depoimento -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Depoimento</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Gravamos Depoimento</label>
+                                <select id="fpDepoimento">
+                                    <option value="">—</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Informações Depoimento</label>
+                                <textarea id="fpInfoDepoimento"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 5 - Orçamento -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Orçamento</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Indicação de Pacote</label>
+                                <input type="text" id="fpIndicacaoPacote" placeholder="Pacote indicado">
+                            </div>
+                            <div class="fp-field">
+                                <label>Foi Passado Orçamento?</label>
+                                <select id="fpOrcamentoFeito">
+                                    <option value="">—</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Data Orçamento</label>
+                                <input type="text" id="fpDataOrcamento" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field">
+                                <label>Orçamento</label>
+                                <input type="text" id="fpOrcamento" placeholder="R$ 0,00">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Obs</label>
+                                <textarea id="fpObsOrcamento" placeholder="Observações sobre o orçamento..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 6 - Retorno -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Retorno</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Status Retorno</label>
+                                <select id="fpStatusRetorno" onchange="fpToggleRetornoFields()">
+                                    <option value="">—</option>
+                                    <option value="Retornou">Retornou</option>
+                                    <option value="Não retornou">Não retornou</option>
+                                    <option value="Aguardando">Aguardando</option>
+                                </select>
+                            </div>
+                            <div class="fp-field">
+                                <label>Data de Retorno</label>
+                                <input type="text" id="fpDataRetorno" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="fp-field full-width" id="fpWrapSemRetorno" style="display:none">
+                                <label>Sem Retorno (Motivo)</label>
+                                <textarea id="fpSemRetornoMotivo" placeholder="Motivo do não retorno..."></textarea>
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Retornou mas Não Vai Tratar (Motivo)</label>
+                                <textarea id="fpNaoVaiTratar" placeholder="Motivo..."></textarea>
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Aguardando Início do Tratamento (Motivo)</label>
+                                <textarea id="fpAguardandoMotivo" placeholder="Motivo da espera..."></textarea>
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Avisos</label>
+                                <textarea id="fpAvisos2" placeholder="Avisos sobre retorno..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 7 - Financeiro -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Financeiro</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Pagamento</label>
+                                <input type="text" id="fpPagamento" placeholder="Forma / valor do pagamento">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Aviso sobre Pagamento</label>
+                                <textarea id="fpAvisoPagamento" placeholder="Avisos financeiros..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 8 - PSI -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">PSI</div>
+                        <div class="fp-fields">
+                            <div class="fp-field">
+                                <label>Contato PSI</label>
+                                <input type="text" id="fpContatoPsi" placeholder="Contato do PSI">
+                            </div>
+                            <div class="fp-field">
+                                <label>Resultado</label>
+                                <input type="text" id="fpResultado" placeholder="Resultado PSI">
+                            </div>
+                            <div class="fp-field">
+                                <label>1ª Consulta</label>
+                                <input type="date" id="fpConsulta1">
+                            </div>
+                            <div class="fp-field">
+                                <label>2ª Consulta</label>
+                                <input type="date" id="fpConsulta2">
+                            </div>
+                            <div class="fp-field full-width">
+                                <label>Informações PSI</label>
+                                <textarea id="fpInfoPsi" placeholder="Informações adicionais do PSI..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo 9 - Pedidos de Exame -->
+                    <div class="fp-group">
+                        <div class="fp-group-title">Pedidos de Exame (Feegow)</div>
+                        <div id="fpExamsList" style="max-height:300px;overflow-y:auto"></div>
+                    </div>
+                </div>
+
+                <!-- Save actions -->
+                <div class="fp-actions">
+                    <button class="fp-btn-save" id="fpSaveBtn" onclick="fpSaveFicha()">💾 Salvar Ficha</button>
+                    <span class="fp-save-msg" id="fpSaveMsg"></span>
+                    <button class="fp-btn-new" onclick="fpNewFicha()" style="margin-left:auto">+ Nova Ficha</button>
+                </div>
+            </div>
+
+            <!-- Saved fichas list -->
+            <div class="fp-saved-section">
+                <h3>Fichas Salvas</h3>
+                <div id="fpSavedList">
+                    <div style="text-align:center;color:var(--muted);padding:20px">Nenhuma ficha salva ainda</div>
+                </div>
+            </div>
         </section>
 
         <!-- Modal CRM -->
@@ -3052,12 +3959,17 @@
             });
 
             // KPIs
-            let nFiv = 0, nComp = 0, nRec = 0, nSem = 0;
+            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nSem = 0;
             doaPatients.forEach(p => {
                 const cls = (crmMap[p.key]?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
                 else if (cls === 'FIV Compartilhada') nComp++;
                 else if (cls === 'Receptora') nRec++;
+                else if (cls === 'Investigando') nInv++;
+                else if (cls === 'Coito Programado') nCoito++;
+                else if (cls === 'Embrião Doado') nEmbriao++;
+                else if (cls === 'FIV ou OD') nFivOd++;
+                else if (cls === 'Congelamento') nCong++;
                 else nSem++;
             });
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -3065,6 +3977,10 @@
             set('doa-fiv-normal', nFiv);
             set('doa-fiv-comp', nComp);
             set('doa-receptora', nRec);
+            set('doa-investigando', nInv);
+            set('doa-coito', nCoito);
+            set('doa-embriao', nEmbriao);
+            set('doa-fiv-od', nFivOd);
             set('doa-sem-class', nSem);
 
             if (!sortedDates.length) {
@@ -3084,7 +4000,12 @@
                         const safeKey = p.key.replace(/'/g, "\\'");
                         const selClass = cls === 'FIV Normal' ? 'cls-fiv-normal'
                             : cls === 'FIV Compartilhada' ? 'cls-fiv-comp'
-                            : cls === 'Receptora' ? 'cls-receptora' : '';
+                            : cls === 'Receptora' ? 'cls-receptora'
+                            : cls === 'Investigando' ? 'cls-investigando'
+                            : cls === 'Coito Programado' ? 'cls-coito'
+                            : cls === 'Embrião Doado' ? 'cls-embriao'
+                            : cls === 'FIV ou OD' ? 'cls-fiv-od'
+                            : cls === 'Congelamento' ? 'cls-congelamento' : '';
                         const isAguard = p.status === 'Aguardando';
                         const statusBadge = isAguard
                             ? '<span class="doa-status doa-status-aguardando">Aguardando</span>'
@@ -3098,6 +4019,11 @@
                                 <option value="FIV Normal" ${cls === 'FIV Normal' ? 'selected' : ''}>FIV Normal</option>
                                 <option value="FIV Compartilhada" ${cls === 'FIV Compartilhada' ? 'selected' : ''}>FIV Compartilhada</option>
                                 <option value="Receptora" ${cls === 'Receptora' ? 'selected' : ''}>Receptora</option>
+                                <option value="Investigando" ${cls === 'Investigando' ? 'selected' : ''}>Investigando</option>
+                                <option value="Coito Programado" ${cls === 'Coito Programado' ? 'selected' : ''}>Coito Programado</option>
+                                <option value="Embrião Doado" ${cls === 'Embrião Doado' ? 'selected' : ''}>Embrião Doado</option>
+                                <option value="FIV ou OD" ${cls === 'FIV ou OD' ? 'selected' : ''}>FIV ou OD</option>
+                                <option value="Congelamento" ${cls === 'Congelamento' ? 'selected' : ''}>Congelamento</option>
                             </select>
                         </div>`;
                     }).join('')}
@@ -3108,13 +4034,17 @@
         async function saveClassificacao(key, selectEl) {
             const value = selectEl.value;
             const row = selectEl.closest('.doa-patient-row');
-            if (row) row.classList.add('doa-saving');
 
-            // Update class visual
+            // Update class visual immediately
             selectEl.className = 'doa-select ' + (
                 value === 'FIV Normal' ? 'cls-fiv-normal'
                 : value === 'FIV Compartilhada' ? 'cls-fiv-comp'
-                : value === 'Receptora' ? 'cls-receptora' : ''
+                : value === 'Receptora' ? 'cls-receptora'
+                : value === 'Investigando' ? 'cls-investigando'
+                : value === 'Coito Programado' ? 'cls-coito'
+                : value === 'Embrião Doado' ? 'cls-embriao'
+                : value === 'FIV ou OD' ? 'cls-fiv-od'
+                : value === 'Congelamento' ? 'cls-congelamento' : ''
             );
 
             // Optimistic update local
@@ -3122,12 +4052,17 @@
             crmMap[key].classificacao = value;
 
             // Atualizar KPIs
-            let nFiv = 0, nComp = 0, nRec = 0, nSem = 0;
+            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nSem = 0;
             doaPatients.forEach(p => {
                 const cls = (crmMap[p.key]?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
                 else if (cls === 'FIV Compartilhada') nComp++;
                 else if (cls === 'Receptora') nRec++;
+                else if (cls === 'Investigando') nInv++;
+                else if (cls === 'Coito Programado') nCoito++;
+                else if (cls === 'Embrião Doado') nEmbriao++;
+                else if (cls === 'FIV ou OD') nFivOd++;
+                else if (cls === 'Congelamento') nCong++;
                 else nSem++;
             });
             const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -3135,35 +4070,36 @@
             s('doa-fiv-normal', nFiv);
             s('doa-fiv-comp', nComp);
             s('doa-receptora', nRec);
+            s('doa-investigando', nInv);
+            s('doa-coito', nCoito);
+            s('doa-embriao', nEmbriao);
+            s('doa-fiv-od', nFivOd);
+            s('doa-congelamento', nCong);
             s('doa-sem-class', nSem);
 
+            // Save to server in background (non-blocking)
             if (CRM_SCRIPT_URL) {
-                try {
-                    const existing = crmMap[key] || {};
-                    const record = {
-                        paciente_key: key,
-                        contato1_data: existing.contato1_data || '',
-                        contato2_data: existing.contato2_data || '',
-                        vendedora: existing.vendedora || '',
-                        valor: existing.valor || '',
-                        retorno_marcado: existing.retorno_marcado || '',
-                        proposta_feita: existing.proposta_feita || '',
-                        parc_pago: existing.parc_pago || false,
-                        quitado: existing.quitado || false,
-                        observacoes: existing.observacoes || '',
-                        classificacao: value,
-                    };
-                    await fetch(CRM_SCRIPT_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: JSON.stringify(record),
-                    });
-                } catch (err) {
-                    console.error('Erro ao salvar classificação:', err);
-                }
+                const existing = crmMap[key] || {};
+                const record = {
+                    paciente_key: key,
+                    contato1_data: existing.contato1_data || '',
+                    contato2_data: existing.contato2_data || '',
+                    vendedora: existing.vendedora || '',
+                    valor: existing.valor || '',
+                    retorno_marcado: existing.retorno_marcado || '',
+                    proposta_feita: existing.proposta_feita || '',
+                    parc_pago: existing.parc_pago || false,
+                    quitado: existing.quitado || false,
+                    observacoes: existing.observacoes || '',
+                    classificacao: value,
+                };
+                fetch(CRM_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(record),
+                }).catch(err => console.error('Erro ao salvar classificação:', err));
             }
-            if (row) row.classList.remove('doa-saving');
         }
 
         // ===================== DOADORAS COMPARTILHADAS =====================
@@ -3607,6 +4543,615 @@
             await init();
         }
 
+        // ===================== FICHA PACIENTE =====================
+        let fichaPatients = [];
+        let fichaCurrentPatient = null;
+
+        // Feegow API helper - usa Google Apps Script como proxy para contornar CORS
+        async function feegowFetch(endpoint, params = {}) {
+            const qs = new URLSearchParams();
+            qs.set('action', 'feegow_proxy');
+            qs.set('endpoint', endpoint);
+            Object.entries(params).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && v !== '') qs.set(k, v);
+            });
+            const resp = await fetch(CRM_SCRIPT_URL + '?' + qs.toString());
+            if (!resp.ok) throw new Error(`Proxy error: ${resp.status}`);
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+            return data;
+        }
+
+        // Search patients - uses local data (Google Sheets) to find, then fetches from Feegow by phone
+        async function fpSearchPatient() {
+            const query = document.getElementById('fpSearchInput').value.trim();
+            if (query.length < 2) return;
+
+            const resultsDiv = document.getElementById('fpSearchResults');
+            resultsDiv.innerHTML = '<div style="padding:12px;color:var(--muted)">Buscando...</div>';
+            resultsDiv.style.display = 'block';
+
+            try {
+                // 1. If numeric, try direct Feegow search by patient ID
+                if (/^\d+$/.test(query)) {
+                    // If looks like a phone number (10+ digits), search by phone
+                    if (query.length >= 10) {
+                        const data = await feegowFetch('/patient/list', { telefone: query, limit: 20, offset: 0 });
+                        const patients = data.content || [];
+                        if (patients.length) { renderFpSearchResults(patients); return; }
+                    }
+                    // Otherwise try as patient ID
+                    const data = await feegowFetch('/patient/search', { paciente_id: query });
+                    if (data.content) {
+                        renderFpSearchResults(Array.isArray(data.content) ? data.content : [data.content]);
+                        return;
+                    }
+                }
+
+                // 2. If looks like CPF (11 digits with or without dots/dash)
+                const cpfClean = query.replace(/[.\-]/g, '');
+                if (/^\d{11}$/.test(cpfClean)) {
+                    const data = await feegowFetch('/patient/list', { cpf: cpfClean, limit: 5, offset: 0 });
+                    const patients = data.content || [];
+                    if (patients.length) { renderFpSearchResults(patients); return; }
+                }
+
+                // 3. Search by name: use local doaPatients + Google Sheets data to find phone, then search Feegow
+                const queryLower = query.toLowerCase();
+                const localMatches = doaPatients.filter(p =>
+                    p.pac?.toLowerCase().includes(queryLower)
+                ).slice(0, 10);
+
+                if (localMatches.length > 0) {
+                    // Try to find in Feegow using phone from first match
+                    const results = [];
+                    for (const local of localMatches) {
+                        const phone = (local.cel || '').replace(/\D/g, '');
+                        if (phone.length >= 10) {
+                            try {
+                                const data = await feegowFetch('/patient/list', { telefone: phone, limit: 1, offset: 0 });
+                                const found = data.content || [];
+                                if (found.length) {
+                                    results.push(...found);
+                                    continue;
+                                }
+                            } catch(e) { /* try next */ }
+                        }
+                        // Add local data as fallback (without Feegow ID)
+                        results.push({
+                            nome: local.pac,
+                            celular: local.cel,
+                            _local: true,
+                            _localData: local
+                        });
+                    }
+                    renderFpSearchResults(results);
+                    return;
+                }
+
+                // 4. Fallback: paginated search in Feegow (broader)
+                const data = await feegowFetch('/patient/list', { limit: 100, offset: 0 });
+                const patients = (data.content || []).filter(p =>
+                    p.nome?.toLowerCase().includes(queryLower)
+                );
+                renderFpSearchResults(patients);
+            } catch(err) {
+                resultsDiv.innerHTML = `<div style="padding:12px;color:#f87171">Erro: ${err.message}</div>`;
+            }
+        }
+
+        function renderFpSearchResults(patients) {
+            const div = document.getElementById('fpSearchResults');
+            // Deduplicate by name
+            const seen = new Set();
+            const unique = patients.filter(p => {
+                const key = (p.nome || p.nome_completo || '').toLowerCase().trim();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            if (!unique.length) {
+                div.innerHTML = '<div style="padding:12px;color:var(--muted)">Nenhum paciente encontrado</div>';
+                return;
+            }
+            div.innerHTML = unique.map(p => {
+                const nome = p.nome || p.nome_completo || '—';
+                const id = p.id || p.paciente_id || p.patient_id || '';
+                const nasc = p.nascimento || '';
+                const cel = p.celular || (p.celulares && p.celulares[0]) || '';
+                const source = id ? `ID: ${id}` : '(dados locais)';
+                if (id) {
+                    return `<div class="fp-result-item" onclick="fpSelectPatient(${id})">
+                        <strong>${nome}</strong>
+                        <span style="color:var(--muted);font-size:11px">${source} | Nasc: ${nasc} | Cel: ${cel}</span>
+                    </div>`;
+                } else {
+                    return `<div class="fp-result-item" onclick="fpSelectPatientLocal(this)" data-nome="${nome.replace(/"/g,'&quot;')}" data-cel="${cel}">
+                        <strong>${nome}</strong>
+                        <span style="color:var(--muted);font-size:11px">${source} | Cel: ${cel}</span>
+                    </div>`;
+                }
+            }).join('');
+        }
+
+        // Select a local patient (no Feegow ID) - just fill basic info
+        function fpSelectPatientLocal(el) {
+            document.getElementById('fpSearchResults').style.display = 'none';
+            document.getElementById('fpFormWrap').style.display = 'block';
+            document.getElementById('fpNome').value = el.dataset.nome || '';
+            document.getElementById('fpCodigo').value = '—';
+        }
+
+        // Helper to calculate age from date string
+        function fpCalcAge(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            let birthDate;
+            if (parts[0].length === 4) birthDate = new Date(parts[0], parts[1]-1, parts[2]);
+            else birthDate = new Date(parts[2], parts[1]-1, parts[0]);
+            if (isNaN(birthDate)) return '';
+            return Math.floor((Date.now() - birthDate) / (365.25 * 24 * 60 * 60 * 1000)) + ' anos';
+        }
+
+        // Parse spouse data from Feegow "observacao" field
+        function fpParseObservacao(obs) {
+            if (!obs) return {};
+            const result = {};
+            // NOME DO COMPANHEIRO(A): ...
+            const nomeMatch = obs.match(/NOME\s*(?:DO|DA)\s*COMPANHEIRO\(?A?\)?\s*:\s*(.+)/i);
+            if (nomeMatch) result.conjuge = nomeMatch[1].trim();
+            // DATA DE NASCIMENTO: dd/mm/yyyy (with label)
+            const nascMatch = obs.match(/DATA\s*DE\s*NASCIMENTO\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+            if (nascMatch) result.nasc_conjuge = nascMatch[1];
+            // Also try standalone date dd/mm/yyyy on its own line (common format)
+            if (!result.nasc_conjuge) {
+                const dateMatch = obs.match(/(?:^|\n)\s*(\d{2}\/\d{2}\/\d{4})\s*(?:\n|$)/m);
+                if (dateMatch) result.nasc_conjuge = dateMatch[1];
+            }
+            // CPF companheiro (with or without label)
+            const cpfMatch = obs.match(/[Cc][Pp][Ff]\s*:?\s*([\d]{3}[.\s]?[\d]{3}[.\s]?[\d]{3}[-.\s]?[\d]{2})/);
+            if (cpfMatch) result.cpf_conjuge = cpfMatch[1];
+            // Email companheiro
+            const emailMatch = obs.match(/[Ee]-?[Mm][Aa][Ii][Ll]\s*:?\s*(\S+@\S+)/);
+            if (emailMatch) result.email_conjuge = emailMatch[1];
+            // COMO NOS CONHECEU
+            const indMatch = obs.match(/COMO\s*NOS\s*CONHECEU\s*\??\s*\n?\s*(.+)/i);
+            if (indMatch) result.indicacao = indMatch[1].trim();
+            return result;
+        }
+
+        // Format DD-MM-YYYY date for display
+        function fpFmtDate(d) {
+            if (!d) return '';
+            // Already DD-MM-YYYY or DD/MM/YYYY
+            if (/^\d{2}[-\/]\d{2}[-\/]\d{4}$/.test(d)) return d.replace(/-/g, '/');
+            // YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
+                const p = d.split('-');
+                return p[2].substring(0,2) + '/' + p[1] + '/' + p[0];
+            }
+            return d;
+        }
+
+        // Select a patient and load data progressively
+        async function fpSelectPatient(patientId) {
+            document.getElementById('fpSearchResults').style.display = 'none';
+            document.getElementById('fpFormWrap').style.display = 'block';
+            document.getElementById('fpLoading').style.display = 'flex';
+
+            try {
+                // Step 1: Load patient data
+                const patientData = await feegowFetch('/patient/search', { paciente_id: patientId });
+                const patient = Array.isArray(patientData.content) ? patientData.content[0] : patientData.content;
+                fichaCurrentPatient = patient;
+
+                // ID field is "id" in Feegow API
+                const pid = patient.id || patient.paciente_id || patient.patient_id || patientId;
+                document.getElementById('fpCodigo').value = pid;
+                document.getElementById('fpNome').value = patient.nome || '';
+                document.getElementById('fpNascimento').value = fpFmtDate(patient.nascimento);
+                document.getElementById('fpIdade').value = fpCalcAge(patient.nascimento);
+
+                // Parse spouse: try nome_social first, then observacao
+                let conjugeNome = '';
+                if (patient.nome_social) {
+                    // "NOME SOCIAL: Alexandre Aleixo Reis" or "ESPOSO: ..." or just a name
+                    const nsClean = patient.nome_social
+                        .replace(/^NOME\s*SOCIAL\s*:\s*/i, '')
+                        .replace(/^ESPOSO\s*:\s*/i, '')
+                        .replace(/^ESPOSA\s*:\s*/i, '')
+                        .replace(/^COMPANHEIRO\(?A?\)?\s*:\s*/i, '')
+                        .trim();
+                    if (nsClean) conjugeNome = nsClean;
+                }
+                const obsData = fpParseObservacao(patient.observacao);
+                if (!conjugeNome && obsData.conjuge) conjugeNome = obsData.conjuge;
+                // Also try first line of observacao if it looks like a name (no ":" prefix)
+                if (!conjugeNome && patient.observacao) {
+                    const firstLine = patient.observacao.split(/[\r\n]/)[0].trim();
+                    if (firstLine && !firstLine.includes(':') && firstLine.length > 3 && firstLine.length < 60) {
+                        conjugeNome = firstLine;
+                    }
+                }
+                if (conjugeNome) document.getElementById('fpConjuge').value = conjugeNome;
+                if (obsData.nasc_conjuge) {
+                    const parts = obsData.nasc_conjuge.split('/');
+                    document.getElementById('fpNascConjuge').value = parts[2] + '-' + parts[1] + '-' + parts[0];
+                    fpCalcIdadeConjuge();
+                }
+
+                // Hide loading — show form immediately
+                document.getElementById('fpLoading').style.display = 'none';
+
+                // Check for saved ficha
+                const existingFicha = fichaPatients.find(f => String(f.paciente_id) === String(pid));
+                if (existingFicha) fpFillManualFields(existingFicha);
+
+                // Step 2: Background loading
+                const fpStatus = document.getElementById('fpLoadStatus');
+                if (fpStatus) fpStatus.style.display = 'block';
+                const setStatus = (msg) => { if (fpStatus) fpStatus.textContent = msg; };
+
+                // Agendamentos — busca em intervalos de 3 meses, até 2 anos atrás
+                setStatus('Carregando agendamentos...');
+                const now = new Date();
+                const fmtDt = (d) => String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+
+                async function fpLoadAllAppoints(pid) {
+                    let allAppoints = [];
+                    for (let i = 0; i < 8; i++) { // 8 x 3 meses = 2 anos
+                        const end = new Date(now);
+                        end.setMonth(end.getMonth() - (i * 3));
+                        const start = new Date(end);
+                        start.setMonth(start.getMonth() - 3);
+                        try {
+                            const data = await feegowFetch('/appoints/search', {
+                                paciente_id: pid, data_start: fmtDt(start), data_end: fmtDt(end)
+                            });
+                            if (data.success !== false && Array.isArray(data.content)) {
+                                allAppoints = allAppoints.concat(data.content);
+                            }
+                        } catch(e) { /* continue */ }
+                        // Se já achou agendamentos, não precisa buscar mais longe
+                        if (allAppoints.length > 0 && i >= 1) break;
+                    }
+                    return allAppoints;
+                }
+
+                fpLoadAllAppoints(patientId).then(appoints => {
+                    if (!appoints.length) { setStatus(''); return; }
+                    const sorted = [...appoints].sort((a,b) => {
+                        const da = new Date((a.data||'').split('-').reverse().join('-') || 0);
+                        const db = new Date((b.data||'').split('-').reverse().join('-') || 0);
+                        return da - db;
+                    });
+                    const first = sorted[0];
+                    document.getElementById('fpDataConsulta').value = fpFmtDate(first.data);
+                    const profName = first.profissional_nome || first.nome_profissional || first.profissional || '';
+                    document.getElementById('fpMedico').value = profName || ('ID: ' + (first.profissional_id || ''));
+                    const retorno = appoints.find(a => a.retorno === true || a.retorno === 1 || a.retorno === '1');
+                    if (retorno) {
+                        document.getElementById('fpDataRetorno').value = fpFmtDate(retorno.data);
+                        document.getElementById('fpStatusRetorno').value = 'Retornou';
+                    }
+                    if (first.dias_limite_retorno) {
+                        const fd = new Date((first.data||'').split('-').reverse().join('-'));
+                        fd.setDate(fd.getDate() + parseInt(first.dias_limite_retorno));
+                        document.getElementById('fpDataMaxRetorno').value = fd.toLocaleDateString('pt-BR');
+                    }
+                    setStatus(`${appoints.length} agendamento(s) encontrado(s)`);
+                }).catch(() => setStatus(''));
+
+                // Propostas
+                feegowFetch('/proposal/list', { paciente_id: patientId })
+                    .then(data => {
+                        const proposals = Array.isArray(data.content) ? data.content : [];
+                        if (proposals.length) {
+                            const latest = proposals[proposals.length - 1];
+                            document.getElementById('fpOrcamentoFeito').value = 'Sim';
+                            document.getElementById('fpDataOrcamento').value = latest.data_proposta || '';
+                            const val = latest.valor_total || latest.valor || '';
+                            document.getElementById('fpOrcamento').value = val ? `R$ ${parseFloat(val).toFixed(2)}` : '';
+                        }
+                    }).catch(() => {});
+
+                // Laudos — needs start_date and end_date (YYYY-MM-DD format)
+                // Pedidos de exame
+                feegowFetch('/patient/exam-requests', { paciente_id: patientId })
+                    .then(data => {
+                        renderFpExams(Array.isArray(data.content) ? data.content : []);
+                    }).catch(() => {});
+
+            } catch(err) {
+                document.getElementById('fpLoading').style.display = 'none';
+                alert('Erro ao carregar paciente: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function fpFillManualFields(ficha) {
+            const fields = ['fpConjuge','fpNascConjuge','fpTratamento','fpObsCaso','fpUrologista',
+                'fpAvisos1','fpRegDoadora','fpPreparoEsp','fpSemen','fpTtoUrologista','fpObsSemen',
+                'fpDataInducao','fpMedicacao','fpFoliculos','fpOvulosAspirados','fpOvulosMaduros',
+                'fpOvulosFertilizados','fpBlastocistos','fpClassPalhetas',
+                'fpHemato','fpAvisoHemato','fpBlastosTransf','fpBlastosSobrando','fpLaboratorio',
+                'fpInjuria','fpResultInjuria','fpFilgastrim','fpTractocile','fpTipoPreparo','fpMedPreparo','fpClexane',
+                'fpDataBeta','fpDosagensBeta',
+                'fpTipoAborto','fpDataParto','fpIdadeGest','fpObsParto',
+                'fpNascVivos','fpEstaturaBebe1','fpPesoBebe1','fpNomeBebe1',
+                'fpEstaturaBebe2','fpPesoBebe2','fpNomeBebe2','fpObsBebe',
+                'fpInfoDepoimento',
+                'fpIndicacaoPacote','fpObsOrcamento','fpSemRetornoMotivo',
+                'fpNaoVaiTratar','fpAguardandoMotivo','fpAvisos2','fpPagamento',
+                'fpAvisoPagamento','fpContatoPsi','fpResultado','fpConsulta1','fpConsulta2','fpInfoPsi'];
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                const key = id.replace('fp', '').replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+                if (el && ficha[key] !== undefined) el.value = ficha[key];
+            });
+            // Fields with special key mapping (acronyms / abbreviations)
+            const specialFields = {
+                fpStatusTTO: 'status_tto', fpAMH: 'amh', fpFragDNA: 'frag_dna', fpDataFragDNA: 'data_frag_dna',
+                fpPGTA: 'pgta', fpResultPGTA: 'result_pgta', fpDataTE: 'data_te', fpTipoTE: 'tipo_te',
+                fpSobrouBlastos: 'sobrou_blastos', fpObsTE: 'obs_te', fpSG: 'sg', fpBCE: 'bce',
+                fpObs1USG: 'obs1_usg', fpData2USG: 'data2_usg', fpObs2USG: 'obs2_usg',
+                fpPreNatal: 'pre_natal', fpTipoGravidez: 'tipo_gravidez', fpPreNatalParaser: 'pre_natal_paraser',
+                fpTipoParto: 'tipo_parto', fpGeneroBebe1: 'genero_bebe1', fpGeneroBebe2: 'genero_bebe2',
+                fpDepoimento: 'depoimento'
+            };
+            Object.entries(specialFields).forEach(([id, key]) => {
+                const el = document.getElementById(id);
+                if (el && ficha[key] !== undefined) el.value = ficha[key];
+            });
+            if (ficha.status_retorno) document.getElementById('fpStatusRetorno').value = ficha.status_retorno;
+            if (ficha.orcamento_feito) document.getElementById('fpOrcamentoFeito').value = ficha.orcamento_feito;
+            fpToggleRetornoFields();
+        }
+
+        function fpStripHtml(html) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        }
+
+        function renderFpExams(exams) {
+            const container = document.getElementById('fpExamsList');
+            if (!exams || !exams.length) {
+                container.innerHTML = '<div style="color:var(--muted);padding:8px">Nenhum pedido de exame encontrado</div>';
+                return;
+            }
+            container.innerHTML = exams.map(e => {
+                const date = e.DataPedido ? e.DataPedido.split(' ')[0] : (e.data || '');
+                const obs = fpStripHtml(e.ObservacaoPedido || '').substring(0, 200);
+                const desc = e.DescricaoExame || obs || 'Pedido de Exame';
+                return `<div class="fp-exam-item" style="flex-direction:column;align-items:flex-start;gap:4px">
+                    <div style="display:flex;justify-content:space-between;width:100%">
+                        <strong style="font-size:12px">Pedido #${e.PedidoExameID || ''}</strong>
+                        <span style="color:var(--muted);font-size:11px">${fpFmtDate(date)}</span>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);line-height:1.4">${desc}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderFpLaudos(laudos) {
+            const container = document.getElementById('fpLaudosList');
+            if (!laudos || !laudos.length) {
+                container.innerHTML = '<div style="color:var(--muted);padding:8px">Nenhum laudo encontrado</div>';
+                return;
+            }
+            container.innerHTML = laudos.map(l => `
+                <div class="fp-exam-item">
+                    <span>${l.procedimento_nome || l.descricao || 'Laudo'}</span>
+                    <span style="color:var(--muted);font-size:11px">${l.data || ''}</span>
+                    <button class="fp-btn-pdf" onclick="fpOpenLaudo(${l.lab_report_id || l.laudo_id})">Ver PDF</button>
+                </div>
+            `).join('');
+        }
+
+        async function fpOpenLaudo(laudoId) {
+            try {
+                const data = await feegowFetch('/medical-reports/get-labs-report-file', { lab_report_id: laudoId });
+                if (data.content?.url || data.url) {
+                    window.open(data.content?.url || data.url, '_blank');
+                }
+            } catch(err) {
+                alert('Erro ao abrir laudo: ' + err.message);
+            }
+        }
+
+        function fpCalcIdadeConjuge() {
+            const input = document.getElementById('fpNascConjuge').value;
+            if (!input) return;
+            const birthDate = new Date(input);
+            const age = Math.floor((Date.now() - birthDate) / (365.25 * 24 * 60 * 60 * 1000));
+            document.getElementById('fpIdadeConjuge').value = age + ' anos';
+        }
+
+        function fpToggleRetornoFields() {
+            const status = document.getElementById('fpStatusRetorno').value;
+            document.getElementById('fpWrapSemRetorno').style.display = (status === 'Não retornou') ? 'flex' : 'none';
+        }
+
+        async function fpSaveFicha() {
+            const btn = document.getElementById('fpSaveBtn');
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+
+            const ficha = {
+                paciente_id: document.getElementById('fpCodigo').value,
+                paciente_nome: document.getElementById('fpNome').value,
+                data_consulta: document.getElementById('fpDataConsulta').value,
+                medico: document.getElementById('fpMedico').value,
+                nascimento: document.getElementById('fpNascimento').value,
+                idade: document.getElementById('fpIdade').value,
+                conjuge: document.getElementById('fpConjuge').value,
+                nasc_conjuge: document.getElementById('fpNascConjuge').value,
+                idade_conjuge: document.getElementById('fpIdadeConjuge').value,
+                data_max_retorno: document.getElementById('fpDataMaxRetorno').value,
+                tratamento: document.getElementById('fpTratamento').value,
+                obs_caso: document.getElementById('fpObsCaso').value,
+                urologista: document.getElementById('fpUrologista').value,
+                avisos1: document.getElementById('fpAvisos1').value,
+                reg_doadora: document.getElementById('fpRegDoadora').value,
+                status_tto: document.getElementById('fpStatusTTO').value,
+                amh: document.getElementById('fpAMH').value,
+                preparo_esp: document.getElementById('fpPreparoEsp').value,
+                semen: document.getElementById('fpSemen').value,
+                tto_urologista: document.getElementById('fpTtoUrologista').value,
+                frag_dna: document.getElementById('fpFragDNA').value,
+                data_frag_dna: document.getElementById('fpDataFragDNA').value,
+                obs_semen: document.getElementById('fpObsSemen').value,
+                data_inducao: document.getElementById('fpDataInducao').value,
+                medicacao: document.getElementById('fpMedicacao').value,
+                foliculos: document.getElementById('fpFoliculos').value,
+                ovulos_aspirados: document.getElementById('fpOvulosAspirados').value,
+                ovulos_maduros: document.getElementById('fpOvulosMaduros').value,
+                ovulos_fertilizados: document.getElementById('fpOvulosFertilizados').value,
+                blastocistos: document.getElementById('fpBlastocistos').value,
+                class_palhetas: document.getElementById('fpClassPalhetas').value,
+                pgta: document.getElementById('fpPGTA').value,
+                result_pgta: document.getElementById('fpResultPGTA').value,
+                hemato: document.getElementById('fpHemato').value,
+                aviso_hemato: document.getElementById('fpAvisoHemato').value,
+                data_te: document.getElementById('fpDataTE').value,
+                tipo_te: document.getElementById('fpTipoTE').value,
+                blastos_transf: document.getElementById('fpBlastosTransf').value,
+                sobrou_blastos: document.getElementById('fpSobrouBlastos').value,
+                blastos_sobrando: document.getElementById('fpBlastosSobrando').value,
+                laboratorio: document.getElementById('fpLaboratorio').value,
+                injuria: document.getElementById('fpInjuria').value,
+                result_injuria: document.getElementById('fpResultInjuria').value,
+                filgastrim: document.getElementById('fpFilgastrim').value,
+                tractocile: document.getElementById('fpTractocile').value,
+                tipo_preparo: document.getElementById('fpTipoPreparo').value,
+                med_preparo: document.getElementById('fpMedPreparo').value,
+                clexane: document.getElementById('fpClexane').value,
+                obs_te: document.getElementById('fpObsTE').value,
+                data_beta: document.getElementById('fpDataBeta').value,
+                dosagens_beta: document.getElementById('fpDosagensBeta').value,
+                sg: document.getElementById('fpSG').value,
+                bce: document.getElementById('fpBCE').value,
+                obs1_usg: document.getElementById('fpObs1USG').value,
+                data2_usg: document.getElementById('fpData2USG').value,
+                obs2_usg: document.getElementById('fpObs2USG').value,
+                pre_natal: document.getElementById('fpPreNatal').value,
+                tipo_gravidez: document.getElementById('fpTipoGravidez').value,
+                tipo_aborto: document.getElementById('fpTipoAborto').value,
+                pre_natal_paraser: document.getElementById('fpPreNatalParaser').value,
+                data_parto: document.getElementById('fpDataParto').value,
+                tipo_parto: document.getElementById('fpTipoParto').value,
+                idade_gest: document.getElementById('fpIdadeGest').value,
+                obs_parto: document.getElementById('fpObsParto').value,
+                nasc_vivos: document.getElementById('fpNascVivos').value,
+                genero_bebe1: document.getElementById('fpGeneroBebe1').value,
+                estatura_bebe1: document.getElementById('fpEstaturaBebe1').value,
+                peso_bebe1: document.getElementById('fpPesoBebe1').value,
+                nome_bebe1: document.getElementById('fpNomeBebe1').value,
+                genero_bebe2: document.getElementById('fpGeneroBebe2').value,
+                estatura_bebe2: document.getElementById('fpEstaturaBebe2').value,
+                peso_bebe2: document.getElementById('fpPesoBebe2').value,
+                nome_bebe2: document.getElementById('fpNomeBebe2').value,
+                obs_bebe: document.getElementById('fpObsBebe').value,
+                depoimento: document.getElementById('fpDepoimento').value,
+                info_depoimento: document.getElementById('fpInfoDepoimento').value,
+                indicacao_pacote: document.getElementById('fpIndicacaoPacote').value,
+                orcamento_feito: document.getElementById('fpOrcamentoFeito').value,
+                data_orcamento: document.getElementById('fpDataOrcamento').value,
+                orcamento: document.getElementById('fpOrcamento').value,
+                obs_orcamento: document.getElementById('fpObsOrcamento').value,
+                status_retorno: document.getElementById('fpStatusRetorno').value,
+                data_retorno: document.getElementById('fpDataRetorno').value,
+                sem_retorno_motivo: document.getElementById('fpSemRetornoMotivo').value,
+                nao_vai_tratar: document.getElementById('fpNaoVaiTratar').value,
+                aguardando_motivo: document.getElementById('fpAguardandoMotivo').value,
+                avisos2: document.getElementById('fpAvisos2').value,
+                pagamento: document.getElementById('fpPagamento').value,
+                aviso_pagamento: document.getElementById('fpAvisoPagamento').value,
+                contato_psi: document.getElementById('fpContatoPsi').value,
+                resultado: document.getElementById('fpResultado').value,
+                consulta1: document.getElementById('fpConsulta1').value,
+                consulta2: document.getElementById('fpConsulta2').value,
+                info_psi: document.getElementById('fpInfoPsi').value,
+                updated_at: new Date().toISOString(),
+            };
+
+            const idx = fichaPatients.findIndex(f => f.paciente_id == ficha.paciente_id);
+            if (idx >= 0) fichaPatients[idx] = ficha;
+            else fichaPatients.push(ficha);
+
+            if (CRM_SCRIPT_URL) {
+                try {
+                    await fetch(CRM_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({ action: 'save_ficha', ...ficha }),
+                    });
+                } catch(err) { console.error('Erro ao salvar ficha:', err); }
+            }
+
+            renderFpList();
+            btn.disabled = false;
+            btn.textContent = 'Salvar Ficha';
+
+            const msg = document.getElementById('fpSaveMsg');
+            msg.textContent = 'Ficha salva com sucesso!';
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        }
+
+        async function fpLoadFichas() {
+            if (!CRM_SCRIPT_URL) return;
+            try {
+                const res = await fetch(CRM_SCRIPT_URL + '?action=get_fichas');
+                const json = await res.json();
+                if (json.fichas) {
+                    fichaPatients = json.fichas;
+                    renderFpList();
+                }
+            } catch(e) { console.warn('Fichas load error:', e); }
+        }
+
+        function renderFpList() {
+            const container = document.getElementById('fpSavedList');
+            if (!fichaPatients.length) {
+                container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">Nenhuma ficha salva ainda</div>';
+                return;
+            }
+            container.innerHTML = `
+                <table>
+                    <thead><tr>
+                        <th>Código</th><th>Paciente</th><th>Médico</th><th>1ª Consulta</th>
+                        <th>Status Retorno</th><th>Tratamento</th><th>Status TTO</th><th>Atualizado</th><th></th>
+                    </tr></thead>
+                    <tbody>
+                        ${fichaPatients.map(f => `<tr>
+                            <td>${f.paciente_id}</td>
+                            <td>${f.paciente_nome || '—'}</td>
+                            <td>${f.medico || '—'}</td>
+                            <td>${f.data_consulta || '—'}</td>
+                            <td><span class="badge ${f.status_retorno === 'Retornou' ? 'badge-green' : f.status_retorno === 'Não retornou' ? 'badge-red' : 'badge-orange'}">${f.status_retorno || '—'}</span></td>
+                            <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.tratamento || '—'}</td>
+                            <td>${f.status_tto || '—'}</td>
+                            <td style="font-size:11px;color:var(--muted)">${f.updated_at ? new Date(f.updated_at).toLocaleDateString('pt-BR') : '—'}</td>
+                            <td><button class="fp-btn-edit" onclick="fpSelectPatient(${f.paciente_id})">Editar</button></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+        }
+
+        function fpNewFicha() {
+            document.getElementById('fpFormWrap').style.display = 'none';
+            document.getElementById('fpSearchInput').value = '';
+            document.getElementById('fpSearchInput').focus();
+            document.querySelectorAll('#fpFormWrap input, #fpFormWrap textarea, #fpFormWrap select').forEach(el => {
+                if (el.type === 'checkbox') el.checked = false;
+                else el.value = el.tagName === 'SELECT' ? el.options[0]?.value || '' : '';
+            });
+            fichaCurrentPatient = null;
+        }
+
         // ===================== INIT =====================
         async function init() {
             try {
@@ -3620,6 +5165,7 @@
                 const d = processData(rows);
                 buildUI(d);
                 loadDonorProfiles();
+                fpLoadFichas().catch(e => console.warn('Fichas load:', e));
                 document.getElementById('loadingOverlay').style.display = 'none';
             } catch(e) {
                 document.getElementById('loadingOverlay').style.display = 'none';
