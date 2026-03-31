@@ -4128,6 +4128,7 @@
             {name:'Preto',iris:'#2a2218',ring:'#0d0a08',img:DN_EYE_IMG_BASE+'preto.png'}
         ];
         const DN_SKIN_IMG_BASE = 'https://raw.githubusercontent.com/felipegrutes-create/Paraser/main/images/skin/';
+        const DN_SKIN_MALE_IMG_BASE = 'https://raw.githubusercontent.com/felipegrutes-create/Paraser/main/images/skin-male/';
         const DN_FITZ = [
             {id:'I',label:'Tipo I',desc:'Pele muito clara\nSempre queima\nNunca bronzeia',skin:'#fde8d0',hair:'#d4b35a',img:DN_SKIN_IMG_BASE+'tipo1.png'},
             {id:'II',label:'Tipo II',desc:'Pele clara\nSempre queima\nÀs vezes bronzeia',skin:'#f5d0a9',hair:'#8b6b3d',img:DN_SKIN_IMG_BASE+'tipo2.png'},
@@ -4214,11 +4215,12 @@
         }
 
         function dnFitzCards(prefix) {
-            return `<div class="dn-fitz-cards">${DN_FITZ.map(f => {
+            const isMale = prefix === 'sp';
+            const imgBase = isMale ? DN_SKIN_MALE_IMG_BASE : DN_SKIN_IMG_BASE;
+            return `<div class="dn-fitz-cards">${DN_FITZ.map((f, i) => {
                 const descLines = f.desc.split('\n').map(l => `<div>${l}</div>`).join('');
-                const preview = f.img
-                    ? `<img src="${f.img}" alt="${f.label}" style="width:60px;height:70px;object-fit:cover;border-radius:6px">`
-                    : `<div style="width:60px;height:70px;background:${f.skin};border-radius:6px"></div>`;
+                const imgUrl = imgBase + 'tipo' + (i + 1) + '.png';
+                const preview = `<img src="${imgUrl}" alt="${f.label}" style="width:60px;height:70px;object-fit:cover;border-radius:6px">`;
                 return `<div class="dn-fitz-card" data-group="${prefix}-pele" data-value="${f.id}" onclick="dnSelectChip(this)">
                     <div class="dn-fitz-face">${preview}</div>
                     <div class="dn-fitz-info">
