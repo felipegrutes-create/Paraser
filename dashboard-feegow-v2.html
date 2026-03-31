@@ -3479,7 +3479,14 @@
             const pvMonths = Object.keys(pvByMonth);
             const minM     = pvMonths.length ? pvMonths.sort()[0]       : "—";
             const maxM     = pvMonths.length ? pvMonths.sort().slice(-1)[0]: "—";
-            set("headerSubtitle", `${monthLabel(minM)} – ${monthLabel(maxM)} · ${fmt(raw.length)} agendamentos · ${fmt(vezRows.length)} consultas 1ª vez`);
+            // Mês corrente: YYYY-MM
+            const nowDate = new Date();
+            const currentMK = nowDate.getFullYear() + '-' + String(nowDate.getMonth()+1).padStart(2,'0');
+            const mesAgend = raw.filter(r => monthKey(r[d.C.data]) === currentMK).length;
+            const mesVez = vezRows.filter(r => (monthKey(r[d.C.dcri]) || monthKey(r[d.C.data])) === currentMK).length;
+            const mesNomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+            const mesLabel = mesNomes[nowDate.getMonth()] + '/' + nowDate.getFullYear();
+            set("headerSubtitle", `${mesLabel} · ${fmt(mesAgend)} agendamentos · ${fmt(mesVez)} consultas 1ª vez`);
             set("footerInfo",     `Sistema Integrado Paraser · Dados em ${todayStr} · Fonte: Google Sheets`);
         }
 
