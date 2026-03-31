@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Dashboard Feegow</title>
+    <title>Sistema Integrado Paraser</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -82,8 +82,9 @@
 
         /* ===== HEADER ===== */
         .header {
-            position: relative;
-            z-index: 10;
+            position: sticky;
+            top: 0;
+            z-index: 100;
             background: var(--surface);
             border-bottom: 1px solid var(--border);
             padding: 14px 28px;
@@ -146,8 +147,9 @@
 
         /* ===== TABS ===== */
         .tabs-wrapper {
-            position: relative;
-            z-index: 10;
+            position: sticky;
+            top: 62px;
+            z-index: 99;
             background: var(--surface);
             border-bottom: 1px solid var(--border);
             padding: 0 28px;
@@ -1511,7 +1513,7 @@
 <body>
     <div id="loadingOverlay">
         <div class="spinner-ring"></div>
-        <h2>Dashboard Feegow</h2>
+        <h2>Sistema Integrado Paraser</h2>
         <p id="loadingMsg">Carregando dados...</p>
     </div>
 
@@ -1519,7 +1521,7 @@
         <div class="header-left">
             <div class="header-logo">F</div>
             <div>
-                <h1>Dashboard de Agendamentos</h1>
+                <h1>Sistema Integrado Paraser</h1>
                 <p id="headerSubtitle">Carregando...</p>
             </div>
         </div>
@@ -2775,7 +2777,7 @@
     </div>
 
     <div class="footer">
-        <div id="footerInfo">Dashboard Feegow | Atualizado: —</div>
+        <div id="footerInfo">Sistema Integrado Paraser | Atualizado: —</div>
     </div>
 
     <script>
@@ -3478,7 +3480,7 @@
             const minM     = pvMonths.length ? pvMonths.sort()[0]       : "—";
             const maxM     = pvMonths.length ? pvMonths.sort().slice(-1)[0]: "—";
             set("headerSubtitle", `${monthLabel(minM)} – ${monthLabel(maxM)} · ${fmt(raw.length)} agendamentos · ${fmt(vezRows.length)} consultas 1ª vez`);
-            set("footerInfo",     `Dashboard Feegow · Dados em ${todayStr} · Fonte: Google Sheets`);
+            set("footerInfo",     `Sistema Integrado Paraser · Dados em ${todayStr} · Fonte: Google Sheets`);
         }
 
 
