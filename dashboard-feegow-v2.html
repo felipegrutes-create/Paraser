@@ -4119,12 +4119,13 @@
             {name:'Cacheado'},
             {name:'Crespo'}
         ];
+        const DN_EYE_IMG_BASE = 'https://raw.githubusercontent.com/felipegrutes-create/Paraser/main/images/eyes/';
         const DN_EYE_COLORS = [
-            {name:'Azul',iris:'#4a90d9',ring:'#1a4a80'},
-            {name:'Verde',iris:'#5b8c3e',ring:'#2a5a1a'},
-            {name:'C. Claro',iris:'#c4a06a',ring:'#7a5a30'},
-            {name:'C. Escuro',iris:'#6a4a30',ring:'#3d2314'},
-            {name:'Preto',iris:'#2a2218',ring:'#0d0a08'}
+            {name:'Azul',iris:'#4a90d9',ring:'#1a4a80',img:DN_EYE_IMG_BASE+'azul.jpeg'},
+            {name:'Verde',iris:'#5b8c3e',ring:'#2a5a1a',img:DN_EYE_IMG_BASE+'verde.png'},
+            {name:'C. Claro',iris:'#c4a06a',ring:'#7a5a30',img:DN_EYE_IMG_BASE+'castanho-claro.png'},
+            {name:'C. Escuro',iris:'#6a4a30',ring:'#3d2314',img:DN_EYE_IMG_BASE+'castanho-escuro.png'},
+            {name:'Preto',iris:'#2a2218',ring:'#0d0a08',img:DN_EYE_IMG_BASE+'preto.png'}
         ];
         const DN_FITZ = [
             {id:'I',label:'Tipo I',desc:'Pele muito clara\nSempre queima\nNunca bronzeia',skin:'#fde8d0',hair:'#d4b35a'},
@@ -4200,25 +4201,11 @@
 
         function dnEyeColorCards(prefix) {
             return `<div class="dn-vcards">${DN_EYE_COLORS.map(e => {
-                const svg = `<svg viewBox="0 0 70 50" width="70" height="50" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <radialGradient id="eye_${prefix}_${e.name.replace(/\./g,'')}" cx="50%" cy="50%">
-                            <stop offset="0%" stop-color="#000"/>
-                            <stop offset="22%" stop-color="#000"/>
-                            <stop offset="24%" stop-color="${e.iris}"/>
-                            <stop offset="50%" stop-color="${e.iris}"/>
-                            <stop offset="72%" stop-color="${e.ring}"/>
-                            <stop offset="74%" stop-color="#e8ddd0"/>
-                            <stop offset="100%" stop-color="#f5ece2"/>
-                        </radialGradient>
-                    </defs>
-                    <rect width="70" height="50" rx="4" fill="#f5ece2"/>
-                    <ellipse cx="35" cy="25" rx="20" ry="20" fill="url(#eye_${prefix}_${e.name.replace(/\./g,'')})"/>
-                    <ellipse cx="35" cy="25" rx="20" ry="14" fill="none" stroke="#d4c0a8" stroke-width="1"/>
-                    <circle cx="30" cy="20" r="3" fill="rgba(255,255,255,0.4)"/>
-                </svg>`;
+                const preview = e.img
+                    ? `<img src="${e.img}" alt="${e.name}" style="width:70px;height:50px;object-fit:cover;border-radius:4px">`
+                    : `<div style="width:70px;height:50px;background:${e.iris};border-radius:4px"></div>`;
                 return `<div class="dn-vcard" data-group="${prefix}-olhos" data-value="${e.name}" onclick="dnSelectChip(this)">
-                    <div class="dn-vc-eye-preview">${svg}</div>
+                    <div class="dn-vc-eye-preview">${preview}</div>
                     <div class="dn-vc-label">${e.name}</div>
                     <div class="dn-vc-mark">( )</div>
                 </div>`;
