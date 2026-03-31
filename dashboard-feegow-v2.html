@@ -4710,6 +4710,29 @@
             statusEl.textContent = 'Salvando...';
             statusEl.style.color = '#f59e0b';
 
+            // Upload photo to Google Drive if it's base64 (new photo)
+            if (data.foto && data.foto.startsWith('data:') && CRM_SCRIPT_URL) {
+                try {
+                    statusEl.textContent = 'Enviando foto...';
+                    const photoRes = await fetch(CRM_SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            action: 'upload_photo',
+                            foto: data.foto,
+                            file_name: data.codigo_perfil.replace(/\s/g,'_') + '_' + Date.now() + '.jpg'
+                        }),
+                    });
+                    const photoJson = await photoRes.json();
+                    if (photoJson.url) {
+                        data.foto = photoJson.url; // Replace base64 with Drive URL
+                    }
+                } catch(e) {
+                    console.warn('Photo upload failed, keeping base64:', e);
+                }
+                statusEl.textContent = 'Salvando perfil...';
+            }
+
             const id = editingDonorId || ('dn_' + Date.now());
             const profile = { id, ...data, ultima_atualizacao: new Date().toISOString() };
 

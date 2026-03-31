@@ -138,6 +138,10 @@ function doPost(e) {
         return handleSaveFicha(body);
       }
 
+      if (action === 'upload_photo') {
+        return handleUploadPhoto(body);
+      }
+
       const key = (body.paciente_key || '').trim();
       if (!key) return jsonErr('paciente_key obrigatório');
 
@@ -327,6 +331,42 @@ function getOrCreateLogSheet() {
     sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+// =========================================================
+// Upload de Foto para Google Drive
+// =========================================================
+const PHOTO_FOLDER_NAME = 'Paraser_Fotos_Doadoras';
+
+function getOrCreatePhotoFolder() {
+  const folders = DriveApp.getFoldersByName(PHOTO_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(PHOTO_FOLDER_NAME);
+}
+
+function handleUploadPhoto(body) {
+  const base64Data = body.foto || '';
+  const fileName = body.file_name || ('foto_' + Date.now() + '.jpg');
+
+  if (!base64Data) return jsonErr('foto obrigatória');
+
+  // Remove data URI prefix: "data:image/jpeg;base64,..."
+  const parts = base64Data.split(',');
+  const raw = parts.length > 1 ? parts[1] : parts[0];
+  const mimeMatch = base64Data.match(/data:([^;]+);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+
+  const decoded = Utilities.base64Decode(raw);
+  const blob = Utilities.newBlob(decoded, mime, fileName);
+
+  const folder = getOrCreatePhotoFolder();
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  const fileId = file.getId();
+  const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+
+  return jsonOk({ success: true, url: viewUrl, file_id: fileId });
 }
 
 // =========================================================
