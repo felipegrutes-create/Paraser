@@ -1033,6 +1033,30 @@
             background: var(--surface); border:1px solid var(--border); border-radius:16px;
             padding:28px; margin-top:16px;
         }
+        .dn-photo-upload {
+            width: 80px;
+            height: 80px;
+            border-radius: 10px;
+            border: 2px dashed rgba(0,212,170,0.3);
+            cursor: pointer;
+            flex-shrink: 0;
+            overflow: hidden;
+            transition: border-color 0.2s;
+            position: relative;
+        }
+        .dn-photo-upload:hover { border-color: var(--accent); }
+        .dn-photo-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            font-size: 20px;
+            line-height: 1.2;
+        }
+        .dn-photo-placeholder span { font-size: 10px; margin-top: 2px; }
         .dn-form-header { display:flex; align-items:center; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
         .dn-form-header input {
             background:var(--surface2); border:1px solid var(--border); border-radius:8px;
@@ -4515,6 +4539,11 @@
             const wrap = document.getElementById('dnFormWrap');
             wrap.innerHTML = `<div class="dn-form">
                 <div class="dn-form-header">
+                    <div class="dn-photo-upload" onclick="document.getElementById('dnPhotoInput').click()">
+                        <img id="dnPhotoPreview" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
+                        <div id="dnPhotoPlaceholder" class="dn-photo-placeholder">📷<br><span>Foto</span></div>
+                        <input type="file" id="dnPhotoInput" accept="image/*" style="display:none" onchange="dnPreviewPhoto(this)">
+                    </div>
                     <input id="dnCodigo" placeholder="Código do Perfil (ex: EDO85)">
                     <button class="dn-btn-close-form" onclick="closeDonorForm()">✕ Fechar</button>
                 </div>
@@ -4532,6 +4561,20 @@
             </div>`;
             wrap.style.display = 'block';
             wrap.scrollIntoView({behavior:'smooth'});
+        }
+
+        function dnPreviewPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('dnPhotoPreview');
+                    const placeholder = document.getElementById('dnPhotoPlaceholder');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
         }
 
         function closeDonorForm() {
@@ -4582,8 +4625,17 @@
         }
 
         function collectDonorData() {
+            const photoPreview = document.getElementById('dnPhotoPreview');
+            const photoData = (photoPreview && photoPreview.style.display !== 'none') ? photoPreview.src : '';
+            // Store patient info if came from pending
+            const wrap = document.getElementById('dnFormWrap');
+            const pacKey = wrap?.dataset?.pacienteKey || '';
+            const pacNome = wrap?.dataset?.pacienteNome || '';
             return {
                 codigo_perfil: document.getElementById('dnCodigo')?.value || '',
+                foto: photoData,
+                paciente_key: pacKey,
+                paciente_nome: pacNome,
                 ov_idade: document.getElementById('dn-ov-idade')?.value || '',
                 ov_sangue: document.getElementById('dn-ov-sangue')?.value || '',
                 ov_altura: document.getElementById('dn-ov-altura')?.value || '',
@@ -4611,13 +4663,24 @@
 
         function fillDonorForm(data) {
             document.getElementById('dnCodigo').value = data.codigo_perfil || '';
+            // Restore photo
+            if (data.foto) {
+                const preview = document.getElementById('dnPhotoPreview');
+                const placeholder = document.getElementById('dnPhotoPlaceholder');
+                if (preview) { preview.src = data.foto; preview.style.display = 'block'; }
+                if (placeholder) placeholder.style.display = 'none';
+            }
+            // Restore patient info
+            const wrap = document.getElementById('dnFormWrap');
+            if (wrap && data.paciente_key) wrap.dataset.pacienteKey = data.paciente_key;
+            if (wrap && data.paciente_nome) wrap.dataset.pacienteNome = data.paciente_nome;
             if (data.ov_idade) document.getElementById('dn-ov-idade').value = data.ov_idade;
             if (data.ov_sangue) document.getElementById('dn-ov-sangue').value = data.ov_sangue;
-            if (data.ov_altura) { document.getElementById('dn-ov-altura').value = data.ov_altura; dnCalcIMC('ov'); }
-            if (data.ov_peso) { document.getElementById('dn-ov-peso').value = data.ov_peso; dnCalcIMC('ov'); }
+            if (data.ov_altura) { document.getElementById('dn-ov-altura').value = data.ov_altura; const v1=document.getElementById('dn-ov-altura-val'); if(v1) v1.textContent=data.ov_altura; dnCalcIMC('ov'); }
+            if (data.ov_peso) { document.getElementById('dn-ov-peso').value = data.ov_peso; const v2=document.getElementById('dn-ov-peso-val'); if(v2) v2.textContent=data.ov_peso; dnCalcIMC('ov'); }
             if (data.sp_sangue) document.getElementById('dn-sp-sangue').value = data.sp_sangue;
-            if (data.sp_altura) { document.getElementById('dn-sp-altura').value = data.sp_altura; dnCalcIMC('sp'); }
-            if (data.sp_peso) { document.getElementById('dn-sp-peso').value = data.sp_peso; dnCalcIMC('sp'); }
+            if (data.sp_altura) { document.getElementById('dn-sp-altura').value = data.sp_altura; const v3=document.getElementById('dn-sp-altura-val'); if(v3) v3.textContent=data.sp_altura; dnCalcIMC('sp'); }
+            if (data.sp_peso) { document.getElementById('dn-sp-peso').value = data.sp_peso; const v4=document.getElementById('dn-sp-peso-val'); if(v4) v4.textContent=data.sp_peso; dnCalcIMC('sp'); }
             // Chips
             ['ov-cabelo','ov-cabelo-tipo','ov-olhos','ov-pele','sp-cabelo','sp-cabelo-tipo','sp-olhos','sp-pele'].forEach(g => {
                 const key = g.replace(/-/g,'_');
