@@ -977,6 +977,35 @@
             }
         }
 
+        /* Slider para altura/peso */
+        .dn-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--surface2);
+            outline: none;
+            margin-top: 6px;
+        }
+        .dn-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(0,212,170,0.4);
+        }
+        .dn-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 6px rgba(0,212,170,0.4);
+        }
+
         /* Doadoras Compartilhadas */
         .dn-toolbar { display:flex; align-items:center; gap:16px; margin-bottom:20px; }
         .dn-btn-new {
@@ -4349,8 +4378,8 @@
                             <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
                         </select>
                     </div>
-                    <div class="dn-field"><label>Altura (m)</label><input type="number" id="dn-${prefix}-altura" step="0.01" min="1" max="2.5" oninput="dnCalcIMC('${prefix}')"></div>
-                    <div class="dn-field"><label>Peso (kg)</label><input type="number" id="dn-${prefix}-peso" step="0.1" min="30" max="200" oninput="dnCalcIMC('${prefix}')"></div>
+                    <div class="dn-field"><label>Altura: <strong id="dn-${prefix}-altura-val">1.65</strong> m</label><input type="range" id="dn-${prefix}-altura" min="1.40" max="2.10" step="0.01" value="1.65" class="dn-slider" oninput="document.getElementById('dn-${prefix}-altura-val').textContent=this.value; dnCalcIMC('${prefix}')"></div>
+                    <div class="dn-field"><label>Peso: <strong id="dn-${prefix}-peso-val">70</strong> kg</label><input type="range" id="dn-${prefix}-peso" min="40" max="160" step="0.5" value="70" class="dn-slider" oninput="document.getElementById('dn-${prefix}-peso-val').textContent=this.value; dnCalcIMC('${prefix}')"></div>
                     <div class="dn-field"><label>IMC</label><div class="dn-imc" id="dn-${prefix}-imc">—</div></div>
                 </div>
 
