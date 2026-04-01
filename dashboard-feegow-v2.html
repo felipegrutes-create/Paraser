@@ -960,6 +960,23 @@
             background: rgba(250,204,21,0.18);
             color: #facc15;
         }
+        .doa-status-naocomp {
+            background: rgba(239,68,68,0.15);
+            color: #f87171;
+        }
+        .doa-status-cancelado {
+            background: rgba(107,122,153,0.15);
+            color: #94a3b8;
+        }
+        .doa-status-remarcado {
+            background: rgba(99,102,241,0.15);
+            color: #818cf8;
+        }
+        .doa-flag-atencao {
+            display: inline-block;
+            margin-left: 6px;
+            font-size: 12px;
+        }
         .doa-select.cls-fiv-normal { border-color: #6366f1; color: #818cf8; }
         .doa-select.cls-fiv-comp { border-color: #f59e0b; color: #fbbf24; }
         .doa-select.cls-receptora { border-color: #ec4899; color: #f472b6; }
@@ -3551,25 +3568,53 @@
             renderKanban();
 
             // == DOADORAS / RECEPTORAS ==
-            // Dados: pacientes com 1ª vez (atendido + aguardando), agrupados por data
+            // Dados: pacientes com 1ª vez OU retorno, todos os status
             doaPatients = [];
-            const doaFirstVez = {};
+            const doaMap = {};
+            // Incluir pacientes com consulta 1ª vez
             vezRows.forEach(r => {
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
-                if (s !== 'atendido' && s !== 'aguardando') return;
                 const k = (r[d.C.pac]||'').trim().toLowerCase();
                 const dt = parseDate(r[d.C.data]);
-                if (!dt) return;
-                if (!doaFirstVez[k] || dt < doaFirstVez[k].date) {
-                    doaFirstVez[k] = {
+                if (!dt || !k) return;
+                if (!doaMap[k] || dt > doaMap[k].date) {
+                    doaMap[k] = {
                         date: dt, pac: r[d.C.pac]||'', prof: r[d.C.prof]||'',
                         cel: r[d.C.cel]||'', email: r[d.C.email]||'',
                         dataAp: r[d.C.data]||'', proc: r[d.C.proc]||'',
-                        status: s === 'atendido' ? 'Atendido' : 'Aguardando'
+                        status: s, tipo: 'vez'
                     };
                 }
             });
-            Object.values(doaFirstVez).forEach(info => {
+            // Incluir pacientes com consulta de retorno
+            const retRows = raw.filter(r => {
+                const proc = (r[C.proc]||'').toLowerCase();
+                return proc.includes('retorno') || proc.includes('retor');
+            });
+            retRows.forEach(r => {
+                const s = (r[d.C.sta]||'').toLowerCase().trim();
+                const k = (r[d.C.pac]||'').trim().toLowerCase();
+                const dt = parseDate(r[d.C.data]);
+                if (!dt || !k) return;
+                if (!doaMap[k] || dt > doaMap[k].date) {
+                    doaMap[k] = {
+                        date: dt, pac: r[d.C.pac]||'', prof: r[d.C.prof]||'',
+                        cel: r[d.C.cel]||'', email: r[d.C.email]||'',
+                        dataAp: r[d.C.data]||'', proc: r[d.C.proc]||'',
+                        status: s, tipo: 'retorno'
+                    };
+                }
+            });
+            // Formatar status para exibição
+            const fmtStatus = (s) => {
+                if (s === 'atendido') return 'Atendido';
+                if (s === 'aguardando' || s === 'marcado') return 'Aguardando';
+                if (s === 'nao compareceu' || s === 'não compareceu') return 'Não Compareceu';
+                if (s === 'cancelado' || s === 'desmarcado') return 'Cancelado';
+                if (s === 'remarcado') return 'Remarcado';
+                return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Desconhecido';
+            };
+            Object.values(doaMap).forEach(info => {
                 doaPatients.push({
                     pac:  info.pac,
                     prof: info.prof,
@@ -3577,7 +3622,9 @@
                     email: info.email,
                     dataAp: info.dataAp,
                     proc: info.proc || '',
-                    status: info.status,
+                    status: fmtStatus(info.status),
+                    statusRaw: info.status,
+                    tipo: info.tipo,
                     key:  normalizeKey(info.pac)
                 });
             });
@@ -4141,10 +4188,14 @@
                             : cls === 'Embrião Doado' ? 'cls-embriao'
                             : cls === 'FIV ou OD' ? 'cls-fiv-od'
                             : cls === 'Congelamento' ? 'cls-congelamento' : '';
-                        const isAguard = p.status === 'Aguardando';
-                        const statusBadge = isAguard
-                            ? '<span class="doa-status doa-status-aguardando">Aguardando</span>'
-                            : '<span class="doa-status doa-status-atendido">Atendido</span>';
+                        const statusClass = p.status === 'Atendido' ? 'doa-status-atendido'
+                            : p.status === 'Aguardando' ? 'doa-status-aguardando'
+                            : (p.status === 'Não Compareceu') ? 'doa-status-naocomp'
+                            : (p.status === 'Cancelado' || p.status === 'Desmarcado') ? 'doa-status-cancelado'
+                            : p.status === 'Remarcado' ? 'doa-status-remarcado'
+                            : 'doa-status-aguardando';
+                        const flagAtencao = p.status !== 'Atendido' ? '<span class="doa-flag-atencao" title="Status: ' + p.status + '">⚠️</span>' : '';
+                        const statusBadge = '<span class="doa-status ' + statusClass + '">' + p.status + '</span>' + flagAtencao;
                         return `<div class="doa-patient-row" id="doa-row-${safeKey}">
                             <div class="doa-pat-name">${p.pac}<small>${p.cel || ''}</small></div>
                             <div class="doa-pat-status">${statusBadge} ${p.prof}</div>
