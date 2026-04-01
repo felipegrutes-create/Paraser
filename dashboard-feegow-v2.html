@@ -876,6 +876,7 @@
         .badge-orange { background: rgba(245,158,11,0.15); color: #fbbf24; }
         .badge-green  { background: rgba(16,185,129,0.15); color: #34d399; }
         .badge-yellow { background: rgba(250,204,21,0.15); color: #facc15; }
+        .badge-pink   { background: rgba(236,72,153,0.15); color: #f472b6; }
 
         /* Doadoras/Receptoras */
         .doa-list { display: flex; flex-direction: column; gap: 20px; }
@@ -2904,6 +2905,12 @@
                         </select>
                     </div>
                 </div>
+                <div class="crm-check-row" style="margin-top:8px">
+                    <label class="crm-check-group">
+                        <input type="checkbox" id="crmProjetoAna">
+                        <span>🩺 Projeto ANA</span>
+                    </label>
+                </div>
 
                 <div class="crm-form-grid" style="margin-top:10px">
                     <div class="crm-field crm-obs-field">
@@ -3817,6 +3824,7 @@
             const prop   = crmRec?.proposta_feita  === 'Sim';
             const parc   = crmRec?.parc_pago === true  || crmRec?.parc_pago === 'TRUE';
             const quit   = crmRec?.quitado   === true  || crmRec?.quitado   === 'TRUE';
+            const ana    = crmRec?.projeto_ana === true || crmRec?.projeto_ana === 'TRUE';
             const uColor = urgencyColor(patient.daysSince);
 
             const shortVend = vend
@@ -3831,6 +3839,7 @@
             const badges = [
                 retBadge,
                 prop  ? '<span class="crm-badge badge-blue">Proposta ✓</span>'    : '',
+                ana   ? '<span class="crm-badge badge-pink">🩺 Projeto ANA</span>' : '',
                 parc  ? '<span class="crm-badge badge-orange">Parc. Pago</span>'  : '',
                 quit  ? '<span class="crm-badge badge-green">Quitado ✓</span>'    : '',
             ].filter(Boolean).join('');
@@ -3989,8 +3998,9 @@
             document.getElementById('crmC2').value       = isoToInputDate(crm.contato2_data);
             document.getElementById('crmVend').value     = crm.vendedora || '';
             document.getElementById('crmProposta').value = crm.proposta_feita  || '';
-            document.getElementById('crmParcPago').checked = crm.parc_pago === true || crm.parc_pago === 'TRUE';
-            document.getElementById('crmQuitado').checked  = crm.quitado   === true || crm.quitado   === 'TRUE';
+            document.getElementById('crmParcPago').checked  = crm.parc_pago === true || crm.parc_pago === 'TRUE';
+            document.getElementById('crmQuitado').checked   = crm.quitado   === true || crm.quitado   === 'TRUE';
+            document.getElementById('crmProjetoAna').checked = crm.projeto_ana === true || crm.projeto_ana === 'TRUE';
 
             const valorRaw = crm.valor ? parseValorFloat(crm.valor) : '';
             const input    = document.getElementById('crmValor');
@@ -4009,7 +4019,7 @@
                 const field = el.closest('.crm-field');
                 if (field) field.classList.remove('crm-field-disabled');
             });
-            ['crmParcPago', 'crmQuitado'].forEach(id => {
+            ['crmParcPago', 'crmQuitado', 'crmProjetoAna'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.disabled = false;
@@ -4050,6 +4060,7 @@
                 proposta_feita:  document.getElementById('crmProposta').value,
                 parc_pago:       document.getElementById('crmParcPago').checked,
                 quitado:         document.getElementById('crmQuitado').checked,
+                projeto_ana:     document.getElementById('crmProjetoAna').checked,
                 observacoes:     document.getElementById('crmObs').value,
                 classificacao:   (crmMap[crmModalKey]?.classificacao) || '',
             };
@@ -4288,6 +4299,7 @@
                     proposta_feita: existing.proposta_feita || '',
                     parc_pago: existing.parc_pago || false,
                     quitado: existing.quitado || false,
+                    projeto_ana: existing.projeto_ana || false,
                     observacoes: existing.observacoes || '',
                     classificacao: value,
                 };
