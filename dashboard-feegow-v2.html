@@ -3571,9 +3571,11 @@
             // Dados: pacientes com 1ª vez OU retorno, todos os status
             doaPatients = [];
             const doaMap = {};
-            // Incluir pacientes com consulta 1ª vez
+            // Incluir pacientes com consulta 1ª vez (exceto cancelado/remarcado)
+            const doaExcludeStatus = ['cancelado','desmarcado','remarcado'];
             vezRows.forEach(r => {
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
+                if (doaExcludeStatus.includes(s)) return;
                 const k = (r[d.C.pac]||'').trim().toLowerCase();
                 const dt = parseDate(r[d.C.data]);
                 if (!dt || !k) return;
@@ -3593,6 +3595,7 @@
             });
             retRows.forEach(r => {
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
+                if (doaExcludeStatus.includes(s)) return;
                 const k = (r[d.C.pac]||'').trim().toLowerCase();
                 const dt = parseDate(r[d.C.data]);
                 if (!dt || !k) return;
