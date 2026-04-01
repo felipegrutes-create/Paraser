@@ -5751,6 +5751,9 @@
                 if (isNaN(valor) || valor === 0) continue;
                 if (isNeg) valor = -valor;
 
+                // Exclui estornos de Cartão de Crédito (valores negativos)
+                if (valor < 0 && catRaw.includes('CARTAO DE CREDITO')) continue;
+
                 const dateRaw = (r[iAprov] || '').toString().trim();
                 let dateObj = null;
                 const dp = dateRaw.split('/');
