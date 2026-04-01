@@ -5733,6 +5733,14 @@
                 if (catRaw.includes('ACERTO EMPR')) continue;
                 if (catRaw === 'EMPRÉSTIMO' && (fornRaw.includes('INSTITUTO PARASER') || fornRaw.includes('PARASER'))) continue;
 
+                // Só dados de 2026 em diante (coluna Competência começa em Jan/2026)
+                const compRaw = (r[iComp >= 0 ? iComp : -1] || '').toString().trim();
+                if (!compRaw) continue;
+                const compKey = parseCompetencia(compRaw);
+                if (!compKey) continue;
+                const [, compYear] = compKey.split('/');
+                if (parseInt(compYear) < 2026) continue;
+
                 const valorRaw = (r[iValor] || '').toString().replace('R$', '').trim();
                 const valor = parseValorBR(valorRaw);
                 if (isNaN(valor) || valor === 0) continue;
