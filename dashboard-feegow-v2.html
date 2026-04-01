@@ -864,6 +864,72 @@
         .badge-yellow { background: rgba(250,204,21,0.15); color: #facc15; }
         .badge-pink   { background: rgba(236,72,153,0.15); color: #f472b6; }
 
+        /* Financeiro */
+        .fin-filters {
+            display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
+        }
+        .fin-filters select {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            min-width: 160px;
+        }
+        .fin-filters select:focus { outline: none; border-color: var(--accent); }
+        .fin-table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .fin-table-scroll {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .fin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+        }
+        .fin-table th {
+            position: sticky; top: 0;
+            background: var(--surface2);
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .fin-table th:hover { color: var(--accent); }
+        .fin-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            white-space: nowrap;
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .fin-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+        .fin-table .fin-val { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .fin-table .fin-val.negative { color: #ef4444; }
+        .fin-badge-pago { background: rgba(16,185,129,0.15); color: #34d399; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+        .fin-badge-pendente { background: rgba(245,158,11,0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+        .fin-badge-other { background: rgba(107,122,153,0.15); color: #6b7a99; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+        .kpi-card.purple { border-top: 3px solid #a855f7; }
+        .kpi-card.purple .value { color: #c084fc; }
+
         /* Doadoras/Receptoras */
         .doa-list { display: flex; flex-direction: column; gap: 20px; }
         .doa-day-group {
@@ -1676,6 +1742,7 @@
         <button class="tab" onclick="showSection('sec-doadoras',this)">Fluxo Pacientes</button>
         <button class="tab" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas</button>
         <button class="tab" onclick="showSection('sec-ficha',this)">Ficha Paciente</button>
+        <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
     </div>
 
     <div class="container">
@@ -2850,6 +2917,80 @@
             </div>
         </section>
 
+        <!-- FINANCEIRO -->
+        <section id="sec-fin" class="section">
+            <p class="section-title">Painel Financeiro — Despesas e Pagamentos</p>
+
+            <div class="kpi-grid" id="finKpiGrid">
+                <div class="kpi-card"><div class="value" id="fin-total-mes">—</div><div class="label">Despesas Mês Atual</div></div>
+                <div class="kpi-card"><div class="value" id="fin-total-ant">—</div><div class="label">Mês Anterior</div></div>
+                <div class="kpi-card"><div class="value" id="fin-variacao">—</div><div class="label">Variação MoM</div></div>
+                <div class="kpi-card purple"><div class="value" id="fin-maior-cat">—</div><div class="label" id="fin-maior-cat-label">Maior Categoria</div></div>
+                <div class="kpi-card orange"><div class="value" id="fin-pendentes">—</div><div class="label">Pendentes</div></div>
+                <div class="kpi-card teal"><div class="value" id="fin-dedutivel">—</div><div class="label">Dedutível</div></div>
+            </div>
+
+            <div class="fin-filters">
+                <select id="finMes" onchange="renderFinanceiro()"><option value="">Todos os meses</option></select>
+                <select id="finCategoria" onchange="renderFinanceiro()"><option value="">Todas as categorias</option></select>
+                <select id="finStatus" onchange="renderFinanceiro()">
+                    <option value="">Todos os Status</option>
+                    <option value="PAGO">Pago</option>
+                    <option value="PENDENTE">Pendente</option>
+                </select>
+                <select id="finPgto" onchange="renderFinanceiro()"><option value="">Todas as formas</option></select>
+            </div>
+
+            <div class="chart-grid">
+                <div class="chart-card" style="grid-column:1/-1">
+                    <h3>📊 Evolução Mensal de Despesas</h3>
+                    <canvas id="finChartMensal" height="100"></canvas>
+                </div>
+            </div>
+            <div class="chart-grid duo">
+                <div class="chart-card">
+                    <h3>📂 Despesas por Categoria</h3>
+                    <canvas id="finChartCategoria"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>🍩 Distribuição por Categoria</h3>
+                    <canvas id="finChartCatDonut"></canvas>
+                </div>
+            </div>
+            <div class="chart-grid duo">
+                <div class="chart-card">
+                    <h3>💳 Formas de Pagamento</h3>
+                    <canvas id="finChartPgto"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>🏢 Top 10 Fornecedores</h3>
+                    <canvas id="finChartFornec"></canvas>
+                </div>
+            </div>
+
+            <div class="fin-table-wrap">
+                <h3 style="margin-bottom:12px;font-size:15px;font-weight:600">📋 Detalhamento de Despesas</h3>
+                <div class="fin-table-scroll">
+                    <table class="fin-table" id="finTable">
+                        <thead>
+                            <tr>
+                                <th data-sort="data" onclick="sortFinTable('data')">Data ↕</th>
+                                <th data-sort="categoria" onclick="sortFinTable('categoria')">Plano de Contas ↕</th>
+                                <th data-sort="fornecedor" onclick="sortFinTable('fornecedor')">Fornecedor ↕</th>
+                                <th>Descrição</th>
+                                <th data-sort="status" onclick="sortFinTable('status')">Status</th>
+                                <th data-sort="valor" onclick="sortFinTable('valor')">Valor ↕</th>
+                                <th>Pgto</th>
+                                <th>Competência</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="finTableInfo" style="text-align:center;color:var(--muted);font-size:12px;margin-top:8px"></div>
+            </div>
+        </section>
+
         <!-- Modal CRM -->
         <div class="crm-modal-overlay" id="crmModalOverlay" onclick="handleModalOverlayClick(event)">
             <div class="crm-modal">
@@ -3685,6 +3826,9 @@
             el?.classList.add("active");
             if (id === 'sec-doashared') {
                 dnRenderPendingCards();
+            }
+            if (id === 'sec-fin') {
+                loadAndRenderFinanceiro();
             }
         }
 
@@ -4912,6 +5056,8 @@
             crmMap         = {};
             pendPatients   = [];
             doaPatients    = [];
+            finData        = [];
+            finDataLoaded  = false;
             await init();
         }
 
@@ -5525,6 +5671,392 @@
         }
 
         // ===================== INIT =====================
+        // ===================== FINANCEIRO =====================
+        const FIN_SHEET_ID = "1uthRnuWMk2A26dZ8GaMXinuvPyxY50EH8RX85NemXwg";
+        let finData = [];
+        let finDataLoaded = false;
+        let finSortCol = 'data';
+        let finSortAsc = false;
+
+        const FIN_COLORS = [
+            '#00d4aa','#6366f1','#f59e0b','#ef4444','#8b5cf6','#ec4899',
+            '#14b8a6','#f97316','#3b82f6','#84cc16','#06b6d4','#e11d48'
+        ];
+
+        async function loadFinanceData() {
+            // Try common sheet names for gid 1372850228
+            const tabNames = ['Contas a Pagar', 'Contas', 'Pagamentos', 'Despesas', 'Sheet1', 'Planilha1'];
+            // First try to get sheet metadata to resolve gid
+            try {
+                const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}?key=${API_KEY}&fields=sheets.properties`);
+                const meta = await metaRes.json();
+                if (meta.sheets) {
+                    const sheet = meta.sheets.find(s => s.properties.sheetId === 1372850228);
+                    if (sheet) tabNames.unshift(sheet.properties.title);
+                }
+            } catch(e) { console.warn('Fin meta fetch failed', e); }
+
+            for (const tab of [...new Set(tabNames)]) {
+                try {
+                    const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
+                    const res = await fetch(url);
+                    if (!res.ok) continue;
+                    const json = await res.json();
+                    if (json.values && json.values.length > 1) return json.values;
+                } catch(e) { continue; }
+            }
+            throw new Error('Não foi possível carregar a planilha financeira');
+        }
+
+        function processFinanceData(rows) {
+            const headers = rows[0].map(h => (h || '').toString().trim().toUpperCase());
+            const ci = (name) => headers.findIndex(h => h.includes(name));
+
+            const iAprov   = ci('APROVA');
+            const iCat     = ci('PLANO');
+            const iForn    = ci('FORNECEDOR');
+            const iDesc    = ci('DESCRI');
+            const iStatus  = ci('STATUS');
+            const iValor   = ci('VALOR');
+            const iNF      = ci('NF');
+            const iPgto    = headers.findIndex(h => h === 'PGTO' || h === 'FORMA' || h === 'PAGAMENTO');
+            const iComp    = ci('COMPET');
+            const iDedut   = ci('DEDUT');
+
+            const data = [];
+            for (let i = 1; i < rows.length; i++) {
+                const r = rows[i];
+                if (!r || !r.length) continue;
+                const valorRaw = (r[iValor] || '').toString().replace('R$', '').trim();
+                const valor = parseValorBR(valorRaw);
+                if (isNaN(valor) || valor === 0) continue;
+
+                const dateRaw = (r[iAprov] || '').toString().trim();
+                let dateObj = null;
+                // Parse dd/mm/yyyy
+                const dp = dateRaw.split('/');
+                if (dp.length === 3) {
+                    dateObj = new Date(parseInt(dp[2]), parseInt(dp[1]) - 1, parseInt(dp[0]));
+                }
+
+                const status = (r[iStatus] || '').toString().trim().toUpperCase();
+                const comp = (r[iComp >= 0 ? iComp : -1] || '').toString().trim();
+                const dedut = (r[iDedut >= 0 ? iDedut : -1] || '').toString().trim().toUpperCase();
+
+                data.push({
+                    data: dateRaw,
+                    dateObj,
+                    categoria: (r[iCat >= 0 ? iCat : -1] || '').toString().trim(),
+                    fornecedor: (r[iForn >= 0 ? iForn : -1] || '').toString().trim(),
+                    descricao: (r[iDesc >= 0 ? iDesc : -1] || '').toString().trim(),
+                    status,
+                    valor,
+                    nf: (r[iNF >= 0 ? iNF : -1] || '').toString().trim(),
+                    pgto: (r[iPgto >= 0 ? iPgto : -1] || '').toString().trim(),
+                    competencia: comp,
+                    dedutivel: dedut === 'SIM' || dedut === 'TRUE' || dedut === 'S' || dedut === 'X',
+                });
+            }
+            return data;
+        }
+
+        function getFinMonthKey(d) {
+            if (!d || !d.dateObj || isNaN(d.dateObj)) return d.competencia || '';
+            return String(d.dateObj.getMonth()+1).padStart(2,'0') + '/' + d.dateObj.getFullYear();
+        }
+
+        function getCurrentMonthKey() {
+            const now = new Date();
+            return String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+        }
+
+        function getPrevMonthKey() {
+            const now = new Date();
+            now.setMonth(now.getMonth() - 1);
+            return String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+        }
+
+        function populateFinFilters() {
+            const meses = new Set(), cats = new Set(), pgtos = new Set();
+            finData.forEach(d => {
+                const mk = getFinMonthKey(d);
+                if (mk) meses.add(mk);
+                if (d.categoria) cats.add(d.categoria);
+                if (d.pgto) pgtos.add(d.pgto);
+            });
+
+            const sortedMeses = [...meses].sort((a,b) => {
+                const [ma,ya] = a.split('/'); const [mb,yb] = b.split('/');
+                return (yb+mb).localeCompare(ya+ma);
+            });
+
+            const selMes = document.getElementById('finMes');
+            selMes.innerHTML = '<option value="">Todos os meses</option>' + sortedMeses.map(m => `<option value="${m}">${m}</option>`).join('');
+
+            const selCat = document.getElementById('finCategoria');
+            selCat.innerHTML = '<option value="">Todas as categorias</option>' + [...cats].sort().map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const selPgto = document.getElementById('finPgto');
+            selPgto.innerHTML = '<option value="">Todas as formas</option>' + [...pgtos].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        function renderFinanceiro() {
+            const fMes  = document.getElementById('finMes').value;
+            const fCat  = document.getElementById('finCategoria').value;
+            const fStat = document.getElementById('finStatus').value;
+            const fPgto = document.getElementById('finPgto').value;
+
+            let filtered = finData.filter(d => {
+                if (fMes && getFinMonthKey(d) !== fMes) return false;
+                if (fCat && d.categoria !== fCat) return false;
+                if (fStat && d.status !== fStat) return false;
+                if (fPgto && d.pgto !== fPgto) return false;
+                return true;
+            });
+
+            // ===== KPIs =====
+            const curMonth = getCurrentMonthKey();
+            const prevMonth = getPrevMonthKey();
+            const totalCur = finData.filter(d => getFinMonthKey(d) === curMonth && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
+            const totalPrev = finData.filter(d => getFinMonthKey(d) === prevMonth && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
+
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            set('fin-total-mes', fmtValor(totalCur));
+            set('fin-total-ant', fmtValor(totalPrev));
+
+            const varEl = document.getElementById('fin-variacao');
+            if (totalPrev > 0) {
+                const pct = ((totalCur - totalPrev) / totalPrev * 100).toFixed(1);
+                varEl.textContent = (pct > 0 ? '+' : '') + pct + '%';
+                varEl.style.color = pct > 0 ? '#ef4444' : '#10b981';
+            } else {
+                varEl.textContent = '—';
+                varEl.style.color = '';
+            }
+
+            // Maior categoria (do mês atual)
+            const catSums = {};
+            finData.filter(d => getFinMonthKey(d) === curMonth && d.status === 'PAGO').forEach(d => {
+                catSums[d.categoria] = (catSums[d.categoria] || 0) + d.valor;
+            });
+            const topCat = Object.entries(catSums).sort((a,b) => b[1] - a[1])[0];
+            set('fin-maior-cat', topCat ? fmtValor(topCat[1]) : '—');
+            set('fin-maior-cat-label', topCat ? topCat[0] : 'Maior Categoria');
+
+            const pendentes = finData.filter(d => d.status !== 'PAGO').reduce((s,d) => s + d.valor, 0);
+            set('fin-pendentes', fmtValor(pendentes));
+
+            const dedutTotal = finData.filter(d => d.dedutivel && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
+            set('fin-dedutivel', fmtValor(dedutTotal));
+
+            // ===== CHARTS =====
+            renderFinCharts(filtered);
+            renderFinTable(filtered);
+        }
+
+        function renderFinCharts(data) {
+            // Evolução mensal (stacked bar)
+            const monthCats = {};
+            const allCats = new Set();
+            data.forEach(d => {
+                const mk = getFinMonthKey(d);
+                if (!mk) return;
+                if (!monthCats[mk]) monthCats[mk] = {};
+                monthCats[mk][d.categoria] = (monthCats[mk][d.categoria] || 0) + d.valor;
+                allCats.add(d.categoria);
+            });
+
+            const sortedMonths = Object.keys(monthCats).sort((a,b) => {
+                const [ma,ya] = a.split('/'); const [mb,yb] = b.split('/');
+                return (ya+ma).localeCompare(yb+mb);
+            });
+
+            // Top 6 categories by total, rest as "Outros"
+            const catTotals = {};
+            data.forEach(d => { catTotals[d.categoria] = (catTotals[d.categoria] || 0) + d.valor; });
+            const topCats = Object.entries(catTotals).sort((a,b) => b[1] - a[1]).slice(0, 6).map(e => e[0]);
+
+            const datasets = topCats.map((cat, i) => ({
+                label: cat,
+                data: sortedMonths.map(m => (monthCats[m]?.[cat] || 0)),
+                backgroundColor: FIN_COLORS[i % FIN_COLORS.length],
+                borderRadius: 3,
+            }));
+
+            // "Outros" dataset
+            const outrosData = sortedMonths.map(m => {
+                const mc = monthCats[m] || {};
+                return Object.entries(mc).filter(([k]) => !topCats.includes(k)).reduce((s,[,v]) => s + v, 0);
+            });
+            if (outrosData.some(v => v > 0)) {
+                datasets.push({ label: 'Outros', data: outrosData, backgroundColor: '#475569', borderRadius: 3 });
+            }
+
+            mkChart('finChartMensal', {
+                type: 'bar',
+                data: { labels: sortedMonths, datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtValor(ctx.raw) } }
+                    },
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }
+                    }
+                }
+            });
+
+            // Categoria horizontal bar
+            const catEntries = Object.entries(catTotals).sort((a,b) => b[1] - a[1]);
+            mkChart('finChartCategoria', {
+                type: 'bar',
+                data: {
+                    labels: catEntries.map(e => e[0] || 'Sem categoria'),
+                    datasets: [{ data: catEntries.map(e => e[1]), backgroundColor: FIN_COLORS.slice(0, catEntries.length), borderRadius: 4 }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => fmtValor(ctx.raw) } }
+                    },
+                    scales: { x: { ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }, y: { grid: { display: false } } }
+                }
+            });
+
+            // Donut categoria
+            mkChart('finChartCatDonut', {
+                type: 'doughnut',
+                data: {
+                    labels: catEntries.slice(0,8).map(e => e[0]),
+                    datasets: [{ data: catEntries.slice(0,8).map(e => e[1]), backgroundColor: FIN_COLORS }]
+                },
+                options: {
+                    responsive: true, cutout: '60%',
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmtValor(ctx.raw) } }
+                    }
+                }
+            });
+
+            // Formas de pagamento donut
+            const pgtoSums = {};
+            data.forEach(d => { if (d.pgto) pgtoSums[d.pgto] = (pgtoSums[d.pgto] || 0) + d.valor; });
+            const pgtoEntries = Object.entries(pgtoSums).sort((a,b) => b[1] - a[1]);
+            mkChart('finChartPgto', {
+                type: 'doughnut',
+                data: {
+                    labels: pgtoEntries.map(e => e[0]),
+                    datasets: [{ data: pgtoEntries.map(e => e[1]), backgroundColor: FIN_COLORS }]
+                },
+                options: {
+                    responsive: true, cutout: '60%',
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmtValor(ctx.raw) } }
+                    }
+                }
+            });
+
+            // Top 10 Fornecedores
+            const fornSums = {};
+            data.forEach(d => { if (d.fornecedor) fornSums[d.fornecedor] = (fornSums[d.fornecedor] || 0) + d.valor; });
+            const fornEntries = Object.entries(fornSums).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            mkChart('finChartFornec', {
+                type: 'bar',
+                data: {
+                    labels: fornEntries.map(e => e[0].length > 25 ? e[0].slice(0,22) + '...' : e[0]),
+                    datasets: [{ data: fornEntries.map(e => e[1]), backgroundColor: '#6366f1', borderRadius: 4 }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => fmtValor(ctx.raw) } }
+                    },
+                    scales: { x: { ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }, y: { grid: { display: false } } }
+                }
+            });
+        }
+
+        function renderFinTable(data) {
+            // Sort
+            const sorted = [...data].sort((a, b) => {
+                let va, vb;
+                switch (finSortCol) {
+                    case 'data':
+                        va = a.dateObj || new Date(0); vb = b.dateObj || new Date(0);
+                        return finSortAsc ? va - vb : vb - va;
+                    case 'valor':
+                        return finSortAsc ? a.valor - b.valor : b.valor - a.valor;
+                    case 'categoria':
+                        return finSortAsc ? a.categoria.localeCompare(b.categoria) : b.categoria.localeCompare(a.categoria);
+                    case 'fornecedor':
+                        return finSortAsc ? a.fornecedor.localeCompare(b.fornecedor) : b.fornecedor.localeCompare(a.fornecedor);
+                    case 'status':
+                        return finSortAsc ? a.status.localeCompare(b.status) : b.status.localeCompare(a.status);
+                    default: return 0;
+                }
+            });
+
+            const show = sorted.slice(0, 100);
+            const tbody = document.getElementById('finTableBody');
+            tbody.innerHTML = show.map(d => {
+                const statusBadge = d.status === 'PAGO'
+                    ? '<span class="fin-badge-pago">PAGO</span>'
+                    : d.status === 'PENDENTE'
+                        ? '<span class="fin-badge-pendente">PENDENTE</span>'
+                        : `<span class="fin-badge-other">${d.status}</span>`;
+                const valClass = d.valor < 0 ? 'fin-val negative' : 'fin-val';
+                return `<tr>
+                    <td>${d.data}</td>
+                    <td title="${d.categoria}">${d.categoria}</td>
+                    <td title="${d.fornecedor}">${d.fornecedor}</td>
+                    <td title="${d.descricao}">${d.descricao}</td>
+                    <td>${statusBadge}</td>
+                    <td class="${valClass}">${fmtValor(d.valor)}</td>
+                    <td>${d.pgto}</td>
+                    <td>${d.competencia}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('finTableInfo').textContent =
+                sorted.length > 100
+                    ? `Mostrando 100 de ${sorted.length} registros`
+                    : `${sorted.length} registro${sorted.length !== 1 ? 's' : ''}`;
+        }
+
+        function sortFinTable(col) {
+            if (finSortCol === col) { finSortAsc = !finSortAsc; }
+            else { finSortCol = col; finSortAsc = true; }
+            renderFinanceiro();
+        }
+
+        async function loadAndRenderFinanceiro() {
+            if (finDataLoaded) return;
+            const section = document.getElementById('sec-fin');
+            const spinner = document.createElement('div');
+            spinner.id = 'finSpinner';
+            spinner.innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner-ring" style="margin:0 auto"></div><p style="color:var(--muted);margin-top:12px">Carregando dados financeiros...</p></div>';
+            section.prepend(spinner);
+
+            try {
+                const rows = await loadFinanceData();
+                finData = processFinanceData(rows);
+                finDataLoaded = true;
+                populateFinFilters();
+                renderFinanceiro();
+            } catch(e) {
+                console.error('Financeiro load error:', e);
+                spinner.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444">Erro ao carregar dados financeiros: ${e.message}</div>`;
+                return;
+            }
+            spinner.remove();
+        }
+
         async function init() {
             try {
                 document.getElementById('loadingMsg').textContent = 'Carregando dados...';
