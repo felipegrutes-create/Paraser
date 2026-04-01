@@ -3678,6 +3678,11 @@
 
         // ===== CRM HELPERS =====
 
+        // Normaliza texto para busca: remove acentos + lowercase
+        function norm(s) {
+            return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
         function normalizeKey(name) {
             return (name || '')
                 .toLowerCase()
@@ -3853,7 +3858,7 @@
             const board = document.getElementById('kanbanBoard');
             if (!board || !pendPatients.length) return;
 
-            const srch = (document.getElementById('kanbSearch')?.value || '').toLowerCase();
+            const srch = norm(document.getElementById('kanbSearch')?.value || '');
             const prof = document.getElementById('kanbProf')?.value  || '';
             const ano  = document.getElementById('kanbAno')?.value   || '';
             const vend = document.getElementById('kanbVend')?.value  || '';
@@ -3861,7 +3866,7 @@
             // Filtrar pacientes
             const filtered = pendPatients.filter(p => {
                 const crm = crmMap[normalizeKey(p.pac)] || {};
-                if (srch && !p.pac.toLowerCase().includes(srch)) return false;
+                if (srch && !norm(p.pac).includes(srch)) return false;
                 if (prof && p.prof !== prof)           return false;
                 if (ano  && p.yearDcri !== ano)        return false;
                 if (vend && crm.vendedora !== vend)    return false;
@@ -4101,12 +4106,12 @@
             const container = document.getElementById('doaList');
             if (!container || !doaPatients.length) return;
 
-            const srch    = (document.getElementById('doaSearch')?.value || '').toLowerCase();
+            const srch    = norm(document.getElementById('doaSearch')?.value || '');
             const profF   = document.getElementById('doaProf')?.value || '';
             const classF  = document.getElementById('doaClass')?.value || '';
 
             const filtered = doaPatients.filter(p => {
-                if (srch && !p.pac.toLowerCase().includes(srch)) return false;
+                if (srch && !norm(p.pac).includes(srch)) return false;
                 if (profF && p.prof !== profF) return false;
                 const cls = (crmMap[p.key]?.classificacao) || '';
                 if (classF === 'sem' && cls) return false;
@@ -4937,9 +4942,9 @@
                 }
 
                 // 3. Search by name: use local doaPatients + Google Sheets data to find phone, then search Feegow
-                const queryLower = query.toLowerCase();
+                const queryNorm = norm(query);
                 const localMatches = doaPatients.filter(p =>
-                    p.pac?.toLowerCase().includes(queryLower)
+                    norm(p.pac).includes(queryNorm)
                 ).slice(0, 10);
 
                 if (localMatches.length > 0) {
@@ -4972,7 +4977,7 @@
                 // 4. Fallback: paginated search in Feegow (broader)
                 const data = await feegowFetch('/patient/list', { limit: 100, offset: 0 });
                 const patients = (data.content || []).filter(p =>
-                    p.nome?.toLowerCase().includes(queryLower)
+                    norm(p.nome).includes(queryNorm)
                 );
                 renderFpSearchResults(patients);
             } catch(err) {
