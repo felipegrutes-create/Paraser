@@ -5720,26 +5720,27 @@
             const iValor   = ci('VALOR');
             const iNF      = ci('NF');
             const iPgto    = headers.findIndex(h => h === 'PGTO' || h === 'FORMA' || h === 'PAGAMENTO');
-            const iComp    = ci('COMPET');
             const iDedut   = ci('DEDUT');
+            const iCaixa   = 12; // Coluna M (índice 12) = mês CAIXA
 
             const data = [];
             for (let i = 1; i < rows.length; i++) {
                 const r = rows[i];
                 if (!r || !r.length) continue;
+
+                // Coluna M (caixa) — única referência de mês
+                const caixaRaw = (r[iCaixa] || '').toString().trim();
+                if (!caixaRaw) continue; // sem coluna M = não entrou no caixa
+                const caixaKey = parseCompetencia(caixaRaw);
+                if (!caixaKey) continue;
+                const [, caixaYear] = caixaKey.split('/');
+                if (parseInt(caixaYear) < 2026) continue;
+
                 // Exclui transferências intercompany
                 const catRaw = (r[iCat >= 0 ? iCat : -1] || '').toString().trim().toUpperCase();
                 const fornRaw = (r[iForn >= 0 ? iForn : -1] || '').toString().trim().toUpperCase();
                 if (catRaw.includes('ACERTO EMPR')) continue;
                 if (catRaw === 'EMPRÉSTIMO' && (fornRaw.includes('INSTITUTO PARASER') || fornRaw.includes('PARASER'))) continue;
-
-                // Só dados de 2026 em diante (coluna Competência começa em Jan/2026)
-                const compRaw = (r[iComp >= 0 ? iComp : -1] || '').toString().trim();
-                if (!compRaw) continue;
-                const compKey = parseCompetencia(compRaw);
-                if (!compKey) continue;
-                const [, compYear] = compKey.split('/');
-                if (parseInt(compYear) < 2026) continue;
 
                 const valorRaw = (r[iValor] || '').toString().replace('R$', '').trim();
                 const valor = parseValorBR(valorRaw);
@@ -5747,14 +5748,12 @@
 
                 const dateRaw = (r[iAprov] || '').toString().trim();
                 let dateObj = null;
-                // Parse dd/mm/yyyy
                 const dp = dateRaw.split('/');
                 if (dp.length === 3) {
                     dateObj = new Date(parseInt(dp[2]), parseInt(dp[1]) - 1, parseInt(dp[0]));
                 }
 
                 const status = (r[iStatus] || '').toString().trim().toUpperCase();
-                const comp = (r[iComp >= 0 ? iComp : -1] || '').toString().trim();
                 const dedut = (r[iDedut >= 0 ? iDedut : -1] || '').toString().trim().toUpperCase();
 
                 data.push({
@@ -5767,7 +5766,7 @@
                     valor,
                     nf: (r[iNF >= 0 ? iNF : -1] || '').toString().trim(),
                     pgto: (r[iPgto >= 0 ? iPgto : -1] || '').toString().trim(),
-                    competencia: comp,
+                    caixa: caixaKey, // mês do caixa (coluna M)
                     dedutivel: dedut === 'SIM' || dedut === 'TRUE' || dedut === 'S' || dedut === 'X',
                 });
             }
@@ -5800,14 +5799,7 @@
         }
 
         function getFinMonthKey(d) {
-            // Prioridade: coluna COMPETÊNCIA (mês real do pagamento)
-            const comp = parseCompetencia(d.competencia);
-            if (comp) return comp;
-            // Fallback: data de aprovação
-            if (d && d.dateObj && !isNaN(d.dateObj)) {
-                return String(d.dateObj.getMonth()+1).padStart(2,'0') + '/' + d.dateObj.getFullYear();
-            }
-            return '';
+            return d.caixa || '';
         }
 
         function monthKeyLabel(mk) {
