@@ -5821,16 +5821,21 @@
         }
 
         function getLatestMonthWithData() {
+            const curKey = getCurrentMonthKey();
+            const [cm, cy] = curKey.split('/');
+            const curVal = cy + cm; // "202604"
             const months = new Set();
             finData.filter(d => d.status === 'PAGO').forEach(d => {
                 const mk = getFinMonthKey(d);
-                if (mk) months.add(mk);
+                if (!mk) return;
+                const [m, y] = mk.split('/');
+                if ((y + m) <= curVal) months.add(mk); // só meses até o atual
             });
             const sorted = [...months].sort((a,b) => {
                 const [ma,ya] = a.split('/'); const [mb,yb] = b.split('/');
                 return (yb+mb).localeCompare(ya+ma);
             });
-            return sorted[0] || getCurrentMonthKey();
+            return sorted[0] || curKey;
         }
 
         function populateFinFilters() {
@@ -5903,10 +5908,16 @@
             set('fin-maior-cat', topCat ? fmtValor(topCat[1]) : '—');
             setH('fin-maior-cat-label', topCat ? `${topCat[0]} (${monthKeyLabel(curMonth)})` : 'Maior Categoria');
 
-            const pendentes = finData.filter(d => d.status !== 'PAGO').reduce((s,d) => s + d.valor, 0);
+            // Pendentes e Dedutível: só até mês atual
+            const curKeyKpi = getCurrentMonthKey();
+            const [ckm, cky] = curKeyKpi.split('/');
+            const curValKpi = cky + ckm;
+            const ateMesAtual = d => { const mk = getFinMonthKey(d); if (!mk) return true; const [m,y] = mk.split('/'); return (y+m) <= curValKpi; };
+
+            const pendentes = finData.filter(d => d.status !== 'PAGO' && ateMesAtual(d)).reduce((s,d) => s + d.valor, 0);
             set('fin-pendentes', fmtValor(pendentes));
 
-            const dedutTotal = finData.filter(d => d.dedutivel && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
+            const dedutTotal = finData.filter(d => d.dedutivel && d.status === 'PAGO' && ateMesAtual(d)).reduce((s,d) => s + d.valor, 0);
             set('fin-dedutivel', fmtValor(dedutTotal));
 
             // ===== CHARTS =====
@@ -5915,10 +5926,21 @@
         }
 
         function renderFinCharts(data) {
+            // Filtra dados até o mês atual para gráficos
+            const curKey = getCurrentMonthKey();
+            const [cm, cy] = curKey.split('/');
+            const curVal = cy + cm;
+            const dataAtual = data.filter(d => {
+                const mk = getFinMonthKey(d);
+                if (!mk) return false;
+                const [m, y] = mk.split('/');
+                return (y + m) <= curVal;
+            });
+
             // Evolução mensal (stacked bar)
             const monthCats = {};
             const allCats = new Set();
-            data.forEach(d => {
+            dataAtual.forEach(d => {
                 const mk = getFinMonthKey(d);
                 if (!mk) return;
                 if (!monthCats[mk]) monthCats[mk] = {};
@@ -5933,7 +5955,7 @@
 
             // Top 6 categories by total, rest as "Outros"
             const catTotals = {};
-            data.forEach(d => { catTotals[d.categoria] = (catTotals[d.categoria] || 0) + d.valor; });
+            dataAtual.forEach(d => { catTotals[d.categoria] = (catTotals[d.categoria] || 0) + d.valor; });
             const topCats = Object.entries(catTotals).sort((a,b) => b[1] - a[1]).slice(0, 6).map(e => e[0]);
 
             const datasets = topCats.map((cat, i) => ({
@@ -6004,7 +6026,7 @@
 
             // Formas de pagamento donut
             const pgtoSums = {};
-            data.forEach(d => { if (d.pgto) pgtoSums[d.pgto] = (pgtoSums[d.pgto] || 0) + d.valor; });
+            dataAtual.forEach(d => { if (d.pgto) pgtoSums[d.pgto] = (pgtoSums[d.pgto] || 0) + d.valor; });
             const pgtoEntries = Object.entries(pgtoSums).sort((a,b) => b[1] - a[1]);
             mkChart('finChartPgto', {
                 type: 'doughnut',
@@ -6023,7 +6045,7 @@
 
             // Top 10 Fornecedores
             const fornSums = {};
-            data.forEach(d => { if (d.fornecedor) fornSums[d.fornecedor] = (fornSums[d.fornecedor] || 0) + d.valor; });
+            dataAtual.forEach(d => { if (d.fornecedor) fornSums[d.fornecedor] = (fornSums[d.fornecedor] || 0) + d.valor; });
             const fornEntries = Object.entries(fornSums).sort((a,b) => b[1] - a[1]).slice(0, 10);
             mkChart('finChartFornec', {
                 type: 'bar',
