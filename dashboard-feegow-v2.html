@@ -3569,10 +3569,17 @@
 
             // == DOADORAS / RECEPTORAS ==
             // Dados: agendamentos de 1ª vez e retorno, exceto cancelado/remarcado
-            // Lista todos os agendamentos (não agrupa por paciente)
             doaPatients = [];
             const doaExcludeStatus = ['cancelado','desmarcado','remarcado'];
-            const doaSeen = new Set(); // evitar duplicatas exatas
+            const doaSeen = new Set();
+
+            // Formatar status para exibição (deve ser definido ANTES de doaAdd)
+            const fmtStatus = (s) => {
+                if (s === 'atendido') return 'Atendido';
+                if (s === 'aguardando' || s === 'marcado' || s === 'marcado - não confirmado' || s === 'marcado - nao confirmado') return 'Aguardando';
+                if (s === 'nao compareceu' || s === 'não compareceu') return 'Não Compareceu';
+                return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Desconhecido';
+            };
 
             // Função para adicionar agendamento
             const doaAdd = (r, tipo) => {
@@ -3590,14 +3597,6 @@
                     proc: r[d.C.proc]||'', status: fmtStatus(s),
                     statusRaw: s, tipo, key: normalizeKey(pac)
                 });
-            };
-
-            // Formatar status para exibição
-            const fmtStatus = (s) => {
-                if (s === 'atendido') return 'Atendido';
-                if (s === 'aguardando' || s === 'marcado' || s === 'marcado - não confirmado') return 'Aguardando';
-                if (s === 'nao compareceu' || s === 'não compareceu') return 'Não Compareceu';
-                return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Desconhecido';
             };
 
             // Incluir consultas 1ª vez
