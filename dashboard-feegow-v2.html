@@ -929,6 +929,21 @@
         .fin-badge-other { background: rgba(107,122,153,0.15); color: #6b7a99; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
         .kpi-card.purple { border-top: 3px solid #a855f7; }
         .kpi-card.purple .value { color: #c084fc; }
+        .fin-kpi-click { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+        .fin-kpi-click:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .fin-kpi-click .label::after { content: ' ▸'; opacity: 0.5; }
+        .fin-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 1000; display: none; align-items: center; justify-content: center;
+        }
+        .fin-modal-overlay.open { display: flex; }
+        .fin-modal {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px; width: 90%; max-width: 800px;
+            max-height: 80vh; overflow-y: auto; position: relative;
+        }
+        .fin-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .fin-modal-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
 
         /* Doadoras/Receptoras */
         .doa-list { display: flex; flex-direction: column; gap: 20px; }
@@ -2925,9 +2940,9 @@
                 <div class="kpi-card"><div class="value" id="fin-mes1">—</div><div class="label" id="fin-mes1-label">Mês Atual</div></div>
                 <div class="kpi-card"><div class="value" id="fin-mes2">—</div><div class="label" id="fin-mes2-label">Mês -1</div></div>
                 <div class="kpi-card"><div class="value" id="fin-mes3">—</div><div class="label" id="fin-mes3-label">Mês -2</div></div>
-                <div class="kpi-card purple"><div class="value" id="fin-top1">—</div><div class="label" id="fin-top1-label">1º Maior Gasto</div></div>
-                <div class="kpi-card orange"><div class="value" id="fin-top2">—</div><div class="label" id="fin-top2-label">2º Maior Gasto</div></div>
-                <div class="kpi-card teal"><div class="value" id="fin-top3">—</div><div class="label" id="fin-top3-label">3º Maior Gasto</div></div>
+                <div class="kpi-card purple fin-kpi-click" id="fin-top1-card" onclick="openFinCatDetail(0)"><div class="value" id="fin-top1">—</div><div class="label" id="fin-top1-label">1º Maior Gasto</div></div>
+                <div class="kpi-card orange fin-kpi-click" id="fin-top2-card" onclick="openFinCatDetail(1)"><div class="value" id="fin-top2">—</div><div class="label" id="fin-top2-label">2º Maior Gasto</div></div>
+                <div class="kpi-card teal fin-kpi-click" id="fin-top3-card" onclick="openFinCatDetail(2)"><div class="value" id="fin-top3">—</div><div class="label" id="fin-top3-label">3º Maior Gasto</div></div>
             </div>
 
             <div class="fin-filters">
@@ -2986,6 +3001,29 @@
                 <div id="finTableInfo" style="text-align:center;color:var(--muted);font-size:12px;margin-top:8px"></div>
             </div>
         </section>
+
+        <!-- Modal Financeiro Detalhamento -->
+        <div class="fin-modal-overlay" id="finModalOverlay" onclick="if(event.target===this)closeFinModal()">
+            <div class="fin-modal">
+                <button class="crm-modal-close" onclick="closeFinModal()">✕</button>
+                <div class="fin-modal-title" id="finModalTitle">—</div>
+                <div class="fin-modal-subtitle" id="finModalSubtitle">—</div>
+                <div class="fin-modal-body">
+                    <table class="fin-table" style="margin-top:12px">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Lançamento</th>
+                                <th>Fornecedor</th>
+                                <th>Empresa</th>
+                                <th style="text-align:right">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finModalBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
         <!-- Modal CRM -->
         <div class="crm-modal-overlay" id="crmModalOverlay" onclick="handleModalOverlayClick(event)">
@@ -5672,6 +5710,7 @@
         let finData = [];
         let finDataLoaded = false;
         let finSortCol = 'data';
+        let finTopCats = []; // top categorias para modal
         let finSortAsc = false;
 
         const FIN_COLORS = [
@@ -5907,6 +5946,7 @@
                 catSumsAll[d.categoria] = (catSumsAll[d.categoria] || 0) + d.valor;
             });
             const topCats = Object.entries(catSumsAll).sort((a,b) => b[1] - a[1]);
+            finTopCats = topCats.map(t => t[0]);
 
             const t1 = topCats[0]; const t2 = topCats[1]; const t3 = topCats[2];
             set('fin-top1', t1 ? fmtValor(t1[1]) : '—');
@@ -6134,6 +6174,36 @@
             if (finSortCol === col) { finSortAsc = !finSortAsc; }
             else { finSortCol = col; finSortAsc = true; }
             renderFinanceiro();
+        }
+
+        function openFinCatDetail(idx) {
+            const cat = finTopCats[idx];
+            if (!cat) return;
+
+            // Filtrar dados dessa categoria, ordenar por data desc
+            const items = finData.filter(d => d.categoria === cat)
+                .sort((a,b) => (b.dateObj || new Date(0)) - (a.dateObj || new Date(0)));
+
+            const total = items.reduce((s,d) => s + d.valor, 0);
+
+            document.getElementById('finModalTitle').textContent = cat;
+            document.getElementById('finModalSubtitle').textContent =
+                `${items.length} lançamentos · Total: ${fmtValor(total)}`;
+
+            const tbody = document.getElementById('finModalBody');
+            tbody.innerHTML = items.map(d => `<tr>
+                <td>${d.data}</td>
+                <td title="${d.descricao}">${d.descricao}</td>
+                <td>${d.fornecedor}</td>
+                <td>${d.empresa || ''}</td>
+                <td class="fin-val">${fmtValor(d.valor)}</td>
+            </tr>`).join('');
+
+            document.getElementById('finModalOverlay').classList.add('open');
+        }
+
+        function closeFinModal() {
+            document.getElementById('finModalOverlay').classList.remove('open');
         }
 
         async function loadAndRenderFinanceiro() {
