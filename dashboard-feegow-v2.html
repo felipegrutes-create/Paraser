@@ -5972,9 +5972,37 @@
                 datasets.push({ label: 'Outros', data: outrosData, backgroundColor: '#475569', borderRadius: 3 });
             }
 
+            // Totais por mês para exibir no topo das barras
+            const monthTotals = sortedMonths.map(m => {
+                return datasets.reduce((sum, ds, idx) => sum + (ds.data[sortedMonths.indexOf(m)] || 0), 0);
+            });
+
+            // Plugin inline para labels de total no topo
+            const totalLabelPlugin = {
+                id: 'finTotalLabels',
+                afterDraw(chart) {
+                    const { ctx, scales: { x, y } } = chart;
+                    ctx.save();
+                    ctx.font = '600 11px Outfit, sans-serif';
+                    ctx.fillStyle = '#e2e8f4';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    sortedMonths.forEach((m, i) => {
+                        const total = monthTotals[i];
+                        if (!total) return;
+                        const xPos = x.getPixelForValue(i);
+                        const yPos = y.getPixelForValue(total);
+                        const label = 'R$ ' + (total/1000).toFixed(0) + 'k';
+                        ctx.fillText(label, xPos, yPos - 4);
+                    });
+                    ctx.restore();
+                }
+            };
+
             mkChart('finChartMensal', {
                 type: 'bar',
                 data: { labels: sortedMonths, datasets },
+                plugins: [totalLabelPlugin],
                 options: {
                     responsive: true,
                     plugins: {
