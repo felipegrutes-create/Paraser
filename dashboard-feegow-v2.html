@@ -2934,7 +2934,7 @@
                 <select id="finMes" onchange="renderFinanceiro()"><option value="">Todos os meses</option></select>
                 <select id="finCategoria" onchange="renderFinanceiro()"><option value="">Todas as categorias</option></select>
                 <input type="hidden" id="finStatus" value="">
-                <select id="finPgto" onchange="renderFinanceiro()"><option value="">Todas as formas</option></select>
+                <select id="finPgto" onchange="renderFinanceiro()"><option value="">Todas as empresas</option></select>
             </div>
 
             <div class="chart-grid">
@@ -2955,7 +2955,7 @@
             </div>
             <div class="chart-grid duo">
                 <div class="chart-card">
-                    <h3>💳 Formas de Pagamento</h3>
+                    <h3>🏢 Despesas por Empresa</h3>
                     <canvas id="finChartPgto"></canvas>
                 </div>
                 <div class="chart-card">
@@ -2973,11 +2973,11 @@
                                 <th data-sort="data" onclick="sortFinTable('data')">Data ↕</th>
                                 <th data-sort="categoria" onclick="sortFinTable('categoria')">Plano de Contas ↕</th>
                                 <th data-sort="fornecedor" onclick="sortFinTable('fornecedor')">Fornecedor ↕</th>
-                                <th>Descrição</th>
-                                <th data-sort="status" onclick="sortFinTable('status')">Status</th>
+                                <th>Lançamento</th>
+                                <th>Empresa</th>
                                 <th data-sort="valor" onclick="sortFinTable('valor')">Valor ↕</th>
-                                <th>Pgto</th>
-                                <th>Competência</th>
+                                <th>Classificação</th>
+                                <th>Mês</th>
                             </tr>
                         </thead>
                         <tbody id="finTableBody"></tbody>
@@ -5680,100 +5680,94 @@
         ];
 
         async function loadFinanceData() {
-            // Try common sheet names for gid 1372850228
-            const tabNames = ['Contas a Pagar', 'Contas', 'Pagamentos', 'Despesas', 'Sheet1', 'Planilha1'];
-            // First try to get sheet metadata to resolve gid
-            try {
-                const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}?key=${API_KEY}&fields=sheets.properties`);
-                const meta = await metaRes.json();
-                if (meta.sheets) {
-                    const sheet = meta.sheets.find(s => s.properties.sheetId === 1372850228);
-                    if (sheet) tabNames.unshift(sheet.properties.title);
-                }
-            } catch(e) { console.warn('Fin meta fetch failed', e); }
+            // Carrega LANÇAMENTOS + LANÇAMENTOS_I e combina
+            const tabs = ['LANÇAMENTOS', 'LANÇAMENTOS_I'];
+            const allRows = [];
+            let headers = null;
 
-            for (const tab of [...new Set(tabNames)]) {
+            for (const tab of tabs) {
                 try {
                     const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
                     const res = await fetch(url);
                     if (!res.ok) continue;
                     const json = await res.json();
-                    if (json.values && json.values.length > 1) return json.values;
-                } catch(e) { continue; }
+                    if (json.values && json.values.length > 1) {
+                        if (!headers) headers = json.values[0];
+                        // Pula header, adiciona dados
+                        for (let i = 1; i < json.values.length; i++) {
+                            allRows.push(json.values[i]);
+                        }
+                    }
+                } catch(e) { console.warn('Fin tab load failed:', tab, e); }
             }
-            throw new Error('Não foi possível carregar a planilha financeira');
+
+            if (!headers || !allRows.length) throw new Error('Não foi possível carregar LANÇAMENTOS');
+            return [headers, ...allRows];
         }
 
         function processFinanceData(rows) {
-            const headers = rows[0].map(h => (h || '').toString().trim().toUpperCase());
-            const ci = (name) => headers.findIndex(h => h.includes(name));
+            // LANÇAMENTOS/LANÇAMENTOS_I columns:
+            // A=Data, B=Lançamento, C=Classificação, D=Valor, E=Saldo Inicial,
+            // F=Entradas, G=Saídas, H=Saldo Diário, I=Saldo Acumulado,
+            // J=Tipo, K=Mês, L=Empresa, M=Fornecedor, N=Plano de Contas
+            const iData = 0, iLanc = 1, iClass = 2, iSaidas = 6;
+            const iTipo = 9, iMes = 10, iEmpresa = 11, iForn = 12, iPlano = 13;
 
-            const iAprov   = ci('APROVA');
-            const iCat     = ci('PLANO');
-            const iForn    = ci('FORNECEDOR');
-            const iDesc    = ci('DESCRI');
-            const iStatus  = ci('STATUS');
-            const iValor   = ci('VALOR');
-            const iNF      = ci('NF');
-            const iPgto    = headers.findIndex(h => h === 'PGTO' || h === 'FORMA' || h === 'PAGAMENTO');
-            const iDedut   = ci('DEDUT');
-            const iCaixa   = 12; // Coluna M (índice 12) = mês CAIXA
+            const mesesMap = {
+                'janeiro':'01','fevereiro':'02','marco':'03','abril':'04',
+                'maio':'05','junho':'06','julho':'07','agosto':'08',
+                'setembro':'09','outubro':'10','novembro':'11','dezembro':'12'
+            };
 
             const data = [];
             for (let i = 1; i < rows.length; i++) {
                 const r = rows[i];
-                if (!r || !r.length) continue;
+                if (!r || r.length < 11) continue;
 
-                // Coluna M (caixa) — única referência de mês
-                const caixaRaw = (r[iCaixa] || '').toString().trim();
-                if (!caixaRaw) continue; // sem coluna M = não entrou no caixa
-                const caixaKey = parseCompetencia(caixaRaw);
-                if (!caixaKey) continue;
-                const [, caixaYear] = caixaKey.split('/');
-                if (parseInt(caixaYear) < 2026) continue;
-
-                // Somente status PAGO
-                const status = (r[iStatus] || '').toString().trim().toUpperCase();
-                if (status !== 'PAGO') continue;
-
-                // Exclui ACERTO EMPRÉSTIMO e EMPRÉSTIMO (exato)
-                const catRaw = (r[iCat >= 0 ? iCat : -1] || '').toString().trim().toUpperCase()
+                // Tipo = Saída apenas
+                const tipo = (r[iTipo] || '').toString().trim().toLowerCase()
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                if (catRaw.includes('ACERTO EMPR')) continue;
-                if (catRaw === 'EMPRESTIMO') continue;
+                if (tipo !== 'saida') continue;
 
-                // Parse valor preservando sinal negativo
-                const valorStr = (r[iValor] || '').toString().trim();
-                const isNeg = valorStr.includes('-');
-                let vs = valorStr.replace(/[^\d,\.]/g, '');
+                // Mês (coluna K) — referência caixa
+                const mesRaw = (r[iMes] || '').toString().trim().toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const mesPad = mesesMap[mesRaw];
+                if (!mesPad) continue;
+                const caixaKey = mesPad + '/2026';
+
+                // Exclui tudo com Empréstimo no Plano de Contas
+                const plano = (r[iPlano] || '').toString().trim().toUpperCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                if (plano.includes('EMPR')) continue;
+
+                // Saídas (coluna G)
+                const saidaStr = (r[iSaidas] || '').toString().trim();
+                let vs = saidaStr.replace(/[^\d,\.]/g, '');
                 if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
                 let valor = parseFloat(vs);
-                if (isNaN(valor) || valor === 0) continue;
-                if (isNeg) valor = -valor;
+                if (isNaN(valor) || valor <= 0) continue;
 
-                // Exclui estornos de Cartão de Crédito (valores negativos)
-                if (valor < 0 && catRaw.includes('CARTAO DE CREDITO')) continue;
-
-                const dateRaw = (r[iAprov] || '').toString().trim();
+                // Data
+                const dateRaw = (r[iData] || '').toString().trim();
                 let dateObj = null;
                 const dp = dateRaw.split('/');
                 if (dp.length === 3) {
                     dateObj = new Date(parseInt(dp[2]), parseInt(dp[1]) - 1, parseInt(dp[0]));
                 }
-                const dedut = (r[iDedut >= 0 ? iDedut : -1] || '').toString().trim().toUpperCase();
 
                 data.push({
                     data: dateRaw,
                     dateObj,
-                    categoria: (r[iCat >= 0 ? iCat : -1] || '').toString().trim(),
-                    fornecedor: (r[iForn >= 0 ? iForn : -1] || '').toString().trim(),
-                    descricao: (r[iDesc >= 0 ? iDesc : -1] || '').toString().trim(),
-                    status,
+                    categoria: (r[iPlano] || '').toString().trim(),
+                    fornecedor: (r[iForn] || '').toString().trim(),
+                    descricao: (r[iLanc] || '').toString().trim(),
+                    classificacao: (r[iClass] || '').toString().trim(),
+                    empresa: (r[iEmpresa] || '').toString().trim(),
+                    status: tipo,
                     valor,
-                    nf: (r[iNF >= 0 ? iNF : -1] || '').toString().trim(),
-                    pgto: (r[iPgto >= 0 ? iPgto : -1] || '').toString().trim(),
-                    caixa: caixaKey, // mês do caixa (coluna M)
-                    dedutivel: dedut === 'SIM' || dedut === 'TRUE' || dedut === 'S' || dedut === 'X',
+                    caixa: caixaKey,
+                    dedutivel: false,
                 });
             }
             return data;
@@ -5845,12 +5839,12 @@
         }
 
         function populateFinFilters() {
-            const meses = new Set(), cats = new Set(), pgtos = new Set();
+            const meses = new Set(), cats = new Set(), empresas = new Set();
             finData.forEach(d => {
                 const mk = getFinMonthKey(d);
                 if (mk) meses.add(mk);
                 if (d.categoria) cats.add(d.categoria);
-                if (d.pgto) pgtos.add(d.pgto);
+                if (d.empresa) empresas.add(d.empresa);
             });
 
             const sortedMeses = [...meses].sort((a,b) => {
@@ -5865,7 +5859,7 @@
             selCat.innerHTML = '<option value="">Todas as categorias</option>' + [...cats].sort().map(c => `<option value="${c}">${c}</option>`).join('');
 
             const selPgto = document.getElementById('finPgto');
-            selPgto.innerHTML = '<option value="">Todas as formas</option>' + [...pgtos].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+            selPgto.innerHTML = '<option value="">Todas as empresas</option>' + [...empresas].sort().map(p => `<option value="${p}">${p}</option>`).join('');
         }
 
         function renderFinanceiro() {
@@ -5878,7 +5872,7 @@
                 if (fMes && getFinMonthKey(d) !== fMes) return false;
                 if (fCat && d.categoria !== fCat) return false;
                 if (fStat && d.status !== fStat) return false;
-                if (fPgto && d.pgto !== fPgto) return false;
+                if (fPgto && d.empresa !== fPgto) return false;
                 return true;
             });
 
@@ -6056,7 +6050,7 @@
 
             // Formas de pagamento donut
             const pgtoSums = {};
-            dataAtual.forEach(d => { if (d.pgto) pgtoSums[d.pgto] = (pgtoSums[d.pgto] || 0) + d.valor; });
+            dataAtual.forEach(d => { if (d.empresa) pgtoSums[d.empresa] = (pgtoSums[d.empresa] || 0) + d.valor; });
             const pgtoEntries = Object.entries(pgtoSums).sort((a,b) => b[1] - a[1]);
             mkChart('finChartPgto', {
                 type: 'doughnut',
@@ -6117,21 +6111,15 @@
             const show = sorted.slice(0, 100);
             const tbody = document.getElementById('finTableBody');
             tbody.innerHTML = show.map(d => {
-                const statusBadge = d.status === 'PAGO'
-                    ? '<span class="fin-badge-pago">PAGO</span>'
-                    : d.status === 'PENDENTE'
-                        ? '<span class="fin-badge-pendente">PENDENTE</span>'
-                        : `<span class="fin-badge-other">${d.status}</span>`;
-                const valClass = d.valor < 0 ? 'fin-val negative' : 'fin-val';
                 return `<tr>
                     <td>${d.data}</td>
                     <td title="${d.categoria}">${d.categoria}</td>
                     <td title="${d.fornecedor}">${d.fornecedor}</td>
                     <td title="${d.descricao}">${d.descricao}</td>
-                    <td>${statusBadge}</td>
-                    <td class="${valClass}">${fmtValor(d.valor)}</td>
-                    <td>${d.pgto}</td>
-                    <td>${d.competencia}</td>
+                    <td>${d.empresa || ''}</td>
+                    <td class="fin-val">${fmtValor(d.valor)}</td>
+                    <td>${d.classificacao || ''}</td>
+                    <td>${monthKeyLabel(d.caixa)}</td>
                 </tr>`;
             }).join('');
 
