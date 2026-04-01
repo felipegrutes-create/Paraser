@@ -3590,7 +3590,7 @@
             });
             // Incluir pacientes com consulta de retorno
             const retRows = raw.filter(r => {
-                const proc = (r[C.proc]||'').toLowerCase();
+                const proc = (r[d.C.proc]||'').toLowerCase();
                 return proc.includes('retorno') || proc.includes('retor');
             });
             retRows.forEach(r => {
