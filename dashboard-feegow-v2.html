@@ -5833,7 +5833,7 @@
             const [cm, cy] = curKey.split('/');
             const curVal = cy + cm; // "202604"
             const months = new Set();
-            finData.filter(d => d.status === 'PAGO').forEach(d => {
+            finData.forEach(d => {
                 const mk = getFinMonthKey(d);
                 if (!mk) return;
                 const [m, y] = mk.split('/');
@@ -5887,8 +5887,8 @@
             // ===== KPIs =====
             const curMonth = getLatestMonthWithData();
             const prevMonth = getPrevMonthKey(curMonth);
-            const totalCur = finData.filter(d => getFinMonthKey(d) === curMonth && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
-            const totalPrev = finData.filter(d => getFinMonthKey(d) === prevMonth && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
+            const totalCur = finData.filter(d => getFinMonthKey(d) === curMonth).reduce((s,d) => s + d.valor, 0);
+            const totalPrev = finData.filter(d => getFinMonthKey(d) === prevMonth).reduce((s,d) => s + d.valor, 0);
 
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
             const setH = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
@@ -5909,7 +5909,7 @@
 
             // Maior categoria (do mês mais recente)
             const catSums = {};
-            finData.filter(d => getFinMonthKey(d) === curMonth && d.status === 'PAGO').forEach(d => {
+            finData.filter(d => getFinMonthKey(d) === curMonth).forEach(d => {
                 catSums[d.categoria] = (catSums[d.categoria] || 0) + d.valor;
             });
             const topCat = Object.entries(catSums).sort((a,b) => b[1] - a[1])[0];
@@ -5925,7 +5925,7 @@
             const pendentes = finData.filter(d => d.status !== 'PAGO' && ateMesAtual(d)).reduce((s,d) => s + d.valor, 0);
             set('fin-pendentes', fmtValor(pendentes));
 
-            const dedutTotal = finData.filter(d => d.dedutivel && d.status === 'PAGO' && ateMesAtual(d)).reduce((s,d) => s + d.valor, 0);
+            const dedutTotal = finData.filter(d => d.dedutivel && ateMesAtual(d)).reduce((s,d) => s + d.valor, 0);
             set('fin-dedutivel', fmtValor(dedutTotal));
 
             // ===== CHARTS =====
