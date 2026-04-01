@@ -3945,7 +3945,7 @@
                 const isRetCol  = col.id === 'retorno-marcado';
                 const cardsHtml = cards.length
                     ? cards.map(({patient, crm, ghost, clone}) => {
-                        const locked = isRetCol && !ghost && patient.returned && !patient.retRealized;
+                        const locked = false;
                         return renderCRMCard(patient, crm, col.color, ghost, deletable, locked, clone);
                     }).join('')
                     : `<div class="crm-empty-col">Nenhum paciente</div>`;
