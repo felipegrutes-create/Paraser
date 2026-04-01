@@ -3582,16 +3582,24 @@
             };
 
             // Função para adicionar agendamento (só hoje e passado, sem futuros)
-            const doaToday = new Date();
-            doaToday.setHours(23,59,59,999);
+            const doaTodayDate = new Date();
+            doaTodayDate.setHours(23,59,59,999);
+            // Também criar string YYYYMMDD para comparação segura
+            const doaTodayStr = doaTodayDate.getFullYear() * 10000 + (doaTodayDate.getMonth()+1) * 100 + doaTodayDate.getDate();
+
             const doaAdd = (r, tipo) => {
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
                 if (doaExcludeStatus.includes(s)) return;
                 const pac = (r[d.C.pac]||'').trim();
                 const dt = r[d.C.data]||'';
                 if (!pac || !dt) return;
-                const dtParsed = parseDate(dt);
-                if (dtParsed && dtParsed > doaToday) return; // excluir futuros
+
+                // Filtrar futuros: parsear DD/MM/YYYY e comparar como número YYYYMMDD
+                const dtParts = dt.trim().split('/');
+                if (dtParts.length === 3) {
+                    const dtNum = parseInt(dtParts[2]) * 10000 + parseInt(dtParts[1]) * 100 + parseInt(dtParts[0]);
+                    if (dtNum > doaTodayStr) return; // data futura, excluir
+                }
                 const uniqueKey = pac.toLowerCase() + '|' + dt + '|' + tipo;
                 if (doaSeen.has(uniqueKey)) return;
                 doaSeen.add(uniqueKey);
