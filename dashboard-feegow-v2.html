@@ -2922,12 +2922,12 @@
             <p class="section-title">Painel Financeiro — Despesas e Pagamentos</p>
 
             <div class="kpi-grid" id="finKpiGrid">
-                <div class="kpi-card"><div class="value" id="fin-total-mes">—</div><div class="label" id="fin-total-mes-label">Despesas Mês Atual</div></div>
-                <div class="kpi-card"><div class="value" id="fin-total-ant">—</div><div class="label" id="fin-total-ant-label">Mês Anterior</div></div>
-                <div class="kpi-card"><div class="value" id="fin-variacao">—</div><div class="label">Variação MoM</div></div>
-                <div class="kpi-card purple"><div class="value" id="fin-maior-cat">—</div><div class="label" id="fin-maior-cat-label">Maior Categoria</div></div>
-                <div class="kpi-card orange"><div class="value" id="fin-acumulado">—</div><div class="label">Total Acumulado 2026</div></div>
-                <div class="kpi-card teal"><div class="value" id="fin-dedutivel">—</div><div class="label">Dedutível</div></div>
+                <div class="kpi-card"><div class="value" id="fin-mes1">—</div><div class="label" id="fin-mes1-label">Mês Atual</div></div>
+                <div class="kpi-card"><div class="value" id="fin-mes2">—</div><div class="label" id="fin-mes2-label">Mês -1</div></div>
+                <div class="kpi-card"><div class="value" id="fin-mes3">—</div><div class="label" id="fin-mes3-label">Mês -2</div></div>
+                <div class="kpi-card purple"><div class="value" id="fin-top1">—</div><div class="label" id="fin-top1-label">1º Maior Gasto</div></div>
+                <div class="kpi-card orange"><div class="value" id="fin-top2">—</div><div class="label" id="fin-top2-label">2º Maior Gasto</div></div>
+                <div class="kpi-card teal"><div class="value" id="fin-top3">—</div><div class="label" id="fin-top3-label">3º Maior Gasto</div></div>
             </div>
 
             <div class="fin-filters">
@@ -5884,36 +5884,36 @@
 
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
             const setH = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
-            set('fin-total-mes', fmtValor(totalCur));
-            setH('fin-total-mes-label', `Despesas (${monthKeyLabel(curMonth)})`);
-            set('fin-total-ant', fmtValor(totalPrev));
-            setH('fin-total-ant-label', `Mês Anterior (${monthKeyLabel(prevMonth)})`);
 
-            const varEl = document.getElementById('fin-variacao');
-            if (totalPrev > 0) {
-                const pct = ((totalCur - totalPrev) / totalPrev * 100).toFixed(1);
-                varEl.textContent = (pct > 0 ? '+' : '') + pct + '%';
-                varEl.style.color = pct > 0 ? '#ef4444' : '#10b981';
-            } else {
-                varEl.textContent = '—';
-                varEl.style.color = '';
-            }
+            // 3 últimos meses
+            const mes1 = curMonth;
+            const mes2 = prevMonth;
+            const mes3 = getPrevMonthKey(mes2);
+            const totalMes1 = finData.filter(d => getFinMonthKey(d) === mes1).reduce((s,d) => s + d.valor, 0);
+            const totalMes2 = finData.filter(d => getFinMonthKey(d) === mes2).reduce((s,d) => s + d.valor, 0);
+            const totalMes3 = finData.filter(d => getFinMonthKey(d) === mes3).reduce((s,d) => s + d.valor, 0);
 
-            // Maior categoria (do mês mais recente)
-            const catSums = {};
-            finData.filter(d => getFinMonthKey(d) === curMonth).forEach(d => {
-                catSums[d.categoria] = (catSums[d.categoria] || 0) + d.valor;
+            set('fin-mes1', fmtValor(totalMes1));
+            setH('fin-mes1-label', monthKeyLabel(mes1));
+            set('fin-mes2', fmtValor(totalMes2));
+            setH('fin-mes2-label', monthKeyLabel(mes2));
+            set('fin-mes3', fmtValor(totalMes3));
+            setH('fin-mes3-label', monthKeyLabel(mes3));
+
+            // Top 3 maiores categorias (acumulado total)
+            const catSumsAll = {};
+            finData.forEach(d => {
+                catSumsAll[d.categoria] = (catSumsAll[d.categoria] || 0) + d.valor;
             });
-            const topCat = Object.entries(catSums).sort((a,b) => b[1] - a[1])[0];
-            set('fin-maior-cat', topCat ? fmtValor(topCat[1]) : '—');
-            setH('fin-maior-cat-label', topCat ? `${topCat[0]} (${monthKeyLabel(curMonth)})` : 'Maior Categoria');
+            const topCats = Object.entries(catSumsAll).sort((a,b) => b[1] - a[1]);
 
-            // Total acumulado 2026 e Dedutível
-            const acumulado = finData.reduce((s,d) => s + d.valor, 0);
-            set('fin-acumulado', fmtValor(acumulado));
-
-            const dedutTotal = finData.filter(d => d.dedutivel).reduce((s,d) => s + d.valor, 0);
-            set('fin-dedutivel', fmtValor(dedutTotal));
+            const t1 = topCats[0]; const t2 = topCats[1]; const t3 = topCats[2];
+            set('fin-top1', t1 ? fmtValor(t1[1]) : '—');
+            setH('fin-top1-label', t1 ? t1[0] : '1º Maior Gasto');
+            set('fin-top2', t2 ? fmtValor(t2[1]) : '—');
+            setH('fin-top2-label', t2 ? t2[0] : '2º Maior Gasto');
+            set('fin-top3', t3 ? fmtValor(t3[1]) : '—');
+            setH('fin-top3-label', t3 ? t3[0] : '3º Maior Gasto');
 
             // ===== CHARTS =====
             renderFinCharts(filtered);
