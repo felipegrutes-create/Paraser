@@ -2926,18 +2926,14 @@
                 <div class="kpi-card"><div class="value" id="fin-total-ant">—</div><div class="label" id="fin-total-ant-label">Mês Anterior</div></div>
                 <div class="kpi-card"><div class="value" id="fin-variacao">—</div><div class="label">Variação MoM</div></div>
                 <div class="kpi-card purple"><div class="value" id="fin-maior-cat">—</div><div class="label" id="fin-maior-cat-label">Maior Categoria</div></div>
-                <div class="kpi-card orange"><div class="value" id="fin-pendentes">—</div><div class="label">Pendentes</div></div>
+                <div class="kpi-card orange"><div class="value" id="fin-acumulado">—</div><div class="label">Total Acumulado 2026</div></div>
                 <div class="kpi-card teal"><div class="value" id="fin-dedutivel">—</div><div class="label">Dedutível</div></div>
             </div>
 
             <div class="fin-filters">
                 <select id="finMes" onchange="renderFinanceiro()"><option value="">Todos os meses</option></select>
                 <select id="finCategoria" onchange="renderFinanceiro()"><option value="">Todas as categorias</option></select>
-                <select id="finStatus" onchange="renderFinanceiro()">
-                    <option value="">Todos os Status</option>
-                    <option value="PAGO">Pago</option>
-                    <option value="PENDENTE">Pendente</option>
-                </select>
+                <input type="hidden" id="finStatus" value="">
                 <select id="finPgto" onchange="renderFinanceiro()"><option value="">Todas as formas</option></select>
             </div>
 
@@ -5736,11 +5732,14 @@
                 const [, caixaYear] = caixaKey.split('/');
                 if (parseInt(caixaYear) < 2026) continue;
 
-                // Exclui transferências intercompany
+                // Somente status PAGO
+                const status = (r[iStatus] || '').toString().trim().toUpperCase();
+                if (status !== 'PAGO') continue;
+
+                // Exclui Acerto Empréstimo e Empréstimo
                 const catRaw = (r[iCat >= 0 ? iCat : -1] || '').toString().trim().toUpperCase();
-                const fornRaw = (r[iForn >= 0 ? iForn : -1] || '').toString().trim().toUpperCase();
                 if (catRaw.includes('ACERTO EMPR')) continue;
-                if (catRaw === 'EMPRÉSTIMO' && (fornRaw.includes('INSTITUTO PARASER') || fornRaw.includes('PARASER'))) continue;
+                if (catRaw === 'EMPRÉSTIMO') continue;
 
                 const valorRaw = (r[iValor] || '').toString().replace('R$', '').trim();
                 const valor = parseValorBR(valorRaw);
@@ -5752,8 +5751,6 @@
                 if (dp.length === 3) {
                     dateObj = new Date(parseInt(dp[2]), parseInt(dp[1]) - 1, parseInt(dp[0]));
                 }
-
-                const status = (r[iStatus] || '').toString().trim().toUpperCase();
                 const dedut = (r[iDedut >= 0 ? iDedut : -1] || '').toString().trim().toUpperCase();
 
                 data.push({
@@ -5908,16 +5905,11 @@
             set('fin-maior-cat', topCat ? fmtValor(topCat[1]) : '—');
             setH('fin-maior-cat-label', topCat ? `${topCat[0]} (${monthKeyLabel(curMonth)})` : 'Maior Categoria');
 
-            // Pendentes e Dedutível: só até mês atual
-            const curKeyKpi = getCurrentMonthKey();
-            const [ckm, cky] = curKeyKpi.split('/');
-            const curValKpi = cky + ckm;
-            const ateMesAtual = d => { const mk = getFinMonthKey(d); if (!mk) return true; const [m,y] = mk.split('/'); return (y+m) <= curValKpi; };
+            // Total acumulado 2026 e Dedutível
+            const acumulado = finData.reduce((s,d) => s + d.valor, 0);
+            set('fin-acumulado', fmtValor(acumulado));
 
-            const pendentes = finData.filter(d => d.status !== 'PAGO' && ateMesAtual(d)).reduce((s,d) => s + d.valor, 0);
-            set('fin-pendentes', fmtValor(pendentes));
-
-            const dedutTotal = finData.filter(d => d.dedutivel && ateMesAtual(d)).reduce((s,d) => s + d.valor, 0);
+            const dedutTotal = finData.filter(d => d.dedutivel).reduce((s,d) => s + d.valor, 0);
             set('fin-dedutivel', fmtValor(dedutTotal));
 
             // ===== CHARTS =====
