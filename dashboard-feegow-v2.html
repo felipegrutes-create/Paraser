@@ -5719,16 +5719,6 @@
             const iDedut   = ci('DEDUT');
             const iCaixa   = 12; // Coluna M (índice 12) = mês CAIXA
 
-            // DEBUG: ver headers e índices
-            console.log('=== FIN HEADERS ===');
-            headers.forEach((h, i) => console.log(`  Col ${i} (${String.fromCharCode(65+i)}): "${h}"`));
-            console.log('Indices:', { iAprov, iCat, iForn, iDesc, iStatus, iValor, iNF, iPgto, iDedut, iCaixa });
-            // Amostra: primeiras 3 linhas de dados
-            for (let s = 1; s <= 3 && s < rows.length; s++) {
-                const sr = rows[s];
-                console.log(`Row ${s}: Cat="${sr[iCat]}" Status="${sr[iStatus]}" Valor="${sr[iValor]}" ColM="${sr[12]}"`);
-            }
-
             const data = [];
             for (let i = 1; i < rows.length; i++) {
                 const r = rows[i];
@@ -5746,13 +5736,20 @@
                 const status = (r[iStatus] || '').toString().trim().toUpperCase();
                 if (status !== 'PAGO') continue;
 
-                // Exclui tudo que contenha Empréstimo no Plano de Contas
-                const catRaw = (r[iCat >= 0 ? iCat : -1] || '').toString().trim().toUpperCase();
-                if (catRaw.includes('EMPR')) continue;
+                // Exclui ACERTO EMPRÉSTIMO e EMPRÉSTIMO (exato)
+                const catRaw = (r[iCat >= 0 ? iCat : -1] || '').toString().trim().toUpperCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                if (catRaw.includes('ACERTO EMPR')) continue;
+                if (catRaw === 'EMPRESTIMO') continue;
 
-                const valorRaw = (r[iValor] || '').toString().replace('R$', '').trim();
-                const valor = parseValorBR(valorRaw);
+                // Parse valor preservando sinal negativo
+                const valorStr = (r[iValor] || '').toString().trim();
+                const isNeg = valorStr.includes('-');
+                let vs = valorStr.replace(/[^\d,\.]/g, '');
+                if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                let valor = parseFloat(vs);
                 if (isNaN(valor) || valor === 0) continue;
+                if (isNeg) valor = -valor;
 
                 const dateRaw = (r[iAprov] || '').toString().trim();
                 let dateObj = null;
@@ -5883,7 +5880,7 @@
             });
 
             // ===== KPIs =====
-            const curMonth = getLatestMonthWithData();
+            const curMonth = getCurrentMonthKey();
             const prevMonth = getPrevMonthKey(curMonth);
             const totalCur = finData.filter(d => getFinMonthKey(d) === curMonth).reduce((s,d) => s + d.valor, 0);
             const totalPrev = finData.filter(d => getFinMonthKey(d) === prevMonth).reduce((s,d) => s + d.valor, 0);
