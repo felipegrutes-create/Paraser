@@ -2922,8 +2922,8 @@
             <p class="section-title">Painel Financeiro — Despesas e Pagamentos</p>
 
             <div class="kpi-grid" id="finKpiGrid">
-                <div class="kpi-card"><div class="value" id="fin-total-mes">—</div><div class="label">Despesas Mês Atual</div></div>
-                <div class="kpi-card"><div class="value" id="fin-total-ant">—</div><div class="label">Mês Anterior</div></div>
+                <div class="kpi-card"><div class="value" id="fin-total-mes">—</div><div class="label" id="fin-total-mes-label">Despesas Mês Atual</div></div>
+                <div class="kpi-card"><div class="value" id="fin-total-ant">—</div><div class="label" id="fin-total-ant-label">Mês Anterior</div></div>
                 <div class="kpi-card"><div class="value" id="fin-variacao">—</div><div class="label">Variação MoM</div></div>
                 <div class="kpi-card purple"><div class="value" id="fin-maior-cat">—</div><div class="label" id="fin-maior-cat-label">Maior Categoria</div></div>
                 <div class="kpi-card orange"><div class="value" id="fin-pendentes">—</div><div class="label">Pendentes</div></div>
@@ -5731,7 +5731,7 @@
                 const catRaw = (r[iCat >= 0 ? iCat : -1] || '').toString().trim().toUpperCase();
                 const fornRaw = (r[iForn >= 0 ? iForn : -1] || '').toString().trim().toUpperCase();
                 if (catRaw.includes('ACERTO EMPR')) continue;
-                if (catRaw.includes('EMPR') && (fornRaw.includes('INSTITUTO PARASER') || fornRaw === 'PARASER')) continue;
+                if (catRaw === 'EMPRÉSTIMO' && (fornRaw.includes('INSTITUTO PARASER') || fornRaw.includes('PARASER'))) continue;
 
                 const valorRaw = (r[iValor] || '').toString().replace('R$', '').trim();
                 const valor = parseValorBR(valorRaw);
@@ -5771,15 +5771,35 @@
             return String(d.dateObj.getMonth()+1).padStart(2,'0') + '/' + d.dateObj.getFullYear();
         }
 
+        function monthKeyLabel(mk) {
+            if (!mk) return '';
+            const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            const [m, y] = mk.split('/');
+            return meses[parseInt(m) - 1] + '/' + y;
+        }
+
         function getCurrentMonthKey() {
             const now = new Date();
             return String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
         }
 
-        function getPrevMonthKey() {
-            const now = new Date();
-            now.setMonth(now.getMonth() - 1);
-            return String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+        function getPrevMonthKey(ref) {
+            const [m, y] = (ref || getCurrentMonthKey()).split('/');
+            const d = new Date(parseInt(y), parseInt(m) - 2, 1);
+            return String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+        }
+
+        function getLatestMonthWithData() {
+            const months = new Set();
+            finData.filter(d => d.status === 'PAGO').forEach(d => {
+                const mk = getFinMonthKey(d);
+                if (mk) months.add(mk);
+            });
+            const sorted = [...months].sort((a,b) => {
+                const [ma,ya] = a.split('/'); const [mb,yb] = b.split('/');
+                return (yb+mb).localeCompare(ya+ma);
+            });
+            return sorted[0] || getCurrentMonthKey();
         }
 
         function populateFinFilters() {
@@ -5821,14 +5841,17 @@
             });
 
             // ===== KPIs =====
-            const curMonth = getCurrentMonthKey();
-            const prevMonth = getPrevMonthKey();
+            const curMonth = getLatestMonthWithData();
+            const prevMonth = getPrevMonthKey(curMonth);
             const totalCur = finData.filter(d => getFinMonthKey(d) === curMonth && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
             const totalPrev = finData.filter(d => getFinMonthKey(d) === prevMonth && d.status === 'PAGO').reduce((s,d) => s + d.valor, 0);
 
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            const setH = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
             set('fin-total-mes', fmtValor(totalCur));
+            setH('fin-total-mes-label', `Despesas (${monthKeyLabel(curMonth)})`);
             set('fin-total-ant', fmtValor(totalPrev));
+            setH('fin-total-ant-label', `Mês Anterior (${monthKeyLabel(prevMonth)})`);
 
             const varEl = document.getElementById('fin-variacao');
             if (totalPrev > 0) {
@@ -5840,14 +5863,14 @@
                 varEl.style.color = '';
             }
 
-            // Maior categoria (do mês atual)
+            // Maior categoria (do mês mais recente)
             const catSums = {};
             finData.filter(d => getFinMonthKey(d) === curMonth && d.status === 'PAGO').forEach(d => {
                 catSums[d.categoria] = (catSums[d.categoria] || 0) + d.valor;
             });
             const topCat = Object.entries(catSums).sort((a,b) => b[1] - a[1])[0];
             set('fin-maior-cat', topCat ? fmtValor(topCat[1]) : '—');
-            set('fin-maior-cat-label', topCat ? topCat[0] : 'Maior Categoria');
+            setH('fin-maior-cat-label', topCat ? `${topCat[0]} (${monthKeyLabel(curMonth)})` : 'Maior Categoria');
 
             const pendentes = finData.filter(d => d.status !== 'PAGO').reduce((s,d) => s + d.valor, 0);
             set('fin-pendentes', fmtValor(pendentes));
