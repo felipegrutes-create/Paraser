@@ -5520,7 +5520,7 @@
 
         // Auto-refresh: verifica a cada 2 min se a página foi atualizada
         (function autoRefresh() {
-            const CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutos
+            const CHECK_INTERVAL = 30 * 1000; // 30 segundos
             let currentHash = null;
 
             async function checkForUpdates() {
