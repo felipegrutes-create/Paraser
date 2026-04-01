@@ -3568,73 +3568,48 @@
             renderKanban();
 
             // == DOADORAS / RECEPTORAS ==
-            // Dados: pacientes com 1ª vez OU retorno, exceto cancelado/remarcado
-            // Cada paciente aparece com a data da 1ª vez (se tiver) ou retorno
+            // Dados: agendamentos de 1ª vez e retorno, exceto cancelado/remarcado
+            // Lista todos os agendamentos (não agrupa por paciente)
             doaPatients = [];
-            const doaMap = {};
             const doaExcludeStatus = ['cancelado','desmarcado','remarcado'];
+            const doaSeen = new Set(); // evitar duplicatas exatas
 
-            // Incluir pacientes com consulta 1ª vez — guarda a PRIMEIRA data
-            vezRows.forEach(r => {
+            // Função para adicionar agendamento
+            const doaAdd = (r, tipo) => {
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
                 if (doaExcludeStatus.includes(s)) return;
-                const k = (r[d.C.pac]||'').trim().toLowerCase();
-                const dt = parseDate(r[d.C.data]);
-                if (!dt || !k) return;
-                if (!doaMap[k] || dt < doaMap[k].date) {
-                    doaMap[k] = {
-                        date: dt, pac: r[d.C.pac]||'', prof: r[d.C.prof]||'',
-                        cel: r[d.C.cel]||'', email: r[d.C.email]||'',
-                        dataAp: r[d.C.data]||'', proc: r[d.C.proc]||'',
-                        status: s, tipo: 'vez'
-                    };
-                }
-            });
+                const pac = (r[d.C.pac]||'').trim();
+                const dt = r[d.C.data]||'';
+                if (!pac || !dt) return;
+                const uniqueKey = pac.toLowerCase() + '|' + dt + '|' + tipo;
+                if (doaSeen.has(uniqueKey)) return;
+                doaSeen.add(uniqueKey);
+                doaPatients.push({
+                    pac, prof: r[d.C.prof]||'', cel: r[d.C.cel]||'',
+                    email: r[d.C.email]||'', dataAp: dt,
+                    proc: r[d.C.proc]||'', status: fmtStatus(s),
+                    statusRaw: s, tipo, key: normalizeKey(pac)
+                });
+            };
 
-            // Incluir pacientes com consulta de retorno — só se NÃO tem 1ª vez
-            const retRows = raw.filter(r => {
-                const proc = (r[d.C.proc]||'').toLowerCase();
-                return proc.includes('retorno') || proc.includes('retor');
-            });
-            retRows.forEach(r => {
-                const s = (r[d.C.sta]||'').toLowerCase().trim();
-                if (doaExcludeStatus.includes(s)) return;
-                const k = (r[d.C.pac]||'').trim().toLowerCase();
-                const dt = parseDate(r[d.C.data]);
-                if (!dt || !k) return;
-                if (!doaMap[k]) {
-                    doaMap[k] = {
-                        date: dt, pac: r[d.C.pac]||'', prof: r[d.C.prof]||'',
-                        cel: r[d.C.cel]||'', email: r[d.C.email]||'',
-                        dataAp: r[d.C.data]||'', proc: r[d.C.proc]||'',
-                        status: s, tipo: 'retorno'
-                    };
-                }
-            });
             // Formatar status para exibição
             const fmtStatus = (s) => {
                 if (s === 'atendido') return 'Atendido';
-                if (s === 'aguardando' || s === 'marcado') return 'Aguardando';
+                if (s === 'aguardando' || s === 'marcado' || s === 'marcado - não confirmado') return 'Aguardando';
                 if (s === 'nao compareceu' || s === 'não compareceu') return 'Não Compareceu';
-                if (s === 'cancelado' || s === 'desmarcado') return 'Cancelado';
-                if (s === 'remarcado') return 'Remarcado';
                 return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Desconhecido';
             };
-            Object.values(doaMap).forEach(info => {
-                doaPatients.push({
-                    pac:  info.pac,
-                    prof: info.prof,
-                    cel:  info.cel,
-                    email: info.email,
-                    dataAp: info.dataAp,
-                    proc: info.proc || '',
-                    status: fmtStatus(info.status),
-                    statusRaw: info.status,
-                    tipo: info.tipo,
-                    key:  normalizeKey(info.pac)
-                });
-            });
-            // Ordenar por data desc
+
+            // Incluir consultas 1ª vez
+            vezRows.forEach(r => doaAdd(r, 'vez'));
+
+            // Incluir consultas de retorno
+            raw.filter(r => {
+                const proc = (r[d.C.proc]||'').toLowerCase();
+                return proc.includes('retorno') || proc.includes('retor');
+            }).forEach(r => doaAdd(r, 'retorno'));
+
+            // Ordenar por data desc (mais recente primeiro)
             doaPatients.sort((a,b) => {
                 const da = parseDate(a.dataAp), db = parseDate(b.dataAp);
                 if (!da && !db) return 0;
