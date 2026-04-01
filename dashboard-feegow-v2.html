@@ -691,25 +691,11 @@
             text-transform: uppercase;
         }
 
-        .crm-card-locked {
-            opacity: 0.4;
-            pointer-events: none;
-            cursor: default;
-            filter: grayscale(20%);
-        }
-        .crm-card-locked:hover {
-            transform: none;
-            box-shadow: none;
-        }
-
         .crm-card-ret-date {
             font-size: 10px;
             color: var(--accent);
             margin-bottom: 5px;
             font-weight: 500;
-        }
-        .crm-card-locked .crm-card-ret-date {
-            color: var(--muted);
         }
 
         .crm-delete-btn {
@@ -3815,7 +3801,7 @@
 
         // ===== KANBAN RENDERING =====
 
-        function renderCRMCard(patient, crmRec, colColor, ghost = false, deletable = false, locked = false, clone = false) {
+        function renderCRMCard(patient, crmRec, colColor, ghost = false, deletable = false, clone = false) {
             const key    = normalizeKey(patient.pac);
             const c1     = fmtCRMDate(crmRec?.contato1_data);
             const c2     = fmtCRMDate(crmRec?.contato2_data);
@@ -3849,13 +3835,13 @@
             const obsShort = obs.length > 40 ? obs.slice(0, 40) + '…' : obs;
             const tel      = patient.cel   || '';
             const email    = patient.email || '';
-            const ghostCls = ghost ? ' crm-card-ghost' : (locked ? ' crm-card-locked' : (clone ? ' crm-card-clone' : ''));
-            const clickAttr = (ghost || locked) ? '' : `onclick="openCRMModal('${safeKey}')"`;
-            const deleteBtn = (deletable && !ghost && !locked && !clone)
+            const ghostCls = ghost ? ' crm-card-ghost' : (clone ? ' crm-card-clone' : '');
+            const clickAttr = ghost ? '' : `onclick="openCRMModal('${safeKey}')"`;
+            const deleteBtn = (deletable && !ghost && !clone)
                 ? `<button class="crm-delete-btn" onclick="event.stopPropagation();deleteCRMRecord('${safeKey}')" title="Apagar e voltar à origem">🗑️</button>`
                 : '';
             const retDateLine = (patient.retDate)
-                ? `<div class="crm-card-ret-date">${locked ? '🔒' : '📅'} Retorno: <b>${patient.retDate}</b></div>`
+                ? `<div class="crm-card-ret-date">📅 Retorno: <b>${patient.retDate}</b></div>`
                 : '';
             return `
                 <div class="crm-card${ghostCls}" style="border-left-color:${colColor}" ${clickAttr}>
@@ -3915,6 +3901,12 @@
                 if (crm && crm.proposta_feita === 'Sim' && col !== 'proposta-feita' && col !== 'quitado') {
                     groups['proposta-feita'].push({ patient: p, crm, ghost: false, clone: true });
                 }
+
+                // Clone na coluna Quitado: se marcou quitado mas não está na coluna quitado (ex: sem retorno Feegow)
+                const isQuit = crm && (crm.quitado === true || crm.quitado === 'TRUE');
+                if (isQuit && col !== 'quitado') {
+                    groups['quitado'].push({ patient: p, crm, ghost: false, clone: true });
+                }
             });
 
             // Ordenar retorno-marcado por data de retorno (mais antiga primeiro)
@@ -3942,11 +3934,9 @@
                 const countLabel = ghostCount > 0 ? `${count} <span style="font-size:9px;opacity:.6">+${ghostCount}</span>` : count;
 
                 const deletable = ['historico-contato','proposta-feita','quitado'].includes(col.id);
-                const isRetCol  = col.id === 'retorno-marcado';
                 const cardsHtml = cards.length
                     ? cards.map(({patient, crm, ghost, clone}) => {
-                        const locked = false;
-                        return renderCRMCard(patient, crm, col.color, ghost, deletable, locked, clone);
+                        return renderCRMCard(patient, crm, col.color, ghost, deletable, clone);
                     }).join('')
                     : `<div class="crm-empty-col">Nenhum paciente</div>`;
 
