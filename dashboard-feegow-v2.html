@@ -3568,18 +3568,20 @@
             renderKanban();
 
             // == DOADORAS / RECEPTORAS ==
-            // Dados: pacientes com 1ª vez OU retorno, todos os status
+            // Dados: pacientes com 1ª vez OU retorno, exceto cancelado/remarcado
+            // Cada paciente aparece com a data da 1ª vez (se tiver) ou retorno
             doaPatients = [];
             const doaMap = {};
-            // Incluir pacientes com consulta 1ª vez (exceto cancelado/remarcado)
             const doaExcludeStatus = ['cancelado','desmarcado','remarcado'];
+
+            // Incluir pacientes com consulta 1ª vez — guarda a PRIMEIRA data
             vezRows.forEach(r => {
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
                 if (doaExcludeStatus.includes(s)) return;
                 const k = (r[d.C.pac]||'').trim().toLowerCase();
                 const dt = parseDate(r[d.C.data]);
                 if (!dt || !k) return;
-                if (!doaMap[k] || dt > doaMap[k].date) {
+                if (!doaMap[k] || dt < doaMap[k].date) {
                     doaMap[k] = {
                         date: dt, pac: r[d.C.pac]||'', prof: r[d.C.prof]||'',
                         cel: r[d.C.cel]||'', email: r[d.C.email]||'',
@@ -3588,7 +3590,8 @@
                     };
                 }
             });
-            // Incluir pacientes com consulta de retorno
+
+            // Incluir pacientes com consulta de retorno — só se NÃO tem 1ª vez
             const retRows = raw.filter(r => {
                 const proc = (r[d.C.proc]||'').toLowerCase();
                 return proc.includes('retorno') || proc.includes('retor');
@@ -3599,7 +3602,7 @@
                 const k = (r[d.C.pac]||'').trim().toLowerCase();
                 const dt = parseDate(r[d.C.data]);
                 if (!dt || !k) return;
-                if (!doaMap[k] || dt > doaMap[k].date) {
+                if (!doaMap[k]) {
                     doaMap[k] = {
                         date: dt, pac: r[d.C.pac]||'', prof: r[d.C.prof]||'',
                         cel: r[d.C.cel]||'', email: r[d.C.email]||'',
