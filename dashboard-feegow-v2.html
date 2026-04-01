@@ -906,6 +906,9 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
         .doa-pat-name small {
             color: var(--muted);
@@ -1670,7 +1673,7 @@
         <button class="tab" onclick="showSection('sec-txconv',this)">TX Conversão</button>
         <button class="tab" onclick="showSection('sec-ret',this)">Retorno</button>
         <button class="tab" onclick="showSection('sec-pend',this)">CRM Comercial</button>
-        <button class="tab" onclick="showSection('sec-doadoras',this)">Doadoras/Receptoras</button>
+        <button class="tab" onclick="showSection('sec-doadoras',this)">Fluxo Pacientes</button>
         <button class="tab" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas</button>
         <button class="tab" onclick="showSection('sec-ficha',this)">Ficha Paciente</button>
     </div>
@@ -2137,7 +2140,7 @@
 
         <!-- DOADORAS / RECEPTORAS -->
         <section id="sec-doadoras" class="section">
-            <p class="section-title">Doadoras / Receptoras — Classificação de Pacientes</p>
+            <p class="section-title">Fluxo Pacientes — Classificação de Pacientes</p>
 
             <div class="kpi-grid">
                 <div class="kpi-card">
@@ -4209,8 +4212,15 @@
                             : 'doa-status-aguardando';
                         const flagAtencao = p.status !== 'Atendido' ? '<span class="doa-flag-atencao" title="Status: ' + p.status + '">⚠️</span>' : '';
                         const statusBadge = '<span class="doa-status ' + statusClass + '">' + p.status + '</span>' + flagAtencao;
+                        const crmRec = crmMap[p.key] || {};
+                        const crmProp = crmRec.proposta_feita === 'Sim';
+                        const crmQuit = crmRec.quitado === true || crmRec.quitado === 'TRUE';
+                        const crmBadges = [
+                            crmProp ? '<span class="crm-badge badge-blue" style="font-size:10px;margin-left:6px">📄 Proposta</span>' : '',
+                            crmQuit ? '<span class="crm-badge badge-green" style="font-size:10px;margin-left:4px">✅ Quitado</span>' : '',
+                        ].filter(Boolean).join('');
                         return `<div class="doa-patient-row" id="doa-row-${safeKey}">
-                            <div class="doa-pat-name">${p.pac}<small>${p.cel || ''}</small></div>
+                            <div class="doa-pat-name">${p.pac}<small>${p.cel || ''}</small>${crmBadges}</div>
                             <div class="doa-pat-status">${statusBadge} ${p.prof}</div>
                             <div class="doa-pat-proc" title="${p.proc}">${p.proc || '—'}</div>
                             <select class="doa-select ${selClass}" onchange="saveClassificacao('${safeKey}', this)">
