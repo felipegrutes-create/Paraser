@@ -3013,10 +3013,11 @@
                         <thead>
                             <tr>
                                 <th>Data</th>
-                                <th>Lançamento</th>
+                                <th>Descrição</th>
                                 <th>Fornecedor</th>
-                                <th>Empresa</th>
+                                <th>Pgto</th>
                                 <th style="text-align:right">Valor</th>
+                                <th>Caixa</th>
                             </tr>
                         </thead>
                         <tbody id="finModalBody"></tbody>
@@ -6176,30 +6177,89 @@
             renderFinanceiro();
         }
 
-        function openFinCatDetail(idx) {
+        let finPagamentosCache = null;
+
+        async function loadPagamentos() {
+            if (finPagamentosCache) return finPagamentosCache;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('PAGAMENTOS')}?key=${API_KEY}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            finPagamentosCache = json.values || [];
+            return finPagamentosCache;
+        }
+
+        async function openFinCatDetail(idx) {
             const cat = finTopCats[idx];
             if (!cat) return;
 
-            // Filtrar dados dessa categoria, ordenar por data desc
-            const items = finData.filter(d => d.categoria === cat)
-                .sort((a,b) => (b.dateObj || new Date(0)) - (a.dateObj || new Date(0)));
-
-            const total = items.reduce((s,d) => s + d.valor, 0);
+            // Normaliza a categoria para comparação
+            const catNorm = cat.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
             document.getElementById('finModalTitle').textContent = cat;
-            document.getElementById('finModalSubtitle').textContent =
-                `${items.length} lançamentos · Total: ${fmtValor(total)}`;
-
-            const tbody = document.getElementById('finModalBody');
-            tbody.innerHTML = items.map(d => `<tr>
-                <td>${d.data}</td>
-                <td title="${d.descricao}">${d.descricao}</td>
-                <td>${d.fornecedor}</td>
-                <td>${d.empresa || ''}</td>
-                <td class="fin-val">${fmtValor(d.valor)}</td>
-            </tr>`).join('');
-
+            document.getElementById('finModalSubtitle').textContent = 'Carregando dados de PAGAMENTOS...';
+            document.getElementById('finModalBody').innerHTML = '';
             document.getElementById('finModalOverlay').classList.add('open');
+
+            try {
+                const rows = await loadPagamentos();
+                // PAGAMENTOS: A=Aprovação, B=Plano, C=Fornecedor, D=Descrição, E=Status, F=Valor, G=NF, J=Pgto, M=Caixa
+                const items = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (!r || r.length < 13) continue;
+                    const plano = (r[1] || '').toString().trim().toUpperCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    if (plano !== catNorm) continue;
+                    const status = (r[4] || '').toString().trim().toUpperCase();
+                    if (status !== 'PAGO') continue;
+                    const caixa = (r[12] || '').toString().trim();
+                    if (!caixa) continue;
+
+                    const valorStr = (r[5] || '').toString().trim();
+                    const isNeg = valorStr.includes('-');
+                    let vs = valorStr.replace(/[^\d,\.]/g, '');
+                    if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                    let valor = parseFloat(vs);
+                    if (isNaN(valor) || valor === 0) continue;
+                    if (isNeg) valor = -valor;
+
+                    items.push({
+                        data: (r[0] || '').toString().trim(),
+                        fornecedor: (r[2] || '').toString().trim(),
+                        descricao: (r[3] || '').toString().trim(),
+                        valor,
+                        nf: (r[6] || '').toString().trim(),
+                        pgto: (r[9] || '').toString().trim(),
+                        caixa,
+                    });
+                }
+
+                // Ordenar por data desc
+                items.sort((a,b) => {
+                    const pa = a.data.split('/'), pb = b.data.split('/');
+                    const da = pa.length===3 ? new Date(pa[2],pa[1]-1,pa[0]) : new Date(0);
+                    const db = pb.length===3 ? new Date(pb[2],pb[1]-1,pb[0]) : new Date(0);
+                    return db - da;
+                });
+
+                const total = items.reduce((s,d) => s + d.valor, 0);
+                document.getElementById('finModalSubtitle').textContent =
+                    `${items.length} lançamentos · Total: ${fmtValor(total)}`;
+
+                document.getElementById('finModalBody').innerHTML = items.map(d => {
+                    const valClass = d.valor < 0 ? 'fin-val negative' : 'fin-val';
+                    return `<tr>
+                        <td>${d.data}</td>
+                        <td title="${d.descricao}" style="max-width:250px;overflow:hidden;text-overflow:ellipsis">${d.descricao}</td>
+                        <td>${d.fornecedor}</td>
+                        <td>${d.pgto}</td>
+                        <td class="${valClass}">${fmtValor(d.valor)}</td>
+                        <td>${d.caixa}</td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {
+                document.getElementById('finModalSubtitle').textContent = 'Erro ao carregar: ' + e.message;
+            }
         }
 
         function closeFinModal() {
