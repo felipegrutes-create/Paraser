@@ -5736,10 +5736,11 @@
                 if (!mesPad) continue;
                 const caixaKey = mesPad + '/2026';
 
-                // Exclui tudo com Empréstimo no Plano de Contas
+                // Exclui Empréstimo e Retirada de Sócios do Plano de Contas
                 const plano = (r[iPlano] || '').toString().trim().toUpperCase()
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                 if (plano.includes('EMPR')) continue;
+                if (plano.includes('RETIRADA')) continue;
 
                 // Saídas (coluna G)
                 const saidaStr = (r[iSaidas] || '').toString().trim();
