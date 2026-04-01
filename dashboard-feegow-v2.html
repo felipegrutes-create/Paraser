@@ -5766,9 +5766,40 @@
             return data;
         }
 
+        function parseCompetencia(comp) {
+            if (!comp) return '';
+            const s = comp.toString().trim().toLowerCase();
+            // Formato "jan./26", "fev./26", "mar/26", "jan/2026", "01/2026", "01/26"
+            const meses = {'jan':1,'fev':2,'mar':3,'abr':4,'mai':5,'jun':6,'jul':7,'ago':8,'set':9,'out':10,'nov':11,'dez':12};
+            // Tenta "mmm./yy" ou "mmm/yy"
+            const m1 = s.replace('.','').split('/');
+            if (m1.length === 2) {
+                const mesNum = meses[m1[0].trim().slice(0,3)];
+                if (mesNum) {
+                    const yr = m1[1].trim();
+                    const fullYear = yr.length === 2 ? '20' + yr : yr;
+                    return String(mesNum).padStart(2,'0') + '/' + fullYear;
+                }
+                // Tenta numérico "03/2026" ou "03/26"
+                const mn = parseInt(m1[0]);
+                if (mn >= 1 && mn <= 12) {
+                    const yr = m1[1].trim();
+                    const fullYear = yr.length === 2 ? '20' + yr : yr;
+                    return String(mn).padStart(2,'0') + '/' + fullYear;
+                }
+            }
+            return '';
+        }
+
         function getFinMonthKey(d) {
-            if (!d || !d.dateObj || isNaN(d.dateObj)) return d.competencia || '';
-            return String(d.dateObj.getMonth()+1).padStart(2,'0') + '/' + d.dateObj.getFullYear();
+            // Prioridade: coluna COMPETÊNCIA (mês real do pagamento)
+            const comp = parseCompetencia(d.competencia);
+            if (comp) return comp;
+            // Fallback: data de aprovação
+            if (d && d.dateObj && !isNaN(d.dateObj)) {
+                return String(d.dateObj.getMonth()+1).padStart(2,'0') + '/' + d.dateObj.getFullYear();
+            }
+            return '';
         }
 
         function monthKeyLabel(mk) {
