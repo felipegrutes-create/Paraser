@@ -4035,29 +4035,23 @@
 
             // Atualiza estado local imediatamente (optimistic update)
             crmMap[crmModalKey] = record;
-            renderKanban();
 
-            if (!CRM_SCRIPT_URL) {
-                statusEl.textContent = '⚠️ CRM_SCRIPT_URL não configurada — salvo localmente apenas';
-                statusEl.style.color = '#f59e0b';
-                setTimeout(closeCRMModal, 2000);
-                return;
-            }
+            // Fechar modal e atualizar kanban imediatamente
+            statusEl.textContent = '✓ Salvo';
+            statusEl.style.color = '#10b981';
+            setTimeout(() => {
+                closeCRMModal();
+                renderKanban();
+            }, 400);
 
-            try {
-                const res  = await fetch(CRM_SCRIPT_URL, {
-                    method:  'POST',
+            // Salvar no servidor em background (não bloqueia)
+            if (CRM_SCRIPT_URL) {
+                fetch(CRM_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
                     headers: { 'Content-Type': 'text/plain' },
-                    body:    JSON.stringify(record),
-                });
-                const json = await res.json();
-                if (json.error) throw new Error(json.error);
-                statusEl.textContent = '✓ Salvo no Sheets';
-                statusEl.style.color = '#10b981';
-                setTimeout(closeCRMModal, 1200);
-            } catch(e) {
-                statusEl.textContent = '✗ Erro: ' + e.message;
-                statusEl.style.color = '#ef4444';
+                    body: JSON.stringify(record),
+                }).catch(e => console.warn('CRM save error:', e));
             }
         }
 
