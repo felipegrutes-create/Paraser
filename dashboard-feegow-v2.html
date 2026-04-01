@@ -5727,9 +5727,11 @@
             for (let i = 1; i < rows.length; i++) {
                 const r = rows[i];
                 if (!r || !r.length) continue;
-                // Exclui transferências intercompany (Acerto Empréstimo)
+                // Exclui transferências intercompany
                 const catRaw = (r[iCat >= 0 ? iCat : -1] || '').toString().trim().toUpperCase();
+                const fornRaw = (r[iForn >= 0 ? iForn : -1] || '').toString().trim().toUpperCase();
                 if (catRaw.includes('ACERTO EMPR')) continue;
+                if (catRaw.includes('EMPR') && (fornRaw.includes('INSTITUTO PARASER') || fornRaw === 'PARASER')) continue;
 
                 const valorRaw = (r[iValor] || '').toString().replace('R$', '').trim();
                 const valor = parseValorBR(valorRaw);
