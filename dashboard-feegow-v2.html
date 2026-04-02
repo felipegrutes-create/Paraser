@@ -6464,7 +6464,7 @@
                     const varKw = ['medicamentos','repasse','cartao credito','cartao de credito','taxa rede','beneficio','reembolso','estorno'];
                     // Colunas: A=categoria, B=?, C=Janeiro, D=Fevereiro, ..., N=Dezembro
                     const meses = ['01','02','03','04','05','06','07','08','09','10','11','12'];
-                    console.log('Budget rows loaded:', budgetRows.length);
+                    const budgetSeen = new Set();
                     budgetRows.forEach((row, idx) => {
                         const catRaw = (row[0] || '').toString().trim();
                         const cat = norm(catRaw);
@@ -6472,7 +6472,9 @@
                         const isFixed = fixedKw.some(kw => cat.includes(kw));
                         const isVar = varKw.some(kw => cat.includes(kw));
                         if (!isFixed && !isVar) return;
-                        console.log('Budget cat:', catRaw, isFixed ? 'CF' : 'CV');
+                        // Evitar duplicatas (ex: "Reembolso" aparece 2x)
+                        if (budgetSeen.has(cat)) return;
+                        budgetSeen.add(cat);
                         for (let col = 2; col <= 13; col++) {
                             const valStr = (row[col] || '').toString().trim();
                             if (!valStr || valStr === '0' || valStr === 'R$ 0') continue;
