@@ -6069,6 +6069,13 @@
                     scales: {
                         x: { stacked: true, grid: { display: false } },
                         y: { stacked: true, grace: '5%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }
+                    },
+                    onClick(evt, elements) {
+                        if (!elements.length) return;
+                        const el = elements[0];
+                        const month = sortedMonths[el.index];
+                        const categoria = datasets[el.datasetIndex]?.label;
+                        if (month && categoria) openFinChartDetail(month, categoria, dataAtual);
                     }
                 }
             });
@@ -6392,6 +6399,75 @@
 
         function closeFinModal() {
             document.getElementById('finModalOverlay').classList.remove('open');
+        }
+
+        async function openFinChartDetail(month, categoria, chartData) {
+            const catNorm = categoria.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+            document.getElementById('finModalTitle').textContent = `${categoria} — ${monthKeyLabel(month)}`;
+            document.getElementById('finModalSubtitle').textContent = 'Carregando...';
+            document.getElementById('finModalBody').innerHTML = '';
+            document.getElementById('finModalTheadRow').innerHTML =
+                '<th style="width:90px">Data</th><th>Descrição</th><th style="width:140px">Fornecedor</th><th style="width:100px;text-align:right">Valor</th>';
+            document.getElementById('finModalOverlay').classList.add('open');
+
+            try {
+                const rows = await loadPagamentos();
+                const items = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (!r || r.length < 13) continue;
+                    const status = (r[4] || '').toString().trim().toUpperCase();
+                    if (status !== 'PAGO') continue;
+                    const caixa = (r[12] || '').toString().trim();
+                    if (!caixa) continue;
+                    const caixaKey = parseCompetencia(caixa);
+                    if (caixaKey !== month) continue;
+                    const plano = (r[1] || '').toString().trim().toUpperCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    // "Outros" = tudo que não é top 6
+                    const isOther = categoria === 'Outros';
+                    if (isOther) {
+                        const topCatNorms = (chartData._topCatNames || []).map(c =>
+                            c.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+                        if (topCatNorms.includes(plano)) continue;
+                    } else {
+                        if (plano !== catNorm) continue;
+                    }
+                    const valor = parseValorPag((r[5] || '').toString().trim());
+                    if (!valor) continue;
+
+                    items.push({
+                        data: (r[0] || '').toString().trim(),
+                        fornecedor: (r[2] || '').toString().trim(),
+                        descricao: (r[3] || '').toString().trim(),
+                        valor,
+                    });
+                }
+
+                items.sort((a,b) => {
+                    const pa = a.data.split('/'), pb = b.data.split('/');
+                    const da = pa.length===3 ? new Date(pa[2],pa[1]-1,pa[0]) : new Date(0);
+                    const db = pb.length===3 ? new Date(pb[2],pb[1]-1,pb[0]) : new Date(0);
+                    return db - da;
+                });
+
+                const total = items.reduce((s,d) => s + d.valor, 0);
+                document.getElementById('finModalSubtitle').textContent =
+                    `${items.length} lançamentos · Total: ${fmtValor(total)}`;
+
+                document.getElementById('finModalBody').innerHTML = items.map(d => {
+                    const valClass = d.valor < 0 ? 'fin-val negative' : 'fin-val';
+                    return `<tr>
+                        <td>${d.data}</td>
+                        <td title="${d.descricao}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${d.descricao}</td>
+                        <td>${d.fornecedor}</td>
+                        <td class="${valClass}">${fmtValor(d.valor)}</td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {
+                document.getElementById('finModalSubtitle').textContent = 'Erro: ' + e.message;
+            }
         }
 
         function toggleFinDetail(gi) {
