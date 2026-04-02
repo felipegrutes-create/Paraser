@@ -6461,22 +6461,22 @@
                     const fixedKw = ['tributos','folha','fornecedor','tarifa','juros'];
                     // Custo Variável (azul): Medicamentos, Repasse, Cartão Crédito, Taxa Rede, Benefício, Reembolso, Estorno
                     const varKw = ['medicamentos','repasse','cartao credito','cartao de credito','taxa rede','beneficio','reembolso','estorno'];
-                    // Colunas: A=categoria, B=?, C=Janeiro, D=Fevereiro, ..., N=Dezembro
+                    // Colunas: A=categoria, B=Janeiro, C=Fevereiro, ..., M=Dezembro
                     const meses = ['01','02','03','04','05','06','07','08','09','10','11','12'];
                     budgetRows.forEach(row => {
                         const cat = norm(row[0] || '');
-                        if (!cat) return;
+                        if (!cat || cat.includes('expense categories')) return;
                         const isFixed = fixedKw.some(kw => cat.includes(kw));
                         const isVar = varKw.some(kw => cat.includes(kw));
                         if (!isFixed && !isVar) return;
-                        for (let col = 2; col <= 13; col++) {
+                        for (let col = 1; col <= 12; col++) {
                             const valStr = (row[col] || '').toString().trim();
                             if (!valStr) continue;
                             let vs = valStr.replace(/[^\d,\.]/g, '');
                             if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
                             const val = parseFloat(vs);
                             if (isNaN(val) || val <= 0) continue;
-                            const mk = meses[col - 2] + '/2026';
+                            const mk = meses[col - 1] + '/2026';
                             if (isFixed) custoFixoByMonth[mk] = (custoFixoByMonth[mk] || 0) + val;
                             else custoVarByMonth[mk] = (custoVarByMonth[mk] || 0) + val;
                         }
