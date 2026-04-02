@@ -6271,14 +6271,16 @@
                 });
                 const maxMes = Math.max(...mesEntries.map(e => e[1]), 1);
 
-                const barsHtml = mesEntries.map(([mk, val]) => {
+                const barColors = ['#6366f1','#f59e0b','#ec4899','#14b8a6','#3b82f6','#ef4444'];
+                const barsHtml = mesEntries.map(([mk, val], bi) => {
                     const pct = Math.max((val / maxMes) * 100, 2);
-                    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                        <span style="font-size:11px;color:var(--muted);width:65px;text-align:right">${monthKeyLabel(mk)}</span>
-                        <div style="flex:1;background:rgba(255,255,255,0.05);border-radius:4px;height:18px;overflow:hidden">
-                            <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
+                    const color = barColors[bi % barColors.length];
+                    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                        <span style="font-size:11px;color:#e2e8f4;font-weight:500;width:65px;text-align:right">${monthKeyLabel(mk)}</span>
+                        <div style="flex:1;background:rgba(255,255,255,0.08);border-radius:5px;height:22px;overflow:hidden">
+                            <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,${color},${color}cc);border-radius:5px"></div>
                         </div>
-                        <span style="font-size:11px;font-weight:600;width:90px;text-align:right">${fmtValor(val)}</span>
+                        <span style="font-size:12px;font-weight:700;color:#e2e8f4;width:100px;text-align:right">${fmtValor(val)}</span>
                     </div>`;
                 }).join('');
 
