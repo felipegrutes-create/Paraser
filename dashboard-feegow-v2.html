@@ -957,6 +957,8 @@
         .fin-modal-body .fin-table td:first-child { width: 90px; }
         .fin-modal-body .fin-table td:nth-child(3) { width: 140px; }
         .fin-modal-body .fin-table td:last-child { width: 100px; }
+        .fin-group-row:hover { background: rgba(255,255,255,0.04); }
+        .fin-detail-row td { padding: 5px 12px; border-bottom: 1px solid rgba(255,255,255,0.02); }
 
         /* Doadoras/Receptoras */
         .doa-list { display: flex; flex-direction: column; gap: 20px; }
@@ -6298,15 +6300,41 @@
                         `${items.length} lançamentos · Total: ${fmtValor(total)}
                         <div style="margin-top:12px">${barsHtml}</div>`;
 
-                    // Tabela agrupada por Plano de Contas
-                    document.getElementById('finModalBody').innerHTML = planoEntries.map(([plano, info]) => {
+                    // Agrupar itens por plano para detalhe
+                    const planoItems = {};
+                    items.forEach(d => {
+                        if (!planoItems[d.plano]) planoItems[d.plano] = [];
+                        planoItems[d.plano].push(d);
+                    });
+
+                    // Tabela agrupada por Plano de Contas (clicável)
+                    document.getElementById('finModalBody').innerHTML = planoEntries.map(([plano, info], gi) => {
                         const pct = ((info.total / total) * 100).toFixed(1);
-                        return `<tr style="border-bottom:1px solid var(--border)">
-                            <td style="font-weight:600;padding:10px 12px">${plano}</td>
+                        const detailItems = (planoItems[plano] || []).sort((a,b) => {
+                            const pa = a.data.split('/'), pb = b.data.split('/');
+                            const da = pa.length===3 ? new Date(pa[2],pa[1]-1,pa[0]) : new Date(0);
+                            const db = pb.length===3 ? new Date(pb[2],pb[1]-1,pb[0]) : new Date(0);
+                            return db - da;
+                        });
+                        const detailRows = detailItems.map(d =>
+                            `<tr class="fin-detail-row">
+                                <td style="padding-left:24px;color:var(--muted);font-size:11px">${d.data}</td>
+                                <td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${d.descricao}">${d.descricao}</td>
+                                <td style="font-size:11px">${d.fornecedor}</td>
+                                <td class="fin-val" style="font-size:11px">${fmtValor(d.valor)}</td>
+                            </tr>`
+                        ).join('');
+                        return `<tr class="fin-group-row" style="border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleFinDetail(${gi})">
+                            <td style="font-weight:600;padding:10px 12px"><span id="fin-arrow-${gi}" style="display:inline-block;transition:transform .2s;margin-right:6px">▶</span>${plano}</td>
                             <td style="text-align:center;color:var(--muted);padding:10px 8px">${info.count}x</td>
                             <td style="text-align:right;color:var(--muted);padding:10px 8px">${pct}%</td>
                             <td class="fin-val" style="font-weight:600;padding:10px 12px">${fmtValor(info.total)}</td>
-                        </tr>`;
+                        </tr>
+                        <tr id="fin-detail-${gi}" style="display:none"><td colspan="4" style="padding:0">
+                            <table class="fin-table" style="background:rgba(255,255,255,0.02)">
+                                <tbody>${detailRows}</tbody>
+                            </table>
+                        </td></tr>`;
                     }).join('');
 
                 } else {
@@ -6364,6 +6392,15 @@
 
         function closeFinModal() {
             document.getElementById('finModalOverlay').classList.remove('open');
+        }
+
+        function toggleFinDetail(gi) {
+            const detail = document.getElementById('fin-detail-' + gi);
+            const arrow = document.getElementById('fin-arrow-' + gi);
+            if (!detail) return;
+            const open = detail.style.display !== 'none';
+            detail.style.display = open ? 'none' : '';
+            if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
         }
 
         async function loadAndRenderFinanceiro() {
