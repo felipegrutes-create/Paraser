@@ -6007,26 +6007,17 @@
                 return (ya+ma).localeCompare(yb+mb);
             });
 
-            // Top 6 categories by total, rest as "Outros"
+            // Todas as categorias ordenadas por total
             const catTotals = {};
             dataAtual.forEach(d => { catTotals[d.categoria] = (catTotals[d.categoria] || 0) + d.valor; });
-            const topCats = Object.entries(catTotals).sort((a,b) => b[1] - a[1]).slice(0, 6).map(e => e[0]);
+            const allCatsSorted = Object.entries(catTotals).sort((a,b) => b[1] - a[1]).map(e => e[0]);
 
-            const datasets = topCats.map((cat, i) => ({
+            const datasets = allCatsSorted.map((cat, i) => ({
                 label: cat,
                 data: sortedMonths.map(m => (monthCats[m]?.[cat] || 0)),
                 backgroundColor: FIN_COLORS[i % FIN_COLORS.length],
                 borderRadius: 3,
             }));
-
-            // "Outros" dataset
-            const outrosData = sortedMonths.map(m => {
-                const mc = monthCats[m] || {};
-                return Object.entries(mc).filter(([k]) => !topCats.includes(k)).reduce((s,[,v]) => s + v, 0);
-            });
-            if (outrosData.some(v => v > 0)) {
-                datasets.push({ label: 'Outros', data: outrosData, backgroundColor: '#475569', borderRadius: 3 });
-            }
 
             // Totais por mês para exibir no topo das barras
             const monthTotals = sortedMonths.map(m => {
