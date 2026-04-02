@@ -1741,6 +1741,19 @@
             font-weight: 500;
         }
         .dn-pending-btn:hover { background: rgba(0,212,170,0.2); }
+        .fin-view-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--muted);
+            font-family: 'Outfit', sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .fin-view-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .fin-view-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -2995,10 +3008,15 @@
             </div>
 
             <div class="chart-card" style="margin-top:20px">
-                <h3 style="display:flex;justify-content:space-between;align-items:center">
+                <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                     📊 Receita vs Despesas — Mensal
                     <span id="finRecDespTotal" style="font-size:12px;font-weight:600;color:var(--muted)"></span>
                 </h3>
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <button class="fin-view-btn active" onclick="setFinView('geral',this)">Visão Geral</button>
+                    <button class="fin-view-btn" onclick="setFinView('negocio',this)">Visão Negócio</button>
+                    <button class="fin-view-btn" onclick="setFinView('socios',this)">Visão Sócios</button>
+                </div>
                 <canvas id="finChartReceitaDespesa" height="120"></canvas>
             </div>
         </section>
@@ -6406,6 +6424,15 @@
             return receita;
         }
 
+        let finViewMode = 'geral';
+
+        function setFinView(mode, btn) {
+            finViewMode = mode;
+            document.querySelectorAll('.fin-view-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            renderReceitaDespesa();
+        }
+
         async function renderReceitaDespesa() {
             const curKey = getCurrentMonthKey();
             const [cm, cy] = curKey.split('/');
@@ -6420,16 +6447,46 @@
                 if (mk) despesaByMonth[mk] = (despesaByMonth[mk] || 0) + d.valor;
             });
 
-            const rvdMonths = [...new Set([...Object.keys(allReceita), ...Object.keys(despesaByMonth)])]
+            // Negócio mode: split costs into fixed and variable
+            const norm = (s) => (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const fixedKeywords = ['tributos','folha','fornecedor','tarifa','juros'];
+            const variableKeywords = ['medicamentos','repasse','cartao credito','taxa rede','beneficio','reembolso','estorno'];
+            const custoFixoByMonth = {};
+            const custoVarByMonth = {};
+            finData.forEach(d => {
+                const mk = getFinMonthKey(d);
+                if (!mk) return;
+                const cls = norm(d.classificacao);
+                const isFixed = fixedKeywords.some(kw => cls.includes(kw));
+                const isVariable = variableKeywords.some(kw => cls.includes(kw));
+                if (isFixed) {
+                    custoFixoByMonth[mk] = (custoFixoByMonth[mk] || 0) + d.valor;
+                } else if (isVariable) {
+                    custoVarByMonth[mk] = (custoVarByMonth[mk] || 0) + d.valor;
+                } else {
+                    // Unclassified goes to fixed by default
+                    custoFixoByMonth[mk] = (custoFixoByMonth[mk] || 0) + d.valor;
+                }
+            });
+
+            const allMonthKeys = finViewMode === 'negocio'
+                ? [...new Set([...Object.keys(allReceita), ...Object.keys(custoFixoByMonth), ...Object.keys(custoVarByMonth)])]
+                : [...new Set([...Object.keys(allReceita), ...Object.keys(despesaByMonth)])];
+
+            const rvdMonths = allMonthKeys
                 .filter(m => { const p = m.split('/'); return p.length === 2 && parseInt(p[1]) >= 2026 && (p[1]+p[0]) <= curVal; })
                 .sort((a,b) => { const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/'); return (ya+ma).localeCompare(yb+mb); });
 
             const rvdReceita = rvdMonths.map(m => allReceita[m] || 0);
             const rvdDespesa = rvdMonths.map(m => despesaByMonth[m] || 0);
+            const rvdFixo = rvdMonths.map(m => custoFixoByMonth[m] || 0);
+            const rvdVar = rvdMonths.map(m => custoVarByMonth[m] || 0);
 
             // Total acumulado
             const totalRec = rvdReceita.reduce((s,v) => s+v, 0);
-            const totalDesp = rvdDespesa.reduce((s,v) => s+v, 0);
+            const totalDesp = finViewMode === 'negocio'
+                ? rvdFixo.reduce((s,v) => s+v, 0) + rvdVar.reduce((s,v) => s+v, 0)
+                : rvdDespesa.reduce((s,v) => s+v, 0);
             const lucro = totalRec - totalDesp;
             const el = document.getElementById('finRecDespTotal');
             if (el) {
@@ -6437,16 +6494,66 @@
                 el.textContent = `Resultado acumulado: ${fmtValor(lucro)}`;
             }
 
-            mkChart('finChartReceitaDespesa', {
-                type: 'bar',
-                data: {
-                    labels: rvdMonths.map(m => monthKeyLabel(m)),
-                    datasets: [
-                        { label: 'Receita', data: rvdReceita, backgroundColor: 'rgba(16,185,129,0.85)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7 },
-                        { label: 'Despesa', data: rvdDespesa, backgroundColor: 'rgba(239,68,68,0.85)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7 },
-                    ]
-                },
-                plugins: [{
+            // Build datasets based on view mode
+            let datasets, chartPlugin;
+
+            if (finViewMode === 'negocio') {
+                datasets = [
+                    { label: 'Receita', data: rvdReceita, backgroundColor: 'rgba(16,185,129,0.85)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.8 },
+                    { label: 'Custo Fixo', data: rvdFixo, backgroundColor: 'rgba(245,158,11,0.85)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.8 },
+                    { label: 'Custo Variável', data: rvdVar, backgroundColor: 'rgba(239,68,68,0.85)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.8 },
+                ];
+                chartPlugin = {
+                    id: 'profitLabels',
+                    afterDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+                        ctx.save();
+                        rvdMonths.forEach((m, i) => {
+                            const rec = rvdReceita[i];
+                            const totalCost = rvdFixo[i] + rvdVar[i];
+                            const profit = rec - totalCost;
+                            const xPos = x.getPixelForValue(i);
+                            const yMax = y.getPixelForValue(Math.max(rec, totalCost));
+
+                            // Profit label with % and R$ value
+                            if (rec > 0) {
+                                const margin = (((rec - totalCost) / rec) * 100).toFixed(1);
+                                const isPos = parseFloat(margin) >= 0;
+                                ctx.font = '800 12px Outfit, sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillStyle = isPos ? '#10b981' : '#ef4444';
+                                const sign = isPos ? '+' : '';
+                                const valSign = profit >= 0 ? '' : '-';
+                                const profitLabel = sign + margin + '% (' + valSign + 'R$ ' + Math.abs(profit/1000).toFixed(0) + 'k)';
+                                ctx.fillText(profitLabel, xPos, yMax - 8);
+                            }
+
+                            // Values inside bars
+                            ctx.font = '600 10px Outfit, sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'top';
+                            ctx.fillStyle = '#fff';
+                            for (let ds = 0; ds < 3; ds++) {
+                                const meta = chart.getDatasetMeta(ds);
+                                if (meta.data[i]) {
+                                    const bar = meta.data[i];
+                                    const barH = bar.base - bar.y;
+                                    const val = ds === 0 ? rvdReceita[i] : ds === 1 ? rvdFixo[i] : rvdVar[i];
+                                    if (barH > 20) ctx.fillText(fmtValor(val), bar.x, bar.y + 4);
+                                }
+                            }
+                        });
+                        ctx.restore();
+                    }
+                };
+            } else {
+                // geral and socios modes (same for now)
+                datasets = [
+                    { label: 'Receita', data: rvdReceita, backgroundColor: 'rgba(16,185,129,0.85)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7 },
+                    { label: 'Despesa', data: rvdDespesa, backgroundColor: 'rgba(239,68,68,0.85)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7 },
+                ];
+                chartPlugin = {
                     id: 'profitLabels',
                     afterDraw(chart) {
                         const { ctx, scales: { x, y } } = chart;
@@ -6487,7 +6594,16 @@
                         });
                         ctx.restore();
                     }
-                }],
+                };
+            }
+
+            mkChart('finChartReceitaDespesa', {
+                type: 'bar',
+                data: {
+                    labels: rvdMonths.map(m => monthKeyLabel(m)),
+                    datasets: datasets
+                },
+                plugins: [chartPlugin],
                 options: {
                     responsive: true,
                     layout: { padding: { top: 35 } },
