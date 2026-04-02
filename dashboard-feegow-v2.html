@@ -3015,9 +3015,7 @@
                                 <th>Data</th>
                                 <th>Descrição</th>
                                 <th>Fornecedor</th>
-                                <th>Pgto</th>
                                 <th style="text-align:right">Valor</th>
-                                <th>Caixa</th>
                             </tr>
                         </thead>
                         <tbody id="finModalBody"></tbody>
@@ -6243,18 +6241,41 @@
                 });
 
                 const total = items.reduce((s,d) => s + d.valor, 0);
-                document.getElementById('finModalSubtitle').textContent =
-                    `${items.length} lançamentos · Total: ${fmtValor(total)}`;
+
+                // Totais por mês (caixa)
+                const mesSums = {};
+                items.forEach(d => {
+                    const ck = parseCompetencia(d.caixa);
+                    if (ck) mesSums[ck] = (mesSums[ck] || 0) + d.valor;
+                });
+                const mesEntries = Object.entries(mesSums).sort((a,b) => {
+                    const [ma,ya] = a[0].split('/'); const [mb,yb] = b[0].split('/');
+                    return (ya+ma).localeCompare(yb+mb);
+                });
+                const maxMes = Math.max(...mesEntries.map(e => e[1]), 1);
+
+                const barsHtml = mesEntries.map(([mk, val]) => {
+                    const pct = Math.max((val / maxMes) * 100, 2);
+                    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                        <span style="font-size:11px;color:var(--muted);width:65px;text-align:right">${monthKeyLabel(mk)}</span>
+                        <div style="flex:1;background:rgba(255,255,255,0.05);border-radius:4px;height:18px;overflow:hidden">
+                            <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
+                        </div>
+                        <span style="font-size:11px;font-weight:600;width:90px;text-align:right">${fmtValor(val)}</span>
+                    </div>`;
+                }).join('');
+
+                document.getElementById('finModalSubtitle').innerHTML =
+                    `${items.length} lançamentos · Total: ${fmtValor(total)}
+                    <div style="margin-top:12px">${barsHtml}</div>`;
 
                 document.getElementById('finModalBody').innerHTML = items.map(d => {
                     const valClass = d.valor < 0 ? 'fin-val negative' : 'fin-val';
                     return `<tr>
                         <td>${d.data}</td>
-                        <td title="${d.descricao}" style="max-width:250px;overflow:hidden;text-overflow:ellipsis">${d.descricao}</td>
+                        <td title="${d.descricao}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${d.descricao}</td>
                         <td>${d.fornecedor}</td>
-                        <td>${d.pgto}</td>
                         <td class="${valClass}">${fmtValor(d.valor)}</td>
-                        <td>${d.caixa}</td>
                     </tr>`;
                 }).join('');
             } catch(e) {
