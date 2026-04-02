@@ -2994,26 +2994,12 @@
                 </div>
             </div>
 
-            <div class="fin-table-wrap">
-                <h3 style="margin-bottom:12px;font-size:15px;font-weight:600">📋 Detalhamento de Despesas</h3>
-                <div class="fin-table-scroll">
-                    <table class="fin-table" id="finTable">
-                        <thead>
-                            <tr>
-                                <th data-sort="data" onclick="sortFinTable('data')">Data ↕</th>
-                                <th data-sort="categoria" onclick="sortFinTable('categoria')">Plano de Contas ↕</th>
-                                <th data-sort="fornecedor" onclick="sortFinTable('fornecedor')">Fornecedor ↕</th>
-                                <th>Lançamento</th>
-                                <th>Empresa</th>
-                                <th data-sort="valor" onclick="sortFinTable('valor')">Valor ↕</th>
-                                <th>Classificação</th>
-                                <th>Mês</th>
-                            </tr>
-                        </thead>
-                        <tbody id="finTableBody"></tbody>
-                    </table>
-                </div>
-                <div id="finTableInfo" style="text-align:center;color:var(--muted);font-size:12px;margin-top:8px"></div>
+            <div class="chart-card" style="margin-top:20px">
+                <h3 style="display:flex;justify-content:space-between;align-items:center">
+                    📊 Receita vs Despesas — Mensal
+                    <span id="finRecDespTotal" style="font-size:12px;font-weight:600;color:var(--muted)"></span>
+                </h3>
+                <canvas id="finChartReceitaDespesa" height="120"></canvas>
             </div>
         </section>
 
@@ -5742,11 +5728,9 @@
         const FIN_SHEET_ID = "1uthRnuWMk2A26dZ8GaMXinuvPyxY50EH8RX85NemXwg";
         let finData = [];
         let finDataLoaded = false;
-        let finPvValByMonth = {}; // receita 1ª vez por mês (do Feegow)
-        let finROIData = { receita: {}, ads: {} }; // dados para gráfico ROI
-        let finSortCol = 'data';
-        let finTopCats = []; // top categorias para modal
-        let finSortAsc = false;
+        let finPvValByMonth = {};
+        let finROIData = { receita: {}, ads: {} };
+        let finTopCats = [];
 
         const FIN_COLORS = [
             '#00d4aa','#6366f1','#f59e0b','#ef4444','#8b5cf6','#ec4899',
@@ -6031,7 +6015,7 @@
 
             // ===== CHARTS =====
             renderFinCharts(filtered);
-            renderFinTable(filtered);
+            renderReceitaDespesa();
         }
 
         function renderFinCharts(data) {
@@ -6393,51 +6377,137 @@
             }
         }
 
-        function renderFinTable(data) {
-            // Sort
-            const sorted = [...data].sort((a, b) => {
-                let va, vb;
-                switch (finSortCol) {
-                    case 'data':
-                        va = a.dateObj || new Date(0); vb = b.dateObj || new Date(0);
-                        return finSortAsc ? va - vb : vb - va;
-                    case 'valor':
-                        return finSortAsc ? a.valor - b.valor : b.valor - a.valor;
-                    case 'categoria':
-                        return finSortAsc ? a.categoria.localeCompare(b.categoria) : b.categoria.localeCompare(a.categoria);
-                    case 'fornecedor':
-                        return finSortAsc ? a.fornecedor.localeCompare(b.fornecedor) : b.fornecedor.localeCompare(a.fornecedor);
-                    case 'status':
-                        return finSortAsc ? a.status.localeCompare(b.status) : b.status.localeCompare(a.status);
-                    default: return 0;
+        let allReceitaCache = null;
+        async function loadAllReceita() {
+            if (allReceitaCache) return allReceitaCache;
+            const mesesMap = {'janeiro':'01','fevereiro':'02','março':'03','marco':'03','abril':'04',
+                'maio':'05','junho':'06','julho':'07','agosto':'08',
+                'setembro':'09','outubro':'10','novembro':'11','dezembro':'12'};
+            const receita = {};
+            try {
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(TAB)}?key=${API_KEY}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                const rows = json.values || [];
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (!r) continue;
+                    const mes2026 = (r[18] || '').toString().trim().toLowerCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    const mesPad = mesesMap[mes2026];
+                    if (!mesPad) continue;
+                    const valStr = (r[14] || '').toString().trim();
+                    let vs = valStr.replace(/[^\d,\.]/g, '');
+                    if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                    const val = parseFloat(vs);
+                    if (!isNaN(val) && val > 0) {
+                        const mk = mesPad + '/2026';
+                        receita[mk] = (receita[mk] || 0) + val;
+                    }
                 }
-            });
-
-            const show = sorted.slice(0, 100);
-            const tbody = document.getElementById('finTableBody');
-            tbody.innerHTML = show.map(d => {
-                return `<tr>
-                    <td>${d.data}</td>
-                    <td title="${d.categoria}">${d.categoria}</td>
-                    <td title="${d.fornecedor}">${d.fornecedor}</td>
-                    <td title="${d.descricao}">${d.descricao}</td>
-                    <td>${d.empresa || ''}</td>
-                    <td class="fin-val">${fmtValor(d.valor)}</td>
-                    <td>${d.classificacao || ''}</td>
-                    <td>${monthKeyLabel(d.caixa)}</td>
-                </tr>`;
-            }).join('');
-
-            document.getElementById('finTableInfo').textContent =
-                sorted.length > 100
-                    ? `Mostrando 100 de ${sorted.length} registros`
-                    : `${sorted.length} registro${sorted.length !== 1 ? 's' : ''}`;
+            } catch(e) { console.warn('All receita load error:', e); }
+            allReceitaCache = receita;
+            return receita;
         }
 
-        function sortFinTable(col) {
-            if (finSortCol === col) { finSortAsc = !finSortAsc; }
-            else { finSortCol = col; finSortAsc = true; }
-            renderFinanceiro();
+        async function renderReceitaDespesa() {
+            const curKey = getCurrentMonthKey();
+            const [cm, cy] = curKey.split('/');
+            const curVal = cy + cm;
+
+            const allReceita = await loadAllReceita();
+
+            // Despesas por mês do finData
+            const despesaByMonth = {};
+            finData.forEach(d => {
+                const mk = getFinMonthKey(d);
+                if (mk) despesaByMonth[mk] = (despesaByMonth[mk] || 0) + d.valor;
+            });
+
+            const rvdMonths = [...new Set([...Object.keys(allReceita), ...Object.keys(despesaByMonth)])]
+                .filter(m => { const p = m.split('/'); return p.length === 2 && parseInt(p[1]) >= 2026 && (p[1]+p[0]) <= curVal; })
+                .sort((a,b) => { const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/'); return (ya+ma).localeCompare(yb+mb); });
+
+            const rvdReceita = rvdMonths.map(m => allReceita[m] || 0);
+            const rvdDespesa = rvdMonths.map(m => despesaByMonth[m] || 0);
+
+            // Total acumulado
+            const totalRec = rvdReceita.reduce((s,v) => s+v, 0);
+            const totalDesp = rvdDespesa.reduce((s,v) => s+v, 0);
+            const lucro = totalRec - totalDesp;
+            const el = document.getElementById('finRecDespTotal');
+            if (el) {
+                el.style.color = lucro >= 0 ? '#10b981' : '#ef4444';
+                el.textContent = `Resultado acumulado: ${fmtValor(lucro)}`;
+            }
+
+            mkChart('finChartReceitaDespesa', {
+                type: 'bar',
+                data: {
+                    labels: rvdMonths.map(m => monthKeyLabel(m)),
+                    datasets: [
+                        { label: 'Receita', data: rvdReceita, backgroundColor: 'rgba(16,185,129,0.85)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7 },
+                        { label: 'Despesa', data: rvdDespesa, backgroundColor: 'rgba(239,68,68,0.85)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7 },
+                    ]
+                },
+                plugins: [{
+                    id: 'profitLabels',
+                    afterDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+                        ctx.save();
+                        rvdMonths.forEach((m, i) => {
+                            const rec = rvdReceita[i], desp = rvdDespesa[i];
+                            const xPos = x.getPixelForValue(i);
+                            const yMax = y.getPixelForValue(Math.max(rec, desp));
+
+                            // Margem de lucro
+                            if (rec > 0) {
+                                const margin = (((rec - desp) / rec) * 100).toFixed(1);
+                                const isPos = parseFloat(margin) >= 0;
+                                ctx.font = '800 13px Outfit, sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillStyle = isPos ? '#10b981' : '#ef4444';
+                                ctx.fillText((isPos ? '+' : '') + margin + '%', xPos, yMax - 10);
+                            }
+
+                            // Valores dentro das barras
+                            ctx.font = '600 10px Outfit, sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'top';
+                            ctx.fillStyle = '#fff';
+                            const meta0 = chart.getDatasetMeta(0);
+                            const meta1 = chart.getDatasetMeta(1);
+                            if (meta0.data[i]) {
+                                const bar = meta0.data[i];
+                                const barH = bar.base - bar.y;
+                                if (barH > 20) ctx.fillText(fmtValor(rec), bar.x, bar.y + 4);
+                            }
+                            if (meta1.data[i]) {
+                                const bar = meta1.data[i];
+                                const barH = bar.base - bar.y;
+                                if (barH > 20) ctx.fillText(fmtValor(desp), bar.x, bar.y + 4);
+                            }
+                        });
+                        ctx.restore();
+                    }
+                }],
+                options: {
+                    responsive: true,
+                    layout: { padding: { top: 35 } },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 12, font: { size: 12, weight: 600 }, color: '#fff', padding: 20 }
+                        },
+                        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtValor(ctx.raw) } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#e2e8f4', font: { weight: 600 } } },
+                        y: { grace: '10%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k', color: '#6b7a99' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                }
+            });
         }
 
         let finPagamentosCache = null;
