@@ -6377,36 +6377,46 @@
             }
         }
 
-        let allReceitaCache = null;
-        async function loadAllReceita() {
-            if (allReceitaCache) return allReceitaCache;
-            const mesesMap = {'janeiro':'01','fevereiro':'02','março':'03','marco':'03','abril':'04',
+        let finReceitaByMonth = {}; // cache receita por mês
+
+        async function loadReceitaFromLancamentos() {
+            if (Object.keys(finReceitaByMonth).length) return finReceitaByMonth;
+            const mesesMap = {'janeiro':'01','fevereiro':'02','marco':'03','abril':'04',
                 'maio':'05','junho':'06','julho':'07','agosto':'08',
                 'setembro':'09','outubro':'10','novembro':'11','dezembro':'12'};
+            const tabs = ['LANÇAMENTOS', 'LANÇAMENTOS_I'];
             const receita = {};
-            try {
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(TAB)}?key=${API_KEY}`;
-                const res = await fetch(url);
-                const json = await res.json();
-                const rows = json.values || [];
-                for (let i = 1; i < rows.length; i++) {
-                    const r = rows[i];
-                    if (!r) continue;
-                    const mes2026 = (r[18] || '').toString().trim().toLowerCase()
-                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    const mesPad = mesesMap[mes2026];
-                    if (!mesPad) continue;
-                    const valStr = (r[14] || '').toString().trim();
-                    let vs = valStr.replace(/[^\d,\.]/g, '');
-                    if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
-                    const val = parseFloat(vs);
-                    if (!isNaN(val) && val > 0) {
-                        const mk = mesPad + '/2026';
-                        receita[mk] = (receita[mk] || 0) + val;
+            for (const tab of tabs) {
+                try {
+                    const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
+                    const res = await fetch(url);
+                    const json = await res.json();
+                    const rows = json.values || [];
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || r.length < 14) continue;
+                        // Coluna N (13) = Plano de Contas, filtrar "RECEITA PRODUTOS E SERVIÇOS"
+                        const plano = (r[13] || '').toString().trim().toUpperCase()
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        if (!plano.includes('RECEITA PRODUTOS E SERVICOS')) continue;
+                        // Coluna K (10) = Mês
+                        const mesRaw = (r[10] || '').toString().trim().toLowerCase()
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        const mesPad = mesesMap[mesRaw];
+                        if (!mesPad) continue;
+                        // Coluna F (5) = Entradas
+                        const entStr = (r[5] || '').toString().trim();
+                        let vs = entStr.replace(/[^\d,\.]/g, '');
+                        if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                        const val = parseFloat(vs);
+                        if (!isNaN(val) && val > 0) {
+                            const mk = mesPad + '/2026';
+                            receita[mk] = (receita[mk] || 0) + val;
+                        }
                     }
-                }
-            } catch(e) { console.warn('All receita load error:', e); }
-            allReceitaCache = receita;
+                } catch(e) { console.warn('Receita load error:', tab, e); }
+            }
+            finReceitaByMonth = receita;
             return receita;
         }
 
@@ -6415,9 +6425,9 @@
             const [cm, cy] = curKey.split('/');
             const curVal = cy + cm;
 
-            const allReceita = await loadAllReceita();
+            const allReceita = await loadReceitaFromLancamentos();
 
-            // Despesas por mês do finData
+            // Despesas por mês do finData (mesmo filtro do dashboard: Tipo=Saída, sem EMPR, sem RETIRADA)
             const despesaByMonth = {};
             finData.forEach(d => {
                 const mk = getFinMonthKey(d);
