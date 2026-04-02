@@ -2990,6 +2990,7 @@
                 </div>
                 <div class="chart-card">
                     <h3>💰 Retirada de Sócios — Mensal</h3>
+                    <div id="finRetiradaTotal" style="text-align:center;font-size:20px;font-weight:700;color:#f59e0b;margin:8px 0"></div>
                     <canvas id="finChartRetirada"></canvas>
                 </div>
             </div>
@@ -6341,6 +6342,9 @@
                     const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/');
                     return (ya+ma).localeCompare(yb+mb);
                 });
+
+                const retTotal = Object.values(retSums).reduce((s,v) => s + v, 0);
+                document.getElementById('finRetiradaTotal').textContent = 'Total 2026: ' + fmtValor(retTotal);
 
                 mkChart('finChartRetirada', {
                     type: 'bar',
