@@ -5920,19 +5920,57 @@
             selPgto.innerHTML = '<option value="">Todas as empresas</option>' + [...empresas].sort().map(p => `<option value="${p}">${p}</option>`).join('');
         }
 
-        function renderFinanceiro() {
+        async function renderFinanceiro() {
             const fMes  = document.getElementById('finMes').value;
             const fCat  = document.getElementById('finCategoria').value;
             const fStat = document.getElementById('finStatus').value;
             const fPgto = document.getElementById('finPgto').value;
 
-            let filtered = finData.filter(d => {
-                if (fMes && getFinMonthKey(d) !== fMes) return false;
-                if (fCat && d.categoria !== fCat) return false;
-                if (fStat && d.status !== fStat) return false;
-                if (fPgto && d.empresa !== fPgto) return false;
-                return true;
-            });
+            // Cartão de Crédito: busca de PAGAMENTOS por PGTO = CART.*
+            const isCartaoFilter = fCat && fCat.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes('CARTAO DE CREDITO');
+            let filtered;
+
+            if (isCartaoFilter) {
+                const rows = await loadPagamentos();
+                filtered = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (!r || r.length < 13) continue;
+                    const status = (r[4] || '').toString().trim().toUpperCase();
+                    if (status !== 'PAGO') continue;
+                    const pgto = (r[9] || '').toString().trim().toUpperCase();
+                    if (!pgto.includes('CART.') && !pgto.includes('CART ')) continue;
+                    const caixa = (r[12] || '').toString().trim();
+                    if (!caixa) continue;
+                    const caixaKey = parseCompetencia(caixa);
+                    if (!caixaKey) continue;
+                    const valor = parseValorPag((r[5] || '').toString().trim());
+                    if (!valor || valor < 0) continue;
+                    if (fMes && caixaKey !== fMes) continue;
+
+                    const dateRaw = (r[0] || '').toString().trim();
+                    let dateObj = null;
+                    const dp = dateRaw.split('/');
+                    if (dp.length === 3) dateObj = new Date(parseInt(dp[2]), parseInt(dp[1])-1, parseInt(dp[0]));
+
+                    filtered.push({
+                        data: dateRaw, dateObj,
+                        categoria: (r[1] || '').toString().trim(), // Plano de Contas real
+                        fornecedor: (r[2] || '').toString().trim(),
+                        descricao: (r[3] || '').toString().trim(),
+                        empresa: pgto,
+                        valor, caixa: caixaKey,
+                    });
+                }
+            } else {
+                filtered = finData.filter(d => {
+                    if (fMes && getFinMonthKey(d) !== fMes) return false;
+                    if (fCat && d.categoria !== fCat) return false;
+                    if (fStat && d.status !== fStat) return false;
+                    if (fPgto && d.empresa !== fPgto) return false;
+                    return true;
+                });
+            }
 
             // ===== KPIs =====
             const curMonth = getCurrentMonthKey();
