@@ -3016,6 +3016,7 @@
                     <button class="fin-view-btn active" onclick="setFinView('geral',this)">Visão Geral</button>
                     <button class="fin-view-btn" onclick="setFinView('negocio',this)">Visão Negócio</button>
                     <button class="fin-view-btn" onclick="setFinView('socios',this)">Visão Sócios</button>
+                    <button class="fin-view-btn" onclick="setFinView('sede',this)">Visão Nova Sede</button>
                 </div>
                 <canvas id="finChartReceitaDespesa" height="120"></canvas>
             </div>
@@ -6459,7 +6460,8 @@
             const custoFixoByMonth = {};
             const custoVarByMonth = {};
             const socioByMonth = {};
-            if (finViewMode === 'negocio' || finViewMode === 'socios') {
+            const sedeByMonth = {};
+            if (finViewMode === 'negocio' || finViewMode === 'socios' || finViewMode === 'sede') {
                 try {
                     // Ler toda a aba para garantir que pega todas as linhas
                     const budgetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('Budget_Consolidado')}?key=${API_KEY}`;
@@ -6509,30 +6511,37 @@
                     console.log('CF by month:', JSON.stringify(custoFixoByMonth));
                     console.log('CV by month:', JSON.stringify(custoVarByMonth));
 
-                    // Ler linha 47 = Sócio (C47:N47)
-                    if (finViewMode === 'socios') {
-                        try {
-                            const socioUrl = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('Budget_Consolidado')}!C47:N47?key=${API_KEY}`;
-                            const socioRes = await fetch(socioUrl);
-                            const socioJson = await socioRes.json();
-                            const socioRow = (socioJson.values || [])[0] || [];
-                            for (let i = 0; i < 12; i++) {
-                                const valStr = (socioRow[i] || '').toString().trim();
-                                if (!valStr || valStr === '0') continue;
-                                let vs = valStr.replace(/R\$\s*/g, '').replace(/\s/g, '');
-                                if (vs.includes(',')) { vs = vs.replace(/\./g, '').replace(',', '.'); }
-                                else { const dp = vs.split('.'); if (dp.length > 1 && dp[dp.length-1].length === 3) vs = vs.replace(/\./g, ''); }
-                                vs = vs.replace(/[^\d.\-]/g, '');
-                                const val = parseFloat(vs);
-                                if (!isNaN(val) && val > 0) { socioByMonth[meses[i] + '/2026'] = val; }
-                            }
-                        } catch(e) { console.warn('Socio load error:', e); }
+                    // Helper para ler uma linha de valores
+                    const readBudgetRow = async (range) => {
+                        const u = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('Budget_Consolidado')}!${range}?key=${API_KEY}`;
+                        const r = await fetch(u);
+                        const j = await r.json();
+                        const row = (j.values || [])[0] || [];
+                        const result = {};
+                        for (let i = 0; i < 12; i++) {
+                            const valStr = (row[i] || '').toString().trim();
+                            if (!valStr || valStr === '0') continue;
+                            let vs = valStr.replace(/R\$\s*/g, '').replace(/\s/g, '');
+                            if (vs.includes(',')) { vs = vs.replace(/\./g, '').replace(',', '.'); }
+                            else { const dp = vs.split('.'); if (dp.length > 1 && dp[dp.length-1].length === 3) vs = vs.replace(/\./g, ''); }
+                            vs = vs.replace(/[^\d.\-]/g, '');
+                            const val = parseFloat(vs);
+                            if (!isNaN(val) && val > 0) result[meses[i] + '/2026'] = val;
+                        }
+                        return result;
+                    };
+                    // Ler Sócio (linha 47) e Nova Sede (linha 46)
+                    if (finViewMode === 'socios' || finViewMode === 'sede') {
+                        try { Object.assign(socioByMonth, await readBudgetRow('C47:N47')); } catch(e) { console.warn('Socio load error:', e); }
+                    }
+                    if (finViewMode === 'sede') {
+                        try { Object.assign(sedeByMonth, await readBudgetRow('C46:N46')); } catch(e) { console.warn('Sede load error:', e); }
                     }
                 } catch(e) { console.warn('Budget_Consolidado load error:', e); }
             }
 
-            const allMonthKeys = (finViewMode === 'negocio' || finViewMode === 'socios')
-                ? [...new Set([...Object.keys(allReceita), ...Object.keys(custoFixoByMonth), ...Object.keys(custoVarByMonth), ...Object.keys(socioByMonth)])]
+            const allMonthKeys = (finViewMode === 'negocio' || finViewMode === 'socios' || finViewMode === 'sede')
+                ? [...new Set([...Object.keys(allReceita), ...Object.keys(custoFixoByMonth), ...Object.keys(custoVarByMonth), ...Object.keys(socioByMonth), ...Object.keys(sedeByMonth)])]
                 : [...new Set([...Object.keys(allReceita), ...Object.keys(despesaByMonth)])];
 
             const rvdMonths = allMonthKeys
@@ -6544,11 +6553,14 @@
             const rvdFixo = rvdMonths.map(m => custoFixoByMonth[m] || 0);
             const rvdVar = rvdMonths.map(m => custoVarByMonth[m] || 0);
             const rvdSocio = rvdMonths.map(m => socioByMonth[m] || 0);
+            const rvdSede = rvdMonths.map(m => sedeByMonth[m] || 0);
 
             // Total acumulado
             const totalRec = rvdReceita.reduce((s,v) => s+v, 0);
-            const totalDesp = (finViewMode === 'negocio' || finViewMode === 'socios')
-                ? rvdFixo.reduce((s,v) => s+v, 0) + rvdVar.reduce((s,v) => s+v, 0) + (finViewMode === 'socios' ? rvdSocio.reduce((s,v) => s+v, 0) : 0)
+            const totalDesp = (finViewMode === 'negocio' || finViewMode === 'socios' || finViewMode === 'sede')
+                ? rvdFixo.reduce((s,v) => s+v, 0) + rvdVar.reduce((s,v) => s+v, 0)
+                    + ((finViewMode === 'socios' || finViewMode === 'sede') ? rvdSocio.reduce((s,v) => s+v, 0) : 0)
+                    + (finViewMode === 'sede' ? rvdSede.reduce((s,v) => s+v, 0) : 0)
                 : rvdDespesa.reduce((s,v) => s+v, 0);
             const lucro = totalRec - totalDesp;
             const el = document.getElementById('finRecDespTotal');
@@ -6560,15 +6572,19 @@
             // Build datasets based on view mode
             let datasets, chartPlugin;
 
-            if (finViewMode === 'negocio' || finViewMode === 'socios') {
+            if (finViewMode === 'negocio' || finViewMode === 'socios' || finViewMode === 'sede') {
                 // Barra empilhada: Custo Fixo (laranja) + Custo Variável (azul) numa única barra
                 datasets = [
                     { label: 'Receita', data: rvdReceita, backgroundColor: 'rgba(16,185,129,0.85)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'receita' },
                     { label: 'CF - Custo Fixo', data: rvdFixo, backgroundColor: 'rgba(245,158,11,0.85)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 0, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'despesa' },
                     { label: 'CV - Custo Variável', data: rvdVar, backgroundColor: 'rgba(59,130,246,0.85)', borderColor: '#3b82f6', borderWidth: 1, borderRadius: finViewMode === 'socios' ? 0 : {topLeft:6,topRight:6}, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'despesa' },
                 ];
-                if (finViewMode === 'socios') {
-                    datasets.push({ label: 'Sócio', data: rvdSocio, backgroundColor: 'rgba(168,85,247,0.85)', borderColor: '#a855f7', borderWidth: 1, borderRadius: {topLeft:6,topRight:6}, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'despesa' });
+                if (finViewMode === 'socios' || finViewMode === 'sede') {
+                    datasets[2].borderRadius = finViewMode === 'sede' ? 0 : (finViewMode === 'socios' ? 0 : {topLeft:6,topRight:6});
+                    datasets.push({ label: 'Sócio', data: rvdSocio, backgroundColor: 'rgba(168,85,247,0.85)', borderColor: '#a855f7', borderWidth: 1, borderRadius: finViewMode === 'sede' ? 0 : {topLeft:6,topRight:6}, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'despesa' });
+                }
+                if (finViewMode === 'sede') {
+                    datasets.push({ label: 'Nova Sede', data: rvdSede, backgroundColor: 'rgba(244,114,182,0.85)', borderColor: '#f472b6', borderWidth: 1, borderRadius: {topLeft:6,topRight:6}, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'despesa' });
                 }
                 chartPlugin = {
                     id: 'profitLabels',
@@ -6577,8 +6593,10 @@
                         ctx.save();
                         rvdMonths.forEach((m, i) => {
                             const rec = rvdReceita[i];
-                            const cf = rvdFixo[i], cv = rvdVar[i], sc = rvdSocio[i];
-                            const totalCost = cf + cv + (finViewMode === 'socios' ? sc : 0);
+                            const cf = rvdFixo[i], cv = rvdVar[i], sc = rvdSocio[i], sd = rvdSede[i];
+                            const totalCost = cf + cv
+                                + ((finViewMode === 'socios' || finViewMode === 'sede') ? sc : 0)
+                                + (finViewMode === 'sede' ? sd : 0);
                             const profit = rec - totalCost;
                             const xPos = x.getPixelForValue(i);
                             const yMax = y.getPixelForValue(Math.max(rec, totalCost));
@@ -6635,8 +6653,11 @@
                             };
                             drawBarLabel(chart.getDatasetMeta(1), 1, 'CF', cf);
                             drawBarLabel(chart.getDatasetMeta(2), 2, 'CV', cv);
-                            if (finViewMode === 'socios') {
+                            if (finViewMode === 'socios' || finViewMode === 'sede') {
                                 drawBarLabel(chart.getDatasetMeta(3), 3, 'SC', sc);
+                            }
+                            if (finViewMode === 'sede') {
+                                drawBarLabel(chart.getDatasetMeta(4), 4, 'NS', sd);
                             }
                         });
                         ctx.restore();
@@ -6710,8 +6731,8 @@
                         tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtValor(ctx.raw) } }
                     },
                     scales: {
-                        x: { stacked: finViewMode === 'negocio' || finViewMode === 'socios', grid: { display: false }, ticks: { color: '#e2e8f4', font: { weight: 600 } } },
-                        y: { stacked: finViewMode === 'negocio' || finViewMode === 'socios', grace: '10%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k', color: '#6b7a99' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                        x: { stacked: finViewMode !== 'geral', grid: { display: false }, ticks: { color: '#e2e8f4', font: { weight: 600 } } },
+                        y: { stacked: finViewMode !== 'geral', grace: '10%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k', color: '#6b7a99' }, grid: { color: 'rgba(255,255,255,0.04)' } }
                     }
                 }
             });
