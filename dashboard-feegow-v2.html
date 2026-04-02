@@ -6166,22 +6166,50 @@
             });
 
             // ===== ROI: Receita 1ª Vez vs ADS =====
-            // ADS por mês (da base LANÇAMENTOS)
-            const adsSums = {};
-            dataAtual.forEach(d => {
-                const catN = d.categoria.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                if (catN.includes('ADS') || catN.includes('PUBLICIDADE') || catN.includes('PROPAGANDA')) {
-                    const mk = getFinMonthKey(d);
-                    adsSums[mk] = (adsSums[mk] || 0) + d.valor;
-                }
+            // Converte finPvValByMonth (formato "2026-01") para "01/2026"
+            const receitaByMonth = {};
+            Object.entries(finPvValByMonth).forEach(([k, v]) => {
+                const [y, m] = k.split('-');
+                receitaByMonth[m + '/' + y] = v;
             });
 
-            // Meses que têm receita OU ads
-            const roiMonths = [...new Set([...Object.keys(finPvValByMonth), ...Object.keys(adsSums)])]
-                .filter(m => { const [mm,yy] = m.split('/'); return parseInt(yy) >= 2026 && (yy+mm) <= curVal; })
+            // ADS: busca de PAGAMENTOS (PGTO=CART.*, Plano=ADS/PUBLICIDADE)
+            const adsSums = {};
+            if (finPagamentosCache) {
+                for (let i = 1; i < finPagamentosCache.length; i++) {
+                    const r = finPagamentosCache[i];
+                    if (!r || r.length < 13) continue;
+                    const status = (r[4] || '').toString().trim().toUpperCase();
+                    if (status !== 'PAGO') continue;
+                    const pgto = (r[9] || '').toString().trim().toUpperCase();
+                    if (!pgto.includes('CART.') && !pgto.includes('CART ')) continue;
+                    const plano = (r[1] || '').toString().trim().toUpperCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    if (!plano.includes('ADS') && !plano.includes('PUBLICIDADE') && !plano.includes('PROPAGANDA')) continue;
+                    const caixa = (r[12] || '').toString().trim();
+                    if (!caixa) continue;
+                    const ck = parseCompetencia(caixa);
+                    if (!ck) continue;
+                    const valor = parseValorPag((r[5] || '').toString().trim());
+                    if (!valor || valor < 0) continue;
+                    adsSums[ck] = (adsSums[ck] || 0) + valor;
+                }
+            } else {
+                // Fallback: busca de LANÇAMENTOS
+                dataAtual.forEach(d => {
+                    const catN = d.categoria.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    if (catN.includes('ADS') || catN.includes('PUBLICIDADE') || catN.includes('PROPAGANDA')) {
+                        adsSums[getFinMonthKey(d)] = (adsSums[getFinMonthKey(d)] || 0) + d.valor;
+                    }
+                });
+            }
+
+            // Meses que têm receita OU ads (formato "MM/YYYY")
+            const roiMonths = [...new Set([...Object.keys(receitaByMonth), ...Object.keys(adsSums)])]
+                .filter(m => { const p = m.split('/'); return p.length === 2 && parseInt(p[1]) >= 2026 && (p[1]+p[0]) <= curVal; })
                 .sort((a,b) => { const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/'); return (ya+ma).localeCompare(yb+mb); });
 
-            const roiReceita = roiMonths.map(m => finPvValByMonth[m] || 0);
+            const roiReceita = roiMonths.map(m => receitaByMonth[m] || 0);
             const roiAds = roiMonths.map(m => adsSums[m] || 0);
 
             mkChart('finChartROI', {
@@ -6662,11 +6690,14 @@
             section.prepend(spinner);
 
             try {
-                const rows = await loadFinanceData();
+                const [rows] = await Promise.all([
+                    loadFinanceData(),
+                    loadPagamentos(), // pre-carrega PAGAMENTOS para ROI de ADS
+                ]);
                 finData = processFinanceData(rows);
                 finDataLoaded = true;
                 populateFinFilters();
-                renderFinanceiro();
+                await renderFinanceiro();
             } catch(e) {
                 console.error('Financeiro load error:', e);
                 spinner.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444">Erro ao carregar dados financeiros: ${e.message}</div>`;
