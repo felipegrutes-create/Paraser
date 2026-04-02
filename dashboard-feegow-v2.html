@@ -6401,9 +6401,9 @@
             if (Object.keys(finReceitaByMonth).length) return finReceitaByMonth;
             const receita = {};
             try {
-                // Ler linha 108 da aba Resultado (Receita Total por mês)
-                // C108=Janeiro, D108=Fevereiro, ..., N108=Dezembro
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('Resultado')}!C108:N108?key=${API_KEY}`;
+                // Ler linha 43 da aba Budget_Consolidado (Receita Total por mês)
+                // C43=Janeiro, D43=Fevereiro, ..., N43=Dezembro
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('Budget_Consolidado')}!C43:N43?key=${API_KEY}`;
                 const res = await fetch(url);
                 const json = await res.json();
                 const row = (json.values || [])[0] || [];
