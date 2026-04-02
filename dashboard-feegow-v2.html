@@ -6153,10 +6153,14 @@
             // Donut categoria
             const donutSlice = catEntries.slice(0,8);
             const donutTotal = donutSlice.reduce((s,e) => s + e[1], 0);
+            const donutLabels = donutSlice.map(e => {
+                const pct = donutTotal > 0 ? ((e[1] / donutTotal) * 100).toFixed(1) : 0;
+                return `${e[0]}  ${pct}%`;
+            });
             mkChart('finChartCatDonut', {
                 type: 'doughnut',
                 data: {
-                    labels: donutSlice.map(e => e[0]),
+                    labels: donutLabels,
                     datasets: [{ data: donutSlice.map(e => e[1]), backgroundColor: FIN_COLORS }]
                 },
                 options: {
@@ -6164,24 +6168,7 @@
                     plugins: {
                         legend: {
                             position: 'right',
-                            labels: {
-                                boxWidth: 12, font: { size: 12, weight: '600' },
-                                color: '#ffffff',
-                                generateLabels(chart) {
-                                    const ds = chart.data.datasets[0];
-                                    return chart.data.labels.map((label, i) => {
-                                        const val = ds.data[i];
-                                        const pct = donutTotal > 0 ? ((val / donutTotal) * 100).toFixed(1) : 0;
-                                        return {
-                                            text: `${label}  ${pct}%`,
-                                            fillStyle: ds.backgroundColor[i],
-                                            strokeStyle: 'transparent',
-                                            hidden: !chart.getDataVisibility(i),
-                                            index: i
-                                        };
-                                    });
-                                }
-                            }
+                            labels: { boxWidth: 12, font: { size: 12, weight: 600 }, color: '#fff' }
                         },
                         tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmtValor(ctx.raw) } }
                     }
