@@ -939,11 +939,24 @@
         .fin-modal-overlay.open { display: flex; }
         .fin-modal {
             background: var(--surface); border: 1px solid var(--border);
-            border-radius: 14px; padding: 24px; width: 90%; max-width: 800px;
-            max-height: 80vh; overflow-y: auto; position: relative;
+            border-radius: 14px; width: 90%; max-width: 800px;
+            max-height: 85vh; position: relative;
+            display: flex; flex-direction: column;
+        }
+        .fin-modal-header {
+            padding: 24px 24px 0; flex-shrink: 0;
+            border-bottom: 1px solid var(--border);
         }
         .fin-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
         .fin-modal-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+        .fin-modal-thead-fixed { margin-bottom: 0; }
+        .fin-modal-thead-fixed th { background: var(--surface); }
+        .fin-modal-body {
+            overflow-y: auto; flex: 1; padding: 0 24px 24px;
+        }
+        .fin-modal-body .fin-table td:first-child { width: 90px; }
+        .fin-modal-body .fin-table td:nth-child(3) { width: 140px; }
+        .fin-modal-body .fin-table td:last-child { width: 100px; }
 
         /* Doadoras/Receptoras */
         .doa-list { display: flex; flex-direction: column; gap: 20px; }
@@ -3006,18 +3019,22 @@
         <div class="fin-modal-overlay" id="finModalOverlay" onclick="if(event.target===this)closeFinModal()">
             <div class="fin-modal">
                 <button class="crm-modal-close" onclick="closeFinModal()">✕</button>
-                <div class="fin-modal-title" id="finModalTitle">—</div>
-                <div class="fin-modal-subtitle" id="finModalSubtitle">—</div>
-                <div class="fin-modal-body">
-                    <table class="fin-table" style="margin-top:12px">
+                <div class="fin-modal-header">
+                    <div class="fin-modal-title" id="finModalTitle">—</div>
+                    <div class="fin-modal-subtitle" id="finModalSubtitle">—</div>
+                    <table class="fin-table fin-modal-thead-fixed">
                         <thead>
                             <tr>
-                                <th>Data</th>
+                                <th style="width:90px">Data</th>
                                 <th>Descrição</th>
-                                <th>Fornecedor</th>
-                                <th style="text-align:right">Valor</th>
+                                <th style="width:140px">Fornecedor</th>
+                                <th style="width:100px;text-align:right">Valor</th>
                             </tr>
                         </thead>
+                    </table>
+                </div>
+                <div class="fin-modal-body">
+                    <table class="fin-table">
                         <tbody id="finModalBody"></tbody>
                     </table>
                 </div>
