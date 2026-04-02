@@ -6411,8 +6411,16 @@
                 for (let i = 0; i < 12; i++) {
                     const valStr = (row[i] || '').toString().trim();
                     if (!valStr) continue;
-                    let vs = valStr.replace(/[^\d,\.]/g, '');
-                    if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                    let vs = valStr.replace(/R\$\s*/g, '').replace(/\s/g, '');
+                    if (vs.includes(',')) {
+                        vs = vs.replace(/\./g, '').replace(',', '.');
+                    } else {
+                        const dotParts = vs.split('.');
+                        if (dotParts.length > 1 && dotParts[dotParts.length-1].length === 3) {
+                            vs = vs.replace(/\./g, '');
+                        }
+                    }
+                    vs = vs.replace(/[^\d.\-]/g, '');
                     const val = parseFloat(vs);
                     if (!isNaN(val) && val > 0) {
                         const mk = meses[i] + '/2026';
