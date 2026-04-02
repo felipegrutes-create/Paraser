@@ -3022,9 +3022,9 @@
                 <div class="fin-modal-header">
                     <div class="fin-modal-title" id="finModalTitle">—</div>
                     <div class="fin-modal-subtitle" id="finModalSubtitle">—</div>
-                    <table class="fin-table fin-modal-thead-fixed">
+                    <table class="fin-table fin-modal-thead-fixed" id="finModalThead">
                         <thead>
-                            <tr>
+                            <tr id="finModalTheadRow">
                                 <th style="width:90px">Data</th>
                                 <th>Descrição</th>
                                 <th style="width:140px">Fornecedor</th>
@@ -6203,100 +6203,160 @@
             return finPagamentosCache;
         }
 
+        function parseValorPag(valorStr) {
+            const isNeg = valorStr.includes('-');
+            let vs = valorStr.replace(/[^\d,\.]/g, '');
+            if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+            let valor = parseFloat(vs);
+            if (isNaN(valor) || valor === 0) return 0;
+            return isNeg ? -valor : valor;
+        }
+
+        function buildFinModalBars(items) {
+            const mesSums = {};
+            items.forEach(d => {
+                const ck = parseCompetencia(d.caixa);
+                if (ck) mesSums[ck] = (mesSums[ck] || 0) + d.valor;
+            });
+            const mesEntries = Object.entries(mesSums).sort((a,b) => {
+                const [ma,ya] = a[0].split('/'); const [mb,yb] = b[0].split('/');
+                return (ya+ma).localeCompare(yb+mb);
+            });
+            const maxMes = Math.max(...mesEntries.map(e => e[1]), 1);
+            const barColors = ['#6366f1','#f59e0b','#ec4899','#14b8a6','#3b82f6','#ef4444'];
+            return mesEntries.map(([mk, val], bi) => {
+                const pct = Math.max((val / maxMes) * 100, 2);
+                const color = barColors[bi % barColors.length];
+                return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                    <span style="font-size:11px;color:#e2e8f4;font-weight:500;width:65px;text-align:right">${monthKeyLabel(mk)}</span>
+                    <div style="flex:1;background:rgba(255,255,255,0.08);border-radius:5px;height:22px;overflow:hidden">
+                        <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,${color},${color}cc);border-radius:5px"></div>
+                    </div>
+                    <span style="font-size:12px;font-weight:700;color:#e2e8f4;width:100px;text-align:right">${fmtValor(val)}</span>
+                </div>`;
+            }).join('');
+        }
+
         async function openFinCatDetail(idx) {
             const cat = finTopCats[idx];
             if (!cat) return;
 
-            // Normaliza a categoria para comparação
             const catNorm = cat.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const isCartao = catNorm.includes('CARTAO DE CREDITO');
 
             document.getElementById('finModalTitle').textContent = cat;
             document.getElementById('finModalSubtitle').textContent = 'Carregando dados de PAGAMENTOS...';
             document.getElementById('finModalBody').innerHTML = '';
+            // Adaptar headers da tabela
+            document.getElementById('finModalTheadRow').innerHTML = isCartao
+                ? '<th>Plano de Contas</th><th style="text-align:center">Qtd</th><th style="text-align:right">%</th><th style="width:120px;text-align:right">Valor</th>'
+                : '<th style="width:90px">Data</th><th>Descrição</th><th style="width:140px">Fornecedor</th><th style="width:100px;text-align:right">Valor</th>';
             document.getElementById('finModalOverlay').classList.add('open');
 
             try {
                 const rows = await loadPagamentos();
-                // PAGAMENTOS: A=Aprovação, B=Plano, C=Fornecedor, D=Descrição, E=Status, F=Valor, G=NF, J=Pgto, M=Caixa
-                const items = [];
-                for (let i = 1; i < rows.length; i++) {
-                    const r = rows[i];
-                    if (!r || r.length < 13) continue;
-                    const plano = (r[1] || '').toString().trim().toUpperCase()
-                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    if (plano !== catNorm) continue;
-                    const status = (r[4] || '').toString().trim().toUpperCase();
-                    if (status !== 'PAGO') continue;
-                    const caixa = (r[12] || '').toString().trim();
-                    if (!caixa) continue;
 
-                    const valorStr = (r[5] || '').toString().trim();
-                    const isNeg = valorStr.includes('-');
-                    let vs = valorStr.replace(/[^\d,\.]/g, '');
-                    if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
-                    let valor = parseFloat(vs);
-                    if (isNaN(valor) || valor === 0) continue;
-                    if (isNeg) valor = -valor;
+                if (isCartao) {
+                    // CARTÃO DE CRÉDITO: filtra por PGTO = CART. ITAÚ ou CART. SANTANDER, agrupa por Plano de Contas
+                    const items = [];
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || r.length < 13) continue;
+                        const status = (r[4] || '').toString().trim().toUpperCase();
+                        if (status !== 'PAGO') continue;
+                        const pgto = (r[9] || '').toString().trim().toUpperCase();
+                        if (!pgto.includes('CART.') && !pgto.includes('CART ')) continue;
+                        const caixa = (r[12] || '').toString().trim();
+                        if (!caixa) continue;
+                        const valor = parseValorPag((r[5] || '').toString().trim());
+                        if (!valor || valor < 0) continue;
 
-                    items.push({
-                        data: (r[0] || '').toString().trim(),
-                        fornecedor: (r[2] || '').toString().trim(),
-                        descricao: (r[3] || '').toString().trim(),
-                        valor,
-                        nf: (r[6] || '').toString().trim(),
-                        pgto: (r[9] || '').toString().trim(),
-                        caixa,
+                        items.push({
+                            data: (r[0] || '').toString().trim(),
+                            plano: (r[1] || '').toString().trim(),
+                            fornecedor: (r[2] || '').toString().trim(),
+                            descricao: (r[3] || '').toString().trim(),
+                            valor,
+                            pgto: (r[9] || '').toString().trim(),
+                            caixa,
+                        });
+                    }
+
+                    const total = items.reduce((s,d) => s + d.valor, 0);
+                    const barsHtml = buildFinModalBars(items);
+
+                    // Agrupar por Plano de Contas
+                    const planoSums = {};
+                    items.forEach(d => {
+                        if (!planoSums[d.plano]) planoSums[d.plano] = { total: 0, count: 0 };
+                        planoSums[d.plano].total += d.valor;
+                        planoSums[d.plano].count++;
                     });
+                    const planoEntries = Object.entries(planoSums).sort((a,b) => b[1].total - a[1].total);
+
+                    document.getElementById('finModalSubtitle').innerHTML =
+                        `${items.length} lançamentos · Total: ${fmtValor(total)}
+                        <div style="margin-top:12px">${barsHtml}</div>`;
+
+                    // Tabela agrupada por Plano de Contas
+                    document.getElementById('finModalBody').innerHTML = planoEntries.map(([plano, info]) => {
+                        const pct = ((info.total / total) * 100).toFixed(1);
+                        return `<tr style="border-bottom:1px solid var(--border)">
+                            <td style="font-weight:600;padding:10px 12px">${plano}</td>
+                            <td style="text-align:center;color:var(--muted);padding:10px 8px">${info.count}x</td>
+                            <td style="text-align:right;color:var(--muted);padding:10px 8px">${pct}%</td>
+                            <td class="fin-val" style="font-weight:600;padding:10px 12px">${fmtValor(info.total)}</td>
+                        </tr>`;
+                    }).join('');
+
+                } else {
+                    // Outras categorias: filtro normal por Plano de Contas
+                    const items = [];
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || r.length < 13) continue;
+                        const plano = (r[1] || '').toString().trim().toUpperCase()
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        if (plano !== catNorm) continue;
+                        const status = (r[4] || '').toString().trim().toUpperCase();
+                        if (status !== 'PAGO') continue;
+                        const caixa = (r[12] || '').toString().trim();
+                        if (!caixa) continue;
+                        const valor = parseValorPag((r[5] || '').toString().trim());
+                        if (!valor) continue;
+
+                        items.push({
+                            data: (r[0] || '').toString().trim(),
+                            fornecedor: (r[2] || '').toString().trim(),
+                            descricao: (r[3] || '').toString().trim(),
+                            valor, caixa,
+                        });
+                    }
+
+                    items.sort((a,b) => {
+                        const pa = a.data.split('/'), pb = b.data.split('/');
+                        const da = pa.length===3 ? new Date(pa[2],pa[1]-1,pa[0]) : new Date(0);
+                        const db = pb.length===3 ? new Date(pb[2],pb[1]-1,pb[0]) : new Date(0);
+                        return db - da;
+                    });
+
+                    const total = items.reduce((s,d) => s + d.valor, 0);
+                    const barsHtml = buildFinModalBars(items);
+
+                    document.getElementById('finModalSubtitle').innerHTML =
+                        `${items.length} lançamentos · Total: ${fmtValor(total)}
+                        <div style="margin-top:12px">${barsHtml}</div>`;
+
+                    document.getElementById('finModalBody').innerHTML = items.map(d => {
+                        const valClass = d.valor < 0 ? 'fin-val negative' : 'fin-val';
+                        return `<tr>
+                            <td>${d.data}</td>
+                            <td title="${d.descricao}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${d.descricao}</td>
+                            <td>${d.fornecedor}</td>
+                            <td class="${valClass}">${fmtValor(d.valor)}</td>
+                        </tr>`;
+                    }).join('');
                 }
-
-                // Ordenar por data desc
-                items.sort((a,b) => {
-                    const pa = a.data.split('/'), pb = b.data.split('/');
-                    const da = pa.length===3 ? new Date(pa[2],pa[1]-1,pa[0]) : new Date(0);
-                    const db = pb.length===3 ? new Date(pb[2],pb[1]-1,pb[0]) : new Date(0);
-                    return db - da;
-                });
-
-                const total = items.reduce((s,d) => s + d.valor, 0);
-
-                // Totais por mês (caixa)
-                const mesSums = {};
-                items.forEach(d => {
-                    const ck = parseCompetencia(d.caixa);
-                    if (ck) mesSums[ck] = (mesSums[ck] || 0) + d.valor;
-                });
-                const mesEntries = Object.entries(mesSums).sort((a,b) => {
-                    const [ma,ya] = a[0].split('/'); const [mb,yb] = b[0].split('/');
-                    return (ya+ma).localeCompare(yb+mb);
-                });
-                const maxMes = Math.max(...mesEntries.map(e => e[1]), 1);
-
-                const barColors = ['#6366f1','#f59e0b','#ec4899','#14b8a6','#3b82f6','#ef4444'];
-                const barsHtml = mesEntries.map(([mk, val], bi) => {
-                    const pct = Math.max((val / maxMes) * 100, 2);
-                    const color = barColors[bi % barColors.length];
-                    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-                        <span style="font-size:11px;color:#e2e8f4;font-weight:500;width:65px;text-align:right">${monthKeyLabel(mk)}</span>
-                        <div style="flex:1;background:rgba(255,255,255,0.08);border-radius:5px;height:22px;overflow:hidden">
-                            <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,${color},${color}cc);border-radius:5px"></div>
-                        </div>
-                        <span style="font-size:12px;font-weight:700;color:#e2e8f4;width:100px;text-align:right">${fmtValor(val)}</span>
-                    </div>`;
-                }).join('');
-
-                document.getElementById('finModalSubtitle').innerHTML =
-                    `${items.length} lançamentos · Total: ${fmtValor(total)}
-                    <div style="margin-top:12px">${barsHtml}</div>`;
-
-                document.getElementById('finModalBody').innerHTML = items.map(d => {
-                    const valClass = d.valor < 0 ? 'fin-val negative' : 'fin-val';
-                    return `<tr>
-                        <td>${d.data}</td>
-                        <td title="${d.descricao}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${d.descricao}</td>
-                        <td>${d.fornecedor}</td>
-                        <td class="${valClass}">${fmtValor(d.valor)}</td>
-                    </tr>`;
-                }).join('');
             } catch(e) {
                 document.getElementById('finModalSubtitle').textContent = 'Erro ao carregar: ' + e.message;
             }
