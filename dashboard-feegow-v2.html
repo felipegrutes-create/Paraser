@@ -6151,16 +6151,38 @@
             });
 
             // Donut categoria
+            const donutSlice = catEntries.slice(0,8);
+            const donutTotal = donutSlice.reduce((s,e) => s + e[1], 0);
             mkChart('finChartCatDonut', {
                 type: 'doughnut',
                 data: {
-                    labels: catEntries.slice(0,8).map(e => e[0]),
-                    datasets: [{ data: catEntries.slice(0,8).map(e => e[1]), backgroundColor: FIN_COLORS }]
+                    labels: donutSlice.map(e => e[0]),
+                    datasets: [{ data: donutSlice.map(e => e[1]), backgroundColor: FIN_COLORS }]
                 },
                 options: {
                     responsive: true, cutout: '60%',
                     plugins: {
-                        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12, font: { size: 11, weight: '500' },
+                                color: '#e2e8f4',
+                                generateLabels(chart) {
+                                    const ds = chart.data.datasets[0];
+                                    return chart.data.labels.map((label, i) => {
+                                        const val = ds.data[i];
+                                        const pct = donutTotal > 0 ? ((val / donutTotal) * 100).toFixed(1) : 0;
+                                        return {
+                                            text: `${label}  ${pct}%`,
+                                            fillStyle: ds.backgroundColor[i],
+                                            strokeStyle: 'transparent',
+                                            hidden: !chart.getDataVisibility(i),
+                                            index: i
+                                        };
+                                    });
+                                }
+                            }
+                        },
                         tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmtValor(ctx.raw) } }
                     }
                 }
