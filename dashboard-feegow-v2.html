@@ -6476,8 +6476,18 @@
                         for (let col = 2; col <= 13; col++) {
                             const valStr = (row[col] || '').toString().trim();
                             if (!valStr || valStr === '0' || valStr === 'R$ 0') continue;
-                            let vs = valStr.replace(/R\$\s*/g, '').replace(/[^\d,\.,-]/g, '');
-                            if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                            let vs = valStr.replace(/R\$\s*/g, '').replace(/\s/g, '');
+                            // Formato BR: 264.634 ou 264.634,00 → remover pontos de milhar
+                            if (vs.includes(',')) {
+                                vs = vs.replace(/\./g, '').replace(',', '.');
+                            } else {
+                                // Só pontos: verificar se é milhar (ex: 264.634 = 264634)
+                                const dotParts = vs.split('.');
+                                if (dotParts.length > 1 && dotParts[dotParts.length-1].length === 3) {
+                                    vs = vs.replace(/\./g, ''); // é separador de milhar
+                                }
+                            }
+                            vs = vs.replace(/[^\d.\-]/g, '');
                             const val = parseFloat(vs);
                             if (isNaN(val) || val <= 0) continue;
                             const mk = meses[col - 2] + '/2026';
