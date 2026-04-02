@@ -6710,8 +6710,8 @@
                         tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtValor(ctx.raw) } }
                     },
                     scales: {
-                        x: { stacked: finViewMode === 'negocio', grid: { display: false }, ticks: { color: '#e2e8f4', font: { weight: 600 } } },
-                        y: { stacked: finViewMode === 'negocio', grace: '10%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k', color: '#6b7a99' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                        x: { stacked: finViewMode === 'negocio' || finViewMode === 'socios', grid: { display: false }, ticks: { color: '#e2e8f4', font: { weight: 600 } } },
+                        y: { stacked: finViewMode === 'negocio' || finViewMode === 'socios', grace: '10%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k', color: '#6b7a99' }, grid: { color: 'rgba(255,255,255,0.04)' } }
                     }
                 }
             });
