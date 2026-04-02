@@ -2985,12 +2985,12 @@
             </div>
             <div class="chart-grid duo">
                 <div class="chart-card">
-                    <h3>🏢 Despesas por Empresa</h3>
-                    <canvas id="finChartPgto"></canvas>
+                    <h3>📈 ROI — Receita 1ª Vez vs Investimento ADS</h3>
+                    <canvas id="finChartROI"></canvas>
                 </div>
                 <div class="chart-card">
-                    <h3>🏢 Top 10 Fornecedores</h3>
-                    <canvas id="finChartFornec"></canvas>
+                    <h3>💰 Retirada de Sócios — Mensal</h3>
+                    <canvas id="finChartRetirada"></canvas>
                 </div>
             </div>
 
@@ -3332,12 +3332,27 @@
                 retDetails.push({ pac:info.pac, prof:info.prof, cel:info.cel, email:info.email, dcri:info.dataCri, dataAp:info.dataAp, returned, retDateObj, retDate, retRealized, daysToRet, daysSince, yearDcri:info.dataCri ? info.dataCri.split("/")[2] : "?" });
             });
 
-            return { raw, C, allByMonth, allByProf, allStatus, vezRows, pvByMonth, pvByProf, pvStatus, firstVez, retDetails };
+            // Receita 1ª vez por mês (atendidos)
+            const pvValByMonth = {};
+            vezRows.forEach(r => {
+                const s = sta(r);
+                if (s !== 'atendido') return;
+                const mk = monthKey(r[C.dcri]);
+                if (!mk) return;
+                const valRaw = (r[C.val] || '').toString().replace(/[^\d,\.]/g, '');
+                let vs = valRaw;
+                if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                const val = parseFloat(vs);
+                if (!isNaN(val) && val > 0) pvValByMonth[mk] = (pvValByMonth[mk] || 0) + val;
+            });
+
+            return { raw, C, allByMonth, allByProf, allStatus, vezRows, pvByMonth, pvByProf, pvStatus, firstVez, retDetails, pvValByMonth };
         }
 
         // ===================== BUILD UI =====================
         function buildUI(d) {
-            const { raw, allByMonth, allByProf, allStatus, vezRows, pvByMonth, pvByProf, pvStatus, retDetails, firstVez } = d;
+            const { raw, allByMonth, allByProf, allStatus, vezRows, pvByMonth, pvByProf, pvStatus, retDetails, firstVez, pvValByMonth } = d;
+            finPvValByMonth = pvValByMonth || {};
             const today    = new Date();
             const todayStr = today.toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" });
 
@@ -5727,6 +5742,7 @@
         const FIN_SHEET_ID = "1uthRnuWMk2A26dZ8GaMXinuvPyxY50EH8RX85NemXwg";
         let finData = [];
         let finDataLoaded = false;
+        let finPvValByMonth = {}; // receita 1ª vez por mês (do Feegow)
         let finSortCol = 'data';
         let finTopCats = []; // top categorias para modal
         let finSortAsc = false;
@@ -6149,44 +6165,167 @@
                 }
             });
 
-            // Formas de pagamento donut
-            const pgtoSums = {};
-            dataAtual.forEach(d => { if (d.empresa) pgtoSums[d.empresa] = (pgtoSums[d.empresa] || 0) + d.valor; });
-            const pgtoEntries = Object.entries(pgtoSums).sort((a,b) => b[1] - a[1]);
-            mkChart('finChartPgto', {
-                type: 'doughnut',
+            // ===== ROI: Receita 1ª Vez vs ADS =====
+            // ADS por mês (da base LANÇAMENTOS)
+            const adsSums = {};
+            dataAtual.forEach(d => {
+                const catN = d.categoria.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                if (catN.includes('ADS') || catN.includes('PUBLICIDADE') || catN.includes('PROPAGANDA')) {
+                    const mk = getFinMonthKey(d);
+                    adsSums[mk] = (adsSums[mk] || 0) + d.valor;
+                }
+            });
+
+            // Meses que têm receita OU ads
+            const roiMonths = [...new Set([...Object.keys(finPvValByMonth), ...Object.keys(adsSums)])]
+                .filter(m => { const [mm,yy] = m.split('/'); return parseInt(yy) >= 2026 && (yy+mm) <= curVal; })
+                .sort((a,b) => { const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/'); return (ya+ma).localeCompare(yb+mb); });
+
+            const roiReceita = roiMonths.map(m => finPvValByMonth[m] || 0);
+            const roiAds = roiMonths.map(m => adsSums[m] || 0);
+
+            mkChart('finChartROI', {
+                type: 'bar',
                 data: {
-                    labels: pgtoEntries.map(e => e[0]),
-                    datasets: [{ data: pgtoEntries.map(e => e[1]), backgroundColor: FIN_COLORS }]
+                    labels: roiMonths.map(m => monthKeyLabel(m)),
+                    datasets: [
+                        { label: 'Receita 1ª Vez', data: roiReceita, backgroundColor: '#10b981', borderRadius: 4 },
+                        { label: 'Investimento ADS', data: roiAds, backgroundColor: '#ef4444', borderRadius: 4 },
+                    ]
                 },
+                plugins: [{
+                    id: 'roiLabels',
+                    afterDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+                        ctx.save();
+                        ctx.font = '600 10px Outfit, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        roiMonths.forEach((m, i) => {
+                            const rec = roiReceita[i], ads = roiAds[i];
+                            if (ads > 0) {
+                                const roi = ((rec / ads - 1) * 100).toFixed(0);
+                                const xPos = x.getPixelForValue(i);
+                                const yPos = y.getPixelForValue(Math.max(rec, ads));
+                                ctx.fillStyle = parseInt(roi) >= 0 ? '#10b981' : '#ef4444';
+                                ctx.fillText('ROI: ' + (roi > 0 ? '+' : '') + roi + '%', xPos, yPos - 6);
+                            }
+                        });
+                        ctx.restore();
+                    }
+                }],
                 options: {
-                    responsive: true, cutout: '60%',
+                    responsive: true,
+                    layout: { padding: { top: 25 } },
                     plugins: {
-                        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
-                        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmtValor(ctx.raw) } }
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtValor(ctx.raw) } }
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }
                     }
                 }
             });
 
-            // Top 10 Fornecedores
-            const fornSums = {};
-            dataAtual.forEach(d => { if (d.fornecedor) fornSums[d.fornecedor] = (fornSums[d.fornecedor] || 0) + d.valor; });
-            const fornEntries = Object.entries(fornSums).sort((a,b) => b[1] - a[1]).slice(0, 10);
-            mkChart('finChartFornec', {
-                type: 'bar',
-                data: {
-                    labels: fornEntries.map(e => e[0].length > 25 ? e[0].slice(0,22) + '...' : e[0]),
-                    datasets: [{ data: fornEntries.map(e => e[1]), backgroundColor: '#6366f1', borderRadius: 4 }]
-                },
-                options: {
-                    indexAxis: 'y', responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: ctx => fmtValor(ctx.raw) } }
-                    },
-                    scales: { x: { ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }, y: { grid: { display: false } } }
+            // ===== RETIRADA DE SÓCIOS — mensal =====
+            // Busca de LANÇAMENTOS (finData completo incluindo retirada — preciso dados antes do filtro)
+            // Retirada foi excluída do finData, então busco direto dos LANÇAMENTOS
+            loadRetiradaChart(sortedMonths, curVal);
+        }
+
+        async function loadRetiradaChart(sortedMonths, curVal) {
+            try {
+                const tabs = ['LANÇAMENTOS', 'LANÇAMENTOS_I'];
+                const mesesMap = {
+                    'janeiro':'01','fevereiro':'02','marco':'03','abril':'04',
+                    'maio':'05','junho':'06','julho':'07','agosto':'08',
+                    'setembro':'09','outubro':'10','novembro':'11','dezembro':'12'
+                };
+                const retSums = {};
+
+                for (const tab of tabs) {
+                    const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
+                    const res = await fetch(url);
+                    const json = await res.json();
+                    const rows = json.values || [];
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || r.length < 14) continue;
+                        const tipo = (r[9] || '').toString().trim().toLowerCase()
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        if (tipo !== 'saida') continue;
+                        const plano = (r[13] || '').toString().trim().toUpperCase()
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        if (!plano.includes('RETIRADA')) continue;
+                        const mesRaw = (r[10] || '').toString().trim().toLowerCase()
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        const mesPad = mesesMap[mesRaw];
+                        if (!mesPad) continue;
+                        const mk = mesPad + '/2026';
+                        const [mm, yy] = mk.split('/');
+                        if ((yy + mm) > curVal) continue;
+
+                        const saidaStr = (r[6] || '').toString().trim();
+                        let vs = saidaStr.replace(/[^\d,\.]/g, '');
+                        if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                        const valor = parseFloat(vs);
+                        if (isNaN(valor) || valor <= 0) continue;
+                        retSums[mk] = (retSums[mk] || 0) + valor;
+                    }
                 }
-            });
+
+                const retMonths = Object.keys(retSums).sort((a,b) => {
+                    const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/');
+                    return (ya+ma).localeCompare(yb+mb);
+                });
+
+                mkChart('finChartRetirada', {
+                    type: 'bar',
+                    data: {
+                        labels: retMonths.map(m => monthKeyLabel(m)),
+                        datasets: [{
+                            label: 'Retirada Sócios',
+                            data: retMonths.map(m => retSums[m]),
+                            backgroundColor: '#f59e0b',
+                            borderRadius: 4,
+                        }]
+                    },
+                    plugins: [{
+                        id: 'retLabels',
+                        afterDraw(chart) {
+                            const { ctx, scales: { x, y } } = chart;
+                            ctx.save();
+                            ctx.font = '600 11px Outfit, sans-serif';
+                            ctx.fillStyle = '#e2e8f4';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            retMonths.forEach((m, i) => {
+                                const val = retSums[m];
+                                if (!val) return;
+                                const xPos = x.getPixelForValue(i);
+                                const yPos = y.getPixelForValue(val);
+                                ctx.fillText(fmtValor(val), xPos, yPos - 4);
+                            });
+                            ctx.restore();
+                        }
+                    }],
+                    options: {
+                        responsive: true,
+                        layout: { padding: { top: 25 } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => fmtValor(ctx.raw) } }
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: { ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }
+                        }
+                    }
+                });
+            } catch(e) {
+                console.warn('Retirada chart error:', e);
+            }
         }
 
         function renderFinTable(data) {
