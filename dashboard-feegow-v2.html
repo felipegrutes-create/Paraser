@@ -5743,6 +5743,7 @@
         let finData = [];
         let finDataLoaded = false;
         let finPvValByMonth = {}; // receita 1ª vez por mês (do Feegow)
+        let finROIData = { receita: {}, ads: {} }; // dados para gráfico ROI
         let finSortCol = 'data';
         let finTopCats = []; // top categorias para modal
         let finSortAsc = false;
@@ -6166,45 +6167,10 @@
             });
 
             // ===== ROI: Receita 1ª Vez vs ADS =====
-            // Converte finPvValByMonth (formato "2026-01") para "01/2026"
-            const receitaByMonth = {};
-            Object.entries(finPvValByMonth).forEach(([k, v]) => {
-                const [y, m] = k.split('-');
-                receitaByMonth[m + '/' + y] = v;
-            });
+            // Receita e ADS vêm de finROIData (carregado de Dados Diários + PAGAMENTOS)
+            const receitaByMonth = finROIData.receita || {};
+            const adsSums = finROIData.ads || {};
 
-            // ADS: busca de PAGAMENTOS (PGTO=CART.*, Plano=ADS/PUBLICIDADE)
-            const adsSums = {};
-            if (finPagamentosCache) {
-                for (let i = 1; i < finPagamentosCache.length; i++) {
-                    const r = finPagamentosCache[i];
-                    if (!r || r.length < 13) continue;
-                    const status = (r[4] || '').toString().trim().toUpperCase();
-                    if (status !== 'PAGO') continue;
-                    const pgto = (r[9] || '').toString().trim().toUpperCase();
-                    if (!pgto.includes('CART.') && !pgto.includes('CART ')) continue;
-                    const plano = (r[1] || '').toString().trim().toUpperCase()
-                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    if (!plano.includes('ADS') && !plano.includes('PUBLICIDADE') && !plano.includes('PROPAGANDA')) continue;
-                    const caixa = (r[12] || '').toString().trim();
-                    if (!caixa) continue;
-                    const ck = parseCompetencia(caixa);
-                    if (!ck) continue;
-                    const valor = parseValorPag((r[5] || '').toString().trim());
-                    if (!valor || valor < 0) continue;
-                    adsSums[ck] = (adsSums[ck] || 0) + valor;
-                }
-            } else {
-                // Fallback: busca de LANÇAMENTOS
-                dataAtual.forEach(d => {
-                    const catN = d.categoria.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    if (catN.includes('ADS') || catN.includes('PUBLICIDADE') || catN.includes('PROPAGANDA')) {
-                        adsSums[getFinMonthKey(d)] = (adsSums[getFinMonthKey(d)] || 0) + d.valor;
-                    }
-                });
-            }
-
-            // Meses que têm receita OU ads (formato "MM/YYYY")
             const roiMonths = [...new Set([...Object.keys(receitaByMonth), ...Object.keys(adsSums)])]
                 .filter(m => { const p = m.split('/'); return p.length === 2 && parseInt(p[1]) >= 2026 && (p[1]+p[0]) <= curVal; })
                 .sort((a,b) => { const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/'); return (ya+ma).localeCompare(yb+mb); });
@@ -6260,6 +6226,65 @@
             // Busca de LANÇAMENTOS (finData completo incluindo retirada — preciso dados antes do filtro)
             // Retirada foi excluída do finData, então busco direto dos LANÇAMENTOS
             loadRetiradaChart(sortedMonths, curVal);
+        }
+
+        async function loadROIData() {
+            const mesesMap = {'janeiro':'01','fevereiro':'02','março':'03','marco':'03','abril':'04',
+                'maio':'05','junho':'06','julho':'07','agosto':'08',
+                'setembro':'09','outubro':'10','novembro':'11','dezembro':'12'};
+
+            // 1. Receita 1ª Vez: Dados Diários, col M=Procedimento (12), col O=Valor (14), col S=Mes 2026 (18)
+            const receita = {};
+            try {
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(TAB)}?key=${API_KEY}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                const rows = json.values || [];
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (!r) continue;
+                    const mes2026 = (r[18] || '').toString().trim().toLowerCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    const mesPad = mesesMap[mes2026];
+                    if (!mesPad) continue;
+                    const proc = (r[12] || '').toString().trim().toLowerCase();
+                    if (!proc.includes('vez')) continue;
+                    const valStr = (r[14] || '').toString().trim();
+                    let vs = valStr.replace(/[^\d,\.]/g, '');
+                    if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                    const val = parseFloat(vs);
+                    if (!isNaN(val) && val > 0) {
+                        const mk = mesPad + '/2026';
+                        receita[mk] = (receita[mk] || 0) + val;
+                    }
+                }
+            } catch(e) { console.warn('ROI receita load error:', e); }
+
+            // 2. ADS: PAGAMENTOS, PGTO=CART.*, Plano=ADS/PUBLICIDADE
+            const ads = {};
+            try {
+                const pagRows = await loadPagamentos();
+                for (let i = 1; i < pagRows.length; i++) {
+                    const r = pagRows[i];
+                    if (!r || r.length < 13) continue;
+                    const status = (r[4] || '').toString().trim().toUpperCase();
+                    if (status !== 'PAGO') continue;
+                    const pgto = (r[9] || '').toString().trim().toUpperCase();
+                    if (!pgto.includes('CART.') && !pgto.includes('CART ')) continue;
+                    const plano = (r[1] || '').toString().trim().toUpperCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    if (!plano.includes('ADS') && !plano.includes('PUBLICIDADE') && !plano.includes('PROPAGANDA')) continue;
+                    const caixa = (r[12] || '').toString().trim();
+                    if (!caixa) continue;
+                    const ck = parseCompetencia(caixa);
+                    if (!ck) continue;
+                    const valor = parseValorPag((r[5] || '').toString().trim());
+                    if (!valor || valor < 0) continue;
+                    ads[ck] = (ads[ck] || 0) + valor;
+                }
+            } catch(e) { console.warn('ROI ads load error:', e); }
+
+            finROIData = { receita, ads };
         }
 
         async function loadRetiradaChart(sortedMonths, curVal) {
@@ -6692,7 +6717,8 @@
             try {
                 const [rows] = await Promise.all([
                     loadFinanceData(),
-                    loadPagamentos(), // pre-carrega PAGAMENTOS para ROI de ADS
+                    loadPagamentos(),
+                    loadROIData(), // Receita 1ª Vez + ADS
                 ]);
                 finData = processFinanceData(rows);
                 finDataLoaded = true;
