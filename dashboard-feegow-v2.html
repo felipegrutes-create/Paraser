@@ -6447,27 +6447,42 @@
                 if (mk) despesaByMonth[mk] = (despesaByMonth[mk] || 0) + d.valor;
             });
 
-            // Negócio mode: split costs into fixed and variable
-            const norm = (s) => (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            const fixedKeywords = ['tributos','folha','fornecedor','tarifa','juros'];
-            const variableKeywords = ['medicamentos','repasse','cartao credito','taxa rede','beneficio','reembolso','estorno'];
+            // Negócio mode: ler CF e CV da aba Budget_Consolidado (a partir da linha 46, coluna A=categoria)
             const custoFixoByMonth = {};
             const custoVarByMonth = {};
-            finData.forEach(d => {
-                const mk = getFinMonthKey(d);
-                if (!mk) return;
-                const cls = norm(d.classificacao);
-                const isFixed = fixedKeywords.some(kw => cls.includes(kw));
-                const isVariable = variableKeywords.some(kw => cls.includes(kw));
-                if (isFixed) {
-                    custoFixoByMonth[mk] = (custoFixoByMonth[mk] || 0) + d.valor;
-                } else if (isVariable) {
-                    custoVarByMonth[mk] = (custoVarByMonth[mk] || 0) + d.valor;
-                } else {
-                    // Unclassified goes to fixed by default
-                    custoFixoByMonth[mk] = (custoFixoByMonth[mk] || 0) + d.valor;
-                }
-            });
+            if (finViewMode === 'negocio') {
+                try {
+                    const budgetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('Budget_Consolidado')}!A46:N200?key=${API_KEY}`;
+                    const budgetRes = await fetch(budgetUrl);
+                    const budgetJson = await budgetRes.json();
+                    const budgetRows = budgetJson.values || [];
+                    const norm = (s) => (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    // Custo Fixo (laranja): Tributos, Folha, Fornecedor, Tarifa, Juros
+                    const fixedKw = ['tributos','folha','fornecedor','tarifa','juros'];
+                    // Custo Variável (azul): Medicamentos, Repasse, Cartão Crédito, Taxa Rede, Benefício, Reembolso, Estorno
+                    const varKw = ['medicamentos','repasse','cartao credito','cartao de credito','taxa rede','beneficio','reembolso','estorno'];
+                    // Colunas: A=categoria, B=?, C=Janeiro, D=Fevereiro, ..., N=Dezembro
+                    const meses = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+                    budgetRows.forEach(row => {
+                        const cat = norm(row[0] || '');
+                        if (!cat) return;
+                        const isFixed = fixedKw.some(kw => cat.includes(kw));
+                        const isVar = varKw.some(kw => cat.includes(kw));
+                        if (!isFixed && !isVar) return;
+                        for (let col = 2; col <= 13; col++) {
+                            const valStr = (row[col] || '').toString().trim();
+                            if (!valStr) continue;
+                            let vs = valStr.replace(/[^\d,\.]/g, '');
+                            if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                            const val = parseFloat(vs);
+                            if (isNaN(val) || val <= 0) continue;
+                            const mk = meses[col - 2] + '/2026';
+                            if (isFixed) custoFixoByMonth[mk] = (custoFixoByMonth[mk] || 0) + val;
+                            else custoVarByMonth[mk] = (custoVarByMonth[mk] || 0) + val;
+                        }
+                    });
+                } catch(e) { console.warn('Budget_Consolidado load error:', e); }
+            }
 
             const allMonthKeys = finViewMode === 'negocio'
                 ? [...new Set([...Object.keys(allReceita), ...Object.keys(custoFixoByMonth), ...Object.keys(custoVarByMonth)])]
@@ -6498,10 +6513,11 @@
             let datasets, chartPlugin;
 
             if (finViewMode === 'negocio') {
+                // Barra empilhada: Custo Fixo (laranja) + Custo Variável (azul) numa única barra
                 datasets = [
-                    { label: 'Receita', data: rvdReceita, backgroundColor: 'rgba(16,185,129,0.85)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.8 },
-                    { label: 'Custo Fixo', data: rvdFixo, backgroundColor: 'rgba(245,158,11,0.85)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.8 },
-                    { label: 'Custo Variável', data: rvdVar, backgroundColor: 'rgba(239,68,68,0.85)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.8 },
+                    { label: 'Receita', data: rvdReceita, backgroundColor: 'rgba(16,185,129,0.85)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'receita' },
+                    { label: 'CF - Custo Fixo', data: rvdFixo, backgroundColor: 'rgba(245,158,11,0.85)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 0, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'despesa' },
+                    { label: 'CV - Custo Variável', data: rvdVar, backgroundColor: 'rgba(59,130,246,0.85)', borderColor: '#3b82f6', borderWidth: 1, borderRadius: {topLeft:6,topRight:6}, barPercentage: 0.45, categoryPercentage: 0.7, stack: 'despesa' },
                 ];
                 chartPlugin = {
                     id: 'profitLabels',
@@ -6510,12 +6526,13 @@
                         ctx.save();
                         rvdMonths.forEach((m, i) => {
                             const rec = rvdReceita[i];
-                            const totalCost = rvdFixo[i] + rvdVar[i];
+                            const cf = rvdFixo[i], cv = rvdVar[i];
+                            const totalCost = cf + cv;
                             const profit = rec - totalCost;
                             const xPos = x.getPixelForValue(i);
                             const yMax = y.getPixelForValue(Math.max(rec, totalCost));
 
-                            // Profit label with % and R$ value
+                            // Margem % e valor
                             if (rec > 0) {
                                 const margin = (((rec - totalCost) / rec) * 100).toFixed(1);
                                 const isPos = parseFloat(margin) >= 0;
@@ -6525,22 +6542,61 @@
                                 ctx.fillStyle = isPos ? '#10b981' : '#ef4444';
                                 const sign = isPos ? '+' : '';
                                 const valSign = profit >= 0 ? '' : '-';
-                                const profitLabel = sign + margin + '% (' + valSign + 'R$ ' + Math.abs(profit/1000).toFixed(0) + 'k)';
-                                ctx.fillText(profitLabel, xPos, yMax - 8);
+                                ctx.fillText(sign + margin + '% (' + valSign + 'R$ ' + Math.abs(profit/1000).toFixed(0) + 'k)', xPos, yMax - 8);
                             }
 
-                            // Values inside bars
-                            ctx.font = '600 10px Outfit, sans-serif';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'top';
-                            ctx.fillStyle = '#fff';
-                            for (let ds = 0; ds < 3; ds++) {
-                                const meta = chart.getDatasetMeta(ds);
-                                if (meta.data[i]) {
-                                    const bar = meta.data[i];
-                                    const barH = bar.base - bar.y;
-                                    const val = ds === 0 ? rvdReceita[i] : ds === 1 ? rvdFixo[i] : rvdVar[i];
-                                    if (barH > 20) ctx.fillText(fmtValor(val), bar.x, bar.y + 4);
+                            // Valor da receita dentro da barra
+                            const meta0 = chart.getDatasetMeta(0);
+                            if (meta0.data[i]) {
+                                const bar = meta0.data[i];
+                                const barH = bar.base - bar.y;
+                                ctx.font = '600 10px Outfit, sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.fillStyle = '#fff';
+                                if (barH > 20) { ctx.textBaseline = 'top'; ctx.fillText(fmtValor(rec), bar.x, bar.y + 4); }
+                            }
+
+                            // CF e CV dentro das barras empilhadas
+                            const metaCF = chart.getDatasetMeta(1);
+                            const metaCV = chart.getDatasetMeta(2);
+                            if (metaCF.data[i]) {
+                                const bar = metaCF.data[i];
+                                const barH = bar.base - bar.y;
+                                if (barH > 28) {
+                                    const mid = bar.y + barH / 2;
+                                    ctx.font = '700 11px Outfit, sans-serif';
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+                                    ctx.fillStyle = '#fff';
+                                    ctx.fillText('CF', bar.x, mid - 7);
+                                    ctx.font = '600 9px Outfit, sans-serif';
+                                    ctx.fillText(fmtValor(cf), bar.x, mid + 7);
+                                } else if (barH > 16) {
+                                    ctx.font = '700 10px Outfit, sans-serif';
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+                                    ctx.fillStyle = '#fff';
+                                    ctx.fillText('CF', bar.x, bar.y + barH / 2);
+                                }
+                            }
+                            if (metaCV.data[i]) {
+                                const bar = metaCV.data[i];
+                                const barH = bar.base - bar.y;
+                                if (barH > 28) {
+                                    const mid = bar.y + barH / 2;
+                                    ctx.font = '700 11px Outfit, sans-serif';
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+                                    ctx.fillStyle = '#fff';
+                                    ctx.fillText('CV', bar.x, mid - 7);
+                                    ctx.font = '600 9px Outfit, sans-serif';
+                                    ctx.fillText(fmtValor(cv), bar.x, mid + 7);
+                                } else if (barH > 16) {
+                                    ctx.font = '700 10px Outfit, sans-serif';
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+                                    ctx.fillStyle = '#fff';
+                                    ctx.fillText('CV', bar.x, bar.y + barH / 2);
                                 }
                             }
                         });
@@ -6615,8 +6671,8 @@
                         tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtValor(ctx.raw) } }
                     },
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: '#e2e8f4', font: { weight: 600 } } },
-                        y: { grace: '10%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k', color: '#6b7a99' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                        x: { stacked: finViewMode === 'negocio', grid: { display: false }, ticks: { color: '#e2e8f4', font: { weight: 600 } } },
+                        y: { stacked: finViewMode === 'negocio', grace: '10%', ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k', color: '#6b7a99' }, grid: { color: 'rgba(255,255,255,0.04)' } }
                     }
                 }
             });
