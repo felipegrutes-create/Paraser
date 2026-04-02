@@ -6608,71 +6608,35 @@
                             }
 
                             // CF e CV dentro das barras empilhadas
-                            const metaCF = chart.getDatasetMeta(1);
-                            const metaCV = chart.getDatasetMeta(2);
-                            if (metaCF.data[i]) {
-                                const bar = metaCF.data[i];
-                                const barH = bar.base - bar.y;
-                                if (barH > 28) {
+                            // Helper para desenhar sigla + valor dentro da barra
+                            const drawBarLabel = (meta, dsIdx, label, val) => {
+                                if (!meta || !meta.data[i]) return;
+                                const bar = meta.data[i];
+                                const barH = Math.abs(bar.base - bar.y);
+                                if (barH < 8 || val <= 0) return;
+                                ctx.textAlign = 'center';
+                                ctx.fillStyle = '#fff';
+                                if (barH > 45) {
                                     const mid = bar.y + barH / 2;
-                                    ctx.font = '700 11px Outfit, sans-serif';
-                                    ctx.textAlign = 'center';
+                                    ctx.font = '800 12px Outfit, sans-serif';
                                     ctx.textBaseline = 'middle';
-                                    ctx.fillStyle = '#fff';
-                                    ctx.fillText('CF', bar.x, mid - 7);
+                                    ctx.fillText(label, bar.x, mid - 8);
                                     ctx.font = '600 9px Outfit, sans-serif';
-                                    ctx.fillText(fmtValor(cf), bar.x, mid + 7);
-                                } else if (barH > 16) {
+                                    ctx.fillText(fmtValor(val), bar.x, mid + 8);
+                                } else if (barH > 22) {
                                     ctx.font = '700 10px Outfit, sans-serif';
-                                    ctx.textAlign = 'center';
                                     ctx.textBaseline = 'middle';
-                                    ctx.fillStyle = '#fff';
-                                    ctx.fillText('CF', bar.x, bar.y + barH / 2);
+                                    ctx.fillText(label + ' ' + (val/1000).toFixed(0) + 'k', bar.x, bar.y + barH / 2);
+                                } else {
+                                    ctx.font = '700 9px Outfit, sans-serif';
+                                    ctx.textBaseline = 'middle';
+                                    ctx.fillText(label, bar.x, bar.y + barH / 2);
                                 }
-                            }
-                            if (metaCV.data[i]) {
-                                const bar = metaCV.data[i];
-                                const barH = bar.base - bar.y;
-                                if (barH > 28) {
-                                    const mid = bar.y + barH / 2;
-                                    ctx.font = '700 11px Outfit, sans-serif';
-                                    ctx.textAlign = 'center';
-                                    ctx.textBaseline = 'middle';
-                                    ctx.fillStyle = '#fff';
-                                    ctx.fillText('CV', bar.x, mid - 7);
-                                    ctx.font = '600 9px Outfit, sans-serif';
-                                    ctx.fillText(fmtValor(cv), bar.x, mid + 7);
-                                } else if (barH > 16) {
-                                    ctx.font = '700 10px Outfit, sans-serif';
-                                    ctx.textAlign = 'center';
-                                    ctx.textBaseline = 'middle';
-                                    ctx.fillStyle = '#fff';
-                                    ctx.fillText('CV', bar.x, bar.y + barH / 2);
-                                }
-                            }
-                            // Barra Sócio (roxo) — só no modo socios
+                            };
+                            drawBarLabel(chart.getDatasetMeta(1), 1, 'CF', cf);
+                            drawBarLabel(chart.getDatasetMeta(2), 2, 'CV', cv);
                             if (finViewMode === 'socios') {
-                                const metaSC = chart.getDatasetMeta(3);
-                                if (metaSC && metaSC.data[i]) {
-                                    const bar = metaSC.data[i];
-                                    const barH = bar.base - bar.y;
-                                    if (barH > 28) {
-                                        const mid = bar.y + barH / 2;
-                                        ctx.font = '700 11px Outfit, sans-serif';
-                                        ctx.textAlign = 'center';
-                                        ctx.textBaseline = 'middle';
-                                        ctx.fillStyle = '#fff';
-                                        ctx.fillText('SC', bar.x, mid - 7);
-                                        ctx.font = '600 9px Outfit, sans-serif';
-                                        ctx.fillText(fmtValor(sc), bar.x, mid + 7);
-                                    } else if (barH > 16) {
-                                        ctx.font = '700 10px Outfit, sans-serif';
-                                        ctx.textAlign = 'center';
-                                        ctx.textBaseline = 'middle';
-                                        ctx.fillStyle = '#fff';
-                                        ctx.fillText('SC', bar.x, bar.y + barH / 2);
-                                    }
-                                }
+                                drawBarLabel(chart.getDatasetMeta(3), 3, 'SC', sc);
                             }
                         });
                         ctx.restore();
