@@ -4345,6 +4345,7 @@
             setTimeout(() => {
                 closeCRMModal();
                 renderKanban();
+                renderDoadoras();
             }, 400);
 
             // Salvar no servidor em background (não bloqueia)
@@ -4588,6 +4589,10 @@
                     body: JSON.stringify(record),
                 }).catch(err => console.error('Erro ao salvar classificação:', err));
             }
+
+            // Atualizar ambas as abas
+            renderKanban();
+            renderDoadoras();
         }
 
         // ===================== DOADORAS COMPARTILHADAS =====================
