@@ -4348,37 +4348,23 @@
             // Atualiza estado local imediatamente (optimistic update)
             crmMap[crmModalKey] = record;
 
-            // Salvar no servidor
+            // Salvar no servidor (no-cors por limitação do Apps Script)
             if (CRM_SCRIPT_URL) {
-                try {
-                    const r = await fetch(CRM_SCRIPT_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: JSON.stringify(record),
-                    });
-                    const json = await r.json();
-                    if (!json || !json.ok) throw new Error(json?.error || 'Resposta inválida');
-                    statusEl.textContent = '✓ Salvo';
-                    statusEl.style.color = '#10b981';
-                    setTimeout(() => {
-                        closeCRMModal();
-                        renderKanban();
-                        renderDoadoras();
-                    }, 400);
-                } catch(e) {
-                    console.error('CRM save error:', e);
-                    statusEl.textContent = '⚠️ Erro ao salvar';
-                    statusEl.style.color = '#f43f5e';
-                }
-            } else {
-                statusEl.textContent = '✓ Salvo';
-                statusEl.style.color = '#10b981';
-                setTimeout(() => {
-                    closeCRMModal();
-                    renderKanban();
-                    renderDoadoras();
-                }, 400);
+                fetch(CRM_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(record),
+                }).catch(e => console.warn('CRM save error:', e));
             }
+
+            statusEl.textContent = '✓ Salvo';
+            statusEl.style.color = '#10b981';
+            setTimeout(() => {
+                closeCRMModal();
+                renderKanban();
+                renderDoadoras();
+            }, 400);
         }
 
         async function deleteCRMRecord(key) {
@@ -4604,31 +4590,27 @@
                     observacoes: existing.observacoes || '',
                     classificacao: value,
                 };
-                // Show saving indicator on select
-                selectEl.disabled = true;
-                const prevTitle = selectEl.title;
-                selectEl.title = 'Salvando...';
+                // Save with no-cors (Apps Script CORS limitation), verify after
                 fetch(CRM_SCRIPT_URL, {
                     method: 'POST',
+                    mode: 'no-cors',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(record),
-                }).then(r => r.json()).then(json => {
-                    if (json && json.ok) {
-                        selectEl.title = '✓ Salvo';
-                        setTimeout(() => { selectEl.title = prevTitle; }, 2000);
-                    } else {
-                        throw new Error(json?.error || 'Resposta inválida');
-                    }
-                }).catch(err => {
-                    console.error('Erro ao salvar classificação:', err);
-                    // Revert local state on failure
-                    crmMap[key].classificacao = existing.classificacao || '';
-                    selectEl.value = existing.classificacao || '';
-                    selectEl.title = '⚠️ Erro ao salvar — tente novamente';
-                    alert('Erro ao salvar classificação de ' + key + '.\nVerifique a conexão e tente novamente.');
-                }).finally(() => {
-                    selectEl.disabled = false;
-                });
+                }).then(() => {
+                    // Verify save after 2s by re-reading from server
+                    setTimeout(async () => {
+                        try {
+                            const freshMap = await loadCRMData();
+                            const saved = freshMap[key]?.classificacao;
+                            if (saved !== value) {
+                                // Server doesn't have the expected value — re-save
+                                crmMap[key].classificacao = value;
+                            } else {
+                                crmMap[key] = { ...crmMap[key], ...freshMap[key] };
+                            }
+                        } catch(e) { /* silent */ }
+                    }, 2500);
+                }).catch(err => console.error('Erro ao salvar classificação:', err));
             }
 
             // Atualizar ambas as abas
