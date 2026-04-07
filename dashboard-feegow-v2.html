@@ -796,6 +796,24 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .crm-card-class { margin-top: 6px; }
+        .crm-class-select {
+            width: 100%;
+            background: rgba(255,255,255,0.06);
+            color: var(--muted);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-family: inherit;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .crm-class-select.has-value {
+            color: #00d4aa;
+            border-color: rgba(0,212,170,0.3);
+            background: rgba(0,212,170,0.08);
+        }
+        .crm-class-select:focus { outline: none; border-color: var(--accent); }
         .crm-modal-info {
             display: flex;
             gap: 14px;
@@ -4091,6 +4109,19 @@
                     ${email ? `<div class="crm-card-contact-line">✉️ <a href="mailto:${email}" onclick="event.stopPropagation()">${email}</a></div>` : ''}
                     ${badges ? `<div class="crm-card-badges">${badges}</div>` : ''}
                     ${obsShort ? `<div class="crm-card-obs">💬 ${obsShort}</div>` : ''}
+                    ${!ghost ? `<div class="crm-card-class" onclick="event.stopPropagation()">
+                        <select class="crm-class-select ${crmRec?.classificacao ? 'has-value' : ''}" onchange="saveClassificacao('${safeKey}', this)">
+                            <option value="">Classificar...</option>
+                            <option value="FIV Normal" ${crmRec?.classificacao==='FIV Normal'?'selected':''}>FIV Normal</option>
+                            <option value="FIV Compartilhada" ${crmRec?.classificacao==='FIV Compartilhada'?'selected':''}>FIV Compartilhada</option>
+                            <option value="Receptora" ${crmRec?.classificacao==='Receptora'?'selected':''}>Receptora</option>
+                            <option value="Investigando" ${crmRec?.classificacao==='Investigando'?'selected':''}>Investigando</option>
+                            <option value="Coito Programado" ${crmRec?.classificacao==='Coito Programado'?'selected':''}>Coito Programado</option>
+                            <option value="Embrião Doado" ${crmRec?.classificacao==='Embrião Doado'?'selected':''}>Embrião Doado</option>
+                            <option value="FIV ou OD" ${crmRec?.classificacao==='FIV ou OD'?'selected':''}>FIV ou OD</option>
+                            <option value="Congelamento" ${crmRec?.classificacao==='Congelamento'?'selected':''}>Congelamento</option>
+                        </select>
+                    </div>` : ''}
                 </div>`;
         }
 
