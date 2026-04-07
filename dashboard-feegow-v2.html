@@ -3284,7 +3284,11 @@
                 allStatus[s]++;
             });
 
-            const vezRows   = raw.filter(r => r[C.proc] && r[C.proc].toLowerCase().includes("vez"));
+            const vezRows   = raw.filter(r => {
+                if (!r[C.proc]) return false;
+                const proc = r[C.proc].trim().toLowerCase().replace(/\s+/g, ' ');
+                return proc.includes("vez") || proc === 'consulta - presencial';
+            });
             const pvByMonth = {};
             const pvByProf  = {};
             const pvStatus  = { atendido:0, nao_compareceu:0, cancelado:0, aguardando:0 };
