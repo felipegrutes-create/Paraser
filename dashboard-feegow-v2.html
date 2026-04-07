@@ -4354,6 +4354,7 @@
 
             // Atualiza estado local imediatamente (optimistic update)
             crmMap[crmModalKey] = record;
+            crmSaveLocal();
 
             // Salvar no servidor (no-cors por limitação do Apps Script)
             if (CRM_SCRIPT_URL) {
@@ -4553,6 +4554,7 @@
             // Optimistic update local
             if (!crmMap[key]) crmMap[key] = {};
             crmMap[key].classificacao = value;
+            crmSaveLocal();
 
             // Atualizar KPIs
             let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nSem = 0;
@@ -7139,6 +7141,32 @@
             spinner.remove();
         }
 
+        const CRM_LOCAL_KEY = 'paraser_crm_v1';
+
+        function crmSaveLocal() {
+            try { localStorage.setItem(CRM_LOCAL_KEY, JSON.stringify(crmMap)); } catch(e) {}
+        }
+
+        function crmLoadLocal() {
+            try { return JSON.parse(localStorage.getItem(CRM_LOCAL_KEY) || '{}'); } catch(e) { return {}; }
+        }
+
+        // Merge local backup into crmMap: local fills gaps not present on server
+        function crmMergeLocal(serverMap) {
+            const local = crmLoadLocal();
+            const merged = { ...serverMap };
+            Object.keys(local).forEach(k => {
+                if (!merged[k]) {
+                    merged[k] = local[k];
+                } else {
+                    // Fill any field missing on server with local value
+                    const lc = local[k].classificacao;
+                    if (lc && !merged[k].classificacao) merged[k].classificacao = lc;
+                }
+            });
+            return merged;
+        }
+
         async function init() {
             try {
                 document.getElementById('loadingMsg').textContent = 'Carregando dados...';
@@ -7146,7 +7174,7 @@
                     loadData(),
                     loadCRMData(),
                 ]);
-                crmMap = crmData;
+                crmMap = crmMergeLocal(crmData);
                 document.getElementById('loadingMsg').textContent = 'Processando dados...';
                 const d = processData(rows);
                 buildUI(d);
