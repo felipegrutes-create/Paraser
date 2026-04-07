@@ -2246,7 +2246,10 @@
 
             <!-- Filtros -->
             <div class="search-box" style="margin-bottom:16px">
-                <input type="text" id="kanbSearch" placeholder="Buscar paciente..." oninput="renderKanban()">
+                <div style="position:relative;flex:1">
+                    <input type="text" id="kanbSearch" placeholder="Buscar paciente..." oninput="renderKanban()" style="width:100%;padding-right:32px">
+                    <button onclick="document.getElementById('kanbSearch').value='';renderKanban()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px" title="Limpar busca">✕</button>
+                </div>
                 <select id="kanbProf" onchange="renderKanban()">
                     <option value="">Todos os profissionais</option>
                 </select>
