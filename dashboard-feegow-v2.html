@@ -4348,23 +4348,36 @@
             // Atualiza estado local imediatamente (optimistic update)
             crmMap[crmModalKey] = record;
 
-            // Fechar modal e atualizar kanban imediatamente
-            statusEl.textContent = '✓ Salvo';
-            statusEl.style.color = '#10b981';
-            setTimeout(() => {
-                closeCRMModal();
-                renderKanban();
-                renderDoadoras();
-            }, 400);
-
-            // Salvar no servidor em background (não bloqueia)
+            // Salvar no servidor
             if (CRM_SCRIPT_URL) {
-                fetch(CRM_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(record),
-                }).catch(e => console.warn('CRM save error:', e));
+                try {
+                    const r = await fetch(CRM_SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify(record),
+                    });
+                    const json = await r.json();
+                    if (!json || !json.ok) throw new Error(json?.error || 'Resposta inválida');
+                    statusEl.textContent = '✓ Salvo';
+                    statusEl.style.color = '#10b981';
+                    setTimeout(() => {
+                        closeCRMModal();
+                        renderKanban();
+                        renderDoadoras();
+                    }, 400);
+                } catch(e) {
+                    console.error('CRM save error:', e);
+                    statusEl.textContent = '⚠️ Erro ao salvar';
+                    statusEl.style.color = '#f43f5e';
+                }
+            } else {
+                statusEl.textContent = '✓ Salvo';
+                statusEl.style.color = '#10b981';
+                setTimeout(() => {
+                    closeCRMModal();
+                    renderKanban();
+                    renderDoadoras();
+                }, 400);
             }
         }
 
@@ -4574,7 +4587,7 @@
             s('doa-congelamento', nCong);
             s('doa-sem-class', nSem);
 
-            // Save to server in background (non-blocking)
+            // Save to server
             if (CRM_SCRIPT_URL) {
                 const existing = crmMap[key] || {};
                 const record = {
@@ -4591,12 +4604,31 @@
                     observacoes: existing.observacoes || '',
                     classificacao: value,
                 };
+                // Show saving indicator on select
+                selectEl.disabled = true;
+                const prevTitle = selectEl.title;
+                selectEl.title = 'Salvando...';
                 fetch(CRM_SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(record),
-                }).catch(err => console.error('Erro ao salvar classificação:', err));
+                }).then(r => r.json()).then(json => {
+                    if (json && json.ok) {
+                        selectEl.title = '✓ Salvo';
+                        setTimeout(() => { selectEl.title = prevTitle; }, 2000);
+                    } else {
+                        throw new Error(json?.error || 'Resposta inválida');
+                    }
+                }).catch(err => {
+                    console.error('Erro ao salvar classificação:', err);
+                    // Revert local state on failure
+                    crmMap[key].classificacao = existing.classificacao || '';
+                    selectEl.value = existing.classificacao || '';
+                    selectEl.title = '⚠️ Erro ao salvar — tente novamente';
+                    alert('Erro ao salvar classificação de ' + key + '.\nVerifique a conexão e tente novamente.');
+                }).finally(() => {
+                    selectEl.disabled = false;
+                });
             }
 
             // Atualizar ambas as abas

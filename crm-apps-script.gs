@@ -40,7 +40,7 @@ const CRM_LOG_SHEET  = 'CRM_Log';
 const CRM_HEADERS = [
   'paciente_key','contato1_data','contato2_data',
   'vendedora','valor','retorno_marcado','proposta_feita',
-  'parc_pago','quitado','observacoes','classificacao','ultima_atualizacao'
+  'parc_pago','quitado','projeto_ana','observacoes','classificacao','ultima_atualizacao'
 ];
 const LOG_HEADERS = [
   'timestamp','acao','paciente_key','usuario',
@@ -317,6 +317,16 @@ function getOrCreateSheet() {
     sheet.getRange(1, 1, 1, CRM_HEADERS.length).setValues([CRM_HEADERS]);
     sheet.getRange(1, 1, 1, CRM_HEADERS.length).setFontWeight('bold');
     sheet.setFrozenRows(1);
+  } else {
+    // Add missing columns (e.g. projeto_ana added later)
+    const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    CRM_HEADERS.forEach((h, i) => {
+      if (!existing.includes(h)) {
+        const newCol = existing.length + 1;
+        sheet.getRange(1, newCol).setValue(h).setFontWeight('bold');
+        existing.push(h);
+      }
+    });
   }
   return sheet;
 }
