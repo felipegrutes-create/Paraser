@@ -3110,6 +3110,22 @@
                         </select>
                     </div>
                 </div>
+                <div class="crm-form-grid" style="margin-top:8px">
+                    <div class="crm-field">
+                        <label>🏷️ Classificação</label>
+                        <select class="crm-input" id="crmClassificacao">
+                            <option value="">— Selecionar —</option>
+                            <option value="FIV Normal">FIV Normal</option>
+                            <option value="FIV Compartilhada">FIV Compartilhada</option>
+                            <option value="Receptora">Receptora</option>
+                            <option value="Investigando">Investigando</option>
+                            <option value="Coito Programado">Coito Programado</option>
+                            <option value="Embrião Doado">Embrião Doado</option>
+                            <option value="FIV ou OD">FIV ou OD</option>
+                            <option value="Congelamento">Congelamento</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="crm-check-row" style="margin-top:8px">
                     <label class="crm-check-group">
                         <input type="checkbox" id="crmProjetoAna">
@@ -4252,6 +4268,7 @@
             document.getElementById('crmC2').value       = isoToInputDate(crm.contato2_data);
             document.getElementById('crmVend').value     = crm.vendedora || '';
             document.getElementById('crmProposta').value = crm.proposta_feita  || '';
+            document.getElementById('crmClassificacao').value = crm.classificacao || '';
             document.getElementById('crmParcPago').checked  = crm.parc_pago === true || crm.parc_pago === 'TRUE';
             document.getElementById('crmQuitado').checked   = crm.quitado   === true || crm.quitado   === 'TRUE';
             document.getElementById('crmProjetoAna').checked = crm.projeto_ana === true || crm.projeto_ana === 'TRUE';
@@ -4316,7 +4333,7 @@
                 quitado:         document.getElementById('crmQuitado').checked,
                 projeto_ana:     document.getElementById('crmProjetoAna').checked,
                 observacoes:     document.getElementById('crmObs').value,
-                classificacao:   (crmMap[crmModalKey]?.classificacao) || '',
+                classificacao:   document.getElementById('crmClassificacao').value,
             };
 
             // Atualiza estado local imediatamente (optimistic update)
