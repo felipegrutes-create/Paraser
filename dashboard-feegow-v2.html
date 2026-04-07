@@ -2304,7 +2304,7 @@
                 </div>
                 <div class="kpi-card" style="border-color:#0ea5e9">
                     <div class="value" style="color:#38bdf8" id="doa-fiv-od">—</div>
-                    <div class="label">FIV ou OD</div>
+                    <div class="label">Doadora Voluntária</div>
                 </div>
                 <div class="kpi-card" style="border-color:#64748b">
                     <div class="value" style="color:#94a3b8" id="doa-congelamento">—</div>
@@ -2329,7 +2329,7 @@
                     <option value="Investigando">Investigando</option>
                     <option value="Coito Programado">Coito Programado</option>
                     <option value="Embrião Doado">Embrião Doado</option>
-                    <option value="FIV ou OD">FIV ou OD</option>
+                    <option value="Doadora Voluntária">Doadora Voluntária</option>
                     <option value="Congelamento">Congelamento</option>
                     <option value="sem">Sem classificação</option>
                 </select>
@@ -3124,7 +3124,7 @@
                             <option value="Investigando">Investigando</option>
                             <option value="Coito Programado">Coito Programado</option>
                             <option value="Embrião Doado">Embrião Doado</option>
-                            <option value="FIV ou OD">FIV ou OD</option>
+                            <option value="Doadora Voluntária">Doadora Voluntária</option>
                             <option value="Congelamento">Congelamento</option>
                         </select>
                     </div>
@@ -4134,7 +4134,7 @@
                                 <option value="Investigando" ${sel('Investigando')}>Investigando</option>
                                 <option value="Coito Programado" ${sel('Coito Programado')}>Coito Programado</option>
                                 <option value="Embrião Doado" ${sel('Embrião Doado')}>Embrião Doado</option>
-                                <option value="FIV ou OD" ${sel('FIV ou OD')}>FIV ou OD</option>
+                                <option value="Doadora Voluntária" ${sel('Doadora Voluntária')}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${sel('Congelamento')}>Congelamento</option>
                             </select>
                         </div>`;
@@ -4442,7 +4442,7 @@
                 else if (cls === 'Investigando') nInv++;
                 else if (cls === 'Coito Programado') nCoito++;
                 else if (cls === 'Embrião Doado') nEmbriao++;
-                else if (cls === 'FIV ou OD') nFivOd++;
+                else if (cls === 'Doadora Voluntária') nFivOd++;
                 else if (cls === 'Congelamento') nCong++;
                 else nSem++;
             });
@@ -4478,7 +4478,7 @@
                             : cls === 'Investigando' ? 'cls-investigando'
                             : cls === 'Coito Programado' ? 'cls-coito'
                             : cls === 'Embrião Doado' ? 'cls-embriao'
-                            : cls === 'FIV ou OD' ? 'cls-fiv-od'
+                            : cls === 'Doadora Voluntária' ? 'cls-fiv-od'
                             : cls === 'Congelamento' ? 'cls-congelamento' : '';
                         const statusClass = p.status === 'Atendido' ? 'doa-status-atendido'
                             : p.status === 'Aguardando' ? 'doa-status-aguardando'
@@ -4507,7 +4507,7 @@
                                 <option value="Investigando" ${cls === 'Investigando' ? 'selected' : ''}>Investigando</option>
                                 <option value="Coito Programado" ${cls === 'Coito Programado' ? 'selected' : ''}>Coito Programado</option>
                                 <option value="Embrião Doado" ${cls === 'Embrião Doado' ? 'selected' : ''}>Embrião Doado</option>
-                                <option value="FIV ou OD" ${cls === 'FIV ou OD' ? 'selected' : ''}>FIV ou OD</option>
+                                <option value="Doadora Voluntária" ${cls === 'Doadora Voluntária' ? 'selected' : ''}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${cls === 'Congelamento' ? 'selected' : ''}>Congelamento</option>
                             </select>
                         </div>`;
@@ -4528,7 +4528,7 @@
                 : value === 'Investigando' ? 'cls-investigando'
                 : value === 'Coito Programado' ? 'cls-coito'
                 : value === 'Embrião Doado' ? 'cls-embriao'
-                : value === 'FIV ou OD' ? 'cls-fiv-od'
+                : value === 'Doadora Voluntária' ? 'cls-fiv-od'
                 : value === 'Congelamento' ? 'cls-congelamento' : ''
             );
 
@@ -4546,7 +4546,7 @@
                 else if (cls === 'Investigando') nInv++;
                 else if (cls === 'Coito Programado') nCoito++;
                 else if (cls === 'Embrião Doado') nEmbriao++;
-                else if (cls === 'FIV ou OD') nFivOd++;
+                else if (cls === 'Doadora Voluntária') nFivOd++;
                 else if (cls === 'Congelamento') nCong++;
                 else nSem++;
             });
@@ -4775,12 +4775,12 @@
 
         // ===== DOADORAS COMPARTILHADAS — INTEGRATION WITH DOADORAS/RECEPTORAS =====
 
-        // Get patients classified as FIV Compartilhada or FIV ou OD that don't have a donor profile yet
+        // Get patients classified as FIV Compartilhada or Doadora Voluntária that don't have a donor profile yet
         function dnGetPendingPatients() {
             const pending = [];
             doaPatients.forEach(p => {
                 const cls = (crmMap[p.key]?.classificacao) || '';
-                if (cls === 'FIV Compartilhada' || cls === 'FIV ou OD') {
+                if (cls === 'FIV Compartilhada' || cls === 'Doadora Voluntária') {
                     // Check if already has a donor profile
                     const hasProfile = donorProfiles.some(dp => {
                         const data = typeof dp.dados === 'string' ? JSON.parse(dp.dados || '{}') : (dp.dados || {});
