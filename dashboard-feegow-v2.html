@@ -1324,9 +1324,16 @@
             border-radius: 16px;
             width: 440px;
             max-width: 95vw;
-            padding: 24px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
             position: relative;
             animation: fadeUp 0.2s ease;
+        }
+        .crm-modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
         }
 
         .crm-modal-close {
@@ -1401,8 +1408,11 @@
             display: flex;
             justify-content: flex-end;
             gap: 8px;
-            padding-top: 16px;
+            padding: 14px 24px;
             border-top: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: 0 0 16px 16px;
+            flex-shrink: 0;
         }
 
         .crm-btn {
@@ -3073,85 +3083,87 @@
         <div class="crm-modal-overlay" id="crmModalOverlay" onclick="handleModalOverlayClick(event)">
             <div class="crm-modal">
                 <button class="crm-modal-close" onclick="closeCRMModal()">✕</button>
-                <div class="crm-modal-name" id="crmModalName">—</div>
-                <div class="crm-modal-sub" id="crmModalSub">—</div>
+                <div class="crm-modal-body">
+                    <div class="crm-modal-name" id="crmModalName">—</div>
+                    <div class="crm-modal-sub" id="crmModalSub">—</div>
 
-                <div class="crm-modal-info">
-                    <span>📅 1ª vez: <strong id="crmInfoData">—</strong></span>
-                    <span id="crmInfoRetWrap" style="display:none">📅 Retorno: <strong id="crmInfoRet" style="color:var(--accent)">—</strong></span>
-                    <span id="crmInfoTelWrap">📱 <a id="crmInfoTel" href="#">—</a></span>
-                    <span id="crmInfoEmailWrap">✉️ <a id="crmInfoEmail" href="#">—</a></span>
-                </div>
+                    <div class="crm-modal-info">
+                        <span>📅 1ª vez: <strong id="crmInfoData">—</strong></span>
+                        <span id="crmInfoRetWrap" style="display:none">📅 Retorno: <strong id="crmInfoRet" style="color:var(--accent)">—</strong></span>
+                        <span id="crmInfoTelWrap">📱 <a id="crmInfoTel" href="#">—</a></span>
+                        <span id="crmInfoEmailWrap">✉️ <a id="crmInfoEmail" href="#">—</a></span>
+                    </div>
 
-                <div class="crm-form-grid">
-                    <div class="crm-field">
-                        <label>📞 Contato 1</label>
-                        <input type="date" class="crm-input" id="crmC1">
+                    <div class="crm-form-grid">
+                        <div class="crm-field">
+                            <label>📞 Contato 1</label>
+                            <input type="date" class="crm-input" id="crmC1">
+                        </div>
+                        <div class="crm-field">
+                            <label>📞 Contato 2</label>
+                            <input type="date" class="crm-input" id="crmC2">
+                        </div>
+                        <div class="crm-field">
+                            <label>👤 Vendedora</label>
+                            <select class="crm-input" id="crmVend">
+                                <option value="">— Selecionar —</option>
+                                <option value="Alice Valentim">Alice Valentim</option>
+                                <option value="Rayssa Guedes">Rayssa Guedes</option>
+                            </select>
+                        </div>
+                        <div class="crm-field">
+                            <label>💰 Valor</label>
+                            <input type="text" class="crm-input" id="crmValor" placeholder="R$ 0,00" oninput="maskCurrency(this)">
+                        </div>
+                        <div class="crm-field">
+                            <label>📄 Proposta Feita</label>
+                            <select class="crm-input" id="crmProposta">
+                                <option value="">— Selecionar —</option>
+                                <option value="Sim">Sim</option>
+                                <option value="Não">Não</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="crm-field">
-                        <label>📞 Contato 2</label>
-                        <input type="date" class="crm-input" id="crmC2">
+                    <div class="crm-form-grid" style="margin-top:8px">
+                        <div class="crm-field">
+                            <label>🏷️ Classificação</label>
+                            <select class="crm-input" id="crmClassificacao">
+                                <option value="">— Selecionar —</option>
+                                <option value="FIV Normal">FIV Normal</option>
+                                <option value="FIV Compartilhada">FIV Compartilhada</option>
+                                <option value="Receptora">Receptora</option>
+                                <option value="Investigando">Investigando</option>
+                                <option value="Coito Programado">Coito Programado</option>
+                                <option value="Embrião Doado">Embrião Doado</option>
+                                <option value="Doadora Voluntária">Doadora Voluntária</option>
+                                <option value="Congelamento">Congelamento</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="crm-field">
-                        <label>👤 Vendedora</label>
-                        <select class="crm-input" id="crmVend">
-                            <option value="">— Selecionar —</option>
-                            <option value="Alice Valentim">Alice Valentim</option>
-                            <option value="Rayssa Guedes">Rayssa Guedes</option>
-                        </select>
+                    <div class="crm-check-row" style="margin-top:8px">
+                        <label class="crm-check-group">
+                            <input type="checkbox" id="crmProjetoAna">
+                            <span>🩺 Projeto ANA</span>
+                        </label>
                     </div>
-                    <div class="crm-field">
-                        <label>💰 Valor</label>
-                        <input type="text" class="crm-input" id="crmValor" placeholder="R$ 0,00" oninput="maskCurrency(this)">
-                    </div>
-                    <div class="crm-field">
-                        <label>📄 Proposta Feita</label>
-                        <select class="crm-input" id="crmProposta">
-                            <option value="">— Selecionar —</option>
-                            <option value="Sim">Sim</option>
-                            <option value="Não">Não</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="crm-form-grid" style="margin-top:8px">
-                    <div class="crm-field">
-                        <label>🏷️ Classificação</label>
-                        <select class="crm-input" id="crmClassificacao">
-                            <option value="">— Selecionar —</option>
-                            <option value="FIV Normal">FIV Normal</option>
-                            <option value="FIV Compartilhada">FIV Compartilhada</option>
-                            <option value="Receptora">Receptora</option>
-                            <option value="Investigando">Investigando</option>
-                            <option value="Coito Programado">Coito Programado</option>
-                            <option value="Embrião Doado">Embrião Doado</option>
-                            <option value="Doadora Voluntária">Doadora Voluntária</option>
-                            <option value="Congelamento">Congelamento</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="crm-check-row" style="margin-top:8px">
-                    <label class="crm-check-group">
-                        <input type="checkbox" id="crmProjetoAna">
-                        <span>🩺 Projeto ANA</span>
-                    </label>
-                </div>
 
-                <div class="crm-form-grid" style="margin-top:10px">
-                    <div class="crm-field crm-obs-field">
-                        <label>💬 Observações</label>
-                        <textarea class="crm-textarea" id="crmObs" placeholder="Histórico de contatos, anotações, próximos passos..."></textarea>
+                    <div class="crm-form-grid" style="margin-top:10px">
+                        <div class="crm-field crm-obs-field">
+                            <label>💬 Observações</label>
+                            <textarea class="crm-textarea" id="crmObs" placeholder="Histórico de contatos, anotações, próximos passos..."></textarea>
+                        </div>
                     </div>
-                </div>
 
-                <div class="crm-check-row">
-                    <label class="crm-check-group">
-                        <input type="checkbox" id="crmParcPago">
-                        <span>Parcialmente Pago</span>
-                    </label>
-                    <label class="crm-check-group">
-                        <input type="checkbox" id="crmQuitado">
-                        <span>Quitado</span>
-                    </label>
+                    <div class="crm-check-row">
+                        <label class="crm-check-group">
+                            <input type="checkbox" id="crmParcPago">
+                            <span>Parcialmente Pago</span>
+                        </label>
+                        <label class="crm-check-group">
+                            <input type="checkbox" id="crmQuitado">
+                            <span>Quitado</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="crm-modal-footer">
