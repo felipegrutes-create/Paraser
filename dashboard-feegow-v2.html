@@ -1330,8 +1330,14 @@
             position: relative;
             animation: fadeUp 0.2s ease;
         }
+        .crm-modal-header {
+            padding: 20px 24px 0 24px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
         .crm-modal-body {
-            padding: 24px;
+            padding: 16px 24px 24px 24px;
             overflow-y: auto;
             flex: 1;
         }
@@ -1351,8 +1357,8 @@
 
         .crm-modal-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
 
-        .crm-modal-name { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 2px; }
-        .crm-modal-sub  { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+        .crm-modal-name { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 2px; padding-right: 40px; }
+        .crm-modal-sub  { font-size: 12px; color: var(--muted); margin-bottom: 0; }
 
         .crm-form-grid {
             display: grid;
@@ -3083,10 +3089,11 @@
         <div class="crm-modal-overlay" id="crmModalOverlay" onclick="handleModalOverlayClick(event)">
             <div class="crm-modal">
                 <button class="crm-modal-close" onclick="closeCRMModal()">✕</button>
-                <div class="crm-modal-body">
+                <div class="crm-modal-header">
                     <div class="crm-modal-name" id="crmModalName">—</div>
                     <div class="crm-modal-sub" id="crmModalSub">—</div>
-
+                </div>
+                <div class="crm-modal-body">
                     <div class="crm-modal-info">
                         <span>📅 1ª vez: <strong id="crmInfoData">—</strong></span>
                         <span id="crmInfoRetWrap" style="display:none">📅 Retorno: <strong id="crmInfoRet" style="color:var(--accent)">—</strong></span>
