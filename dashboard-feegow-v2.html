@@ -3874,14 +3874,8 @@
                 });
             };
 
-            // Incluir consultas 1ª vez
+            // Incluir consultas 1ª vez (inclui "Consulta - Presencial")
             vezRows.forEach(r => doaAdd(r, 'vez'));
-
-            // Incluir consultas "Consulta - Presencial" (condição diferenciada)
-            raw.filter(r => {
-                const proc = (r[d.C.proc]||'').trim().toLowerCase().replace(/\s+/g, ' ');
-                return proc === 'consulta - presencial';
-            }).forEach(r => doaAdd(r, 'consulta'));
 
             // Incluir consultas de retorno
             raw.filter(r => {
