@@ -47,6 +47,7 @@ const LOG_HEADERS = [
   'dados_anteriores','coluna_origem','coluna_destino'
 ];
 const DONOR_SHEET = 'Doadoras_Perfis';
+const BACKUP_SHEET_NAME = 'Backup_Agendamentos';
 const DONOR_HEADERS = ['id','codigo_perfil','dados','ultima_atualizacao'];
 
 function doGet(e) {
@@ -105,6 +106,15 @@ function doGet(e) {
       return jsonOk({ profiles });
     }
 
+    // Retornar backup de agendamentos
+    if (action === 'get_backup') {
+      const bSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BACKUP_SHEET_NAME);
+      if (!bSheet) return jsonOk({ backup: null });
+      const bData = bSheet.getDataRange().getValues();
+      const meta = bSheet.getRange('A1').getNote(); // timestamp no note da célula A1
+      return jsonOk({ backup: bData, timestamp: meta || '' });
+    }
+
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
     const data  = sheet.getDataRange().getValues();
@@ -130,6 +140,10 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
+      if (action === 'save_backup') {
+        return handleSaveBackup(body);
+      }
+
       if (action === 'save_donor') {
         return handleSaveDonor(body);
       }
@@ -520,6 +534,38 @@ function handleFeegowTest(params) {
   return ContentService
     .createTextOutput(JSON.stringify(results, null, 2))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleSaveBackup(body) {
+  const rows = body.rows;
+  if (!rows || !rows.length) return jsonErr('rows obrigatório');
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(BACKUP_SHEET_NAME);
+
+  if (sheet) {
+    sheet.clear();
+  } else {
+    sheet = ss.insertSheet(BACKUP_SHEET_NAME);
+  }
+
+  // Escrever dados em batch (muito mais rápido que appendRow)
+  if (rows.length > 0) {
+    const maxCols = Math.max(...rows.map(r => (r || []).length));
+    // Normalizar todas as linhas para ter o mesmo número de colunas
+    const normalized = rows.map(r => {
+      const row = r || [];
+      while (row.length < maxCols) row.push('');
+      return row;
+    });
+    sheet.getRange(1, 1, normalized.length, maxCols).setValues(normalized);
+    sheet.setFrozenRows(1);
+  }
+
+  // Salvar timestamp como note na célula A1
+  sheet.getRange('A1').setNote('Backup: ' + new Date().toISOString() + ' | ' + rows.length + ' linhas');
+
+  return jsonOk({ success: true, rows_saved: rows.length });
 }
 
 function jsonOk(data) {

@@ -3337,14 +3337,20 @@
                 // Proteção: se API retorna menos de 50% dos dados conhecidos, rejeitar
                 const cached = loadAgendLocal();
                 if (cached && cached.count > 100 && rows.length < cached.count * 0.5) {
-                    console.warn(`API retornou ${rows.length} linhas (esperado ~${cached.count}). Usando cache local.`);
+                    console.warn(`API retornou ${rows.length} linhas (esperado ~${cached.count}). Usando backup.`);
                     feegowStatus = 'stale';
+                    // Tentar backup Sheets primeiro
+                    try {
+                        const backupRows = await loadAgendBackupSheets();
+                        if (backupRows && backupRows.length > cached.count * 0.5) return backupRows;
+                    } catch(be) {}
                     return cached.data;
                 }
 
-                // Dados válidos — salvar cache local
+                // Dados válidos — salvar cache local + backup no Sheets (background)
                 if (rows.length > 10) {
                     saveAgendLocal(rows);
+                    saveAgendBackupSheets(rows);
                     feegowStatus = 'ok';
                 }
                 return rows;
@@ -3352,7 +3358,16 @@
                 console.warn('Feegow/Sheets load failed:', e.message);
                 feegowStatus = 'error';
 
-                // Fallback: usar cache local
+                // Fallback 1: tentar backup do Google Sheets (funciona em qualquer máquina)
+                try {
+                    const backupRows = await loadAgendBackupSheets();
+                    if (backupRows && backupRows.length > 10) {
+                        console.log(`Usando backup Sheets (${backupRows.length} linhas)`);
+                        return backupRows;
+                    }
+                } catch(be) { console.warn('Backup Sheets failed:', be.message); }
+
+                // Fallback 2: cache local (só nesta máquina)
                 const cached = loadAgendLocal();
                 if (cached && cached.data && cached.data.length > 10) {
                     const age = Math.floor((Date.now() - cached.ts) / 60000);
@@ -3360,7 +3375,7 @@
                     return cached.data;
                 }
 
-                throw new Error('API indisponível e sem cache local: ' + e.message);
+                throw new Error('API indisponível e sem backup disponível: ' + e.message);
             }
         }
 
@@ -7258,6 +7273,33 @@
         }
 
         const CRM_LOCAL_KEY = 'paraser_crm_v1';
+
+        // Backup agendamentos no Google Sheets (via Apps Script)
+        let _lastBackupTs = 0;
+        function saveAgendBackupSheets(rows) {
+            // Salvar no máximo 1x a cada 30 min
+            if (Date.now() - _lastBackupTs < 30 * 60 * 1000) return;
+            _lastBackupTs = Date.now();
+            if (!CRM_SCRIPT_URL) return;
+            fetch(CRM_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'save_backup', rows }),
+            }).then(() => console.log('Backup agendamentos salvo no Sheets'))
+              .catch(e => console.warn('Backup save error:', e));
+        }
+
+        async function loadAgendBackupSheets() {
+            if (!CRM_SCRIPT_URL) return null;
+            const res = await fetch(CRM_SCRIPT_URL + '?action=get_backup', { signal: AbortSignal.timeout(10000) });
+            const json = await res.json();
+            if (json.backup && json.backup.length > 10) {
+                console.log('Backup Sheets carregado:', json.backup.length, 'linhas |', json.timestamp);
+                return json.backup;
+            }
+            return null;
+        }
 
         function updateFeegowStatusBanner() {
             const banner = document.getElementById('feegowStatusBanner');
