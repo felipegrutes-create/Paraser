@@ -1105,6 +1105,7 @@
         .doa-select.cls-embriao { border-color: #f43f5e; color: #fb7185; }
         .doa-select.cls-fiv-od { border-color: #0ea5e9; color: #38bdf8; }
         .doa-select.cls-congelamento { border-color: #64748b; color: #94a3b8; }
+        .doa-select.cls-nova-tec { border-color: #06b6d4; color: #22d3ee; }
         .doa-saving { opacity: 0.5; pointer-events: none; }
 
         @media (max-width: 768px) {
@@ -2347,6 +2348,7 @@
                     <option value="Embrião Doado">Embrião Doado</option>
                     <option value="Doadora Voluntária">Doadora Voluntária</option>
                     <option value="Congelamento">Congelamento</option>
+                    <option value="Nova TEC">Nova TEC</option>
                     <option value="sem">Sem classificação</option>
                 </select>
             </div>
@@ -3144,6 +3146,7 @@
                                 <option value="Embrião Doado">Embrião Doado</option>
                                 <option value="Doadora Voluntária">Doadora Voluntária</option>
                                 <option value="Congelamento">Congelamento</option>
+                                <option value="Nova TEC">Nova TEC</option>
                             </select>
                         </div>
                     </div>
@@ -4161,6 +4164,7 @@
                                 <option value="Embrião Doado" ${sel('Embrião Doado')}>Embrião Doado</option>
                                 <option value="Doadora Voluntária" ${sel('Doadora Voluntária')}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${sel('Congelamento')}>Congelamento</option>
+                                <option value="Nova TEC" ${sel('Nova TEC')}>Nova TEC</option>
                             </select>
                         </div>`;
                     })() : ''}
@@ -4469,6 +4473,7 @@
                 else if (cls === 'Embrião Doado') nEmbriao++;
                 else if (cls === 'Doadora Voluntária') nFivOd++;
                 else if (cls === 'Congelamento') nCong++;
+                else if (cls === 'Nova TEC') nCong++; // conta junto com Congelamento
                 else nSem++;
             });
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -4504,7 +4509,8 @@
                             : cls === 'Coito Programado' ? 'cls-coito'
                             : cls === 'Embrião Doado' ? 'cls-embriao'
                             : cls === 'Doadora Voluntária' ? 'cls-fiv-od'
-                            : cls === 'Congelamento' ? 'cls-congelamento' : '';
+                            : cls === 'Congelamento' ? 'cls-congelamento'
+                            : cls === 'Nova TEC' ? 'cls-nova-tec' : '';
                         const statusClass = p.status === 'Atendido' ? 'doa-status-atendido'
                             : p.status === 'Aguardando' ? 'doa-status-aguardando'
                             : (p.status === 'Não Compareceu') ? 'doa-status-naocomp'
@@ -4537,6 +4543,7 @@
                                 <option value="Embrião Doado" ${cls === 'Embrião Doado' ? 'selected' : ''}>Embrião Doado</option>
                                 <option value="Doadora Voluntária" ${cls === 'Doadora Voluntária' ? 'selected' : ''}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${cls === 'Congelamento' ? 'selected' : ''}>Congelamento</option>
+                                <option value="Nova TEC" ${cls === 'Nova TEC' ? 'selected' : ''}>Nova TEC</option>
                             </select>
                         </div>`;
                     }).join('')}
@@ -4557,7 +4564,8 @@
                 : value === 'Coito Programado' ? 'cls-coito'
                 : value === 'Embrião Doado' ? 'cls-embriao'
                 : value === 'Doadora Voluntária' ? 'cls-fiv-od'
-                : value === 'Congelamento' ? 'cls-congelamento' : ''
+                : value === 'Congelamento' ? 'cls-congelamento'
+                : value === 'Nova TEC' ? 'cls-nova-tec' : ''
             );
 
             // Optimistic update local
@@ -4577,6 +4585,7 @@
                 else if (cls === 'Embrião Doado') nEmbriao++;
                 else if (cls === 'Doadora Voluntária') nFivOd++;
                 else if (cls === 'Congelamento') nCong++;
+                else if (cls === 'Nova TEC') nCong++; // conta junto com Congelamento
                 else nSem++;
             });
             const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
