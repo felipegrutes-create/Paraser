@@ -534,6 +534,28 @@
             margin-bottom: 16px;
             font-size: 13px;
         }
+        #feegowStatusBanner {
+            padding: 10px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #feegowStatusBanner.status-error {
+            background: rgba(239,68,68,0.08);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.2);
+        }
+        #feegowStatusBanner.status-stale {
+            background: rgba(245,158,11,0.08);
+            color: #fbbf24;
+            border: 1px solid rgba(245,158,11,0.2);
+        }
+        #feegowStatusBanner.status-ok {
+            display: none;
+        }
 
         .info-note {
             font-size: 11px;
@@ -1825,6 +1847,7 @@
 
     <div class="container">
         <div id="errorBanner"></div>
+        <div id="feegowStatusBanner" style="display:none"></div>
 
         <!-- VISÃO GERAL -->
         <section id="sec-vg" class="section active">
@@ -3279,14 +3302,66 @@
         }
 
         // ===================== DATA LOAD =====================
+        const AGEND_LOCAL_KEY = 'paraser_agendamentos_v1';
+        let feegowStatus = 'ok'; // 'ok' | 'error' | 'stale'
+
+        function saveAgendLocal(rows) {
+            try {
+                localStorage.setItem(AGEND_LOCAL_KEY, JSON.stringify({
+                    ts: Date.now(),
+                    count: rows.length,
+                    data: rows
+                }));
+            } catch(e) { /* localStorage cheio — ignora */ }
+        }
+
+        function loadAgendLocal() {
+            try {
+                const raw = localStorage.getItem(AGEND_LOCAL_KEY);
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch(e) { return null; }
+        }
+
         async function loadData() {
             document.getElementById("loadingMsg").textContent = "Buscando dados do Google Sheets...";
-            const range = encodeURIComponent(`'${TAB}'!A:R`);
+            const range = encodeURIComponent(`'${TAB}'!A:S`);
             const url   = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?key=${API_KEY}`;
-            const res   = await fetch(url);
-            if (!res.ok) throw new Error(`API error ${res.status}`);
-            const json  = await res.json();
-            return json.values || [];
+
+            try {
+                const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+                if (!res.ok) throw new Error(`API error ${res.status}`);
+                const json = await res.json();
+                const rows = json.values || [];
+
+                // Proteção: se API retorna menos de 50% dos dados conhecidos, rejeitar
+                const cached = loadAgendLocal();
+                if (cached && cached.count > 100 && rows.length < cached.count * 0.5) {
+                    console.warn(`API retornou ${rows.length} linhas (esperado ~${cached.count}). Usando cache local.`);
+                    feegowStatus = 'stale';
+                    return cached.data;
+                }
+
+                // Dados válidos — salvar cache local
+                if (rows.length > 10) {
+                    saveAgendLocal(rows);
+                    feegowStatus = 'ok';
+                }
+                return rows;
+            } catch(e) {
+                console.warn('Feegow/Sheets load failed:', e.message);
+                feegowStatus = 'error';
+
+                // Fallback: usar cache local
+                const cached = loadAgendLocal();
+                if (cached && cached.data && cached.data.length > 10) {
+                    const age = Math.floor((Date.now() - cached.ts) / 60000);
+                    console.log(`Usando cache local (${cached.count} linhas, ${age} min atrás)`);
+                    return cached.data;
+                }
+
+                throw new Error('API indisponível e sem cache local: ' + e.message);
+            }
         }
 
         function processData(rows) {
@@ -5265,7 +5340,7 @@
             document.getElementById('errorBanner').style.display    = 'none';
             Object.values(chartInstances).forEach(c => c.destroy());
             chartInstances = {};
-            crmMap         = {};
+            // NÃO limpar crmMap — preservar dados do CRM
             pendPatients   = [];
             doaPatients    = [];
             finData        = [];
@@ -7184,6 +7259,26 @@
 
         const CRM_LOCAL_KEY = 'paraser_crm_v1';
 
+        function updateFeegowStatusBanner() {
+            const banner = document.getElementById('feegowStatusBanner');
+            if (!banner) return;
+            banner.className = '';
+            if (feegowStatus === 'error') {
+                const cached = loadAgendLocal();
+                const age = cached ? Math.floor((Date.now() - cached.ts) / 60000) : 0;
+                banner.className = 'status-error';
+                banner.style.display = 'flex';
+                banner.innerHTML = `⚠️ <strong>API Feegow indisponível</strong> — Exibindo dados em cache${cached ? ' (atualizado há ' + (age < 60 ? age + ' min' : Math.floor(age/60) + 'h') + ')' : ''}. O CRM Comercial e dados financeiros funcionam normalmente.`;
+            } else if (feegowStatus === 'stale') {
+                banner.className = 'status-stale';
+                banner.style.display = 'flex';
+                banner.innerHTML = `⚠️ <strong>Dados parciais detectados</strong> — A API retornou menos dados que o esperado. Exibindo cache local como proteção. Dados do CRM e financeiro não foram afetados.`;
+            } else {
+                banner.className = 'status-ok';
+                banner.style.display = 'none';
+            }
+        }
+
         function crmSaveLocal() {
             try { localStorage.setItem(CRM_LOCAL_KEY, JSON.stringify(crmMap)); } catch(e) {}
         }
@@ -7211,14 +7306,25 @@
         async function init() {
             try {
                 document.getElementById('loadingMsg').textContent = 'Carregando dados...';
-                const [rows, crmData] = await Promise.all([
-                    loadData(),
-                    loadCRMData(),
-                ]);
+
+                // CRM carrega sempre (independente do Feegow)
+                let crmData = {};
+                try {
+                    crmData = await loadCRMData();
+                } catch(e) { console.warn('CRM load failed, using local:', e); }
                 crmMap = crmMergeLocal(crmData);
+                crmSaveLocal(); // backup local sempre atualizado
+
+                // Agendamentos — pode falhar, usa cache
+                const rows = await loadData();
+
                 document.getElementById('loadingMsg').textContent = 'Processando dados...';
                 const d = processData(rows);
                 buildUI(d);
+
+                // Mostrar banner de status Feegow
+                updateFeegowStatusBanner();
+
                 loadDonorProfiles();
                 fpLoadFichas().catch(e => console.warn('Fichas load:', e));
                 document.getElementById('loadingOverlay').style.display = 'none';
