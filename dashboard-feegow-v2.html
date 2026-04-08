@@ -3941,30 +3941,8 @@
                     + profs.map(p => `<option value="${p}">${p}</option>`).join('');
             }
 
-            // Adicionar pacientes classificadas no CRM que não vieram de firstVez
-            const pendKeys = new Set(retDetails.map(r => normalizeKey(r.pac)));
-            Object.entries(crmMap).forEach(([key, crm]) => {
-                if (!crm.classificacao || pendKeys.has(key)) return;
-                // Buscar dados da paciente no raw (agendamentos Feegow)
-                const patRows = raw.filter(r => normalizeKey(r[C.pac]) === key);
-                if (!patRows.length) return;
-                // Pegar a consulta mais recente
-                const patSorted = patRows.map(r => ({ r, d: parseDate(r[C.data]) })).filter(x => x.d).sort((a,b) => b.d - a.d);
-                if (!patSorted.length) return;
-                const latest = patSorted[0].r;
-                const latestDate = patSorted[0].d;
-                const daysSince = daysBetween(latestDate, today);
-                retDetails.push({
-                    pac: (latest[C.pac]||'').trim(), prof: latest[C.prof]||'', cel: latest[C.cel]||'',
-                    email: latest[C.email]||'', dcri: latest[C.dcri]||'', dataAp: latest[C.data]||'',
-                    returned: patSorted.length > 1, retDateObj: null, retDate: null, retRealized: false, daysToRet: null,
-                    daysSince, yearDcri: latest[C.dcri] ? latest[C.dcri].split('/')[2] : '?'
-                });
-            });
-
-            // Guardar globalmente e renderizar board
-            pendPatients = retDetails.sort((a, b) => b.daysSince - a.daysSince);
-            renderKanban();
+            // Guardar retDetails provisório (será completado após doaPatients)
+            pendPatients = retDetails;
 
             // == DOADORAS / RECEPTORAS ==
             // Dados: agendamentos de 1ª vez e retorno, exceto cancelado/remarcado
@@ -4036,6 +4014,29 @@
                     + profs.map(p => `<option value="${p}">${p}</option>`).join('');
             }
             renderDoadoras();
+
+            // Adicionar TODAS as pacientes do Fluxo Pacientes que não estão no CRM
+            const pendKeys = new Set(retDetails.map(r => normalizeKey(r.pac)));
+            doaPatients.forEach(p => {
+                const key = normalizeKey(p.pac);
+                if (pendKeys.has(key)) return;
+                pendKeys.add(key);
+                const patRows = raw.filter(r => normalizeKey(r[C.pac]) === key);
+                if (!patRows.length) return;
+                const patSorted = patRows.map(r => ({ r, d: parseDate(r[C.data]) })).filter(x => x.d).sort((a,b) => b.d - a.d);
+                if (!patSorted.length) return;
+                const latest = patSorted[0].r;
+                const latestDate = patSorted[0].d;
+                const daysSince = daysBetween(latestDate, today);
+                retDetails.push({
+                    pac: (latest[C.pac]||'').trim(), prof: latest[C.prof]||'', cel: latest[C.cel]||'',
+                    email: latest[C.email]||'', dcri: latest[C.dcri]||'', dataAp: latest[C.data]||'',
+                    returned: patSorted.length > 1, retDateObj: null, retDate: null, retRealized: false, daysToRet: null,
+                    daysSince, yearDcri: latest[C.dcri] ? latest[C.dcri].split('/')[2] : '?'
+                });
+            });
+            pendPatients = retDetails.sort((a, b) => b.daysSince - a.daysSince);
+            renderKanban();
 
             const pvMonths = Object.keys(pvByMonth);
             const minM     = pvMonths.length ? pvMonths.sort()[0]       : "—";
