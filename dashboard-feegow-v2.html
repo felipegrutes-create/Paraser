@@ -3851,7 +3851,34 @@
                     + profs.map(p => `<option value="${p}">${p}</option>`).join('');
             }
 
-            // Guardar globalmente e renderizar board (todos os pacientes, não só retNao)
+            // Adicionar pacientes classificadas no CRM que não vieram de firstVez
+            const pendKeys = new Set(retDetails.map(r => normalizeKey(r.pac)));
+            Object.entries(crmMap).forEach(([key, crm]) => {
+                if (!crm.classificacao || pendKeys.has(key)) return;
+                // Buscar dados da paciente no raw
+                const patRows = raw.filter(r => normalizeKey(r[C.pac]) === key);
+                if (!patRows.length) return;
+                // Pegar a consulta mais recente
+                const sorted = patRows.map(r => ({ r, d: parseDate(r[C.data]) })).filter(x => x.d).sort((a,b) => b.d - a.d);
+                if (!sorted.length) return;
+                const latest = sorted[0].r;
+                const latestDate = sorted[0].d;
+                const daysSince = daysBetween(latestDate, today);
+                // Verificar se tem retorno após essa data
+                const laterAppts = sorted.filter(x => x.d > latestDate);
+                const returned = laterAppts.length > 0;
+                const retDateObj = returned ? laterAppts[laterAppts.length-1].d : null;
+                const retDate = retDateObj ? retDateObj.toLocaleDateString('pt-BR') : null;
+                const retRealized = returned && sta(laterAppts[laterAppts.length-1].r) === 'atendido';
+                retDetails.push({
+                    pac: (latest[C.pac]||'').trim(), prof: latest[C.prof]||'', cel: latest[C.cel]||'',
+                    email: latest[C.email]||'', dcri: latest[C.dcri]||'', dataAp: latest[C.data]||'',
+                    returned, retDateObj, retDate, retRealized, daysToRet: null,
+                    daysSince, yearDcri: latest[C.dcri] ? latest[C.dcri].split('/')[2] : '?'
+                });
+            });
+
+            // Guardar globalmente e renderizar board
             pendPatients = retDetails.sort((a, b) => b.daysSince - a.daysSince);
             renderKanban();
 
