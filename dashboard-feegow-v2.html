@@ -4516,12 +4516,15 @@
                         const crmRec = crmMap[p.key] || {};
                         const crmProp = crmRec.proposta_feita === 'Sim';
                         const crmQuit = crmRec.quitado === true || crmRec.quitado === 'TRUE';
+                        const c1 = fmtCRMDate(crmRec.contato1_data);
+                        const c2 = fmtCRMDate(crmRec.contato2_data);
+                        const contatoBadge = c1 ? `<span style="font-size:10px;color:#fbbf24;margin-left:6px">📞 Atendida em ${c2 || c1}</span>` : '';
                         const crmBadges = [
                             crmProp ? '<span class="crm-badge badge-blue" style="font-size:10px;margin-left:6px">📄 Proposta</span>' : '',
                             crmQuit ? '<span class="crm-badge badge-green" style="font-size:10px;margin-left:4px">✅ Quitado</span>' : '',
                         ].filter(Boolean).join('');
                         return `<div class="doa-patient-row" id="doa-row-${safeKey}">
-                            <div class="doa-pat-name">${p.pac}<small>${p.cel || ''}</small>${crmBadges}</div>
+                            <div class="doa-pat-name">${p.pac}<small>${p.cel || ''}</small>${contatoBadge}${crmBadges}</div>
                             <div class="doa-pat-status">${statusBadge} ${p.prof}</div>
                             <div class="doa-pat-proc" title="${p.proc}">${p.proc || '—'}</div>
                             <select class="doa-select ${selClass}" onchange="saveClassificacao('${safeKey}', this)">
