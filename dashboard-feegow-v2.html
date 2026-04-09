@@ -4949,9 +4949,18 @@
                 const cls = (crmMap[p.key]?.classificacao) || '';
                 if (cls === 'FIV Compartilhada') {
                     // Check if already has a donor profile
+                    const pKey = p.key;
+                    const pNome = p.pac;
                     const hasProfile = donorProfiles.some(dp => {
-                        const data = typeof dp.dados === 'string' ? JSON.parse(dp.dados || '{}') : (dp.dados || {});
-                        return data.paciente_nome === p.pac || data.paciente_key === p.key;
+                        // Check in parsed dados
+                        let d = dp;
+                        if (typeof dp.dados === 'string' && dp.dados) {
+                            try { d = { ...dp, ...JSON.parse(dp.dados) }; } catch(e) {}
+                        }
+                        if (d.paciente_key === pKey || d.paciente_nome === pNome) return true;
+                        // Also check top-level fields
+                        if (dp.paciente_key === pKey || dp.paciente_nome === pNome) return true;
+                        return false;
                     });
                     if (!hasProfile) {
                         pending.push({ ...p, classificacao: cls });
@@ -5363,8 +5372,9 @@
                 const ovInfo = [d.ov_idade ? d.ov_idade+' anos' : '', d.ov_sangue, d.ov_cabelo, d.ov_olhos ? 'Olhos '+d.ov_olhos : ''].filter(Boolean).join(' · ');
                 const spInfo = [d.sp_sangue, d.sp_cabelo, d.sp_olhos ? 'Olhos '+d.sp_olhos : ''].filter(Boolean).join(' · ');
                 const dt = d.ultima_atualizacao ? new Date(d.ultima_atualizacao).toLocaleDateString('pt-BR') : '';
+                const pacNome = d.paciente_nome || '';
                 return `<div class="dn-profile-card" onclick="editDonorProfile('${p.id}')">
-                    <h4>${d.codigo_perfil || 'Sem código'}</h4>
+                    <h4>${d.codigo_perfil || 'Sem código'}${pacNome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${pacNome}</span>` : ''}</h4>
                     <div class="dn-pc-meta">
                         ${ovInfo ? `🥚 ${ovInfo}<br>` : ''}
                         ${spInfo ? `🔬 ${spInfo}<br>` : ''}
