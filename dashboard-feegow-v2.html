@@ -1439,8 +1439,10 @@
             background: rgba(8,13,26,0.85);
             backdrop-filter: blur(4px);
             z-index: 1000;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
+            padding-top: 120px;
+            overflow-y: auto;
         }
 
         .crm-modal-overlay.open { display: flex; }
@@ -1458,10 +1460,13 @@
             animation: fadeUp 0.2s ease;
         }
         .crm-modal-header {
-            padding: 20px 24px 0 24px;
+            padding: 20px 24px 14px 24px;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: 16px 16px 0 0;
         }
         .crm-modal-body {
             padding: 16px 24px 24px 24px;
