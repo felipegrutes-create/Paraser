@@ -6377,6 +6377,7 @@
                     if (typeof dvTab !== 'undefined') dvTab.load(json.profiles);
                     if (typeof rcTab !== 'undefined') rcTab.load(json.profiles);
                     if (typeof ebTab !== 'undefined') ebTab.load(json.profiles);
+                    updateDonorTabBadges();
                 }
             } catch(e) { console.error('Erro ao carregar perfis:', e); }
         }
@@ -8803,7 +8804,6 @@
                 updateFeegowStatusBanner();
 
                 loadDonorProfiles();
-                updateDonorTabBadges();
                 fpLoadFichas().catch(e => console.warn('Fichas load:', e));
                 document.getElementById('loadingOverlay').style.display = 'none';
             } catch(e) {
