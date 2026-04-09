@@ -2396,31 +2396,43 @@
                         <input type="text" id="dnFilterNome" placeholder="Nome ou código da doadora..." oninput="renderDonorCards()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
                         <button onclick="document.getElementById('dnFilterNome').value='';renderDonorCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
                     </div>
-                    <select id="dnFilterSangue" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:130px;cursor:pointer">
-                        <option value="">🩸 Tipo Sanguíneo</option>
-                        <option value="A+">A+</option><option value="A-">A-</option>
-                        <option value="B+">B+</option><option value="B-">B-</option>
-                        <option value="AB+">AB+</option><option value="AB-">AB-</option>
-                        <option value="O+">O+</option><option value="O-">O-</option>
-                    </select>
-                    <select id="dnFilterCabelo" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
-                        <option value="">💇 Cor Cabelo</option>
-                        <option value="Loiro">Loiro</option><option value="Ruivo">Ruivo</option>
-                        <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
-                        <option value="Preto">Preto</option>
-                    </select>
-                    <select id="dnFilterOlhos" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
-                        <option value="">👁️ Cor Olhos</option>
-                        <option value="Azul">Azul</option><option value="Verde">Verde</option>
-                        <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
-                        <option value="Preto">Preto</option>
-                    </select>
-                    <select id="dnFilterPele" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:140px;cursor:pointer">
-                        <option value="">🎨 Tom de Pele</option>
-                        <option value="I">I - Muito Clara</option><option value="II">II - Clara</option>
-                        <option value="III">III - Média</option><option value="IV">IV - Morena</option>
-                        <option value="V">V - Escura</option><option value="VI">VI - Muito Escura</option>
-                    </select>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">🩸</span>
+                        <select id="dnFilterSangue" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:130px;cursor:pointer">
+                            <option value="">Tipo Sanguíneo</option>
+                            <option value="A+">A+</option><option value="A-">A-</option>
+                            <option value="B+">B+</option><option value="B-">B-</option>
+                            <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                            <option value="O+">O+</option><option value="O-">O-</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">💇</span>
+                        <select id="dnFilterCabelo" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
+                            <option value="">Cor Cabelo</option>
+                            <option value="Loiro">Loiro</option><option value="Ruivo">Ruivo</option>
+                            <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                            <option value="Preto">Preto</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">👁️</span>
+                        <select id="dnFilterOlhos" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
+                            <option value="">Cor Olhos</option>
+                            <option value="Azul">Azul</option><option value="Verde">Verde</option>
+                            <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                            <option value="Preto">Preto</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">🎨</span>
+                        <select id="dnFilterPele" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:140px;cursor:pointer">
+                            <option value="">Tom de Pele</option>
+                            <option value="I">I - Muito Clara</option><option value="II">II - Clara</option>
+                            <option value="III">III - Média</option><option value="IV">IV - Morena</option>
+                            <option value="V">V - Escura</option><option value="VI">VI - Muito Escura</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div id="dnCards" class="dn-cards"></div>
