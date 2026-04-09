@@ -5606,7 +5606,9 @@
             // Lookup: pacFirstVezMap (built from scheduling data, keyed by normalizeKey)
             const fvz = pacKey ? pacFirstVezMap[pacKey] : null;
             // Fallback: pendPatients array (contains dataAp but no agendId)
-            const pend = pacKey ? pendPatients.find(p => normalizeKey(p.pac) === pacKey) : null;
+            const pend = pacKey ? pendPatients.find(pp => normalizeKey(pp.pac) === pacKey) : null;
+            // CRM record for this patient
+            const crm = pacKey ? crmMap[pacKey] : null;
             // Pre-fill ID do agendamento → Código da Paciente
             const codEl = document.getElementById(p + 'cod_paciente');
             if (codEl && !codEl.value) {
@@ -5616,10 +5618,21 @@
             // Pre-fill Data Consulta 1ª Vez (scheduling date > CRM contato1 > pendPatients)
             const dataEl = document.getElementById(p + 'data_consulta_1vez');
             if (dataEl && !dataEl.value) {
-                const raw = fvz?.dataAp || pend?.dataAp || (pacKey && crmMap[pacKey]?.contato1_data) || '';
+                const raw = fvz?.dataAp || pend?.dataAp || crm?.contato1_data || '';
                 if (raw.includes('/')) {
                     const parts = raw.split('/');
                     if (parts.length === 3) dataEl.value = parts[2] + '-' + parts[1] + '-' + parts[0];
+                }
+            }
+            // Pre-fill Orçamento from CRM (proposta_feita → Orçamento Passado?, valor → Qual Orçamento)
+            if (crm) {
+                const orcEl = document.getElementById(p + 'orcamento_passado');
+                if (orcEl && !orcEl.value && crm.proposta_feita) {
+                    orcEl.value = crm.proposta_feita === 'Sim' ? 'Sim' : 'Não';
+                }
+                const qualEl = document.getElementById(p + 'qual_orcamento');
+                if (qualEl && !qualEl.value && crm.valor) {
+                    qualEl.value = fmtValor(crm.valor) !== '—' ? fmtValor(crm.valor) : crm.valor;
                 }
             }
         }
