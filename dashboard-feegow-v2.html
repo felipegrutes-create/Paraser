@@ -6198,8 +6198,9 @@
                 const pacNome = d.paciente_nome || '';
                 const pacKey_card = d.paciente_key || normalizeKey(pacNome);
                 const distancia = dnIsDistancia(d);
+                const locInfo = distancia ? [d.pf_cidade, d.pf_pais].filter(Boolean).join(' · ') : '';
                 return `<div class="dn-profile-card${distancia ? ' distancia' : ''}" onclick="editDonorProfile('${p.id}')">
-                    ${distancia ? '<span class="dn-distancia-badge">✈️ Paciente a distância</span><br>' : ''}
+                    ${distancia ? `<span class="dn-distancia-badge">✈️ Paciente a distância${locInfo ? ' &nbsp;·&nbsp; ' + locInfo : ''}</span><br>` : ''}
                     ${dnConversaBadgeHTML(pacKey_card)}
                     <h4>${d.codigo_perfil || 'Sem código'}${pacNome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${pacNome}</span>` : ''}</h4>
                     <div class="dn-pc-meta">
@@ -6561,8 +6562,9 @@
                     const dt = d.ultima_atualizacao ? new Date(d.ultima_atualizacao).toLocaleDateString('pt-BR') : '';
                     const pacKey_t = d.paciente_key || normalizeKey(d.paciente_nome || '');
                     const distancia_t = dnIsDistancia(d);
+                    const locInfo_t = distancia_t ? [d.pf_cidade, d.pf_pais].filter(Boolean).join(' · ') : '';
                     return `<div class="dn-profile-card${distancia_t ? ' distancia' : ''}" onclick="${T}Tab.editProfile('${p.id}')">
-                        ${distancia_t ? '<span class="dn-distancia-badge">✈️ Paciente a distância</span><br>' : ''}
+                        ${distancia_t ? `<span class="dn-distancia-badge">✈️ Paciente a distância${locInfo_t ? ' &nbsp;·&nbsp; ' + locInfo_t : ''}</span><br>` : ''}
                         ${cfg.hideSp ? '' : dnConversaBadgeHTML(pacKey_t)}
                         <h4>${d.codigo_perfil || 'Sem código'}${d.paciente_nome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${d.paciente_nome}</span>` : ''}</h4>
                         <div class="dn-pc-meta">
