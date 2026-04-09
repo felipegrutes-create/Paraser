@@ -406,7 +406,7 @@ function handleUploadPhoto(body) {
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
   const fileId = file.getId();
-  const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+  const viewUrl = 'https://lh3.googleusercontent.com/d/' + fileId;
 
   return jsonOk({ success: true, url: viewUrl, file_id: fileId });
 }

@@ -5208,7 +5208,14 @@
                 if (data[field]) {
                     const preview = document.getElementById('dnPhotoPreview' + i);
                     const placeholder = document.getElementById('dnPhotoPlaceholder' + i);
-                    if (preview) { preview.src = data[field]; preview.style.display = 'block'; }
+                    if (preview) {
+                        // Converter URL antiga do Drive para formato que funciona em <img>
+                        let url = data[field];
+                        const driveMatch = url.match(/drive\.google\.com\/uc\?export=view&id=([^&]+)/);
+                        if (driveMatch) url = 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
+                        preview.src = url;
+                        preview.style.display = 'block';
+                    }
                     if (placeholder) placeholder.style.display = 'none';
                 }
             });
