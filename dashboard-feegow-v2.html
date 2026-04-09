@@ -6545,7 +6545,7 @@
                     const dt = d.ultima_atualizacao ? new Date(d.ultima_atualizacao).toLocaleDateString('pt-BR') : '';
                     const pacKey_t = d.paciente_key || normalizeKey(d.paciente_nome || '');
                     return `<div class="dn-profile-card" onclick="${T}Tab.editProfile('${p.id}')">
-                        ${dnConversaBadgeHTML(pacKey_t)}
+                        ${cfg.hideSp ? '' : dnConversaBadgeHTML(pacKey_t)}
                         <h4>${d.codigo_perfil || 'Sem código'}${d.paciente_nome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${d.paciente_nome}</span>` : ''}</h4>
                         <div class="dn-pc-meta">
                             ${ovInfo ? `🥚 ${ovInfo}<br>` : ''}
