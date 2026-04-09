@@ -1740,18 +1740,15 @@
 
         /* Doadoras Compartilhadas - Dropdown & Pending */
         .dn-new-dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
+            position: fixed;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 10px;
             min-width: 320px;
             max-height: 400px;
             overflow-y: auto;
-            z-index: 500;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            margin-top: 4px;
+            z-index: 9999;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
         }
         .dn-dd-item {
             padding: 10px 14px;
@@ -5023,8 +5020,12 @@
             const dd = document.getElementById('dnNewDropdown');
             if (dd.style.display === 'none') {
                 dnRenderPendingDropdown();
+                // Posicionar abaixo do botão
+                const btn = document.querySelector('.dn-btn-new');
+                const rect = btn.getBoundingClientRect();
+                dd.style.top = (rect.bottom + 4) + 'px';
+                dd.style.left = rect.left + 'px';
                 dd.style.display = 'block';
-                // Close on click outside
                 setTimeout(() => document.addEventListener('click', dnCloseDropdownOutside, { once: true }), 10);
             } else {
                 dd.style.display = 'none';
