@@ -1937,6 +1937,7 @@
         <button class="tab" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas</button>
         <button class="tab" onclick="showSection('sec-doavol',this)">Doadoras Voluntárias</button>
         <button class="tab" onclick="showSection('sec-receptoras',this)">Receptoras</button>
+        <button class="tab" onclick="showSection('sec-embriao',this)">Embrião Doado</button>
         <button class="tab" onclick="showSection('sec-ficha',this)">Ficha Paciente</button>
         <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
     </div>
@@ -2678,6 +2679,75 @@
             </div>
             <div id="rcCards" class="dn-cards"></div>
             <div id="rcFormWrap" style="display:none"></div>
+        </section>
+
+        <!-- EMBRIÃO DOADO -->
+        <section id="sec-embriao" class="section">
+            <p class="section-title">Embrião Doado — Perfis</p>
+            <div class="dn-toolbar">
+                <div style="position:relative">
+                    <button class="dn-btn-new" onclick="ebTab.toggleDropdown()">+ Novo Perfil ▾</button>
+                    <div class="dn-new-dropdown" id="ebNewDropdown" style="display:none">
+                        <div class="dn-dd-item" onclick="ebTab.newProfile(); ebTab.closeDropdown()">📝 Perfil em Branco</div>
+                        <div class="dn-dd-divider"></div>
+                        <div class="dn-dd-title">Pacientes Embrião Doado:</div>
+                        <div id="ebPendingList"></div>
+                    </div>
+                </div>
+                <span class="dn-count" id="ebCount">0 perfis</span>
+            </div>
+            <div id="ebPendingCards" style="margin-bottom:20px"></div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">
+                <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px;letter-spacing:0.5px">🔍 BUSCA MULTI FILTROS</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                    <div style="position:relative;flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:18px;text-align:center">🔎</span>
+                        <div style="position:relative">
+                            <input type="text" id="ebFilterNome" placeholder="Nome ou código da paciente..." oninput="ebTab.renderCards()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
+                            <button onclick="document.getElementById('ebFilterNome').value='';ebTab.renderCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">🩸</span>
+                        <select id="ebFilterSangue" onchange="ebTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:130px;cursor:pointer">
+                            <option value="">Tipo Sanguíneo</option>
+                            <option value="A+">A+</option><option value="A-">A-</option>
+                            <option value="B+">B+</option><option value="B-">B-</option>
+                            <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                            <option value="O+">O+</option><option value="O-">O-</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">💇</span>
+                        <select id="ebFilterCabelo" onchange="ebTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
+                            <option value="">Cor Cabelo</option>
+                            <option value="Loiro">Loiro</option><option value="Ruivo">Ruivo</option>
+                            <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                            <option value="Preto">Preto</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">👁️</span>
+                        <select id="ebFilterOlhos" onchange="ebTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
+                            <option value="">Cor Olhos</option>
+                            <option value="Azul">Azul</option><option value="Verde">Verde</option>
+                            <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                            <option value="Preto">Preto</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">🎨</span>
+                        <select id="ebFilterPele" onchange="ebTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:140px;cursor:pointer">
+                            <option value="">Tom de Pele</option>
+                            <option value="I">I - Muito Clara</option><option value="II">II - Clara</option>
+                            <option value="III">III - Média</option><option value="IV">IV - Morena</option>
+                            <option value="V">V - Escura</option><option value="VI">VI - Muito Escura</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="ebCards" class="dn-cards"></div>
+            <div id="ebFormWrap" style="display:none"></div>
         </section>
 
         <!-- FICHA PACIENTE -->
@@ -4420,6 +4490,7 @@
             if (id === 'sec-doashared') dnRenderPendingCards();
             if (id === 'sec-doavol') dvTab.renderPending();
             if (id === 'sec-receptoras') rcTab.renderPending();
+            if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             // Re-render abas dirty ao entrar
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
@@ -6299,6 +6370,7 @@
                     renderDonorCards();
                     if (typeof dvTab !== 'undefined') dvTab.load(json.profiles);
                     if (typeof rcTab !== 'undefined') rcTab.load(json.profiles);
+                    if (typeof ebTab !== 'undefined') ebTab.load(json.profiles);
                 }
             } catch(e) { console.error('Erro ao carregar perfis:', e); }
         }
@@ -6692,6 +6764,7 @@
 
         const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'], patientSource: () => avalDoadPatients, hideSp: true });
         const rcTab = makeDonorTab({ tabId: 'rc', classFilters: ['Receptora'] });
+        const ebTab = makeDonorTab({ tabId: 'eb', classFilters: ['Embrião Doado'] });
 
         async function reloadData() {
             document.getElementById('loadingOverlay').style.display = 'flex';
