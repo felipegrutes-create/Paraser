@@ -4747,9 +4747,12 @@
                 return db - da;
             });
 
-            // KPIs
+            // KPIs — deduplica por paciente (uma paciente pode ter múltiplos agendamentos em doaPatients)
             let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nSem = 0;
+            const kpiSeenKeys = new Set();
             doaPatients.forEach(p => {
+                if (kpiSeenKeys.has(p.key)) return;
+                kpiSeenKeys.add(p.key);
                 const cls = (crmMap[p.key]?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
                 else if (cls === 'FIV Compartilhada') nComp++;
@@ -4763,7 +4766,7 @@
                 else nSem++;
             });
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-            set('doa-total', doaPatients.length);
+            set('doa-total', kpiSeenKeys.size);
             set('doa-fiv-normal', nFiv);
             set('doa-fiv-comp', nComp);
             set('doa-receptora', nRec);
@@ -4859,9 +4862,12 @@
             crmMap[key].classificacao = value;
             crmSaveLocal();
 
-            // Atualizar KPIs
+            // Atualizar KPIs — deduplica por paciente
             let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nSem = 0;
+            const kpiSeen2 = new Set();
             doaPatients.forEach(p => {
+                if (kpiSeen2.has(p.key)) return;
+                kpiSeen2.add(p.key);
                 const cls = (crmMap[p.key]?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
                 else if (cls === 'FIV Compartilhada') nComp++;
@@ -4875,7 +4881,7 @@
                 else nSem++;
             });
             const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-            s('doa-total', doaPatients.length);
+            s('doa-total', kpiSeen2.size);
             s('doa-fiv-normal', nFiv);
             s('doa-fiv-comp', nComp);
             s('doa-receptora', nRec);
@@ -5126,15 +5132,13 @@
                     const pKey = p.key;
                     const pNome = p.pac;
                     const hasProfile = donorProfiles.some(dp => {
-                        // Check in parsed dados
                         let d = dp;
                         if (typeof dp.dados === 'string' && dp.dados) {
                             try { d = { ...dp, ...JSON.parse(dp.dados) }; } catch(e) {}
                         }
-                        if (d.paciente_key === pKey || d.paciente_nome === pNome) return true;
-                        // Also check top-level fields
-                        if (dp.paciente_key === pKey || dp.paciente_nome === pNome) return true;
-                        return false;
+                        const dpKey = d.paciente_key || dp.paciente_key || '';
+                        const dpNome = normalizeKey(d.paciente_nome || dp.paciente_nome || '');
+                        return dpKey === pKey || dpNome === pKey;
                     });
                     if (!hasProfile) {
                         pending.push({ ...p, classificacao: cls });
@@ -6006,8 +6010,11 @@
                     const cls = (crmMap[p.key]?.classificacao) || '';
                     if (cfg.classFilters.includes(cls)) {
                         const hasP = profiles.some(dp => {
-                            const d = typeof dp.dados === 'string' ? JSON.parse(dp.dados || '{}') : (dp.dados || {});
-                            return d.paciente_nome === p.pac || d.paciente_key === p.key;
+                            let d = dp;
+                            if (typeof dp.dados === 'string' && dp.dados) { try { d = { ...dp, ...JSON.parse(dp.dados) }; } catch(e) {} }
+                            const dpKey = d.paciente_key || dp.paciente_key || '';
+                            const dpNome = normalizeKey(d.paciente_nome || dp.paciente_nome || '');
+                            return dpKey === p.key || dpNome === p.key;
                         });
                         if (!hasP) pending.push({ ...p, classificacao: cls });
                     }
