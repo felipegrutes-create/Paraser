@@ -1334,6 +1334,50 @@
             border-radius:10px; color:var(--text); padding:12px; font-family:inherit; font-size:13px; resize:vertical;
         }
         .dn-form-footer textarea:focus { outline:none; border-color:var(--accent); }
+        /* Donor Profile Extra Blocks */
+        .dn-extra-blocks { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+        .dn-block {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .dn-block-header {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 16px; padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .dn-block-title { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+        .dn-block-role { font-size: 11px; color: var(--muted); margin-left: auto; font-style: italic; }
+        .dn-block-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+        .dn-block-field { display: flex; flex-direction: column; gap: 4px; }
+        .dn-block-field.span2 { grid-column: span 2; }
+        .dn-block-field.full { grid-column: 1 / -1; }
+        .dn-block-field label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .dn-block-field input, .dn-block-field select, .dn-block-field textarea {
+            background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
+            color: var(--text); padding: 7px 10px; font-size: 12px; font-family: inherit; width: 100%; box-sizing: border-box;
+        }
+        .dn-block-field input:focus, .dn-block-field select:focus, .dn-block-field textarea:focus { outline: none; border-color: var(--accent); }
+        .dn-block-field textarea { min-height: 70px; resize: vertical; }
+        .dn-retorno-warn { font-size: 11px; padding: 4px 8px; border-radius: 6px; margin-top: 4px; display: none; }
+        .dn-retorno-warn.warn-vencido { background: rgba(239,68,68,0.15); color: #f87171; display: block; }
+        .dn-retorno-warn.warn-proximo { background: rgba(245,158,11,0.15); color: #fbbf24; display: block; }
+        .dn-expandable-field { position: relative; }
+        .dn-expand-preview {
+            background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
+            padding: 7px 10px; font-size: 12px; color: var(--muted); cursor: pointer;
+            min-height: 38px; line-height: 1.5; overflow: hidden;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        }
+        .dn-expand-preview:hover { border-color: var(--accent); color: var(--text); }
+        .dn-expand-preview.empty::before { content: '📝 Clique para escrever...'; color: var(--muted); font-style: italic; }
+        .dn-expand-full { display: none; }
+        .dn-expandable-field.open .dn-expand-preview { display: none; }
+        .dn-expandable-field.open .dn-expand-full { display: block; }
+        .dn-block-optional { border-left: 3px solid rgba(99,102,241,0.5); }
+        .dn-block-psi { border-left: 3px solid rgba(168,85,247,0.5); }
+        .dn-block-bianca { border-left: 3px solid rgba(236,72,153,0.5); }
         .dn-form-btns { display:flex; gap:10px; align-items:center; }
         .dn-btn-save {
             background:var(--accent); color:#080d1a; border:none; border-radius:10px;
@@ -5158,6 +5202,7 @@
                 wrap.dataset.pacienteKey = key;
                 wrap.dataset.pacienteNome = nome;
             }
+            autoFillExtraBlocks('dn', key, nome);
             // Add a note at the top of the form
             const header = wrap?.querySelector('.dn-form-header');
             if (header) {
@@ -5165,6 +5210,204 @@
                 note.style.cssText = 'background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#fbbf24';
                 note.textContent = '📋 Perfil para: ' + nome;
                 header.appendChild(note);
+            }
+        }
+
+        // ===== DONOR PROFILE EXTRA BLOCKS =====
+        function dnCheckRetorno(inputEl) {
+            const val = inputEl.value;
+            const warnEl = document.getElementById(inputEl.id + '_warn');
+            if (!warnEl || !val) return;
+            const diff = Math.ceil((new Date(val) - new Date()) / 86400000);
+            warnEl.className = 'dn-retorno-warn';
+            if (diff < 0) { warnEl.className += ' warn-vencido'; warnEl.textContent = '⚠️ Retorno vencido há ' + Math.abs(diff) + ' dia(s)!'; }
+            else if (diff <= 30) { warnEl.className += ' warn-proximo'; warnEl.textContent = '⏰ Retorno em ' + diff + ' dia(s) — contatar paciente!'; }
+        }
+
+        function dnToggleExpand(el) {
+            const container = el.closest('.dn-expandable-field');
+            if (!container) return;
+            container.classList.toggle('open');
+            if (container.classList.contains('open')) {
+                const ta = container.querySelector('textarea');
+                if (ta) ta.focus();
+            } else {
+                const ta = container.querySelector('textarea');
+                const preview = container.querySelector('.dn-expand-preview');
+                if (ta && preview) {
+                    preview.textContent = ta.value || '';
+                    if (!ta.value) preview.classList.add('empty'); else preview.classList.remove('empty');
+                }
+            }
+        }
+
+        function dnSyncExpandPreview(ta) {
+            const container = ta.closest('.dn-expandable-field');
+            const preview = container?.querySelector('.dn-expand-preview');
+            if (preview) {
+                preview.textContent = ta.value;
+                if (!ta.value) preview.classList.add('empty'); else preview.classList.remove('empty');
+            }
+        }
+
+        function buildExpandField(id, label, placeholder='') {
+            return `<div class="dn-block-field full">
+                <label>${label}</label>
+                <div class="dn-expandable-field">
+                    <div class="dn-expand-preview empty" onclick="dnToggleExpand(this)"></div>
+                    <textarea class="dn-expand-full" id="${id}" placeholder="${placeholder}" oninput="dnSyncExpandPreview(this)" onblur="dnToggleExpand(this)"></textarea>
+                </div>
+            </div>`;
+        }
+
+        function buildDonorExtraBlocks(pfx) {
+            const p = pfx + '_eb_';
+            const inp = (id, type='text', extra='') => `<input type="${type}" id="${p}${id}" ${extra}>`;
+            const sel = (id, opts, placeholder='Selecionar...') => `<select id="${p}${id}"><option value="">${placeholder}</option>${opts.map(o => typeof o === 'string' ? `<option value="${o}">${o}</option>` : `<option value="${o.v}">${o.l}</option>`).join('')}</select>`;
+            const fld = (label, html, cls='') => `<div class="dn-block-field ${cls}"><label>${label}</label>${html}</div>`;
+            const expandFld = (id, label, ph='') => buildExpandField(p+id, label, ph);
+
+            const TRATAMENTOS = ['FIV Normal','FIV Compartilhada','Receptora de Óvulos','Receptora de Embrião','Coito Programado','IIU','Congelamento de Óvulos','PGTA','Investigação / Exames','Outro'];
+            const PACOTES = ['Em definição','Pacote FIV Básico','Pacote FIV Completo','Pacote Compartilhado','Pacote Receptora','Outro'];
+            const STATUS_CONTATO_PSI = ['Sem contato ainda','Aguardando retorno','Marcou consulta','Recusou contato','Reagendou'];
+            const STATUS_BIANCA = ['Receptora de Óvulos','Receptora de Embrião Doado','Doadora Compartilhada','Doadora Voluntária'];
+            const STATUS_RETORNO = ['Retornou','Não retornou — sem contato','Não vai tratar','Aguardando para iniciar'];
+            const MOTIVO_NAO_RETORNO = ['Sem contato','Mudou de clínica','Gravidez espontânea','Problema de saúde','Motivo financeiro','Não informado','Outro'];
+            const MOTIVO_NAO_TRATA = ['Motivo financeiro','Mudou de planos','Gravidez espontânea','Mudou de clínica','Problema de saúde','Não informado','Outro'];
+            const MOTIVO_AGUARDANDO = ['Aguardando menstruar','Aguardando cirurgia','Aguardando exames','Aguardando questão financeira','Aguardando doadora','Outro'];
+
+            return `<div class="dn-extra-blocks">
+
+                <!-- BLOCO 1 — CONSULTA INICIAL -->
+                <div class="dn-block">
+                    <div class="dn-block-header">
+                        <span class="dn-block-title">📋 Consulta Inicial</span>
+                        <span class="dn-block-role">Alice / Isabela / Erica</span>
+                    </div>
+                    <div class="dn-block-grid">
+                        ${fld('Mês/Ano', inp('mes_ano','month'))}
+                        ${fld('Data Consulta 1ª Vez', inp('data_consulta_1vez','date'))}
+                        ${fld('Nome da Paciente', inp('nome_paciente'))}
+                        ${fld('Idade na Consulta', inp('idade_paciente','number','min="0" max="80"'))}
+                        ${fld('Nome do Cônjuge', inp('nome_conjuge'))}
+                        ${fld('Idade do Cônjuge', inp('idade_conjuge','number','min="0" max="80"'))}
+                        <div class="dn-block-field">
+                            <label>Data Máxima Retorno</label>
+                            ${inp('data_max_retorno','date', `oninput="dnCheckRetorno(this)"`)}
+                            <div class="dn-retorno-warn" id="${p}data_max_retorno_warn"></div>
+                        </div>
+                        ${fld('Tratamento Proposto', sel('tratamento_proposto', TRATAMENTOS, 'Selecionar tratamento...'))}
+                        ${fld('Indicação Urologista?', sel('indicacao_urologista', ['Sim','Não']))}
+                        ${fld('Indicação de Pacote', sel('indicacao_pacote', PACOTES, 'Nenhum / A definir'))}
+                        ${fld('Orçamento Passado?', sel('orcamento_passado', ['Sim','Não']))}
+                        ${fld('Qual Orçamento', inp('qual_orcamento'))}
+                        ${fld('Data do Orçamento', inp('data_orcamento','date'))}
+                    </div>
+                </div>
+
+                <!-- BLOCO 2 — PSICOLÓGICO -->
+                <div class="dn-block dn-block-psi">
+                    <div class="dn-block-header">
+                        <span class="dn-block-title">🧠 Acompanhamento Psicológico</span>
+                        <span class="dn-block-role">Sara</span>
+                    </div>
+                    <div class="dn-block-grid">
+                        ${fld('Data Contato Psicóloga', inp('data_contato_psi','date'))}
+                        ${fld('Status do Contato', sel('status_contato_psi', STATUS_CONTATO_PSI))}
+                        ${fld('Data 1ª Consulta Psicóloga', inp('data_consulta_psi','date'))}
+                        ${fld('Data 2ª Consulta Psicóloga', inp('data_consulta_psi2','date'))}
+                        ${expandFld('info_psi', 'Informação Importante sobre a Paciente / Casal', 'Clique para escrever observações importantes...')}
+                    </div>
+                </div>
+
+                <!-- BLOCO 3 — DRA BIANCA -->
+                <div class="dn-block dn-block-bianca dn-block-optional">
+                    <div class="dn-block-header">
+                        <span class="dn-block-title">🩺 Avaliação Dra. Bianca</span>
+                        <span class="dn-block-role">Dra. Bianca — apenas para Doadoras / Receptoras</span>
+                    </div>
+                    <div class="dn-block-grid">
+                        ${fld('Data Conversa Dra. Bianca', inp('data_conversa_bianca','date'))}
+                        ${fld('Status da Paciente', sel('status_bianca', STATUS_BIANCA, 'Selecionar status...'))}
+                        ${fld('Data Início Procura Doadora', inp('data_inicio_procura','date'))}
+                        ${fld('Data OK para Doadora', inp('data_ok_doadora','date'))}
+                        ${expandFld('info_bianca', 'Informação sobre a Conversa', 'Clique para escrever observações da Dra. Bianca...')}
+                    </div>
+                </div>
+
+                <!-- BLOCO 4 — CONSULTA DE RETORNO -->
+                <div class="dn-block">
+                    <div class="dn-block-header">
+                        <span class="dn-block-title">🔄 Consulta de Retorno</span>
+                        <span class="dn-block-role">Alice / Isabela / Erica</span>
+                    </div>
+                    <div class="dn-block-grid">
+                        ${fld('Data da Consulta de Retorno', inp('data_retorno','date'))}
+                        ${fld('Status do Retorno', sel('status_retorno', STATUS_RETORNO))}
+                        ${fld('Motivo Não Retornou', sel('motivo_nao_retorno', MOTIVO_NAO_RETORNO, 'N/A'))}
+                        ${fld('Motivo Não Vai Tratar', sel('motivo_nao_trata', MOTIVO_NAO_TRATA, 'N/A'))}
+                        ${fld('Motivo Aguardando', sel('motivo_aguardando', MOTIVO_AGUARDANDO, 'N/A'))}
+                        <div class="dn-block-field full">
+                            <label>Informações Adicionais</label>
+                            <textarea id="${p}info_retorno" placeholder="Qualquer informação complementar sobre o retorno..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+            </div>`;
+        }
+
+        function collectExtraBlocks(pfx) {
+            const p = pfx + '_eb_';
+            const result = {};
+            const container = document.getElementById(pfx + 'ExtraBlocks');
+            if (!container) return result;
+            container.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+                if (el.id.startsWith(p)) {
+                    const key = el.id.substring(p.length);
+                    result[key] = el.value || '';
+                }
+            });
+            return result;
+        }
+
+        function fillExtraBlocks(pfx, data) {
+            const p = pfx + '_eb_';
+            Object.keys(data).forEach(key => {
+                const el = document.getElementById(p + key);
+                if (el) {
+                    el.value = data[key] || '';
+                    // Sync expandable preview
+                    const container = el.closest?.('.dn-expandable-field');
+                    if (container) {
+                        const preview = container.querySelector('.dn-expand-preview');
+                        if (preview) {
+                            preview.textContent = data[key] || '';
+                            if (!data[key]) preview.classList.add('empty'); else preview.classList.remove('empty');
+                        }
+                    }
+                    // Trigger retorno warning
+                    if ((p + key).includes('data_max_retorno') && data[key]) dnCheckRetorno(el);
+                }
+            });
+        }
+
+        function autoFillExtraBlocks(pfx, pacKey, pacNome) {
+            const p = pfx + '_eb_';
+            // Pre-fill nome
+            const nomeEl = document.getElementById(p + 'nome_paciente');
+            if (nomeEl && pacNome && !nomeEl.value) nomeEl.value = pacNome;
+            // Pre-fill from crmMap if available
+            if (pacKey && crmMap[pacKey]) {
+                const crm = crmMap[pacKey];
+                if (crm.contato1_data) {
+                    const dataEl = document.getElementById(p + 'data_consulta_1vez');
+                    // contato1_data is DD/MM/YYYY — convert to YYYY-MM-DD
+                    if (dataEl && !dataEl.value && crm.contato1_data.includes('/')) {
+                        const parts = crm.contato1_data.split('/');
+                        if (parts.length === 3) dataEl.value = parts[2] + '-' + parts[1] + '-' + parts[0];
+                    }
+                }
             }
         }
 
@@ -5188,6 +5431,7 @@
                 <div class="dn-sides" style="grid-template-columns:1fr">
                     ${buildDonorSide('ov','🥚 Características Físicas','ov', DN_MED_PERSONAL_OV)}
                 </div>
+                <div id="dnExtraBlocks">${buildDonorExtraBlocks('dn')}</div>
                 <div class="dn-form-footer">
                     <textarea id="dnInfoAdicional" placeholder="Informações adicionais (ex: histórico familiar relevante, observações médicas...)"></textarea>
                     <div class="dn-form-btns">
@@ -5299,6 +5543,7 @@
                 ...dnGetRadios('sp_malf', DN_MALFORM),
                 ...dnGetRadios('sp_gen', DN_GENETICA),
                 info_adicional: document.getElementById('dnInfoAdicional')?.value || '',
+                ...collectExtraBlocks('dn'),
             };
         }
 
@@ -5352,6 +5597,7 @@
                 }
             });
             if (data.info_adicional) document.getElementById('dnInfoAdicional').value = data.info_adicional;
+            fillExtraBlocks('dn', data);
         }
 
         async function saveDonorProfile() {
@@ -5636,6 +5882,7 @@
                         ${buildDonorSide('ov','🥚 Características Físicas — Lado Óvulos','ov', DN_MED_PERSONAL_OV, T)}
                         ${buildDonorSide('sp','🔬 Características Físicas — Lado Espermatozóides','sp', DN_MED_PERSONAL_SP, T)}
                     </div>
+                    <div id="${T}ExtraBlocks">${buildDonorExtraBlocks(T)}</div>
                     <div class="dn-form-footer">
                         <textarea id="${T}InfoAdicional" placeholder="Informações adicionais..."></textarea>
                         <div class="dn-form-btns">
@@ -5699,6 +5946,7 @@
                     ...dnGetRadios(`${T}_sp_malf`, DN_MALFORM),
                     ...dnGetRadios(`${T}_sp_gen`, DN_GENETICA),
                     info_adicional: document.getElementById(T + 'InfoAdicional')?.value || '',
+                    ...collectExtraBlocks(T),
                 };
             }
 
@@ -5730,6 +5978,7 @@
                     else { const radio = document.querySelector(`input[name="${k}"][value="${data[k]}"]`); if (radio) radio.checked = true; }
                 });
                 if (data.info_adicional) { const el = document.getElementById(T + 'InfoAdicional'); if (el) el.value = data.info_adicional; }
+                fillExtraBlocks(T, data);
             }
 
             async function saveProfile() {
@@ -5821,6 +6070,7 @@
                 if (codigoEl) codigoEl.value = code;
                 const wrap = document.getElementById(T + 'FormWrap');
                 if (wrap) { wrap.dataset.pacienteKey = key; wrap.dataset.pacienteNome = nome; }
+                autoFillExtraBlocks(T, key, nome);
                 const header = wrap?.querySelector('.dn-form-header');
                 if (header) {
                     const note = document.createElement('div');
