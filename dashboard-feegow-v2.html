@@ -3460,6 +3460,7 @@
         let pacPsiMap       = {}; // normalizedKey → [{ dataAp, statusRaw }] sorted asc
         let pacConversaMap  = {}; // normalizedKey → [{ dataAp, statusRaw }] sorted asc
         let avalDoadPatients = []; // patients with "Avaliação Doadora" appointment (for dvTab pending)
+        let pacAvalDoadMap   = {}; // normalizedKey → { id:agendId, dataAp } for dvTab auto-fill
 
         const KANBAN_COLS = [
             { id:'retornos-pendentes', label:'📋 Retornos Pendentes', color:'#ef4444', showTotal:false },
@@ -4279,10 +4280,13 @@
                     pac, prof: r[d.C.prof]||'', cel: r[d.C.cel]||'',
                     email: r[d.C.email]||'', dataAp: dt,
                     proc: r[d.C.proc]||'', status: fmtStatus(s),
-                    statusRaw: s, tipo: 'avaliacaoDoadora', key: k
+                    statusRaw: s, tipo: 'avaliacaoDoadora', key: k,
+                    id: r[d.C.id]||''
                 });
             });
             avalDoadPatients.sort((a,b) => (parseDate(b.dataAp)||0) - (parseDate(a.dataAp)||0));
+            pacAvalDoadMap = {};
+            avalDoadPatients.forEach(p => { pacAvalDoadMap[p.key] = { id: p.id, dataAp: p.dataAp }; });
 
             // Popular filtro de profissionais
             const doaProfSel = document.getElementById('doaProf');
@@ -5752,16 +5756,18 @@
             const pend = pacKey ? pendPatients.find(pp => normalizeKey(pp.pac) === pacKey) : null;
             // CRM record for this patient
             const crm = pacKey ? crmMap[pacKey] : null;
+            // Fallback: avalDoadMap (for dvTab patients who don't have a 1ª Vez appointment)
+            const avd = pacKey ? pacAvalDoadMap[pacKey] : null;
             // Pre-fill ID do agendamento → Código da Paciente
             const codEl = document.getElementById(p + 'cod_paciente');
             if (codEl && !codEl.value) {
-                const id = fvz?.id || '';
+                const id = fvz?.id || avd?.id || '';
                 if (id) codEl.value = id;
             }
-            // Pre-fill Data Consulta 1ª Vez (scheduling date > CRM contato1 > pendPatients)
+            // Pre-fill Data Consulta 1ª Vez (scheduling date > avalDoadMap > CRM contato1 > pendPatients)
             const dataEl = document.getElementById(p + 'data_consulta_1vez');
             if (dataEl && !dataEl.value) {
-                const raw = fvz?.dataAp || pend?.dataAp || crm?.contato1_data || '';
+                const raw = fvz?.dataAp || avd?.dataAp || pend?.dataAp || crm?.contato1_data || '';
                 if (raw.includes('/')) {
                     const parts = raw.split('/');
                     if (parts.length === 3) dataEl.value = parts[2] + '-' + parts[1] + '-' + parts[0];
@@ -6327,10 +6333,14 @@
                 if (!wrap) return;
                 wrap.innerHTML = `<div class="dn-form">
                     <div class="dn-form-header">
-                        <div class="dn-photo-upload" onclick="document.getElementById('${T}PhotoInput').click()">
-                            <img id="${T}PhotoPreview" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
-                            <div id="${T}PhotoPlaceholder" class="dn-photo-placeholder">📷<br><span>Foto</span></div>
-                            <input type="file" id="${T}PhotoInput" accept="image/*" style="display:none" onchange="${T}Tab.previewPhoto(this)">
+                        <div style="display:flex;gap:8px">
+                            ${[0,1,2,3].map(i => `
+                                <div class="dn-photo-upload" onclick="document.getElementById('${T}PhotoInput${i}').click()">
+                                    <img id="${T}PhotoPreview${i}" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
+                                    <div id="${T}PhotoPlaceholder${i}" class="dn-photo-placeholder">📷<br><span>Foto ${i+1}</span></div>
+                                    <input type="file" id="${T}PhotoInput${i}" accept="image/*" style="display:none" onchange="${T}Tab.previewPhoto(this,${i})">
+                                </div>
+                            `).join('')}
                         </div>
                         <input id="${T}Codigo" placeholder="Código do Perfil (ex: EDO85)">
                         <button class="dn-btn-close-form" onclick="${T}Tab.closeForm()">✕ Fechar</button>
@@ -6352,12 +6362,12 @@
                 wrap.scrollIntoView({ behavior: 'smooth' });
             }
 
-            function previewPhoto(input) {
+            function previewPhoto(input, idx) {
                 if (input.files && input.files[0]) {
                     const reader = new FileReader();
                     reader.onload = e => {
-                        const preview = document.getElementById(T + 'PhotoPreview');
-                        const ph = document.getElementById(T + 'PhotoPlaceholder');
+                        const preview = document.getElementById(T + 'PhotoPreview' + idx);
+                        const ph = document.getElementById(T + 'PhotoPlaceholder' + idx);
                         if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
                         if (ph) ph.style.display = 'none';
                     };
@@ -6372,13 +6382,12 @@
             }
 
             function collectData() {
-                const photoPreview = document.getElementById(T + 'PhotoPreview');
-                const photoData = (photoPreview && photoPreview.style.display !== 'none') ? photoPreview.src : '';
+                const fotos = [0,1,2,3].map(i => { const el = document.getElementById(T + 'PhotoPreview' + i); return (el && el.style.display !== 'none' && el.src) ? el.src : ''; });
                 const wrap = document.getElementById(T + 'FormWrap');
                 return {
                     tab_type: T,
                     codigo_perfil: document.getElementById(T + 'Codigo')?.value || '',
-                    foto: photoData,
+                    foto: fotos[0] || '', foto2: fotos[1] || '', foto3: fotos[2] || '', foto4: fotos[3] || '',
                     paciente_key: wrap?.dataset?.pacienteKey || '',
                     paciente_nome: wrap?.dataset?.pacienteNome || '',
                     ov_idade: document.getElementById(`${T}-ov-idade`)?.value || '',
@@ -6410,12 +6419,14 @@
             function fillForm(data) {
                 const codigoEl = document.getElementById(T + 'Codigo');
                 if (codigoEl) codigoEl.value = data.codigo_perfil || '';
-                if (data.foto) {
-                    const preview = document.getElementById(T + 'PhotoPreview');
-                    const ph = document.getElementById(T + 'PhotoPlaceholder');
-                    if (preview) { preview.src = data.foto; preview.style.display = 'block'; }
-                    if (ph) ph.style.display = 'none';
-                }
+                ['foto','foto2','foto3','foto4'].forEach((field, i) => {
+                    if (data[field]) {
+                        const preview = document.getElementById(T + 'PhotoPreview' + i);
+                        const ph = document.getElementById(T + 'PhotoPlaceholder' + i);
+                        if (preview) { preview.src = data[field]; preview.style.display = 'block'; }
+                        if (ph) ph.style.display = 'none';
+                    }
+                });
                 const wrap = document.getElementById(T + 'FormWrap');
                 if (wrap && data.paciente_key) wrap.dataset.pacienteKey = data.paciente_key;
                 if (wrap && data.paciente_nome) wrap.dataset.pacienteNome = data.paciente_nome;
@@ -6444,13 +6455,19 @@
                 if (!data.codigo_perfil) { alert('Preencha o código do perfil'); return; }
                 const statusEl = document.getElementById(T + 'SaveStatus');
                 if (statusEl) { statusEl.textContent = 'Salvando...'; statusEl.style.color = '#f59e0b'; }
-                if (data.foto && data.foto.startsWith('data:') && CRM_SCRIPT_URL) {
-                    try {
-                        if (statusEl) statusEl.textContent = 'Enviando foto...';
-                        const r = await fetch(CRM_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'upload_photo', foto:data.foto, file_name: data.codigo_perfil.replace(/\s/g,'_')+'_'+Date.now()+'.jpg' }) });
-                        const rj = await r.json();
-                        if (rj.url) data.foto = rj.url;
-                    } catch(e) { console.warn('Photo upload failed:', e); }
+                if (CRM_SCRIPT_URL) {
+                    const fotoFields = ['foto','foto2','foto3','foto4'];
+                    for (const field of fotoFields) {
+                        if (data[field] && data[field].startsWith('data:')) {
+                            try {
+                                const idx = fotoFields.indexOf(field) + 1;
+                                if (statusEl) statusEl.textContent = `Enviando foto ${idx}/4...`;
+                                const r = await fetch(CRM_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'upload_photo', foto: data[field], file_name: data.codigo_perfil.replace(/\s/g,'_')+'_f'+idx+'_'+Date.now()+'.jpg' }) });
+                                const rj = await r.json();
+                                if (rj.url) data[field] = rj.url;
+                            } catch(e) { console.warn('Photo upload failed:', e); }
+                        }
+                    }
                     if (statusEl) statusEl.textContent = 'Salvando perfil...';
                 }
                 const id = editingId || (T + '_' + Date.now());
