@@ -2387,6 +2387,35 @@
                 <span class="dn-count" id="dnCount">0 perfis</span>
             </div>
 
+            <div class="fin-filters" style="margin-bottom:16px" id="dnFilters">
+                <input type="text" id="dnFilterNome" placeholder="Buscar por nome ou código..." oninput="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;min-width:200px;flex:1">
+                <select id="dnFilterSangue" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;min-width:100px">
+                    <option value="">Tipo Sanguíneo</option>
+                    <option value="A+">A+</option><option value="A-">A-</option>
+                    <option value="B+">B+</option><option value="B-">B-</option>
+                    <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                    <option value="O+">O+</option><option value="O-">O-</option>
+                </select>
+                <select id="dnFilterCabelo" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;min-width:100px">
+                    <option value="">Cor Cabelo</option>
+                    <option value="Loiro">Loiro</option><option value="Ruivo">Ruivo</option>
+                    <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                    <option value="Preto">Preto</option>
+                </select>
+                <select id="dnFilterOlhos" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;min-width:100px">
+                    <option value="">Cor Olhos</option>
+                    <option value="Azul">Azul</option><option value="Verde">Verde</option>
+                    <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                    <option value="Preto">Preto</option>
+                </select>
+                <select id="dnFilterPele" onchange="renderDonorCards()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;min-width:100px">
+                    <option value="">Tom de Pele</option>
+                    <option value="I">I - Muito Clara</option><option value="II">II - Clara</option>
+                    <option value="III">III - Média</option><option value="IV">IV - Morena</option>
+                    <option value="V">V - Escura</option><option value="VI">VI - Muito Escura</option>
+                </select>
+            </div>
+
             <div id="dnPendingCards" style="margin-bottom:20px"></div>
             <div id="dnCards" class="dn-cards"></div>
             <div id="dnFormWrap" style="display:none"></div>
@@ -5360,15 +5389,39 @@
             const container = document.getElementById('dnCards');
             const countEl = document.getElementById('dnCount');
             if (!container) return;
-            if (countEl) countEl.textContent = `${donorProfiles.length} perfil${donorProfiles.length !== 1 ? 's' : ''}`;
 
-            if (!donorProfiles.length) {
-                container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px">Nenhum perfil cadastrado. Clique em "+ Novo Perfil" para começar.</div>';
+            // Aplicar filtros
+            const fNome = (document.getElementById('dnFilterNome')?.value || '').toLowerCase().trim();
+            const fSangue = document.getElementById('dnFilterSangue')?.value || '';
+            const fCabelo = document.getElementById('dnFilterCabelo')?.value || '';
+            const fOlhos = document.getElementById('dnFilterOlhos')?.value || '';
+            const fPele = document.getElementById('dnFilterPele')?.value || '';
+
+            const filtered = donorProfiles.filter(p => {
+                let d = p;
+                if (p.dados) { try { d = {...p, ...JSON.parse(p.dados)}; } catch(e){} }
+                if (fNome) {
+                    const nome = ((d.paciente_nome || '') + ' ' + (d.codigo_perfil || '')).toLowerCase();
+                    if (!nome.includes(fNome)) return false;
+                }
+                if (fSangue && d.ov_sangue !== fSangue) return false;
+                if (fCabelo && d.ov_cabelo !== fCabelo) return false;
+                if (fOlhos && d.ov_olhos !== fOlhos) return false;
+                if (fPele && d.ov_pele !== fPele) return false;
+                return true;
+            });
+
+            if (countEl) countEl.textContent = `${filtered.length} de ${donorProfiles.length} perfil${donorProfiles.length !== 1 ? 's' : ''}`;
+
+            if (!filtered.length) {
+                container.innerHTML = donorProfiles.length
+                    ? '<div style="text-align:center;color:var(--muted);padding:40px">Nenhum perfil encontrado com esses filtros</div>'
+                    : '<div style="text-align:center;color:var(--muted);padding:40px">Nenhum perfil cadastrado. Clique em "+ Novo Perfil" para começar.</div>';
                 dnRenderPendingCards();
                 return;
             }
 
-            container.innerHTML = donorProfiles.map(p => {
+            container.innerHTML = filtered.map(p => {
                 let d = p;
                 if (p.dados) { try { d = {...p, ...JSON.parse(p.dados)}; } catch(e){} }
                 const ovInfo = [d.ov_idade ? d.ov_idade+' anos' : '', d.ov_sangue, d.ov_cabelo, d.ov_olhos ? 'Olhos '+d.ov_olhos : ''].filter(Boolean).join(' · ');
