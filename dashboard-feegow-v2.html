@@ -4947,7 +4947,7 @@
             const pending = [];
             doaPatients.forEach(p => {
                 const cls = (crmMap[p.key]?.classificacao) || '';
-                if (cls === 'FIV Compartilhada' || cls === 'Doadora Voluntária') {
+                if (cls === 'FIV Compartilhada') {
                     // Check if already has a donor profile
                     const hasProfile = donorProfiles.some(dp => {
                         const data = typeof dp.dados === 'string' ? JSON.parse(dp.dados || '{}') : (dp.dados || {});
@@ -5298,11 +5298,37 @@
             fillDonorForm(data);
         }
 
-        function deleteDonorProfile(id) {
-            if (!confirm('Tem certeza que deseja excluir este perfil?')) return;
+        async function deleteDonorProfile(id) {
+            const profile = donorProfiles.find(p => p.id === id);
+            if (!profile) return;
+
+            let dados = profile;
+            if (profile.dados) { try { dados = {...profile, ...JSON.parse(profile.dados)}; } catch(e){} }
+            const codigo = dados.codigo_perfil || 'Sem código';
+            const nome = dados.paciente_nome || '';
+
+            if (!confirm(`Tem certeza que deseja excluir o perfil ${codigo}${nome ? ' (' + nome + ')' : ''}?\n\nEssa ação será registrada no log.`)) return;
+
+            // Remover local
             donorProfiles = donorProfiles.filter(p => p.id !== id);
             renderDonorCards();
-            // TODO: delete from server
+
+            // Excluir do servidor
+            if (CRM_SCRIPT_URL) {
+                try {
+                    await fetch(CRM_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            action: 'delete_donor',
+                            id: id,
+                            dados_excluidos: JSON.stringify(dados),
+                            usuario: 'dashboard',
+                        }),
+                    });
+                } catch(e) { console.warn('Erro ao excluir perfil:', e); }
+            }
         }
 
         function renderDonorCards() {

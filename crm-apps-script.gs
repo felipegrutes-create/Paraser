@@ -148,6 +148,10 @@ function doPost(e) {
         return handleSaveDonor(body);
       }
 
+      if (action === 'delete_donor') {
+        return handleDeleteDonor(body);
+      }
+
       if (action === 'save_ficha') {
         return handleSaveFicha(body);
       }
@@ -534,6 +538,45 @@ function handleFeegowTest(params) {
   return ContentService
     .createTextOutput(JSON.stringify(results, null, 2))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleDeleteDonor(body) {
+  const id = (body.id || '').trim();
+  if (!id) return jsonErr('id obrigatório para exclusão');
+
+  const sheet = getOrCreateDonorSheet();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+
+  let targetRow = -1;
+  let oldData = {};
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]).trim() === id) {
+      targetRow = i + 1;
+      headers.forEach((h, j) => { oldData[h] = data[i][j]; });
+      break;
+    }
+  }
+
+  if (targetRow < 0) return jsonErr('Perfil não encontrado');
+
+  // Gravar log antes de apagar
+  const logSheet = getOrCreateLogSheet();
+  logSheet.appendRow([
+    new Date().toISOString(),
+    'delete_donor',
+    id,
+    body.usuario || 'desconhecido',
+    body.dados_excluidos || JSON.stringify(oldData),
+    '',
+    ''
+  ]);
+
+  // Remover a linha da planilha
+  sheet.deleteRow(targetRow);
+
+  return jsonOk({ success: true, logged: true });
 }
 
 function handleSaveBackup(body) {
