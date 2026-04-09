@@ -2458,8 +2458,9 @@
                 </div>
             </div>
 
-            <div class="search-box" style="margin-bottom:16px">
-                <input type="text" id="doaSearch" placeholder="Buscar paciente..." oninput="debounceDoadoras()">
+            <div class="search-box" style="margin-bottom:16px;position:relative">
+                <input type="text" id="doaSearch" placeholder="Buscar paciente..." oninput="debounceDoadoras()" style="padding-right:36px">
+                <button onclick="document.getElementById('doaSearch').value='';debounceDoadoras()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
                 <select id="doaProf" onchange="renderDoadoras()">
                     <option value="">Todos os profissionais</option>
                 </select>
