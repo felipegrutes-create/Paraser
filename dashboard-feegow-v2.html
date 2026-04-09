@@ -4223,11 +4223,6 @@
                 const pac = (r[d.C.pac]||'').trim();
                 const dt  = r[d.C.data]||'';
                 if (!pac || !dt) return;
-                const dtParts = dt.trim().split('/');
-                if (dtParts.length === 3) {
-                    const dtNum = parseInt(dtParts[2]) * 10000 + parseInt(dtParts[1]) * 100 + parseInt(dtParts[0]);
-                    if (dtNum > doaTodayStr) return;
-                }
                 const k = normalizeKey(pac);
                 if (avalDoadSeen.has(k)) return;
                 avalDoadSeen.add(k);
