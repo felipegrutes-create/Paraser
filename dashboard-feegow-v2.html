@@ -1378,6 +1378,7 @@
         .dn-block-optional { border-left: 3px solid rgba(99,102,241,0.5); }
         .dn-block-psi { border-left: 3px solid rgba(168,85,247,0.5); }
         .dn-block-bianca { border-left: 3px solid rgba(236,72,153,0.5); }
+        .dn-block-perfil { border-left: 3px solid rgba(14,165,233,0.5); }
         /* Treatment Block */
         .dn-block-tratamento {
             border: 2px solid transparent;
@@ -5313,6 +5314,7 @@
                         <span class="dn-block-role">Alice / Isabela / Erica</span>
                     </div>
                     <div class="dn-block-grid">
+                        ${fld('Código da Paciente', inp('cod_paciente'))}
                         ${fld('Mês/Ano', inp('mes_ano','month'))}
                         ${fld('Data Consulta 1ª Vez', inp('data_consulta_1vez','date'))}
                         ${fld('Nome da Paciente', inp('nome_paciente'))}
@@ -5324,12 +5326,41 @@
                             ${inp('data_max_retorno','date', `oninput="dnCheckRetorno(this)"`)}
                             <div class="dn-retorno-warn" id="${p}data_max_retorno_warn"></div>
                         </div>
+                        ${fld('Status da Paciente', sel('status_paciente', ['FIV Normal','FIV Compartilhada','Receptora','Coito Programado','IIU','Congelamento de Óvulos','PGTA','Investigação / Exames','Doadora Voluntária'], 'Selecionar status...'))}
+                        ${fld('Aviso sobre a Paciente', sel('aviso_paciente', ['Sem aviso','Com aviso']))}
                         ${fld('Tratamento Proposto', sel('tratamento_proposto', TRATAMENTOS, 'Selecionar tratamento...'))}
                         ${fld('Indicação Urologista?', sel('indicacao_urologista', ['Sim','Não']))}
                         ${fld('Indicação de Pacote', sel('indicacao_pacote', PACOTES, 'Nenhum / A definir'))}
                         ${fld('Orçamento Passado?', sel('orcamento_passado', ['Sim','Não']))}
                         ${fld('Qual Orçamento', inp('qual_orcamento'))}
                         ${fld('Data do Orçamento', inp('data_orcamento','date'))}
+                    </div>
+                </div>
+
+                <!-- BLOCO 1B — PERFIL DA PACIENTE -->
+                <div class="dn-block dn-block-perfil">
+                    <div class="dn-block-header">
+                        <span class="dn-block-title">👤 Perfil da Paciente</span>
+                        <span class="dn-block-role">Dados pessoais e características</span>
+                    </div>
+                    <div class="dn-block-grid">
+                        ${fld('Data de Nascimento', inp('pf_data_nascimento','date'))}
+                        ${fld('Onde Mora (Cidade)', inp('pf_cidade'))}
+                        ${fld('Tipo Sanguíneo', sel('pf_tipo_sanguineo', ['O+','O-','A+','A-','B+','B-','AB+','AB-']))}
+                        ${fld('Peso (kg)', inp('pf_peso','number','min="0" step="0.1"'))}
+                        ${fld('Altura (cm)', inp('pf_altura','number','min="0"'))}
+                        ${fld('Escolaridade', sel('pf_escolaridade', ['Superior Incompleto','Superior Completo','Pós-Graduada','Outro']))}
+                        ${fld('Profissão', inp('pf_profissao'))}
+                        ${fld('Religião', inp('pf_religiao'))}
+                        ${fld('Hobby', inp('pf_hobby'))}
+                        ${fld('Estado Civil', sel('pf_estado_civil', ['Solteira','Casada','Viúva','Divorciada','União Estável']))}
+                        ${fld('Tem Filhos?', sel('pf_tem_filhos', ['Sim','Não']))}
+                        ${fld('Vegetariana?', sel('pf_vegetariana', ['Sim','Não']))}
+                        ${fld('Usa Óculos?', sel('pf_usa_oculos', ['Sim','Não']))}
+                        ${fld('Fumante?', sel('pf_fumante', ['Sim','Não']))}
+                        ${fld('Etilista?', sel('pf_etilista', ['Sim','Não']))}
+                        ${fld('Alergia', inp('pf_alergia'))}
+                        ${expandFld('pf_caracteristicas', 'Características Familiares', 'Clique para descrever características importantes de pais ou avós...')}
                     </div>
                 </div>
 
@@ -5409,6 +5440,11 @@
                         <div class="dn-trat-sections">
                             ${sec('📌','Doadora / Status do Tratamento',`
                                 ${fld('Nº Registro Doadora / Embrião', inp('tto_nr_registro'))}
+                                ${fld('Nome da Doadora', inp('tto_nome_doadora'))}
+                                ${fld('Tipo de Doadora', ts('tto_tipo_doadora', ['Compartilhada','Voluntária','Voluntária Nesse Ciclo']))}
+                                ${fld('Tipo Sanguíneo (TS)', inp('tto_ts_doadora'))}
+                                ${fld('Status do Ciclo', ts('tto_status_ciclo', ['Reservado','Finalizado','Livre']))}
+                                ${fld('Nome da Receptora', inp('tto_nome_receptora'))}
                                 ${fld('Status do Tratamento', ts('tto_status', STATUS_TTO))}
                                 ${fld('AMH', inp('tto_amh'))}
                                 ${fld('Preparo Específico', inp('tto_preparo_especifico'))}
@@ -5422,10 +5458,13 @@
                             `)}
                             ${sec('💉','Indução e Aspiração',`
                                 ${fld('Data Início Indução', inp('tto_data_inducao','date'))}
+                                ${fld('Data de Punção', inp('tto_data_puncao','date'))}
+                                ${fld('Data da ICSI', inp('tto_data_icsi','date'))}
                                 ${fld('Medicação', inp('tto_medicacao'))}
                                 ${fld('Folículos Previstos', inp('tto_foliculos','number','min="0"'))}
                                 ${fld('Nº Óvulos Aspirados', inp('tto_ovulos_aspirados','number','min="0"'))}
-                                ${fld('Nº Óvulos Maduros', inp('tto_ovulos_maduros','number','min="0"'))}
+                                ${fld('Nº Óvulos Maduros (MII)', inp('tto_ovulos_maduros','number','min="0"'))}
+                                ${fld('Tipo de Óvulos', ts('tto_tipo_ovulos', ['Óvulos a Fresco','Óv. Congelados']))}
                             `)}
                             ${sec('🧫','Embriologia',`
                                 ${fld('Nº Óvulos Fertilizados', inp('tto_fertilizados','number','min="0"'))}
@@ -5488,6 +5527,12 @@
                                 ${fld('Peso Bebê 2', inp('tto_peso_b2'))}
                                 ${fld('Nome Bebê 2', inp('tto_nome_b2'))}
                                 ${expandFld('tto_obs_bebe', 'Observações Bebê', 'Clique para escrever observações sobre o(s) bebê(s)...')}
+                            `)}
+                            ${sec('💑','Parceiro / Marido (Receptora)',`
+                                ${fld('Nome do Marido / Parceiro', inp('tto_parceiro_nome'))}
+                                ${fld('Tipo Sanguíneo do Marido', ts('tto_parceiro_ts', ['O+','O-','A+','A-','B+','B-','AB+','AB-']))}
+                                ${fld('Deseja Compatibilidade Sanguínea?', ts('tto_compatibilidade_ts', ['Sim','Não','Indiferente']))}
+                                ${fld('Sêmen: Marido ou Doador?', ts('tto_semen_origem', ['Marido','Doador Identificado','Doador Banco']))}
                             `)}
                             ${sec('🎥','Depoimento',`
                                 ${fld('Gravamos Depoimento?', ts('tto_depoimento', DEPOIMENTO))}
