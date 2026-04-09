@@ -5809,19 +5809,20 @@
                 const c2El = document.getElementById(p + 'data_consulta_psi2');
                 if (c2El && !c2El.value && atendidas[1]) { const v = toISO(atendidas[1].dataAp); if (v) c2El.value = v; }
             }
-            // Pre-fill Avaliação Dra. Bianca from scheduling (conversa) + status from status_paciente above
+            // Pre-fill Avaliação Dra. Bianca from scheduling (conversa or Avaliação Doadora)
             const conversaApts = pacKey ? (pacConversaMap[pacKey] || []) : [];
-            if (conversaApts.length) {
-                const toISO = raw => {
-                    if (!raw || !raw.includes('/')) return '';
-                    const [d,m,y] = raw.split('/');
-                    return y && m && d ? `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}` : '';
-                };
-                const dcbEl = document.getElementById(p + 'data_conversa_bianca');
-                if (dcbEl && !dcbEl.value) {
-                    const v = toISO(conversaApts[conversaApts.length - 1].dataAp);
-                    if (v) dcbEl.value = v;
-                }
+            const toISOb = raw => {
+                if (!raw || !raw.includes('/')) return '';
+                const [d,m,y] = raw.split('/');
+                return y && m && d ? `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}` : '';
+            };
+            const dcbEl = document.getElementById(p + 'data_conversa_bianca');
+            if (dcbEl && !dcbEl.value) {
+                // Priority: conversa appointment > Avaliação Doadora appointment
+                const conversaDate = conversaApts.length ? toISOb(conversaApts[conversaApts.length - 1].dataAp) : '';
+                const avalDate = avd?.dataAp ? toISOb(avd.dataAp) : '';
+                const v = conversaDate || avalDate;
+                if (v) dcbEl.value = v;
             }
             // Status Dra. Bianca ← mapped from status_paciente
             const sbEl = document.getElementById(p + 'status_bianca');
