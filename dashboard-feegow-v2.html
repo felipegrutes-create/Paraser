@@ -1846,7 +1846,6 @@
     <div class="tabs-wrapper">
         <button class="tab active" onclick="showSection('sec-vg',this)">Visão Geral</button>
         <button class="tab" onclick="showSection('sec-pv',this)">1ª Vez — Geral</button>
-        <button class="tab" onclick="showSection('sec-pvcomp',this)">1ª Vez — Comparativo</button>
         <button class="tab" onclick="showSection('sec-txconv',this)">TX Conversão</button>
         <button class="tab" onclick="showSection('sec-ret',this)">Retorno</button>
         <button class="tab" onclick="showSection('sec-pend',this)">CRM Comercial</button>
@@ -2052,89 +2051,89 @@
                     <canvas id="statusPV"></canvas>
                 </div>
             </div>
-        </section>
 
-        <!-- 1ª VEZ COMPARATIVO -->
-        <section id="sec-pvcomp" class="section">
-            <p class="section-title">Consultas 1ª Vez — Comparativo 2025 vs 2026 (por Data de Criação)</p>
-            <div class="duo">
-                <div class="kpi-card">
-                    <div class="duo-header">
-                        <span id="pvc-2025-label">2025</span>
-                        <span class="year-badge y2025">2025</span>
+            <!-- COMPARATIVO 1ª VEZ 2025 vs 2026 embutido -->
+            <div class="vg-compare-block">
+                <div class="vg-compare-title">📊 Comparativo 1ª Vez — 2025 vs 2026</div>
+                <div class="duo">
+                    <div class="kpi-card">
+                        <div class="duo-header">
+                            <span id="pvc-2025-label">2025</span>
+                            <span class="year-badge y2025">2025</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Total 1ª Vez</span>
+                            <span class="d-value" id="pv25-total">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Atendidas</span>
+                            <span class="d-value" id="pv25-atend" style="color:var(--success)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Média/mês</span>
+                            <span class="d-value" id="pv25-media">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Canceladas</span>
+                            <span class="d-value" id="pv25-cancel" style="color:var(--danger)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Profissionais</span>
+                            <span class="d-value" id="pv25-profs">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Não Compareceu</span>
+                            <span class="d-value" id="pv25-naocomp" style="color:var(--warning)">—</span>
+                        </div>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Total 1ª Vez</span>
-                        <span class="d-value" id="pv25-total">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Atendidas</span>
-                        <span class="d-value" id="pv25-atend" style="color:var(--success)">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Média/mês</span>
-                        <span class="d-value" id="pv25-media">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Canceladas</span>
-                        <span class="d-value" id="pv25-cancel" style="color:var(--danger)">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Profissionais</span>
-                        <span class="d-value" id="pv25-profs">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Não Compareceu</span>
-                        <span class="d-value" id="pv25-naocomp" style="color:var(--warning)">—</span>
+                    <div class="kpi-card">
+                        <div class="duo-header">
+                            <span id="pvc-2026-label">2026 parcial</span>
+                            <span class="year-badge y2026">2026</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Total 1ª Vez</span>
+                            <span class="d-value" id="pv26-total">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Atendidas</span>
+                            <span class="d-value" id="pv26-atend" style="color:var(--success)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Média/mês</span>
+                            <span class="d-value" id="pv26-media">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label"><span class="compare" id="pv26-media-cmp"></span></span>
+                            <span></span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Canceladas</span>
+                            <span class="d-value" id="pv26-cancel" style="color:var(--danger)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Profissionais</span>
+                            <span class="d-value" id="pv26-profs">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Não Compareceu</span>
+                            <span class="d-value" id="pv26-naocomp" style="color:var(--warning)">—</span>
+                        </div>
                     </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="duo-header">
-                        <span id="pvc-2026-label">2026 parcial</span>
-                        <span class="year-badge y2026">2026</span>
+                <div class="chart-grid">
+                    <div class="chart-card chart-full">
+                        <h3>Comparativo Mensal 1ª Vez — Jan–Mar (2025 vs 2026)</h3>
+                        <canvas id="monthPVcomp"></canvas>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Total 1ª Vez</span>
-                        <span class="d-value" id="pv26-total">—</span>
+                    <div class="chart-card">
+                        <h3>Profissionais 2025 — 1ª Vez</h3>
+                        <canvas id="profPV25"></canvas>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Atendidas</span>
-                        <span class="d-value" id="pv26-atend" style="color:var(--success)">—</span>
+                    <div class="chart-card">
+                        <h3>Profissionais 2026 — 1ª Vez</h3>
+                        <canvas id="profPV26"></canvas>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Média/mês</span>
-                        <span class="d-value" id="pv26-media">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label"><span class="compare" id="pv26-media-cmp"></span></span>
-                        <span></span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Canceladas</span>
-                        <span class="d-value" id="pv26-cancel" style="color:var(--danger)">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Profissionais</span>
-                        <span class="d-value" id="pv26-profs">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Não Compareceu</span>
-                        <span class="d-value" id="pv26-naocomp" style="color:var(--warning)">—</span>
-                    </div>
-                </div>
-            </div>
-            <div class="chart-grid">
-                <div class="chart-card chart-full">
-                    <h3>Comparativo Mensal 1ª Vez — Jan–Mar (2025 vs 2026)</h3>
-                    <canvas id="monthPVcomp"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Profissionais 2025 — 1ª Vez</h3>
-                    <canvas id="profPV25"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Profissionais 2026 — 1ª Vez</h3>
-                    <canvas id="profPV26"></canvas>
                 </div>
             </div>
         </section>
