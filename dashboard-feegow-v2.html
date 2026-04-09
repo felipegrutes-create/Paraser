@@ -1202,6 +1202,11 @@
         .dn-profile-card.distancia { border-color:#38bdf8; background: linear-gradient(135deg, var(--surface) 0%, rgba(56,189,248,0.06) 100%); }
         .dn-profile-card.distancia:hover { border-color:#7dd3fc; box-shadow:0 8px 24px rgba(56,189,248,0.15); }
         .dn-distancia-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px; margin-bottom:8px; display:inline-block; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.35); letter-spacing:0.2px; }
+        .dn-inducao-badge { font-size:11px; font-weight:600; padding:3px 10px; border-radius:6px; margin-bottom:6px; display:inline-block; }
+        .dn-inducao-ok { background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); }
+        .dn-inducao-pending { background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3); }
+        @keyframes dn-inducao-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,0.45);border-color:rgba(251,191,36,0.55);} 50%{box-shadow:0 0 0 10px rgba(251,191,36,0);border-color:rgba(251,191,36,0.2);} }
+        .dn-inducao-block { background:linear-gradient(135deg,rgba(251,191,36,0.07) 0%,rgba(245,158,11,0.04) 100%); border:2px solid rgba(251,191,36,0.5); border-radius:14px; padding:18px 22px; margin-bottom:18px; animation:dn-inducao-pulse 2.2s ease-in-out infinite; }
         .dn-conversa-badge { font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; margin-bottom:10px; display:inline-block; }
         .dn-conversa-ok { background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); }
         .dn-conversa-pending { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
@@ -5463,6 +5468,20 @@
 
             return `<div class="dn-extra-blocks">
 
+                <!-- AVISO INDUÇÃO DA OVULAÇÃO -->
+                <div class="dn-inducao-block">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                        <span style="font-size:20px">💉</span>
+                        <span style="font-size:13px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:0.8px">Aviso — Início da Indução da Ovulação</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                        <div style="display:flex;flex-direction:column;gap:5px">
+                            <label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Data de Início</label>
+                            <input type="date" id="${p}inicio_inducao" style="background:var(--surface2);color:var(--text);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:14px;min-width:200px">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- BLOCO 1 — CONSULTA INICIAL -->
                 <div class="dn-block">
                     <div class="dn-block-header">
@@ -6200,6 +6219,7 @@
                 const distancia = dnIsDistancia(d);
                 const locInfo = distancia ? [d.pf_cidade, d.pf_pais].filter(Boolean).join(' · ') : '';
                 return `<div class="dn-profile-card${distancia ? ' distancia' : ''}" onclick="editDonorProfile('${p.id}')">
+                    ${dnInducaoBadgeHTML(d)}<br>
                     ${distancia ? `<span class="dn-distancia-badge">✈️ Paciente a distância${locInfo ? ' &nbsp;·&nbsp; ' + locInfo : ''}</span><br>` : ''}
                     ${dnConversaBadgeHTML(pacKey_card)}
                     <h4>${d.codigo_perfil || 'Sem código'}${pacNome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${pacNome}</span>` : ''}</h4>
@@ -6235,6 +6255,14 @@
         }
 
         // ===================== DONOR TAB FACTORY =====================
+        function dnInducaoBadgeHTML(d) {
+            const dt = d.inicio_inducao || '';
+            if (!dt) return '<span class="dn-inducao-badge dn-inducao-pending">⚠️ Indução da Ovulação não iniciada</span>';
+            const parts = dt.split('-');
+            const fmt = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dt;
+            return `<span class="dn-inducao-badge dn-inducao-ok">💉 Indução da ovulação em ${fmt}</span>`;
+        }
+
         // Returns true when patient is outside Rio de Janeiro AND outside Brasil
         function dnIsDistancia(d) {
             const city    = (d.pf_cidade || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -6566,6 +6594,7 @@
                     const distancia_t = dnIsDistancia(d);
                     const locInfo_t = distancia_t ? [d.pf_cidade, d.pf_pais].filter(Boolean).join(' · ') : '';
                     return `<div class="dn-profile-card${distancia_t ? ' distancia' : ''}" onclick="${T}Tab.editProfile('${p.id}')">
+                        ${cfg.tabId !== 'rc' ? dnInducaoBadgeHTML(d) + '<br>' : ''}
                         ${distancia_t ? `<span class="dn-distancia-badge">✈️ Paciente a distância${locInfo_t ? ' &nbsp;·&nbsp; ' + locInfo_t : ''}</span><br>` : ''}
                         ${cfg.hideSp ? '' : dnConversaBadgeHTML(pacKey_t)}
                         <h4>${d.codigo_perfil || 'Sem código'}${d.paciente_nome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${d.paciente_nome}</span>` : ''}</h4>
