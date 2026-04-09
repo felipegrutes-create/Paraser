@@ -6289,13 +6289,15 @@
                         <span style="font-size:12px;font-weight:600;color:var(--warning)">⚠ ${pending.length} paciente(s) aguardando criação de perfil</span>
                     </div>
                     ${pending.map(p => {
-                        const cc = parseCocComName(p.pac);
+                        const cc = cfg.hideSp ? parseCocComName(p.pac) : null;
                         const subLine = cc
                             ? `<div style="font-size:11px;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
                                    <span><span style="color:var(--accent);font-weight:600">Doadora:</span> ${cc.doadora}</span>
                                    <span><span style="color:#a78bfa;font-weight:600">Indicação:</span> ${cc.indicacao}</span>
                                </div>`
-                            : `<div style="margin-top:3px"><span style="background:rgba(250,204,21,0.15);color:#facc15;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px">Voluntária</span></div>`;
+                            : cfg.hideSp
+                                ? `<div style="margin-top:3px"><span style="background:rgba(250,204,21,0.15);color:#facc15;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px">Voluntária</span></div>`
+                                : '';
                         return `
                         <div class="dn-pending-card">
                             <div class="dn-pend-info">
