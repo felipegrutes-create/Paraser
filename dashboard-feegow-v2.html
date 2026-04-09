@@ -5624,6 +5624,15 @@
                     if (parts.length === 3) dataEl.value = parts[2] + '-' + parts[1] + '-' + parts[0];
                 }
             }
+            // Auto-fill Data Máxima Retorno = Data Consulta 1ª Vez + 60 dias
+            const retornoEl = document.getElementById(p + 'data_max_retorno');
+            if (retornoEl && !retornoEl.value && dataEl?.value) {
+                const d60 = new Date(dataEl.value + 'T12:00:00');
+                d60.setDate(d60.getDate() + 60);
+                const yy = d60.getFullYear(), mm = String(d60.getMonth()+1).padStart(2,'0'), dd = String(d60.getDate()).padStart(2,'0');
+                retornoEl.value = `${yy}-${mm}-${dd}`;
+                dnCheckRetorno(retornoEl);
+            }
             // Pre-fill Orçamento from CRM (proposta_feita → Orçamento Passado?, valor → Qual Orçamento)
             if (crm) {
                 const orcEl = document.getElementById(p + 'orcamento_passado');
