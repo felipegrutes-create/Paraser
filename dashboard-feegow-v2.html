@@ -1199,6 +1199,9 @@
         .dn-profile-card h4 { color:var(--accent); margin-bottom:8px; font-size:15px; }
         .dn-profile-card .dn-pc-meta { color:var(--muted); font-size:12px; line-height:1.6; }
         .dn-profile-card .dn-pc-actions { display:flex; gap:8px; margin-top:12px; }
+        .dn-profile-card.distancia { border-color:#38bdf8; background: linear-gradient(135deg, var(--surface) 0%, rgba(56,189,248,0.06) 100%); }
+        .dn-profile-card.distancia:hover { border-color:#7dd3fc; box-shadow:0 8px 24px rgba(56,189,248,0.15); }
+        .dn-distancia-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px; margin-bottom:8px; display:inline-block; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.35); letter-spacing:0.2px; }
         .dn-conversa-badge { font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; margin-bottom:10px; display:inline-block; }
         .dn-conversa-ok { background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); }
         .dn-conversa-pending { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
@@ -5511,6 +5514,7 @@
                     <div class="dn-block-grid">
                         ${fld('Data de Nascimento', inp('pf_data_nascimento','date'))}
                         ${fld('Onde Mora (Cidade)', inp('pf_cidade'))}
+                        ${fld('País', inp('pf_pais'))}
                         ${fld('Tipo Sanguíneo', sel('pf_tipo_sanguineo', ['O+','O-','A+','A-','B+','B-','AB+','AB-']))}
                         ${fld('Peso (kg)', inp('pf_peso','number','min="0" step="0.1"'))}
                         ${fld('Altura (cm)', inp('pf_altura','number','min="0"'))}
@@ -6193,7 +6197,9 @@
                 const dt = d.ultima_atualizacao ? new Date(d.ultima_atualizacao).toLocaleDateString('pt-BR') : '';
                 const pacNome = d.paciente_nome || '';
                 const pacKey_card = d.paciente_key || normalizeKey(pacNome);
-                return `<div class="dn-profile-card" onclick="editDonorProfile('${p.id}')">
+                const distancia = dnIsDistancia(d);
+                return `<div class="dn-profile-card${distancia ? ' distancia' : ''}" onclick="editDonorProfile('${p.id}')">
+                    ${distancia ? '<span class="dn-distancia-badge">✈️ Paciente a distância</span><br>' : ''}
                     ${dnConversaBadgeHTML(pacKey_card)}
                     <h4>${d.codigo_perfil || 'Sem código'}${pacNome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${pacNome}</span>` : ''}</h4>
                     <div class="dn-pc-meta">
@@ -6228,6 +6234,16 @@
         }
 
         // ===================== DONOR TAB FACTORY =====================
+        // Returns true when patient is outside Rio de Janeiro AND outside Brasil
+        function dnIsDistancia(d) {
+            const city    = (d.pf_cidade || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+            const country = (d.pf_pais   || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+            if (!city && !country) return false;
+            const isRio    = !city    || city    === 'rio de janeiro' || city    === 'rj';
+            const isBrasil = !country || country === 'brasil'         || country === 'brazil' || country === 'br';
+            return !isRio || !isBrasil;
+        }
+
         // Parses names with "COC" or "COM" separator (e.g. "Ana Coc Beatriz")
         // Returns { doadora, indicacao } or null if no separator found
         function parseCocComName(nome) {
@@ -6544,7 +6560,9 @@
                     const spInfo = [d.sp_sangue, d.sp_cabelo, d.sp_olhos ? 'Olhos '+d.sp_olhos : ''].filter(Boolean).join(' · ');
                     const dt = d.ultima_atualizacao ? new Date(d.ultima_atualizacao).toLocaleDateString('pt-BR') : '';
                     const pacKey_t = d.paciente_key || normalizeKey(d.paciente_nome || '');
-                    return `<div class="dn-profile-card" onclick="${T}Tab.editProfile('${p.id}')">
+                    const distancia_t = dnIsDistancia(d);
+                    return `<div class="dn-profile-card${distancia_t ? ' distancia' : ''}" onclick="${T}Tab.editProfile('${p.id}')">
+                        ${distancia_t ? '<span class="dn-distancia-badge">✈️ Paciente a distância</span><br>' : ''}
                         ${cfg.hideSp ? '' : dnConversaBadgeHTML(pacKey_t)}
                         <h4>${d.codigo_perfil || 'Sem código'}${d.paciente_nome ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">— ${d.paciente_nome}</span>` : ''}</h4>
                         <div class="dn-pc-meta">
