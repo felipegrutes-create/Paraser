@@ -3404,6 +3404,7 @@
         let pendPatients = []; // retDetails filtrados (não retornaram)
         let doaPatients  = []; // pacientes para aba Doadoras/Receptoras
         let crmModalKey = '';  // key do paciente aberto no modal
+        let pacFirstVezMap = {}; // normalizedKey → { id:agendId, dataAp }
 
         const KANBAN_COLS = [
             { id:'retornos-pendentes', label:'📋 Retornos Pendentes', color:'#ef4444', showTotal:false },
@@ -3635,7 +3636,8 @@
                 const d = parseDate(r[C.data]);
                 if (!d) return;
                 if (!firstVez[k] || d < firstVez[k].date) {
-                    firstVez[k] = { date:d, prof:r[C.prof]||"", pac:r[C.pac]||"", cel:r[C.cel]||"", email:r[C.email]||"", dataCri:r[C.dcri]||"", dataAp:r[C.data]||"", proc:r[C.proc]||"" };
+                    firstVez[k] = { date:d, prof:r[C.prof]||"", pac:r[C.pac]||"", cel:r[C.cel]||"", email:r[C.email]||"", dataCri:r[C.dcri]||"", dataAp:r[C.data]||"", proc:r[C.proc]||"", agendId:r[C.id]||"" };
+                    pacFirstVezMap[k] = { id: r[C.id]||"", dataAp: r[C.data]||"" };
                 }
             });
 
@@ -5315,7 +5317,19 @@
                     </div>
                     <div class="dn-block-grid">
                         ${fld('Código da Paciente', inp('cod_paciente'))}
-                        ${fld('Mês/Ano', inp('mes_ano','month'))}
+                        <div class="dn-block-field">
+                            <label>Mês / Ano</label>
+                            <div style="display:flex;gap:6px">
+                                <select id="${p}mes_ano_mes" style="flex:1.5">
+                                    <option value="">Mês</option>
+                                    ${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('')}
+                                </select>
+                                <select id="${p}mes_ano_ano" style="flex:1">
+                                    <option value="">Ano</option>
+                                    ${Array.from({length:12},(_,i)=>2020+i).map(y=>`<option value="${y}">${y}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
                         ${fld('Data Consulta 1ª Vez', inp('data_consulta_1vez','date'))}
                         ${fld('Nome da Paciente', inp('nome_paciente'))}
                         ${fld('Idade na Consulta', inp('idade_paciente','number','min="0" max="80"'))}
@@ -5326,7 +5340,7 @@
                             ${inp('data_max_retorno','date', `oninput="dnCheckRetorno(this)"`)}
                             <div class="dn-retorno-warn" id="${p}data_max_retorno_warn"></div>
                         </div>
-                        ${fld('Status da Paciente', sel('status_paciente', ['FIV Normal','FIV Compartilhada','Receptora','Coito Programado','IIU','Congelamento de Óvulos','PGTA','Investigação / Exames','Doadora Voluntária'], 'Selecionar status...'))}
+                        ${fld('Status da Paciente', sel('status_paciente', ['Receptora de Óvulos','Receptora de Embrião','Doadora de Óvulos Compartilhada','Doadora de Óvulos Voluntária'], 'Selecionar status...'))}
                         ${fld('Aviso sobre a Paciente', sel('aviso_paciente', ['Sem aviso','Com aviso']))}
                         ${fld('Tratamento Proposto', sel('tratamento_proposto', TRATAMENTOS, 'Selecionar tratamento...'))}
                         ${fld('Indicação Urologista?', sel('indicacao_urologista', ['Sim','Não']))}
@@ -5585,16 +5599,17 @@
             // Pre-fill nome
             const nomeEl = document.getElementById(p + 'nome_paciente');
             if (nomeEl && pacNome && !nomeEl.value) nomeEl.value = pacNome;
-            // Pre-fill from crmMap if available
-            if (pacKey && crmMap[pacKey]) {
-                const crm = crmMap[pacKey];
-                if (crm.contato1_data) {
-                    const dataEl = document.getElementById(p + 'data_consulta_1vez');
-                    // contato1_data is DD/MM/YYYY — convert to YYYY-MM-DD
-                    if (dataEl && !dataEl.value && crm.contato1_data.includes('/')) {
-                        const parts = crm.contato1_data.split('/');
-                        if (parts.length === 3) dataEl.value = parts[2] + '-' + parts[1] + '-' + parts[0];
-                    }
+            // Pre-fill ID do agendamento → Código da Paciente
+            const codEl = document.getElementById(p + 'cod_paciente');
+            const fvz = pacKey ? pacFirstVezMap[pacKey] : null;
+            if (codEl && fvz?.id && !codEl.value) codEl.value = fvz.id;
+            // Pre-fill Data Consulta 1ª Vez from scheduling system (DD/MM/YYYY → YYYY-MM-DD)
+            const dataEl = document.getElementById(p + 'data_consulta_1vez');
+            if (dataEl && !dataEl.value) {
+                const raw = fvz?.dataAp || (pacKey && crmMap[pacKey]?.contato1_data) || '';
+                if (raw.includes('/')) {
+                    const parts = raw.split('/');
+                    if (parts.length === 3) dataEl.value = parts[2] + '-' + parts[1] + '-' + parts[0];
                 }
             }
         }
