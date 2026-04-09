@@ -1378,6 +1378,34 @@
         .dn-block-optional { border-left: 3px solid rgba(99,102,241,0.5); }
         .dn-block-psi { border-left: 3px solid rgba(168,85,247,0.5); }
         .dn-block-bianca { border-left: 3px solid rgba(236,72,153,0.5); }
+        /* Treatment Block */
+        .dn-block-tratamento {
+            border: 2px solid transparent;
+            background: linear-gradient(var(--surface), var(--surface)) padding-box,
+                        linear-gradient(135deg, #10b981 0%, #0ea5e9 50%, #6366f1 100%) border-box;
+            border-radius: 14px; padding: 0; overflow: hidden; margin-top: 8px;
+        }
+        .dn-trat-header {
+            background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(14,165,233,0.08) 100%);
+            padding: 20px 24px 16px; border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .dn-trat-header-title {
+            font-size: 14px; font-weight: 800; color: #10b981;
+            text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 8px;
+        }
+        .dn-trat-header-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+        .dn-trat-sections { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+        .dn-trat-section {
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px; padding: 16px;
+        }
+        .dn-trat-section-title {
+            font-size: 10px; font-weight: 700; color: #10b981; text-transform: uppercase;
+            letter-spacing: 0.07em; margin-bottom: 12px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(16,185,129,0.18);
+            display: flex; align-items: center; gap: 6px;
+        }
         .dn-form-btns { display:flex; gap:10px; align-items:center; }
         .dn-btn-save {
             background:var(--accent); color:#080d1a; border:none; border-radius:10px;
@@ -5353,6 +5381,121 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- BLOCO 5 — DADOS DO TRATAMENTO (destaque visual) -->
+                ${(()=>{
+                    const STATUS_TTO = ['Em avaliação','Em tratamento','Tratamento concluído','Tratamento cancelado','Em pausa','Aguardando doadora','Outro'];
+                    const SEMEN = ['Cônjuge','Doador Identificado','Doador Banco'];
+                    const FRAG_DNA = ['Sim','Não','Não solicitado'];
+                    const TIPO_TE = ['Fresco','Congelado','Euplóide','Mosaico'];
+                    const PREPARO = ['Natural','Hormonal','Natural Modificado'];
+                    const TIPO_GRAVIDEZ = ['Única','Gemelar','Trigêmeos'];
+                    const TIPO_ABORTO = ['N/A','Bioquímica','Espontâneo','Terapêutico'];
+                    const TIPO_PARTO = ['Normal','Cesárea'];
+                    const GENERO_BEBE = ['Menino','Menina','Não informado'];
+                    const DEPOIMENTO = ['Sim','Não','Em andamento'];
+                    const HEMATO = ['Sim','Não','Em avaliação'];
+                    const ts = (id, opts, ph='Selecionar...') => sel(id, opts, ph);
+                    const sec = (icon, title, content) => `
+                        <div class="dn-trat-section">
+                            <div class="dn-trat-section-title">${icon} ${title}</div>
+                            <div class="dn-block-grid">${content}</div>
+                        </div>`;
+                    return `<div class="dn-block-tratamento">
+                        <div class="dn-trat-header">
+                            <div class="dn-trat-header-title">🧬 Dados do Tratamento</div>
+                            <div class="dn-trat-header-sub">Registros clínicos do ciclo — Embriologia · Transferência · Gestação · Bebê</div>
+                        </div>
+                        <div class="dn-trat-sections">
+                            ${sec('📌','Doadora / Status do Tratamento',`
+                                ${fld('Nº Registro Doadora / Embrião', inp('tto_nr_registro'))}
+                                ${fld('Status do Tratamento', ts('tto_status', STATUS_TTO))}
+                                ${fld('AMH', inp('tto_amh'))}
+                                ${fld('Preparo Específico', inp('tto_preparo_especifico'))}
+                            `)}
+                            ${sec('🔬','Sêmen',`
+                                ${fld('Tipo de Sêmen', ts('tto_semen', SEMEN))}
+                                ${fld('Tratamento com Urologista', ts('tto_urologista', ['Sim','Não']))}
+                                ${fld('Fragmentação de DNA', ts('tto_frag_dna', FRAG_DNA))}
+                                ${fld('Data Exame Fragmentação', inp('tto_data_frag','date'))}
+                                ${fld('Obs sobre o Sêmen', inp('tto_obs_semen'))}
+                            `)}
+                            ${sec('💉','Indução e Aspiração',`
+                                ${fld('Data Início Indução', inp('tto_data_inducao','date'))}
+                                ${fld('Medicação', inp('tto_medicacao'))}
+                                ${fld('Folículos Previstos', inp('tto_foliculos','number','min="0"'))}
+                                ${fld('Nº Óvulos Aspirados', inp('tto_ovulos_aspirados','number','min="0"'))}
+                                ${fld('Nº Óvulos Maduros', inp('tto_ovulos_maduros','number','min="0"'))}
+                            `)}
+                            ${sec('🧫','Embriologia',`
+                                ${fld('Nº Óvulos Fertilizados', inp('tto_fertilizados','number','min="0"'))}
+                                ${fld('Blastocistos', inp('tto_blastocistos','number','min="0"'))}
+                                ${fld('Classificação / Palhetas', inp('tto_classificacao_palhetas'))}
+                            `)}
+                            ${sec('🧬','PGT-A',`
+                                ${fld('PGT-A?', ts('tto_pgta', ['Sim','Não']))}
+                                ${fld('Resultado PGT-A', inp('tto_pgta_resultado'))}
+                            `)}
+                            ${sec('🩸','Hematologia',`
+                                ${fld('Hematologista?', ts('tto_hematologista', HEMATO))}
+                                ${fld('Aviso Hemato', inp('tto_aviso_hemato'))}
+                            `)}
+                            ${sec('🔁','Transferência Embrionária',`
+                                ${fld('Data da TE', inp('tto_data_te','date'))}
+                                ${fld('Tipo de TE', ts('tto_tipo_te', TIPO_TE))}
+                                ${fld('Blastos Transferidos', inp('tto_blastos_transferidos','number','min="0"'))}
+                                ${fld('Sobrou Blastos?', ts('tto_sobrou_blastos', ['Sim','Não']))}
+                                ${fld('Blastos Sobrando', inp('tto_blastos_sobrando','number','min="0"'))}
+                                ${fld('Laboratório', inp('tto_laboratorio'))}
+                            `)}
+                            ${sec('💊','Medicação TE',`
+                                ${fld('Injúria?', ts('tto_injuria', ['Sim','Não']))}
+                                ${fld('Resultado Injúria', inp('tto_injuria_resultado'))}
+                                ${fld('Filgastrim?', ts('tto_filgastrim', ['Sim','Não']))}
+                                ${fld('Tractocile?', ts('tto_tractocile', ['Sim','Não']))}
+                                ${fld('Tipo Preparo', ts('tto_tipo_preparo', PREPARO))}
+                                ${fld('Medicação Preparo', inp('tto_med_preparo'))}
+                                ${fld('Clexane?', ts('tto_clexane', ['Sim','Não']))}
+                                ${expandFld('tto_obs_te', 'Obs sobre a TE', 'Clique para escrever observações sobre a transferência...')}
+                            `)}
+                            ${sec('🩺','Beta HCG / Ultrassom',`
+                                ${fld('Data Beta HCG', inp('tto_data_beta','date'))}
+                                ${fld('Dosagens Beta', inp('tto_dosagens_beta'))}
+                                ${fld('SG (Saco Gestacional)', inp('tto_sg'))}
+                                ${fld('BCE (Batimento Cardíaco)', inp('tto_bce'))}
+                                ${expandFld('tto_obs_usg1', 'Obs 1ª USG Pós Beta', 'Clique para escrever observações da 1ª ultrassonografia...')}
+                                ${fld('Data 2ª USG Pós Beta', inp('tto_data_usg2','date'))}
+                                ${expandFld('tto_obs_usg2', 'Obs 2ª USG', 'Clique para escrever observações da 2ª ultrassonografia...')}
+                            `)}
+                            ${sec('🤰','Gestação / Parto',`
+                                ${fld('Pré-Natal?', ts('tto_pre_natal', ['Sim','Não','Em andamento']))}
+                                ${fld('Tipo de Gravidez', ts('tto_tipo_gravidez', TIPO_GRAVIDEZ))}
+                                ${fld('Tipo de Aborto', ts('tto_tipo_aborto', TIPO_ABORTO))}
+                                ${fld('Pré-Natal na Paraser?', ts('tto_prenatal_paraser', ['Sim','Não']))}
+                                ${fld('Data do Parto', inp('tto_data_parto','date'))}
+                                ${fld('Tipo de Parto', ts('tto_tipo_parto', TIPO_PARTO))}
+                                ${fld('Idade Gestacional (IG)', inp('tto_ig'))}
+                                ${expandFld('tto_obs_parto', 'Obs sobre o Parto', 'Clique para escrever observações sobre o parto...')}
+                            `)}
+                            ${sec('👶','Bebê(s)',`
+                                ${fld('Nasc. Vivos', inp('tto_nasc_vivos','number','min="0"'))}
+                                ${fld('Gênero Bebê 1', ts('tto_genero_b1', GENERO_BEBE))}
+                                ${fld('Estatura Bebê 1', inp('tto_estatura_b1'))}
+                                ${fld('Peso Bebê 1', inp('tto_peso_b1'))}
+                                ${fld('Nome Bebê 1', inp('tto_nome_b1'))}
+                                ${fld('Gênero Bebê 2', ts('tto_genero_b2', GENERO_BEBE))}
+                                ${fld('Estatura Bebê 2', inp('tto_estatura_b2'))}
+                                ${fld('Peso Bebê 2', inp('tto_peso_b2'))}
+                                ${fld('Nome Bebê 2', inp('tto_nome_b2'))}
+                                ${expandFld('tto_obs_bebe', 'Observações Bebê', 'Clique para escrever observações sobre o(s) bebê(s)...')}
+                            `)}
+                            ${sec('🎥','Depoimento',`
+                                ${fld('Gravamos Depoimento?', ts('tto_depoimento', DEPOIMENTO))}
+                                ${expandFld('tto_info_depoimento', 'Informações do Depoimento', 'Clique para escrever detalhes sobre o depoimento...')}
+                            `)}
+                        </div>
+                    </div>`;
+                })()}
 
             </div>`;
         }
