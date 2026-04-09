@@ -3410,6 +3410,7 @@
         let pacFirstVezMap  = {}; // normalizedKey → { id:agendId, dataAp }
         let pacPsiMap       = {}; // normalizedKey → [{ dataAp, statusRaw }] sorted asc
         let pacConversaMap  = {}; // normalizedKey → [{ dataAp, statusRaw }] sorted asc
+        let avalDoadPatients = []; // patients with "Avaliação Doadora" appointment (for dvTab pending)
 
         const KANBAN_COLS = [
             { id:'retornos-pendentes', label:'📋 Retornos Pendentes', color:'#ef4444', showTotal:false },
@@ -4152,6 +4153,7 @@
             // == DOADORAS / RECEPTORAS ==
             // Dados: agendamentos de 1ª vez e retorno, exceto cancelado/remarcado
             doaPatients = [];
+            avalDoadPatients = [];
             const doaExcludeStatus = ['cancelado','desmarcado','remarcado'];
             const doaSeen = new Set();
 
@@ -4210,6 +4212,33 @@
                 if (!db) return -1;
                 return db - da;
             });
+
+            // Pacientes com "Avaliação Doadora" na planilha → fonte para dvTab (Doadoras Voluntárias)
+            const avalDoadSeen = new Set();
+            raw.forEach(r => {
+                const proc = (r[d.C.proc]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                if (!proc.includes('avaliacao') || !proc.includes('doador')) return;
+                const s = (r[d.C.sta]||'').toLowerCase().trim();
+                if (doaExcludeStatus.includes(s)) return;
+                const pac = (r[d.C.pac]||'').trim();
+                const dt  = r[d.C.data]||'';
+                if (!pac || !dt) return;
+                const dtParts = dt.trim().split('/');
+                if (dtParts.length === 3) {
+                    const dtNum = parseInt(dtParts[2]) * 10000 + parseInt(dtParts[1]) * 100 + parseInt(dtParts[0]);
+                    if (dtNum > doaTodayStr) return;
+                }
+                const k = normalizeKey(pac);
+                if (avalDoadSeen.has(k)) return;
+                avalDoadSeen.add(k);
+                avalDoadPatients.push({
+                    pac, prof: r[d.C.prof]||'', cel: r[d.C.cel]||'',
+                    email: r[d.C.email]||'', dataAp: dt,
+                    proc: r[d.C.proc]||'', status: fmtStatus(s),
+                    statusRaw: s, tipo: 'avaliacaoDoadora', key: k
+                });
+            });
+            avalDoadPatients.sort((a,b) => (parseDate(b.dataAp)||0) - (parseDate(a.dataAp)||0));
 
             // Popular filtro de profissionais
             const doaProfSel = document.getElementById('doaProf');
@@ -6154,19 +6183,21 @@
             let editingId = null;
 
             function getPending() {
+                const srcPatients = cfg.patientSource ? cfg.patientSource() : doaPatients;
                 const pending = [];
-                doaPatients.forEach(p => {
-                    const cls = (crmMap[p.key]?.classificacao) || '';
-                    if (cfg.classFilters.includes(cls)) {
-                        const hasP = profiles.some(dp => {
-                            let d = dp;
-                            if (typeof dp.dados === 'string' && dp.dados) { try { d = { ...dp, ...JSON.parse(dp.dados) }; } catch(e) {} }
-                            const dpKey = d.paciente_key || dp.paciente_key || '';
-                            const dpNome = normalizeKey(d.paciente_nome || dp.paciente_nome || '');
-                            return dpKey === p.key || dpNome === p.key;
-                        });
-                        if (!hasP) pending.push({ ...p, classificacao: cls });
-                    }
+                srcPatients.forEach(p => {
+                    // classFilters: check CRM classification. patientSource: patients already pre-filtered by proc
+                    const cls = (crmMap[p.key]?.classificacao) || (cfg.patientSource ? 'Avaliação Doadora' : '');
+                    const include = cfg.patientSource ? true : cfg.classFilters.includes(cls);
+                    if (!include) return;
+                    const hasP = profiles.some(dp => {
+                        let d = dp;
+                        if (typeof dp.dados === 'string' && dp.dados) { try { d = { ...dp, ...JSON.parse(dp.dados) }; } catch(e) {} }
+                        const dpKey = d.paciente_key || dp.paciente_key || '';
+                        const dpNome = normalizeKey(d.paciente_nome || dp.paciente_nome || '');
+                        return dpKey === p.key || dpNome === p.key;
+                    });
+                    if (!hasP) pending.push({ ...p, classificacao: cls });
                 });
                 const seen = new Set();
                 return pending.filter(p => { if (seen.has(p.key)) return false; seen.add(p.key); return true; });
@@ -6459,7 +6490,7 @@
             return { getPending, renderPending, toggleDropdown, closeDropdown, newProfile, previewPhoto, closeForm, saveProfile, editProfile, deleteProfile, renderCards, newFromPending, load };
         }
 
-        const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'] });
+        const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'], patientSource: () => avalDoadPatients });
         const rcTab = makeDonorTab({ tabId: 'rc', classFilters: ['Receptora'] });
 
         async function reloadData() {
