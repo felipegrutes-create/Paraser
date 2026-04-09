@@ -5256,7 +5256,8 @@
                             body: JSON.stringify({
                                 action: 'upload_photo',
                                 foto: data[field],
-                                file_name: data.codigo_perfil.replace(/\s/g,'_') + '_' + idx + '_' + Date.now() + '.jpg'
+                                file_name: data.codigo_perfil.replace(/\s/g,'_') + '_' + idx + '_' + Date.now() + '.jpg',
+                                paciente_nome: data.paciente_nome || data.codigo_perfil || ''
                             }),
                         });
                         const photoJson = await photoRes.json();

@@ -375,6 +375,7 @@ function getOrCreatePhotoFolder() {
 function handleUploadPhoto(body) {
   const base64Data = body.foto || '';
   const fileName = body.file_name || ('foto_' + Date.now() + '.jpg');
+  const pacienteNome = (body.paciente_nome || '').trim();
 
   if (!base64Data) return jsonErr('foto obrigatória');
 
@@ -387,8 +388,21 @@ function handleUploadPhoto(body) {
   const decoded = Utilities.base64Decode(raw);
   const blob = Utilities.newBlob(decoded, mime, fileName);
 
-  const folder = getOrCreatePhotoFolder();
-  const file = folder.createFile(blob);
+  // Pasta raiz → subpasta com nome da paciente
+  const rootFolder = getOrCreatePhotoFolder();
+  let targetFolder = rootFolder;
+
+  if (pacienteNome) {
+    // Buscar ou criar subpasta com nome da paciente
+    const subFolders = rootFolder.getFoldersByName(pacienteNome);
+    if (subFolders.hasNext()) {
+      targetFolder = subFolders.next();
+    } else {
+      targetFolder = rootFolder.createFolder(pacienteNome);
+    }
+  }
+
+  const file = targetFolder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
   const fileId = file.getId();
