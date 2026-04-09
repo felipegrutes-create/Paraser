@@ -5098,14 +5098,14 @@
                 <div class="dn-field-row">
                     ${hasAge ? `<div class="dn-field"><label>Idade</label><input type="number" id="${tabPfx}-${prefix}-idade" min="18" max="50"></div>` : ''}
                     <div class="dn-field"><label>Tipo Sanguíneo</label>
-                        <select id="${tabPfx}-${prefix}-sangue">
+                        <select id="${tabPfx}-${prefix}-sangue" onchange="dnMirrorToProfile('${tabPfx}','sangue',this.value)">
                             <option value="">—</option>
                             <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
                             <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
                         </select>
                     </div>
-                    <div class="dn-field"><label>Altura: <strong id="${tabPfx}-${prefix}-altura-val">1.65</strong> m</label><input type="range" id="${tabPfx}-${prefix}-altura" min="1.40" max="2.10" step="0.01" value="1.65" class="dn-slider" oninput="document.getElementById('${tabPfx}-${prefix}-altura-val').textContent=this.value; dnCalcIMC('${prefix}','${tabPfx}')"></div>
-                    <div class="dn-field"><label>Peso: <strong id="${tabPfx}-${prefix}-peso-val">70</strong> kg</label><input type="range" id="${tabPfx}-${prefix}-peso" min="40" max="160" step="0.5" value="70" class="dn-slider" oninput="document.getElementById('${tabPfx}-${prefix}-peso-val').textContent=this.value; dnCalcIMC('${prefix}','${tabPfx}')"></div>
+                    <div class="dn-field"><label>Altura: <strong id="${tabPfx}-${prefix}-altura-val">1.65</strong> m</label><input type="range" id="${tabPfx}-${prefix}-altura" min="1.40" max="2.10" step="0.01" value="1.65" class="dn-slider" oninput="document.getElementById('${tabPfx}-${prefix}-altura-val').textContent=this.value; dnCalcIMC('${prefix}','${tabPfx}'); dnMirrorToProfile('${tabPfx}','altura',this.value)"></div>
+                    <div class="dn-field"><label>Peso: <strong id="${tabPfx}-${prefix}-peso-val">70</strong> kg</label><input type="range" id="${tabPfx}-${prefix}-peso" min="40" max="160" step="0.5" value="70" class="dn-slider" oninput="document.getElementById('${tabPfx}-${prefix}-peso-val').textContent=this.value; dnCalcIMC('${prefix}','${tabPfx}'); dnMirrorToProfile('${tabPfx}','peso',this.value)"></div>
                     <div class="dn-field"><label>IMC</label><div class="dn-imc" id="${tabPfx}-${prefix}-imc">—</div></div>
                 </div>
 
@@ -5283,6 +5283,31 @@
                 preview.textContent = ta.value;
                 if (!ta.value) preview.classList.add('empty'); else preview.classList.remove('empty');
             }
+        }
+
+        // Mirrors blood type / height / weight from physical profile to Perfil da Paciente block
+        function dnMirrorToProfile(tabPfx, field, value) {
+            const p = tabPfx + '_eb_pf_';
+            if (field === 'sangue') {
+                const el = document.getElementById(p + 'tipo_sanguineo');
+                if (el) el.value = value;
+            } else if (field === 'altura') {
+                const el = document.getElementById(p + 'altura');
+                if (el) el.value = Math.round(parseFloat(value) * 100);
+            } else if (field === 'peso') {
+                const el = document.getElementById(p + 'peso');
+                if (el) el.value = parseFloat(value);
+            }
+        }
+
+        // Sync all three at once (called after loading a saved profile)
+        function dnSyncAllToProfile(tabPfx) {
+            const sangue = document.getElementById(tabPfx + '-ov-sangue')?.value;
+            const altura = document.getElementById(tabPfx + '-ov-altura')?.value;
+            const peso   = document.getElementById(tabPfx + '-ov-peso')?.value;
+            if (sangue) dnMirrorToProfile(tabPfx, 'sangue', sangue);
+            if (altura) dnMirrorToProfile(tabPfx, 'altura', altura);
+            if (peso)   dnMirrorToProfile(tabPfx, 'peso',   peso);
         }
 
         function buildExpandField(id, label, placeholder='') {
@@ -5833,6 +5858,7 @@
             });
             if (data.info_adicional) document.getElementById('dnInfoAdicional').value = data.info_adicional;
             fillExtraBlocks('dn', data);
+            dnSyncAllToProfile('dn');
         }
 
         async function saveDonorProfile() {
@@ -6217,6 +6243,7 @@
                 });
                 if (data.info_adicional) { const el = document.getElementById(T + 'InfoAdicional'); if (el) el.value = data.info_adicional; }
                 fillExtraBlocks(T, data);
+                dnSyncAllToProfile(T);
             }
 
             async function saveProfile() {
