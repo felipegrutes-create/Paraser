@@ -1213,6 +1213,14 @@
         @keyframes dn-inducao-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,0.45);border-color:rgba(251,191,36,0.55);} 50%{box-shadow:0 0 0 10px rgba(251,191,36,0);border-color:rgba(251,191,36,0.2);} }
         .dn-inducao-block { background:linear-gradient(135deg,rgba(251,191,36,0.07) 0%,rgba(245,158,11,0.04) 100%); border:2px solid rgba(251,191,36,0.5); border-radius:14px; padding:18px 22px; margin-bottom:18px; animation:dn-inducao-pulse 2.2s ease-in-out infinite; }
         .dn-conversa-badge { font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; margin-bottom:10px; display:inline-block; }
+        /* Questionário Modal */
+        .dn-quest-modal { position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:10000;display:flex;align-items:center;justify-content:center; }
+        .dn-quest-box { background:var(--surface);border-radius:16px;padding:24px;width:520px;max-width:92vw;max-height:80vh;overflow-y:auto;border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+        .dn-quest-result { cursor:pointer;padding:12px 14px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;transition:background 0.15s; }
+        .dn-quest-result:hover { background:var(--surface2);border-color:rgba(99,102,241,0.4); }
+        .dn-btn-questionnaire { background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;transition:background 0.15s;white-space:nowrap; }
+        .dn-btn-questionnaire:hover { background:rgba(99,102,241,0.22); }
+        .dn-quest-filled-tag { display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);margin-left:6px;vertical-align:middle; }
         .dn-conversa-ok { background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); }
         .dn-conversa-pending { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
         .dn-pc-btn { background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:5px 12px; font-size:11px; cursor:pointer; font-family:inherit; }
@@ -5447,6 +5455,80 @@
             if (mark) mark.textContent = '( X )';
         }
 
+        // ---- Questionário helpers ----
+
+        function parseAndSetChips(T, side, text) {
+            if (!text) return;
+            const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const setChip = (group, val) => {
+                const el = document.querySelector(`[data-group="${T}-${side}-${group}"][data-value="${val}"]`);
+                if (el) dnSelectChip(el);
+            };
+            // Cor dos cabelos
+            if (/loiro|loira|blond/.test(t)) setChip('cabelo','Loiro');
+            else if (/ruivo|ruiva|vermelh/.test(t)) setChip('cabelo','Ruivo');
+            else if (/castanho.{0,15}claro|castanha.{0,15}clara|marrom.{0,15}clar/.test(t)) setChip('cabelo','C. Claro');
+            else if (/preto|preta|negro|negra/.test(t) && /cabelo/.test(t)) setChip('cabelo','Preto');
+            else if (/castanho.{0,15}escuro|castanha.{0,15}escura/.test(t)) setChip('cabelo','C. Escuro');
+            else if (/castanho|castanha|marrom/.test(t)) setChip('cabelo','C. Escuro');
+            // Tipo dos cabelos
+            if (/crespo|crespa/.test(t)) setChip('cabelo-tipo','Crespo');
+            else if (/cacheado|cacheada/.test(t)) setChip('cabelo-tipo','Cacheado');
+            else if (/ondulado|ondulada/.test(t)) setChip('cabelo-tipo','Ondulado');
+            else if (/liso|lisa/.test(t)) setChip('cabelo-tipo','Liso');
+            // Cor dos olhos
+            if (/olho.{0,20}azul|azul.{0,20}olho|olhos azuis/.test(t)) setChip('olhos','Azul');
+            else if (/olho.{0,20}verde|verde.{0,20}olho/.test(t)) setChip('olhos','Verde');
+            else if (/olho.{0,20}(mel|ambar|castanho clar|marrom clar)|mel.{0,10}olho/.test(t)) setChip('olhos','C. Claro');
+            else if (/olho.{0,20}(castanho|marrom)|(castanho|marrom).{0,20}olho/.test(t)) setChip('olhos','C. Escuro');
+            else if (/olho.{0,20}(preto|negro)|(preto|negro).{0,20}olho/.test(t)) setChip('olhos','Preto');
+            // Pele — Fitzpatrick
+            if (/muito clara|branca muito|extremamente clara/.test(t)) setChip('pele','I');
+            else if (/pele.{0,10}(clara|branca)|pele muito clara/.test(t)) setChip('pele','II');
+            else if (/morena clara|menos clara|trigona/.test(t)) setChip('pele','III');
+            else if (/morena|parda|oliv|bronzeada/.test(t)) setChip('pele','IV');
+            else if (/negra clara|pele escura/.test(t)) setChip('pele','V');
+            else if (/negra escura|muito escura|muito negra/.test(t)) setChip('pele','VI');
+            else if (/negra|negro/.test(t)) setChip('pele','V');
+        }
+
+        async function dnQuestDoSearch(T) {
+            const input = document.getElementById('dnQuestSearchInput');
+            const name = input ? input.value.trim() : '';
+            if (!name) return;
+            const btn = document.getElementById('dnQuestSearchBtn');
+            const resultsDiv = document.getElementById('dnQuestResults');
+            if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+            if (resultsDiv) resultsDiv.innerHTML = '<div style="padding:14px;color:var(--muted);text-align:center">Buscando...</div>';
+            try {
+                const qs = new URLSearchParams({ action: 'get_form_responses', nome: name });
+                const resp = await fetch(CRM_SCRIPT_URL + '?' + qs.toString());
+                const data = await resp.json();
+                if (!resultsDiv) return;
+                if (!data.success || !data.responses || data.responses.length === 0) {
+                    resultsDiv.innerHTML = `<div style="padding:14px;color:var(--muted);text-align:center">Nenhuma resposta encontrada para "<strong>${name}</strong>"</div>`;
+                    return;
+                }
+                window._dnQuestResponses = data.responses;
+                resultsDiv.innerHTML = data.responses.map((row, i) => {
+                    const nome = row[2] || 'Sem nome';
+                    const ts = row[0] || '';
+                    const parceiro = row[5] || row[44] || '';
+                    const email = row[1] || '';
+                    return `<div class="dn-quest-result" onclick="document.getElementById('dnQuestModal').remove();window['${T}Tab']&&window['${T}Tab'].fillFromFormRow(window._dnQuestResponses[${i}])">
+                        <div style="font-weight:700;color:var(--text);font-size:14px">${nome}</div>
+                        ${parceiro ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">👫 Parceiro(a): ${parceiro}</div>` : ''}
+                        ${email ? `<div style="font-size:11px;color:var(--muted)">📧 ${email}</div>` : ''}
+                        <div style="font-size:11px;color:#818cf8;margin-top:4px">Enviado em ${ts} · Clique para preencher formulário →</div>
+                    </div>`;
+                }).join('');
+            } catch(err) {
+                if (resultsDiv) resultsDiv.innerHTML = `<div style="padding:14px;color:#ef4444">Erro: ${err.message}</div>`;
+            } finally {
+                if (btn) { btn.textContent = 'Buscar'; btn.disabled = false; }
+            }
+        }
+
         function dnCalcIMC(prefix, tabPfx='dn') {
             const a = parseFloat(document.getElementById(`${tabPfx}-${prefix}-altura`)?.value);
             const p = parseFloat(document.getElementById(`${tabPfx}-${prefix}-peso`)?.value);
@@ -5917,6 +5999,7 @@
                             `).join('')}
                         </div>
                         <input id="${T}Codigo" placeholder="Código do Perfil (ex: EDO85)">
+                        <button id="${T}FormSearchBtn" class="dn-btn-questionnaire" onclick="${T}Tab.openFormSearch()">📋 Questionário</button>
                         <button class="dn-btn-close-form" onclick="${T}Tab.closeForm()">✕ Fechar</button>
                     </div>
                     <div class="dn-sides" style="${cfg.hideSp ? 'grid-template-columns:1fr' : ''}">
@@ -6164,12 +6247,216 @@
                 renderCards();
             }
 
-            return { getPending, renderPending, toggleDropdown, closeDropdown, newProfile, previewPhoto, closeForm, saveProfile, editProfile, deleteProfile, renderCards, newFromPending, load };
+            function openFormSearch() {
+                const nameEl = document.getElementById(T + '_eb_nome_paciente');
+                const prefill = nameEl ? nameEl.value.trim() : '';
+                let modal = document.getElementById('dnQuestModal');
+                if (modal) modal.remove();
+                modal = document.createElement('div');
+                modal.id = 'dnQuestModal';
+                modal.className = 'dn-quest-modal';
+                modal.innerHTML = `
+                    <div class="dn-quest-box">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+                            <div>
+                                <div style="font-size:16px;font-weight:700;color:var(--text)">📋 Buscar no Questionário</div>
+                                <div style="font-size:11px;color:var(--muted);margin-top:2px">Preenche automaticamente os campos do perfil</div>
+                            </div>
+                            <button onclick="document.getElementById('dnQuestModal').remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">✕</button>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:16px">
+                            <input id="dnQuestSearchInput" type="text" placeholder="Nome da paciente..." value="${prefill.replace(/"/g,'&quot;')}" style="flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;font-size:14px;outline:none" onkeydown="if(event.key==='Enter')dnQuestDoSearch('${T}')">
+                            <button id="dnQuestSearchBtn" onclick="dnQuestDoSearch('${T}')" style="padding:10px 18px;border-radius:10px;background:rgba(99,102,241,0.2);color:#818cf8;border:1px solid rgba(99,102,241,0.3);cursor:pointer;font-family:inherit;font-weight:600;font-size:14px">Buscar</button>
+                        </div>
+                        <div id="dnQuestResults"></div>
+                    </div>`;
+                modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+                document.body.appendChild(modal);
+                if (prefill) dnQuestDoSearch(T);
+                else setTimeout(() => document.getElementById('dnQuestSearchInput')?.focus(), 50);
+            }
+
+            function fillFromFormRow(row) {
+                const p = T + '_eb_';
+                // Helper: set value on input/select with fuzzy select matching
+                const setVal = (id, val) => {
+                    if (!val) return;
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    if (el.tagName === 'SELECT') {
+                        const norm = v => v.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                        const nv = norm(val);
+                        const opt = [...el.options].find(o => norm(o.value) === nv || norm(o.text) === nv || norm(o.value).includes(nv) || nv.includes(norm(o.value)));
+                        if (opt) el.value = opt.value;
+                    } else {
+                        el.value = val;
+                    }
+                };
+                // Date: DD/MM/YYYY → YYYY-MM-DD
+                const cvDate = str => {
+                    if (!str) return '';
+                    const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                    return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : str;
+                };
+                // Number extract
+                const numStr = str => (str||'').replace(/[^\d.,]/g,'').replace(',','.');
+
+                // --- PERFIL PACIENTE ---
+                setVal(p + 'nome_paciente', row[2]);
+                setVal(p + 'pf_data_nascimento', cvDate(row[4]));
+                setVal(p + 'nome_conjuge', row[5] || row[44]);
+
+                // País
+                const resideBrasil = (row[8]||'').toLowerCase().includes('sim');
+                const paisVal = row[9] || (resideBrasil ? 'Brasil' : '');
+                if (paisVal) setVal(p + 'pf_pais', paisVal);
+
+                // Peso e altura (perfil)
+                const pesoN = numStr(row[13]); const altN = numStr(row[14]);
+                if (pesoN) setVal(p + 'pf_peso', pesoN);
+                if (altN) {
+                    let alt = parseFloat(altN);
+                    if (alt && alt < 3) alt = Math.round(alt * 100); // metros → cm
+                    if (alt) setVal(p + 'pf_altura', alt.toString());
+                }
+
+                // Escolaridade (fuzzy)
+                const esc = (row[11]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                if (/pos.grad|mestrado|doutora/.test(esc)) setVal(p+'pf_escolaridade','Pós-Graduada');
+                else if (/superior.{0,10}(complet|grad)/.test(esc)) setVal(p+'pf_escolaridade','Superior Completo');
+                else if (/superior|faculdade|univer/.test(esc)) setVal(p+'pf_escolaridade','Superior Incompleto');
+
+                // Filhos
+                const filhosRaw = (row[17]||'').toLowerCase().trim();
+                if (filhosRaw === 'sim' || filhosRaw === 's') setVal(p+'pf_tem_filhos','Sim');
+                else if (/^n/.test(filhosRaw)) setVal(p+'pf_tem_filhos','Não');
+
+                // Alergia
+                setVal(p + 'pf_alergia', row[27]);
+
+                // Profissão
+                setVal(p + 'pf_profissao', row[72]);
+
+                // Fumante / Etilista (col 30 combinado)
+                const fumaRaw = (row[30]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                if (/nao fuma|nao fum/.test(fumaRaw)) setVal(p+'pf_fumante','Não');
+                else if (/fuma|fumante|cigarro/.test(fumaRaw)) setVal(p+'pf_fumante','Sim');
+                else if (/^nao$|^n$/.test(fumaRaw)) { setVal(p+'pf_fumante','Não'); setVal(p+'pf_etilista','Não'); }
+                if (/nao ingere|nao bebe|nao consome alcool/.test(fumaRaw)) setVal(p+'pf_etilista','Não');
+                else if (/ingere|bebe|alcool/.test(fumaRaw)) setVal(p+'pf_etilista','Sim');
+
+                // --- CHIPS OV (características físicas paciente) ---
+                const caracOV = (row[39]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                parseAndSetChips(T, 'ov', caracOV);
+
+                // Sliders OV
+                if (altN) {
+                    let alt = parseFloat(altN);
+                    if (alt > 3) alt = alt / 100;
+                    const sl = document.getElementById(T+'-ov-altura');
+                    if (sl && alt >= 1.40 && alt <= 2.10) {
+                        sl.value = alt.toFixed(2);
+                        const vEl = document.getElementById(T+'-ov-altura-val');
+                        if (vEl) vEl.textContent = alt.toFixed(2);
+                        dnCalcIMC('ov', T);
+                    }
+                }
+                if (pesoN) {
+                    const wt = parseFloat(pesoN);
+                    const sl = document.getElementById(T+'-ov-peso');
+                    if (sl && wt >= 40 && wt <= 160) {
+                        sl.value = wt;
+                        const vEl = document.getElementById(T+'-ov-peso-val');
+                        if (vEl) vEl.textContent = wt;
+                        dnCalcIMC('ov', T);
+                    }
+                }
+
+                // --- SP side (parceiro) ---
+                if (!cfg.hideSp) {
+                    const caracSP = (row[67]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                    if (caracSP) parseAndSetChips(T, 'sp', caracSP);
+                    const spPeso = numStr(row[51]); const spAlt = numStr(row[52]);
+                    if (spPeso) { const wt=parseFloat(spPeso); const sl=document.getElementById(T+'-sp-peso'); if(sl&&wt>=40&&wt<=160){sl.value=wt;const v=document.getElementById(T+'-sp-peso-val');if(v)v.textContent=wt;dnCalcIMC('sp',T);} }
+                    if (spAlt) { let alt=parseFloat(spAlt); if(alt>3)alt=alt/100; const sl=document.getElementById(T+'-sp-altura'); if(sl&&alt>=1.40&&alt<=2.10){sl.value=alt.toFixed(2);const v=document.getElementById(T+'-sp-altura-val');if(v)v.textContent=alt.toFixed(2);dnCalcIMC('sp',T);} }
+                }
+
+                // --- pf_caracteristicas (família) ---
+                const caracParts = [];
+                if (row[39]) caracParts.push('📝 Características pessoais: ' + row[39]);
+                if (row[40]) caracParts.push('👩 Mãe: ' + row[40]);
+                if (row[41]) caracParts.push('👨 Pai: ' + row[41]);
+                if (row[42]) caracParts.push('👴👵 Avós maternos: ' + row[42]);
+                if (row[43]) caracParts.push('👴👵 Avós paternos: ' + row[43]);
+                if (caracParts.length) {
+                    const el = document.getElementById(p+'pf_caracteristicas');
+                    if (el) el.value = caracParts.join('\n\n');
+                }
+
+                // --- InfoAdicional — dados clínicos do questionário ---
+                const infoLines = [];
+                if (row[20]) infoLines.push('📋 Histórico tentativas/tratamentos: ' + row[20]);
+                if (row[19]) infoLines.push('🏥 Histórico parto/aborto: ' + row[19]);
+                if (row[21]) infoLines.push('🏃 Atividades físicas: ' + row[21]);
+                if (row[22]) infoLines.push('🥗 Rotina alimentar: ' + row[22]);
+                const diag = [row[23],row[24]].filter(v=>v&&v.trim()).join('; ');
+                if (diag) infoLines.push('💊 Diagnósticos: ' + diag);
+                if (row[25]) infoLines.push('🧒 Doenças na infância: ' + row[25]);
+                if (row[26]) infoLines.push('💊 Medicação regular: ' + row[26]);
+                if (row[28]) infoLines.push('🔪 Cirurgias: ' + row[28]);
+                if (row[29]) infoLines.push('⚠️ Drogas/anabolizantes: ' + row[29]);
+                if (row[36]) infoLines.push('🦠 Histórico IST: ' + row[36]);
+                if (row[37]) infoLines.push('🧬 Histórico familiar doenças: ' + row[37]);
+                if (row[38]) infoLines.push('🧬 Histórico familiar infertilidade: ' + row[38]);
+                if (row[31]) infoLines.push('📅 Idade 1ª menstruação: ' + row[31]);
+                if (row[32]) infoLines.push('📅 Ciclos menstruais: ' + row[32]);
+                if (row[33]) infoLines.push('📅 Última menstruação: ' + row[33]);
+                if (row[34]) infoLines.push('❓ Dor na relação/exames: ' + row[34]);
+                if (row[35]) infoLines.push('💊 Anticoncepcional: ' + row[35]);
+                if (row[15]) infoLines.push('💍 Tempo de união: ' + row[15]);
+                if (row[16]) infoLines.push('⏳ Tempo de tentativa: ' + row[16]);
+                // SP anamnese
+                if (!cfg.hideSp) {
+                    if (row[55]) infoLines.push('🏃 [Parceiro] Atividades físicas: ' + row[55]);
+                    if (row[57]) infoLines.push('💊 [Parceiro] Diagnósticos: ' + row[57]);
+                    if (row[59]) infoLines.push('💊 [Parceiro] Medicação: ' + row[59]);
+                    if (row[60]) infoLines.push('🤧 [Parceiro] Alergia: ' + row[60]);
+                    if (row[61]) infoLines.push('🔪 [Parceiro] Cirurgias: ' + row[61]);
+                    if (row[64]) infoLines.push('🦠 [Parceiro] Histórico IST: ' + row[64]);
+                    if (row[65]) infoLines.push('🧬 [Parceiro] Hist. familiar doenças: ' + row[65]);
+                    if (row[73]) {
+                        const profConjEl = document.getElementById(p+'pf_profissao'); // re-use field or add to notes
+                        // parceiro profissão goes to notes since there's no specific field
+                        infoLines.push('💼 [Parceiro] Profissão: ' + row[73]);
+                    }
+                }
+                if (infoLines.length) {
+                    const infoEl = document.getElementById(T+'InfoAdicional');
+                    if (infoEl) {
+                        const existing = infoEl.value ? infoEl.value + '\n\n' : '';
+                        infoEl.value = existing + '--- Dados do Questionário ---\n' + infoLines.join('\n');
+                    }
+                }
+
+                // Feedback visual
+                const btn = document.getElementById(T+'FormSearchBtn');
+                if (btn) {
+                    btn.textContent = '✅ Preenchido';
+                    btn.style.background = 'rgba(16,185,129,0.15)';
+                    btn.style.color = '#10b981';
+                    btn.style.borderColor = 'rgba(16,185,129,0.3)';
+                    setTimeout(() => { btn.textContent = '📋 Questionário'; btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }, 3000);
+                }
+            }
+
+            return { getPending, renderPending, toggleDropdown, closeDropdown, newProfile, previewPhoto, closeForm, saveProfile, editProfile, deleteProfile, renderCards, newFromPending, load, openFormSearch, fillFromFormRow };
         }
 
         const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'], patientSource: () => avalDoadPatients, hideSp: true });
         const rcTab = makeDonorTab({ tabId: 'rc', classFilters: ['Receptora'] });
         const ebTab = makeDonorTab({ tabId: 'eb', classFilters: ['Embrião Doado'] });
+        // Expose tabs globally so modal onclicks can resolve by tab ID string
+        window.dvTab = dvTab; window.rcTab = rcTab; window.ebTab = ebTab;
 
         async function reloadData() {
             document.getElementById('loadingOverlay').style.display = 'flex';

@@ -78,6 +78,11 @@ function doGet(e) {
       return jsonOk({ fichas });
     }
 
+    // Buscar respostas do questionário de anamnese por nome
+    if (action === 'get_form_responses') {
+      return handleGetFormResponses(e.parameter);
+    }
+
     // Retornar log de exclusões
     if (action === 'get_log') {
       const logSheet = getOrCreateLogSheet();
@@ -623,6 +628,61 @@ function handleSaveBackup(body) {
   sheet.getRange('A1').setNote('Backup: ' + new Date().toISOString() + ' | ' + rows.length + ' linhas');
 
   return jsonOk({ success: true, rows_saved: rows.length });
+}
+
+// =========================================================
+// Questionário de Anamnese — busca por nome na planilha do Forms
+// =========================================================
+function handleGetFormResponses(params) {
+  const name = (params.nome || '').toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!name || name.length < 2) return jsonErr('nome deve ter pelo menos 2 caracteres');
+
+  try {
+    const FORM_SS_ID    = '1h9Jhjpv-SRmOGX6rXypHgTy_9YaAhr2WvqA8G8EpwrY';
+    const FORM_SHEET_GID = 1452374010;
+
+    const ss = SpreadsheetApp.openById(FORM_SS_ID);
+    let sheet = null;
+    const allSheets = ss.getSheets();
+    for (let i = 0; i < allSheets.length; i++) {
+      if (allSheets[i].getSheetId() === FORM_SHEET_GID) { sheet = allSheets[i]; break; }
+    }
+    if (!sheet) sheet = allSheets[0];
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return jsonOk({ responses: [], total: 0 });
+
+    const headers = data[0].map(function(h) { return h.toString().trim(); });
+    const NAME_COL = 2; // coluna C = "Nome Completo" da paciente
+
+    const nameParts = name.split(/\s+/).filter(function(p) { return p.length > 2; });
+
+    const matches = [];
+    for (let i = 1; i < data.length; i++) {
+      const rowName = (data[i][NAME_COL] || '').toString().trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (!rowName) continue;
+      const hit = rowName.includes(name) ||
+        (nameParts.length >= 2 && nameParts.every(function(p) { return rowName.includes(p); }));
+      if (!hit) continue;
+
+      const obj = {};
+      headers.forEach(function(h, j) {
+        const val = data[i][j];
+        if (val instanceof Date) {
+          obj[j] = Utilities.formatDate(val, 'America/Sao_Paulo', 'dd/MM/yyyy');
+        } else {
+          obj[j] = (val !== undefined && val !== null) ? val.toString() : '';
+        }
+      });
+      matches.push(obj);
+    }
+
+    return jsonOk({ responses: matches, total: matches.length, headers: headers });
+  } catch(err) {
+    return jsonErr('Erro ao ler formulário: ' + err.message);
+  }
 }
 
 function jsonOk(data) {
