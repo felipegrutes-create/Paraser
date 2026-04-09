@@ -2383,12 +2383,6 @@
             <div class="dn-toolbar">
                 <div style="position:relative">
                     <button class="dn-btn-new" onclick="dnToggleNewDropdown()">+ Novo Perfil ▾</button>
-                    <div class="dn-new-dropdown" id="dnNewDropdown" style="display:none">
-                        <div class="dn-dd-item" onclick="newDonorProfile(); dnCloseDropdown()">📝 Perfil em Branco</div>
-                        <div class="dn-dd-divider"></div>
-                        <div class="dn-dd-title">Pacientes FIV Compartilhada / OD:</div>
-                        <div id="dnPendingList"></div>
-                    </div>
                 </div>
                 <span class="dn-count" id="dnCount">0 perfis</span>
             </div>
@@ -7462,5 +7456,13 @@
             setInterval(checkForUpdates, CHECK_INTERVAL);
         })();
     </script>
+
+    <!-- Dropdown Novo Perfil (fora de containers com transform/filter) -->
+    <div class="dn-new-dropdown" id="dnNewDropdown" style="display:none">
+        <div class="dn-dd-item" onclick="newDonorProfile(); dnCloseDropdown()">📝 Perfil em Branco</div>
+        <div class="dn-dd-divider"></div>
+        <div class="dn-dd-title">Pacientes FIV Compartilhada:</div>
+        <div id="dnPendingList"></div>
+    </div>
 </body>
 </html>
