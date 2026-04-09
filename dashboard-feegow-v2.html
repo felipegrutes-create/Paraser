@@ -3405,6 +3405,7 @@
         let doaPatients  = []; // pacientes para aba Doadoras/Receptoras
         let crmModalKey = '';  // key do paciente aberto no modal
         let pacFirstVezMap = {}; // normalizedKey → { id:agendId, dataAp }
+        let pacPsiMap = {};      // normalizedKey → [{ dataAp, statusRaw }] sorted asc
 
         const KANBAN_COLS = [
             { id:'retornos-pendentes', label:'📋 Retornos Pendentes', color:'#ef4444', showTotal:false },
@@ -3639,6 +3640,20 @@
                     firstVez[k] = { date:d, prof:r[C.prof]||"", pac:r[C.pac]||"", cel:r[C.cel]||"", email:r[C.email]||"", dataCri:r[C.dcri]||"", dataAp:r[C.data]||"", proc:r[C.proc]||"", agendId:r[C.id]||"" };
                     pacFirstVezMap[normalizeKey(r[C.pac]||"")] = { id: r[C.id]||"", dataAp: r[C.data]||"" };
                 }
+            });
+
+            // Mapa de consultas psicológicas por paciente
+            pacPsiMap = {};
+            raw.forEach(r => {
+                const proc = (r[C.proc]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+                if (!proc.includes('psicolog')) return;
+                const k = normalizeKey(r[C.pac]||'');
+                if (!k || !r[C.data]) return;
+                if (!pacPsiMap[k]) pacPsiMap[k] = [];
+                pacPsiMap[k].push({ dataAp: r[C.data], statusRaw: (r[C.sta]||'').toLowerCase() });
+            });
+            Object.keys(pacPsiMap).forEach(k => {
+                pacPsiMap[k].sort((a,b) => (parseDate(a.dataAp)||0) - (parseDate(b.dataAp)||0));
             });
 
             const allByPat = {};
@@ -5657,6 +5672,33 @@
                 const yy = d60.getFullYear(), mm = String(d60.getMonth()+1).padStart(2,'0'), dd = String(d60.getDate()).padStart(2,'0');
                 retornoEl.value = `${yy}-${mm}-${dd}`;
                 dnCheckRetorno(retornoEl);
+            }
+            // Pre-fill Acompanhamento Psicológico from scheduling data
+            const psiApts = pacKey ? (pacPsiMap[pacKey] || []) : [];
+            if (psiApts.length) {
+                // Converte DD/MM/YYYY → YYYY-MM-DD
+                const toISO = raw => {
+                    if (!raw || !raw.includes('/')) return '';
+                    const [d,m,y] = raw.split('/');
+                    return y && m && d ? `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}` : '';
+                };
+                // Status do contato baseado no status do 1º agendamento
+                const statusEl = document.getElementById(p + 'status_contato_psi');
+                if (statusEl && !statusEl.value) {
+                    const s = psiApts[0].statusRaw;
+                    if (s.includes('atendido')) statusEl.value = 'Marcou consulta';
+                    else if (s.includes('aguardando') || s.includes('marcado') || s.includes('confirmado')) statusEl.value = 'Aguardando retorno';
+                    else if (s.includes('cancelado') || s.includes('desmarcado')) statusEl.value = 'Reagendou';
+                }
+                // Data contato = data do 1º agendamento (qualquer status)
+                const dcEl = document.getElementById(p + 'data_contato_psi');
+                if (dcEl && !dcEl.value) { const v = toISO(psiApts[0].dataAp); if (v) dcEl.value = v; }
+                // Consultas realizadas (status atendido)
+                const atendidas = psiApts.filter(a => a.statusRaw.includes('atendido'));
+                const c1El = document.getElementById(p + 'data_consulta_psi');
+                if (c1El && !c1El.value && atendidas[0]) { const v = toISO(atendidas[0].dataAp); if (v) c1El.value = v; }
+                const c2El = document.getElementById(p + 'data_consulta_psi2');
+                if (c2El && !c2El.value && atendidas[1]) { const v = toISO(atendidas[1].dataAp); if (v) c2El.value = v; }
             }
             // Pre-fill Orçamento from CRM (proposta_feita → Orçamento Passado?, valor → Qual Orçamento)
             if (crm) {
