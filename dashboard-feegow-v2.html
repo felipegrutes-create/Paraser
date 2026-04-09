@@ -6691,7 +6691,7 @@
         }
 
         const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'], patientSource: () => avalDoadPatients, hideSp: true });
-        const rcTab = makeDonorTab({ tabId: 'rc', classFilters: ['Receptora'], hideSp: true });
+        const rcTab = makeDonorTab({ tabId: 'rc', classFilters: ['Receptora'] });
 
         async function reloadData() {
             document.getElementById('loadingOverlay').style.display = 'flex';
