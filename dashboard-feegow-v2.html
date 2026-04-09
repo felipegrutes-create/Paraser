@@ -6221,6 +6221,14 @@
         }
 
         // ===================== DONOR TAB FACTORY =====================
+        // Parses names with "COC" or "COM" separator (e.g. "Ana Coc Beatriz")
+        // Returns { doadora, indicacao } or null if no separator found
+        function parseCocComName(nome) {
+            const m = (nome||'').match(/^(.+?)\s+(?:coc|com)\s+(.+)$/i);
+            if (!m) return null;
+            return { doadora: m[1].trim(), indicacao: m[2].trim() };
+        }
+
         function makeDonorTab(cfg) {
             const T = cfg.tabId;
             let profiles = [];
@@ -6256,18 +6264,27 @@
                     <div style="margin-bottom:12px">
                         <span style="font-size:12px;font-weight:600;color:var(--warning)">⚠ ${pending.length} paciente(s) aguardando criação de perfil</span>
                     </div>
-                    ${pending.map(p => `
+                    ${pending.map(p => {
+                        const cc = parseCocComName(p.pac);
+                        const subLine = cc
+                            ? `<div style="font-size:11px;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
+                                   <span><span style="color:var(--accent);font-weight:600">Doadora:</span> ${cc.doadora}</span>
+                                   <span><span style="color:#a78bfa;font-weight:600">Indicação:</span> ${cc.indicacao}</span>
+                               </div>`
+                            : '';
+                        return `
                         <div class="dn-pending-card">
                             <div class="dn-pend-info">
                                 <div class="dn-pend-name">${p.pac}</div>
+                                ${subLine}
                                 <div class="dn-pend-meta">${p.prof || ''} · ${p.classificacao} · ${p.dataAp || ''}</div>
                             </div>
                             <div style="display:flex;align-items:center;gap:8px">
                                 <span class="dn-pending-badge">Pendente</span>
                                 <button class="dn-pending-btn" onclick="${T}Tab.newFromPending('${p.key.replace(/'/g,"\\'")}','${p.pac.replace(/'/g,"\\'")}')">Criar Perfil</button>
                             </div>
-                        </div>
-                    `).join('')}
+                        </div>`;
+                    }).join('')}
                 `;
             }
 
