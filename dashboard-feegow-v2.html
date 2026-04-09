@@ -357,6 +357,21 @@
         }
 
         /* ===== DUO CARDS ===== */
+        .vg-compare-block {
+            margin-top: 32px;
+            padding: 24px;
+            background: linear-gradient(135deg, rgba(0,212,170,0.06) 0%, rgba(99,102,241,0.06) 100%);
+            border: 1px solid rgba(0,212,170,0.2);
+            border-radius: 16px;
+        }
+        .vg-compare-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 18px;
+            letter-spacing: 0.02em;
+        }
+
         .duo {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1830,7 +1845,6 @@
 
     <div class="tabs-wrapper">
         <button class="tab active" onclick="showSection('sec-vg',this)">Visão Geral</button>
-        <button class="tab" onclick="showSection('sec-comp2526',this)">2025 vs 2026</button>
         <button class="tab" onclick="showSection('sec-pv',this)">1ª Vez — Geral</button>
         <button class="tab" onclick="showSection('sec-pvcomp',this)">1ª Vez — Comparativo</button>
         <button class="tab" onclick="showSection('sec-txconv',this)">TX Conversão</button>
@@ -1909,88 +1923,89 @@
                 </table>
                 <div class="info-note">* Soma dos valores registrados nos agendamentos com status Atendido.</div>
             </div>
-        </section>
 
-        <!-- 2025 vs 2026 -->
-        <section id="sec-comp2526" class="section">
-            <div class="duo">
-                <div class="kpi-card">
-                    <div class="duo-header">
-                        <span id="comp-2025-label">2025</span>
-                        <span class="year-badge y2025">2025</span>
+            <!-- COMPARATIVO 2025 vs 2026 embutido na Visão Geral -->
+            <div class="vg-compare-block">
+                <div class="vg-compare-title">📊 Comparativo 2025 vs 2026</div>
+                <div class="duo">
+                    <div class="kpi-card">
+                        <div class="duo-header">
+                            <span id="comp-2025-label">2025</span>
+                            <span class="year-badge y2025">2025</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Total</span>
+                            <span class="d-value" id="c25-total">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label" id="c25-atend-lbl">Atendidos</span>
+                            <span class="d-value" id="c25-atend" style="color:var(--success)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Média/mês</span>
+                            <span class="d-value" id="c25-media">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Cancelados</span>
+                            <span class="d-value" id="c25-cancel" style="color:var(--danger)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Aguardando</span>
+                            <span class="d-value" id="c25-aguard">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">1ª Vez</span>
+                            <span class="d-value" id="c25-vez" style="color:var(--accent2)">—</span>
+                        </div>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Total</span>
-                        <span class="d-value" id="c25-total">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label" id="c25-atend-lbl">Atendidos</span>
-                        <span class="d-value" id="c25-atend" style="color:var(--success)">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Média/mês</span>
-                        <span class="d-value" id="c25-media">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Cancelados</span>
-                        <span class="d-value" id="c25-cancel" style="color:var(--danger)">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Aguardando</span>
-                        <span class="d-value" id="c25-aguard">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">1ª Vez</span>
-                        <span class="d-value" id="c25-vez" style="color:var(--accent2)">—</span>
+                    <div class="kpi-card">
+                        <div class="duo-header">
+                            <span id="comp-2026-label">2026 parcial</span>
+                            <span class="year-badge y2026">2026</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Total</span>
+                            <span class="d-value" id="c26-total">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Atendidos</span>
+                            <span class="d-value" id="c26-atend" style="color:var(--success)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Média/mês</span>
+                            <span class="d-value" id="c26-media">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label"><span class="compare" id="c26-media-cmp"></span></span>
+                            <span></span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Cancelados</span>
+                            <span class="d-value" id="c26-cancel" style="color:var(--danger)">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">Aguardando</span>
+                            <span class="d-value" id="c26-aguard">—</span>
+                        </div>
+                        <div class="duo-row">
+                            <span class="d-label">1ª Vez</span>
+                            <span class="d-value" id="c26-vez" style="color:var(--accent2)">—</span>
+                        </div>
                     </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="duo-header">
-                        <span id="comp-2026-label">2026 parcial</span>
-                        <span class="year-badge y2026">2026</span>
+                <div class="chart-grid">
+                    <div class="chart-card chart-full">
+                        <h3>Comparativo Mensal — Jan–Mar (2025 vs 2026)</h3>
+                        <canvas id="monthCompare"></canvas>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Total</span>
-                        <span class="d-value" id="c26-total">—</span>
+                    <div class="chart-card">
+                        <h3>Profissionais 2025</h3>
+                        <canvas id="prof2025"></canvas>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Atendidos</span>
-                        <span class="d-value" id="c26-atend" style="color:var(--success)">—</span>
+                    <div class="chart-card">
+                        <h3>Profissionais 2026</h3>
+                        <canvas id="prof2026"></canvas>
                     </div>
-                    <div class="duo-row">
-                        <span class="d-label">Média/mês</span>
-                        <span class="d-value" id="c26-media">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label"><span class="compare" id="c26-media-cmp"></span></span>
-                        <span></span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Cancelados</span>
-                        <span class="d-value" id="c26-cancel" style="color:var(--danger)">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">Aguardando</span>
-                        <span class="d-value" id="c26-aguard">—</span>
-                    </div>
-                    <div class="duo-row">
-                        <span class="d-label">1ª Vez</span>
-                        <span class="d-value" id="c26-vez" style="color:var(--accent2)">—</span>
-                    </div>
-                </div>
-            </div>
-            <div class="chart-grid">
-                <div class="chart-card chart-full">
-                    <h3>Comparativo Mensal — Jan–Mar (2025 vs 2026)</h3>
-                    <canvas id="monthCompare"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Profissionais 2025</h3>
-                    <canvas id="prof2025"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Profissionais 2026</h3>
-                    <canvas id="prof2026"></canvas>
                 </div>
             </div>
         </section>
