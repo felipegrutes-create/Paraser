@@ -5185,9 +5185,8 @@
                     <input id="dnCodigo" placeholder="Código do Perfil (ex: EDO85)">
                     <button class="dn-btn-close-form" onclick="closeDonorForm()">✕ Fechar</button>
                 </div>
-                <div class="dn-sides">
-                    ${buildDonorSide('ov','🥚 Características Físicas — Lado Óvulos','ov', DN_MED_PERSONAL_OV)}
-                    ${buildDonorSide('sp','🔬 Características Físicas — Lado Espermatozóides','sp', DN_MED_PERSONAL_SP)}
+                <div class="dn-sides" style="grid-template-columns:1fr">
+                    ${buildDonorSide('ov','🥚 Características Físicas','ov', DN_MED_PERSONAL_OV)}
                 </div>
                 <div class="dn-form-footer">
                     <textarea id="dnInfoAdicional" placeholder="Informações adicionais (ex: histórico familiar relevante, observações médicas...)"></textarea>
