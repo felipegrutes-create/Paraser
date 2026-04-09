@@ -2391,10 +2391,13 @@
 
             <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px">
                 <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px;letter-spacing:0.5px">🔍 BUSCA MULTI FILTROS</div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-                    <div style="position:relative;flex:1;min-width:200px">
-                        <input type="text" id="dnFilterNome" placeholder="Nome ou código da doadora..." oninput="renderDonorCards()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
-                        <button onclick="document.getElementById('dnFilterNome').value='';renderDonorCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                    <div style="position:relative;flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:18px;text-align:center">🔎</span>
+                        <div style="position:relative">
+                            <input type="text" id="dnFilterNome" placeholder="Nome ou código da doadora..." oninput="renderDonorCards()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
+                            <button onclick="document.getElementById('dnFilterNome').value='';renderDonorCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
+                        </div>
                     </div>
                     <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
                         <span style="font-size:18px">🩸</span>
