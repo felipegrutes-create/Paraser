@@ -3637,7 +3637,7 @@
                 if (!d) return;
                 if (!firstVez[k] || d < firstVez[k].date) {
                     firstVez[k] = { date:d, prof:r[C.prof]||"", pac:r[C.pac]||"", cel:r[C.cel]||"", email:r[C.email]||"", dataCri:r[C.dcri]||"", dataAp:r[C.data]||"", proc:r[C.proc]||"", agendId:r[C.id]||"" };
-                    pacFirstVezMap[k] = { id: r[C.id]||"", dataAp: r[C.data]||"" };
+                    pacFirstVezMap[normalizeKey(r[C.pac]||"")] = { id: r[C.id]||"", dataAp: r[C.data]||"" };
                 }
             });
 
@@ -5599,14 +5599,20 @@
             // Pre-fill nome
             const nomeEl = document.getElementById(p + 'nome_paciente');
             if (nomeEl && pacNome && !nomeEl.value) nomeEl.value = pacNome;
+            // Lookup: pacFirstVezMap (built from scheduling data, keyed by normalizeKey)
+            const fvz = pacKey ? pacFirstVezMap[pacKey] : null;
+            // Fallback: pendPatients array (contains dataAp but no agendId)
+            const pend = pacKey ? pendPatients.find(p => normalizeKey(p.pac) === pacKey) : null;
             // Pre-fill ID do agendamento → Código da Paciente
             const codEl = document.getElementById(p + 'cod_paciente');
-            const fvz = pacKey ? pacFirstVezMap[pacKey] : null;
-            if (codEl && fvz?.id && !codEl.value) codEl.value = fvz.id;
-            // Pre-fill Data Consulta 1ª Vez from scheduling system (DD/MM/YYYY → YYYY-MM-DD)
+            if (codEl && !codEl.value) {
+                const id = fvz?.id || '';
+                if (id) codEl.value = id;
+            }
+            // Pre-fill Data Consulta 1ª Vez (scheduling date > CRM contato1 > pendPatients)
             const dataEl = document.getElementById(p + 'data_consulta_1vez');
             if (dataEl && !dataEl.value) {
-                const raw = fvz?.dataAp || (pacKey && crmMap[pacKey]?.contato1_data) || '';
+                const raw = fvz?.dataAp || pend?.dataAp || (pacKey && crmMap[pacKey]?.contato1_data) || '';
                 if (raw.includes('/')) {
                     const parts = raw.split('/');
                     if (parts.length === 3) dataEl.value = parts[2] + '-' + parts[1] + '-' + parts[0];
