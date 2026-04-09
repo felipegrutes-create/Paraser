@@ -177,6 +177,10 @@
         }
 
         .tab:hover { color: var(--text); }
+        .tab.tab-donor { background: rgba(236,72,153,0.10); border-radius: 8px 8px 0 0; color: #f0abcb; }
+        .tab.tab-donor:hover { background: rgba(236,72,153,0.18); color: #fce7f3; }
+        .tab.tab-donor.active { background: rgba(236,72,153,0.18); color: var(--accent); }
+        .tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:17px; height:17px; border-radius:999px; background:#ec4899; color:#fff; font-size:10px; font-weight:700; padding:0 4px; margin-left:6px; line-height:1; vertical-align:middle; }
 
         .tab.active {
             color: var(--accent);
@@ -1935,10 +1939,10 @@
         <button class="tab" onclick="showSection('sec-ret',this)">Retorno</button>
         <button class="tab" onclick="showSection('sec-pend',this)">CRM Comercial</button>
         <button class="tab" onclick="showSection('sec-doadoras',this)">Fluxo Pacientes</button>
-        <button class="tab" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas</button>
-        <button class="tab" onclick="showSection('sec-doavol',this)">Doadoras Voluntárias</button>
-        <button class="tab" onclick="showSection('sec-receptoras',this)">Receptoras</button>
-        <button class="tab" onclick="showSection('sec-embriao',this)">Embrião Doado</button>
+        <button class="tab tab-donor" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas<span class="tab-badge" id="tabBadgeDc" style="display:none"></span></button>
+        <button class="tab tab-donor" onclick="showSection('sec-doavol',this)">Doadoras Voluntárias<span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
+        <button class="tab tab-donor" onclick="showSection('sec-receptoras',this)">Receptoras<span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
+        <button class="tab tab-donor" onclick="showSection('sec-embriao',this)">Embrião Doado<span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
         <button class="tab" onclick="showSection('sec-ficha',this)">Ficha Paciente</button>
         <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
     </div>
@@ -5176,6 +5180,7 @@
             else _dirtyKanban = true;
             if (document.getElementById('sec-doadoras')?.classList.contains('active')) renderDoadoras();
             else _dirtyDoadoras = true;
+            updateDonorTabBadges();
         }
 
         // ===================== DOADORAS COMPARTILHADAS =====================
@@ -6386,6 +6391,19 @@
         }
 
         // Returns true when patient is outside Rio de Janeiro AND outside Brasil
+        function updateDonorTabBadges() {
+            const setBadge = (id, count) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (count > 0) { el.textContent = count; el.style.display = 'inline-flex'; }
+                else { el.style.display = 'none'; }
+            };
+            setBadge('tabBadgeDc', dnGetPendingPatients().length);
+            if (typeof dvTab !== 'undefined') setBadge('tabBadgeDv', dvTab.getPending().length);
+            if (typeof rcTab !== 'undefined') setBadge('tabBadgeRc', rcTab.getPending().length);
+            if (typeof ebTab !== 'undefined') setBadge('tabBadgeEb', ebTab.getPending().length);
+        }
+
         function dnIsDistancia(d) {
             const city    = (d.pf_cidade || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
             const country = (d.pf_pais   || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -8785,6 +8803,7 @@
                 updateFeegowStatusBanner();
 
                 loadDonorProfiles();
+                updateDonorTabBadges();
                 fpLoadFichas().catch(e => console.warn('Fichas load:', e));
                 document.getElementById('loadingOverlay').style.display = 'none';
             } catch(e) {
