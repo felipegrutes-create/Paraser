@@ -1838,6 +1838,8 @@
         <button class="tab" onclick="showSection('sec-pend',this)">CRM Comercial</button>
         <button class="tab" onclick="showSection('sec-doadoras',this)">Fluxo Pacientes</button>
         <button class="tab" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas</button>
+        <button class="tab" onclick="showSection('sec-doavol',this)">Doadoras Voluntárias</button>
+        <button class="tab" onclick="showSection('sec-receptoras',this)">Receptoras</button>
         <button class="tab" onclick="showSection('sec-ficha',this)">Ficha Paciente</button>
         <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
     </div>
@@ -2440,6 +2442,46 @@
             </div>
             <div id="dnCards" class="dn-cards"></div>
             <div id="dnFormWrap" style="display:none"></div>
+        </section>
+
+        <!-- DOADORAS VOLUNTÁRIAS -->
+        <section id="sec-doavol" class="section">
+            <p class="section-title">Doadoras Voluntárias — Perfis</p>
+            <div class="dn-toolbar">
+                <div style="position:relative">
+                    <button class="dn-btn-new" onclick="dvTab.toggleDropdown()">+ Novo Perfil ▾</button>
+                    <div class="dn-new-dropdown" id="dvNewDropdown" style="display:none">
+                        <div class="dn-dd-item" onclick="dvTab.newProfile(); dvTab.closeDropdown()">📝 Perfil em Branco</div>
+                        <div class="dn-dd-divider"></div>
+                        <div class="dn-dd-title">Pacientes Doadora Voluntária:</div>
+                        <div id="dvPendingList"></div>
+                    </div>
+                </div>
+                <span class="dn-count" id="dvCount">0 perfis</span>
+            </div>
+            <div id="dvPendingCards" style="margin-bottom:20px"></div>
+            <div id="dvCards" class="dn-cards"></div>
+            <div id="dvFormWrap" style="display:none"></div>
+        </section>
+
+        <!-- RECEPTORAS -->
+        <section id="sec-receptoras" class="section">
+            <p class="section-title">Receptoras — Perfis</p>
+            <div class="dn-toolbar">
+                <div style="position:relative">
+                    <button class="dn-btn-new" onclick="rcTab.toggleDropdown()">+ Novo Perfil ▾</button>
+                    <div class="dn-new-dropdown" id="rcNewDropdown" style="display:none">
+                        <div class="dn-dd-item" onclick="rcTab.newProfile(); rcTab.closeDropdown()">📝 Perfil em Branco</div>
+                        <div class="dn-dd-divider"></div>
+                        <div class="dn-dd-title">Pacientes Receptora:</div>
+                        <div id="rcPendingList"></div>
+                    </div>
+                </div>
+                <span class="dn-count" id="rcCount">0 perfis</span>
+            </div>
+            <div id="rcPendingCards" style="margin-bottom:20px"></div>
+            <div id="rcCards" class="dn-cards"></div>
+            <div id="rcFormWrap" style="display:none"></div>
         </section>
 
         <!-- FICHA PACIENTE -->
@@ -4120,6 +4162,8 @@
             document.getElementById(id)?.classList.add("active");
             el?.classList.add("active");
             if (id === 'sec-doashared') dnRenderPendingCards();
+            if (id === 'sec-doavol') dvTab.renderPending();
+            if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             // Re-render abas dirty ao entrar
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
@@ -4869,9 +4913,9 @@
             </svg>`;
         }
 
-        function dnHairColorCards(prefix) {
+        function dnHairColorCards(prefix, tabPfx='dn') {
             return `<div class="dn-vcards">${DN_HAIR_COLORS.map(h =>
-                `<div class="dn-vcard" data-group="${prefix}-cabelo" data-value="${h.name}" onclick="dnSelectChip(this)">
+                `<div class="dn-vcard" data-group="${tabPfx}-${prefix}-cabelo" data-value="${h.name}" onclick="dnSelectChip(this)">
                     <div class="dn-vc-preview" style="background:${h.grad};border-radius:4px;"></div>
                     <div class="dn-vc-label">${h.name}</div>
                     <div class="dn-vc-mark">( )</div>
@@ -4879,7 +4923,7 @@
             ).join('')}</div>`;
         }
 
-        function dnHairTypeCards(prefix) {
+        function dnHairTypeCards(prefix, tabPfx='dn') {
             const types = {
                 'Liso': (c) => [10,22,34,46,58,70].map(x => `<line x1="${x}" y1="2" x2="${x}" y2="62" stroke="${c}" stroke-width="4" stroke-linecap="round"/>`).join(''),
                 'Ondulado': (c) => [10,24,38,52,66].map(x => `<path d="M${x},2 Q${x+8},18 ${x},32 Q${x-8},46 ${x},62" stroke="${c}" fill="none" stroke-width="3.5" stroke-linecap="round"/>`).join(''),
@@ -4891,7 +4935,7 @@
                     <rect width="80" height="64" rx="4" fill="#f0e8dd"/>
                     ${types[t.name]('#8b6b3d')}
                 </svg>`;
-                return `<div class="dn-vcard" data-group="${prefix}-cabelo-tipo" data-value="${t.name}" onclick="dnSelectChip(this)">
+                return `<div class="dn-vcard" data-group="${tabPfx}-${prefix}-cabelo-tipo" data-value="${t.name}" onclick="dnSelectChip(this)">
                     <div class="dn-vc-preview">${svg}</div>
                     <div class="dn-vc-label">${t.name}</div>
                     <div class="dn-vc-mark">( )</div>
@@ -4899,12 +4943,12 @@
             }).join('')}</div>`;
         }
 
-        function dnEyeColorCards(prefix) {
+        function dnEyeColorCards(prefix, tabPfx='dn') {
             return `<div class="dn-vcards">${DN_EYE_COLORS.map(e => {
                 const preview = e.img
                     ? `<img src="${e.img}" alt="${e.name}" style="width:70px;height:50px;object-fit:cover;border-radius:4px">`
                     : `<div style="width:70px;height:50px;background:${e.iris};border-radius:4px"></div>`;
-                return `<div class="dn-vcard" data-group="${prefix}-olhos" data-value="${e.name}" onclick="dnSelectChip(this)">
+                return `<div class="dn-vcard" data-group="${tabPfx}-${prefix}-olhos" data-value="${e.name}" onclick="dnSelectChip(this)">
                     <div class="dn-vc-eye-preview">${preview}</div>
                     <div class="dn-vc-label">${e.name}</div>
                     <div class="dn-vc-mark">( )</div>
@@ -4912,14 +4956,14 @@
             }).join('')}</div>`;
         }
 
-        function dnFitzCards(prefix) {
+        function dnFitzCards(prefix, tabPfx='dn') {
             const isMale = prefix === 'sp';
             const imgBase = isMale ? DN_SKIN_MALE_IMG_BASE : DN_SKIN_IMG_BASE;
             return `<div class="dn-fitz-cards">${DN_FITZ.map((f, i) => {
                 const descLines = f.desc.split('\n').map(l => `<div>${l}</div>`).join('');
                 const imgUrl = imgBase + 'tipo' + (i + 1) + '.png';
                 const preview = `<img src="${imgUrl}" alt="${f.label}" style="width:60px;height:70px;object-fit:cover;border-radius:6px">`;
-                return `<div class="dn-fitz-card" data-group="${prefix}-pele" data-value="${f.id}" onclick="dnSelectChip(this)">
+                return `<div class="dn-fitz-card" data-group="${tabPfx}-${prefix}-pele" data-value="${f.id}" onclick="dnSelectChip(this)">
                     <div class="dn-fitz-face">${preview}</div>
                     <div class="dn-fitz-info">
                         <div class="dn-fitz-type">${f.label}</div>
@@ -4952,32 +4996,32 @@
             }).join('')}</table>`;
         }
 
-        function buildDonorSide(prefix, title, cls, medQuestions) {
+        function buildDonorSide(prefix, title, cls, medQuestions, tabPfx='dn') {
             const hasAge = prefix === 'ov';
             return `<div class="dn-side">
                 <div class="dn-side-title ${cls}">${title}</div>
                 <div class="dn-field-row">
-                    ${hasAge ? `<div class="dn-field"><label>Idade</label><input type="number" id="dn-${prefix}-idade" min="18" max="50"></div>` : ''}
+                    ${hasAge ? `<div class="dn-field"><label>Idade</label><input type="number" id="${tabPfx}-${prefix}-idade" min="18" max="50"></div>` : ''}
                     <div class="dn-field"><label>Tipo Sanguíneo</label>
-                        <select id="dn-${prefix}-sangue">
+                        <select id="${tabPfx}-${prefix}-sangue">
                             <option value="">—</option>
                             <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
                             <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
                         </select>
                     </div>
-                    <div class="dn-field"><label>Altura: <strong id="dn-${prefix}-altura-val">1.65</strong> m</label><input type="range" id="dn-${prefix}-altura" min="1.40" max="2.10" step="0.01" value="1.65" class="dn-slider" oninput="document.getElementById('dn-${prefix}-altura-val').textContent=this.value; dnCalcIMC('${prefix}')"></div>
-                    <div class="dn-field"><label>Peso: <strong id="dn-${prefix}-peso-val">70</strong> kg</label><input type="range" id="dn-${prefix}-peso" min="40" max="160" step="0.5" value="70" class="dn-slider" oninput="document.getElementById('dn-${prefix}-peso-val').textContent=this.value; dnCalcIMC('${prefix}')"></div>
-                    <div class="dn-field"><label>IMC</label><div class="dn-imc" id="dn-${prefix}-imc">—</div></div>
+                    <div class="dn-field"><label>Altura: <strong id="${tabPfx}-${prefix}-altura-val">1.65</strong> m</label><input type="range" id="${tabPfx}-${prefix}-altura" min="1.40" max="2.10" step="0.01" value="1.65" class="dn-slider" oninput="document.getElementById('${tabPfx}-${prefix}-altura-val').textContent=this.value; dnCalcIMC('${prefix}','${tabPfx}')"></div>
+                    <div class="dn-field"><label>Peso: <strong id="${tabPfx}-${prefix}-peso-val">70</strong> kg</label><input type="range" id="${tabPfx}-${prefix}-peso" min="40" max="160" step="0.5" value="70" class="dn-slider" oninput="document.getElementById('${tabPfx}-${prefix}-peso-val').textContent=this.value; dnCalcIMC('${prefix}','${tabPfx}')"></div>
+                    <div class="dn-field"><label>IMC</label><div class="dn-imc" id="${tabPfx}-${prefix}-imc">—</div></div>
                 </div>
 
-                <div class="dn-subsec"><h5>Cor dos Cabelos</h5>${dnHairColorCards(prefix)}</div>
-                <div class="dn-subsec"><h5>Característica dos Cabelos</h5>${dnHairTypeCards(prefix)}</div>
-                <div class="dn-subsec"><h5>Cor dos Olhos</h5>${dnEyeColorCards(prefix)}</div>
-                <div class="dn-subsec"><h5>Cor da Pele — Escala de Fitzpatrick</h5>${dnFitzCards(prefix)}</div>
+                <div class="dn-subsec"><h5>Cor dos Cabelos</h5>${dnHairColorCards(prefix, tabPfx)}</div>
+                <div class="dn-subsec"><h5>Característica dos Cabelos</h5>${dnHairTypeCards(prefix, tabPfx)}</div>
+                <div class="dn-subsec"><h5>Cor dos Olhos</h5>${dnEyeColorCards(prefix, tabPfx)}</div>
+                <div class="dn-subsec"><h5>Cor da Pele — Escala de Fitzpatrick</h5>${dnFitzCards(prefix, tabPfx)}</div>
 
-                <div class="dn-subsec"><h5>Histórico Médico Pessoal</h5>${dnMedTable(prefix+'_med', medQuestions)}</div>
-                <div class="dn-subsec"><h5>Malformações Congênitas</h5>${dnMedSimple(prefix+'_malf', DN_MALFORM)}</div>
-                <div class="dn-subsec"><h5>Doenças Genéticas Hereditárias</h5>${dnMedSimple(prefix+'_gen', DN_GENETICA)}</div>
+                <div class="dn-subsec"><h5>Histórico Médico Pessoal</h5>${dnMedTable(tabPfx+'_'+prefix+'_med', medQuestions)}</div>
+                <div class="dn-subsec"><h5>Malformações Congênitas</h5>${dnMedSimple(tabPfx+'_'+prefix+'_malf', DN_MALFORM)}</div>
+                <div class="dn-subsec"><h5>Doenças Genéticas Hereditárias</h5>${dnMedSimple(tabPfx+'_'+prefix+'_gen', DN_GENETICA)}</div>
             </div>`;
         }
 
@@ -5173,10 +5217,10 @@
             if (mark) mark.textContent = '( X )';
         }
 
-        function dnCalcIMC(prefix) {
-            const a = parseFloat(document.getElementById(`dn-${prefix}-altura`)?.value);
-            const p = parseFloat(document.getElementById(`dn-${prefix}-peso`)?.value);
-            const el = document.getElementById(`dn-${prefix}-imc`);
+        function dnCalcIMC(prefix, tabPfx='dn') {
+            const a = parseFloat(document.getElementById(`${tabPfx}-${prefix}-altura`)?.value);
+            const p = parseFloat(document.getElementById(`${tabPfx}-${prefix}-peso`)?.value);
+            const el = document.getElementById(`${tabPfx}-${prefix}-imc`);
             if (a > 0 && p > 0 && el) {
                 el.textContent = (p / (a * a)).toFixed(2);
             } else if (el) {
@@ -5471,11 +5515,321 @@
                 const res = await fetch(CRM_SCRIPT_URL + '?action=get_donors');
                 const json = await res.json();
                 if (json.profiles) {
-                    donorProfiles = json.profiles;
+                    donorProfiles = json.profiles.filter(p => {
+                        const d = typeof p.dados === 'string' ? JSON.parse(p.dados || '{}') : (p.dados || {});
+                        return !d.tab_type || d.tab_type === 'dn';
+                    });
                     renderDonorCards();
+                    if (typeof dvTab !== 'undefined') dvTab.load(json.profiles);
+                    if (typeof rcTab !== 'undefined') rcTab.load(json.profiles);
                 }
             } catch(e) { console.error('Erro ao carregar perfis:', e); }
         }
+
+        // ===================== DONOR TAB FACTORY =====================
+        function makeDonorTab(cfg) {
+            const T = cfg.tabId;
+            let profiles = [];
+            let editingId = null;
+
+            function getPending() {
+                const pending = [];
+                doaPatients.forEach(p => {
+                    const cls = (crmMap[p.key]?.classificacao) || '';
+                    if (cfg.classFilters.includes(cls)) {
+                        const hasP = profiles.some(dp => {
+                            const d = typeof dp.dados === 'string' ? JSON.parse(dp.dados || '{}') : (dp.dados || {});
+                            return d.paciente_nome === p.pac || d.paciente_key === p.key;
+                        });
+                        if (!hasP) pending.push({ ...p, classificacao: cls });
+                    }
+                });
+                const seen = new Set();
+                return pending.filter(p => { if (seen.has(p.key)) return false; seen.add(p.key); return true; });
+            }
+
+            function renderPending() {
+                const pending = getPending();
+                const container = document.getElementById(T + 'PendingCards');
+                if (!container) return;
+                if (!pending.length) { container.innerHTML = ''; return; }
+                container.innerHTML = `
+                    <div style="margin-bottom:12px">
+                        <span style="font-size:12px;font-weight:600;color:var(--warning)">⚠ ${pending.length} paciente(s) aguardando criação de perfil</span>
+                    </div>
+                    ${pending.map(p => `
+                        <div class="dn-pending-card">
+                            <div class="dn-pend-info">
+                                <div class="dn-pend-name">${p.pac}</div>
+                                <div class="dn-pend-meta">${p.prof || ''} · ${p.classificacao} · ${p.dataAp || ''}</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span class="dn-pending-badge">Pendente</span>
+                                <button class="dn-pending-btn" onclick="${T}Tab.newFromPending('${p.key.replace(/'/g,"\\'")}','${p.pac.replace(/'/g,"\\'")}')">Criar Perfil</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+            }
+
+            function renderDropdown() {
+                const pending = getPending();
+                const list = document.getElementById(T + 'PendingList');
+                if (!list) return;
+                if (!pending.length) { list.innerHTML = '<div class="dn-dd-item" style="color:var(--muted);cursor:default">Nenhuma paciente pendente</div>'; return; }
+                list.innerHTML = pending.map(p => `
+                    <div class="dn-dd-item" onclick="${T}Tab.newFromPending('${p.key.replace(/'/g,"\\'")}','${p.pac.replace(/'/g,"\\'")}'); ${T}Tab.closeDropdown()">
+                        <strong>${p.pac}</strong>
+                        <div style="font-size:11px;color:var(--muted)">${p.classificacao} · ${p.prof || ''}</div>
+                    </div>
+                `).join('');
+            }
+
+            function toggleDropdown() {
+                const dd = document.getElementById(T + 'NewDropdown');
+                if (!dd) return;
+                if (dd.style.display === 'none') {
+                    renderDropdown();
+                    dd.style.display = 'block';
+                    setTimeout(() => document.addEventListener('click', closeOutside, { once: true }), 10);
+                } else { dd.style.display = 'none'; }
+            }
+
+            function closeDropdown() {
+                const dd = document.getElementById(T + 'NewDropdown');
+                if (dd) dd.style.display = 'none';
+            }
+
+            function closeOutside(e) {
+                const dd = document.getElementById(T + 'NewDropdown');
+                if (dd && !dd.contains(e.target) && !e.target.closest('.dn-btn-new')) dd.style.display = 'none';
+            }
+
+            function newProfile() {
+                editingId = null;
+                const wrap = document.getElementById(T + 'FormWrap');
+                if (!wrap) return;
+                wrap.innerHTML = `<div class="dn-form">
+                    <div class="dn-form-header">
+                        <div class="dn-photo-upload" onclick="document.getElementById('${T}PhotoInput').click()">
+                            <img id="${T}PhotoPreview" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
+                            <div id="${T}PhotoPlaceholder" class="dn-photo-placeholder">📷<br><span>Foto</span></div>
+                            <input type="file" id="${T}PhotoInput" accept="image/*" style="display:none" onchange="${T}Tab.previewPhoto(this)">
+                        </div>
+                        <input id="${T}Codigo" placeholder="Código do Perfil (ex: EDO85)">
+                        <button class="dn-btn-close-form" onclick="${T}Tab.closeForm()">✕ Fechar</button>
+                    </div>
+                    <div class="dn-sides">
+                        ${buildDonorSide('ov','🥚 Características Físicas — Lado Óvulos','ov', DN_MED_PERSONAL_OV, T)}
+                        ${buildDonorSide('sp','🔬 Características Físicas — Lado Espermatozóides','sp', DN_MED_PERSONAL_SP, T)}
+                    </div>
+                    <div class="dn-form-footer">
+                        <textarea id="${T}InfoAdicional" placeholder="Informações adicionais..."></textarea>
+                        <div class="dn-form-btns">
+                            <button class="dn-btn-save" onclick="${T}Tab.saveProfile()">💾 Salvar Perfil</button>
+                            <span class="dn-save-status" id="${T}SaveStatus"></span>
+                        </div>
+                    </div>
+                </div>`;
+                wrap.style.display = 'block';
+                wrap.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            function previewPhoto(input) {
+                if (input.files && input.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        const preview = document.getElementById(T + 'PhotoPreview');
+                        const ph = document.getElementById(T + 'PhotoPlaceholder');
+                        if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+                        if (ph) ph.style.display = 'none';
+                    };
+                    reader.readAsDataURL(input.files[0]);
+                }
+            }
+
+            function closeForm() {
+                const wrap = document.getElementById(T + 'FormWrap');
+                if (wrap) wrap.style.display = 'none';
+                editingId = null;
+            }
+
+            function collectData() {
+                const photoPreview = document.getElementById(T + 'PhotoPreview');
+                const photoData = (photoPreview && photoPreview.style.display !== 'none') ? photoPreview.src : '';
+                const wrap = document.getElementById(T + 'FormWrap');
+                return {
+                    tab_type: T,
+                    codigo_perfil: document.getElementById(T + 'Codigo')?.value || '',
+                    foto: photoData,
+                    paciente_key: wrap?.dataset?.pacienteKey || '',
+                    paciente_nome: wrap?.dataset?.pacienteNome || '',
+                    ov_idade: document.getElementById(`${T}-ov-idade`)?.value || '',
+                    ov_sangue: document.getElementById(`${T}-ov-sangue`)?.value || '',
+                    ov_altura: document.getElementById(`${T}-ov-altura`)?.value || '',
+                    ov_peso: document.getElementById(`${T}-ov-peso`)?.value || '',
+                    ov_cabelo: dnGetChip(`${T}-ov-cabelo`),
+                    ov_cabelo_tipo: dnGetChip(`${T}-ov-cabelo-tipo`),
+                    ov_olhos: dnGetChip(`${T}-ov-olhos`),
+                    ov_pele: dnGetChip(`${T}-ov-pele`),
+                    ...dnGetRadios(`${T}_ov_med`, DN_MED_PERSONAL_OV),
+                    ...dnGetRadios(`${T}_ov_malf`, DN_MALFORM),
+                    ...dnGetRadios(`${T}_ov_gen`, DN_GENETICA),
+                    sp_sangue: document.getElementById(`${T}-sp-sangue`)?.value || '',
+                    sp_altura: document.getElementById(`${T}-sp-altura`)?.value || '',
+                    sp_peso: document.getElementById(`${T}-sp-peso`)?.value || '',
+                    sp_cabelo: dnGetChip(`${T}-sp-cabelo`),
+                    sp_cabelo_tipo: dnGetChip(`${T}-sp-cabelo-tipo`),
+                    sp_olhos: dnGetChip(`${T}-sp-olhos`),
+                    sp_pele: dnGetChip(`${T}-sp-pele`),
+                    ...dnGetRadios(`${T}_sp_med`, DN_MED_PERSONAL_SP),
+                    ...dnGetRadios(`${T}_sp_malf`, DN_MALFORM),
+                    ...dnGetRadios(`${T}_sp_gen`, DN_GENETICA),
+                    info_adicional: document.getElementById(T + 'InfoAdicional')?.value || '',
+                };
+            }
+
+            function fillForm(data) {
+                const codigoEl = document.getElementById(T + 'Codigo');
+                if (codigoEl) codigoEl.value = data.codigo_perfil || '';
+                if (data.foto) {
+                    const preview = document.getElementById(T + 'PhotoPreview');
+                    const ph = document.getElementById(T + 'PhotoPlaceholder');
+                    if (preview) { preview.src = data.foto; preview.style.display = 'block'; }
+                    if (ph) ph.style.display = 'none';
+                }
+                const wrap = document.getElementById(T + 'FormWrap');
+                if (wrap && data.paciente_key) wrap.dataset.pacienteKey = data.paciente_key;
+                if (wrap && data.paciente_nome) wrap.dataset.pacienteNome = data.paciente_nome;
+                ['ov','sp'].forEach(side => {
+                    if (data[side+'_sangue']) { const el = document.getElementById(`${T}-${side}-sangue`); if (el) el.value = data[side+'_sangue']; }
+                    if (data[side+'_altura']) { const el = document.getElementById(`${T}-${side}-altura`); if (el) el.value = data[side+'_altura']; const v = document.getElementById(`${T}-${side}-altura-val`); if (v) v.textContent = data[side+'_altura']; dnCalcIMC(side, T); }
+                    if (data[side+'_peso']) { const el = document.getElementById(`${T}-${side}-peso`); if (el) el.value = data[side+'_peso']; const v = document.getElementById(`${T}-${side}-peso-val`); if (v) v.textContent = data[side+'_peso']; dnCalcIMC(side, T); }
+                });
+                if (data.ov_idade) { const el = document.getElementById(`${T}-ov-idade`); if (el) el.value = data.ov_idade; }
+                [`${T}-ov-cabelo`,`${T}-ov-cabelo-tipo`,`${T}-ov-olhos`,`${T}-ov-pele`,`${T}-sp-cabelo`,`${T}-sp-cabelo-tipo`,`${T}-sp-olhos`,`${T}-sp-pele`].forEach(g => {
+                    const key = g.replace(new RegExp(`^${T}-`), '').replace(/-/g,'_');
+                    const val = data[key];
+                    if (val) { const el = document.querySelector(`[data-group="${g}"][data-value="${val}"]`); if (el) el.classList.add('selected'); }
+                });
+                Object.keys(data).forEach(k => {
+                    if (k.endsWith('_detail')) { const inp = document.querySelector(`input[name="${k}"]`); if (inp) inp.value = data[k]; }
+                    else { const radio = document.querySelector(`input[name="${k}"][value="${data[k]}"]`); if (radio) radio.checked = true; }
+                });
+                if (data.info_adicional) { const el = document.getElementById(T + 'InfoAdicional'); if (el) el.value = data.info_adicional; }
+            }
+
+            async function saveProfile() {
+                const data = collectData();
+                if (!data.codigo_perfil) { alert('Preencha o código do perfil'); return; }
+                const statusEl = document.getElementById(T + 'SaveStatus');
+                if (statusEl) { statusEl.textContent = 'Salvando...'; statusEl.style.color = '#f59e0b'; }
+                if (data.foto && data.foto.startsWith('data:') && CRM_SCRIPT_URL) {
+                    try {
+                        if (statusEl) statusEl.textContent = 'Enviando foto...';
+                        const r = await fetch(CRM_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'upload_photo', foto:data.foto, file_name: data.codigo_perfil.replace(/\s/g,'_')+'_'+Date.now()+'.jpg' }) });
+                        const rj = await r.json();
+                        if (rj.url) data.foto = rj.url;
+                    } catch(e) { console.warn('Photo upload failed:', e); }
+                    if (statusEl) statusEl.textContent = 'Salvando perfil...';
+                }
+                const id = editingId || (T + '_' + Date.now());
+                const profile = { id, ...data, ultima_atualizacao: new Date().toISOString() };
+                const idx = profiles.findIndex(p => p.id === id);
+                if (idx >= 0) profiles[idx] = profile; else profiles.push(profile);
+                renderCards();
+                if (CRM_SCRIPT_URL) {
+                    try {
+                        await fetch(CRM_SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'save_donor', ...profile, dados: JSON.stringify(data) }) });
+                        if (statusEl) { statusEl.textContent = '✓ Salvo com sucesso'; statusEl.style.color = 'var(--success)'; }
+                    } catch(e) {
+                        if (statusEl) { statusEl.textContent = '✗ Erro ao salvar'; statusEl.style.color = 'var(--danger)'; }
+                    }
+                } else {
+                    if (statusEl) { statusEl.textContent = '⚠️ Salvo localmente'; statusEl.style.color = '#f59e0b'; }
+                }
+                setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+            }
+
+            function editProfile(id) {
+                const profile = profiles.find(p => p.id === id);
+                if (!profile) return;
+                editingId = id;
+                newProfile();
+                editingId = id;
+                let data = profile;
+                if (profile.dados) { try { data = { ...profile, ...JSON.parse(profile.dados) }; } catch(e) {} }
+                fillForm(data);
+            }
+
+            function deleteProfile(id) {
+                if (!confirm('Tem certeza que deseja excluir este perfil?')) return;
+                profiles = profiles.filter(p => p.id !== id);
+                renderCards();
+            }
+
+            function renderCards() {
+                const container = document.getElementById(T + 'Cards');
+                const countEl = document.getElementById(T + 'Count');
+                if (!container) return;
+                if (countEl) countEl.textContent = `${profiles.length} perfil${profiles.length !== 1 ? 's' : ''}`;
+                if (!profiles.length) {
+                    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px">Nenhum perfil cadastrado. Clique em "+ Novo Perfil" para começar.</div>';
+                    renderPending();
+                    return;
+                }
+                container.innerHTML = profiles.map(p => {
+                    let d = p;
+                    if (p.dados) { try { d = {...p, ...JSON.parse(p.dados)}; } catch(e){} }
+                    const ovInfo = [d.ov_idade ? d.ov_idade+' anos' : '', d.ov_sangue, d.ov_cabelo, d.ov_olhos ? 'Olhos '+d.ov_olhos : ''].filter(Boolean).join(' · ');
+                    const spInfo = [d.sp_sangue, d.sp_cabelo, d.sp_olhos ? 'Olhos '+d.sp_olhos : ''].filter(Boolean).join(' · ');
+                    const dt = d.ultima_atualizacao ? new Date(d.ultima_atualizacao).toLocaleDateString('pt-BR') : '';
+                    return `<div class="dn-profile-card" onclick="${T}Tab.editProfile('${p.id}')">
+                        <h4>${d.codigo_perfil || 'Sem código'}</h4>
+                        <div class="dn-pc-meta">
+                            ${ovInfo ? `🥚 ${ovInfo}<br>` : ''}
+                            ${spInfo ? `🔬 ${spInfo}<br>` : ''}
+                            ${dt ? `📅 Atualizado: ${dt}` : ''}
+                        </div>
+                        <div class="dn-pc-actions">
+                            <button class="dn-pc-btn" onclick="event.stopPropagation();${T}Tab.editProfile('${p.id}')">✏️ Editar</button>
+                            <button class="dn-pc-btn danger" onclick="event.stopPropagation();${T}Tab.deleteProfile('${p.id}')">🗑️ Excluir</button>
+                        </div>
+                    </div>`;
+                }).join('');
+                renderPending();
+            }
+
+            function newFromPending(key, nome) {
+                newProfile();
+                const initials = nome.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 4);
+                const code = initials + '-' + Date.now().toString().slice(-4);
+                const codigoEl = document.getElementById(T + 'Codigo');
+                if (codigoEl) codigoEl.value = code;
+                const wrap = document.getElementById(T + 'FormWrap');
+                if (wrap) { wrap.dataset.pacienteKey = key; wrap.dataset.pacienteNome = nome; }
+                const header = wrap?.querySelector('.dn-form-header');
+                if (header) {
+                    const note = document.createElement('div');
+                    note.style.cssText = 'background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:#fbbf24';
+                    note.textContent = '📋 Perfil para: ' + nome;
+                    header.appendChild(note);
+                }
+            }
+
+            function load(allProfiles) {
+                profiles = (allProfiles || []).filter(p => {
+                    const d = typeof p.dados === 'string' ? JSON.parse(p.dados || '{}') : (p.dados || {});
+                    return d.tab_type === T;
+                });
+                renderCards();
+            }
+
+            return { getPending, renderPending, toggleDropdown, closeDropdown, newProfile, previewPhoto, closeForm, saveProfile, editProfile, deleteProfile, renderCards, newFromPending, load };
+        }
+
+        const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'] });
+        const rcTab = makeDonorTab({ tabId: 'rc', classFilters: ['Receptora'] });
 
         async function reloadData() {
             document.getElementById('loadingOverlay').style.display = 'flex';
