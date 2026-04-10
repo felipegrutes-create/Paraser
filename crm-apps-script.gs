@@ -737,7 +737,7 @@ function handleGetFormResponses(params) {
       lastNames.push((lv || '').toString().trim());
     }
 
-    return jsonOk({ responses: matches, total: matches.length, headers: headers,
+    return jsonOk({ success: true, responses: matches, total: matches.length, headers: headers,
                     debug_rows: data.length, debug_sheet: sheet.getName(),
                     debug_all_sheets: sheetList,
                     debug_name_col: NAME_COL,
