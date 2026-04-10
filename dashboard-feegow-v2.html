@@ -3911,6 +3911,17 @@
                 .replace(/\s+/g, ' ');
         }
 
+        // Lookup CRM tolerando sufixos extras no nome do Feegow (ex: "... Fich")
+        function getCrmRec(key) {
+            if (crmMap[key]) return crmMap[key];
+            const found = Object.keys(crmMap).find(k =>
+                key.startsWith(k) || k.startsWith(key) ||
+                (key.length > 10 && k.length > 10 &&
+                 key.split(' ').slice(0, 3).join(' ') === k.split(' ').slice(0, 3).join(' '))
+            );
+            return found ? crmMap[found] : null;
+        }
+
         function getCRMColumn(rec, patient) {
             const bool = v => v === true || v === 'TRUE';
             const hasReturn = patient && patient.returned;
@@ -4359,7 +4370,7 @@
             const filtered = doaPatients.filter(p => {
                 if (srch && !norm(p.pac).includes(srch)) return false;
                 if (profF && p.prof !== profF) return false;
-                const cls = (crmMap[p.key]?.classificacao) || '';
+                const cls = (getCrmRec(p.key)?.classificacao) || '';
                 if (classF === 'sem' && cls) return false;
                 if (classF && classF !== 'sem' && cls !== classF) return false;
                 return true;
@@ -4389,7 +4400,7 @@
             doaPatients.forEach(p => {
                 if (kpiSeenKeys.has(p.key)) return;
                 kpiSeenKeys.add(p.key);
-                const cls = (crmMap[p.key]?.classificacao) || '';
+                const cls = (getCrmRec(p.key)?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
                 else if (cls === 'FIV Compartilhada') nComp++;
                 else if (cls === 'Receptora') nRec++;
@@ -4425,7 +4436,7 @@
                         <span class="doa-day-count">${patients.length} paciente${patients.length > 1 ? 's' : ''}</span>
                     </div>
                     ${patients.map(p => {
-                        const cls = (crmMap[p.key]?.classificacao) || '';
+                        const cls = (getCrmRec(p.key)?.classificacao) || '';
                         const safeKey = p.key.replace(/'/g, "\\'");
                         const selClass = cls === 'FIV Normal' ? 'cls-fiv-normal'
                             : cls === 'FIV Compartilhada' ? 'cls-fiv-comp'
@@ -4444,7 +4455,7 @@
                             : 'doa-status-aguardando';
                         const flagAtencao = p.status !== 'Atendido' ? '<span class="doa-flag-atencao" title="Status: ' + p.status + '">⚠️</span>' : '';
                         const statusBadge = '<span class="doa-status ' + statusClass + '">' + p.status + '</span>' + flagAtencao;
-                        const crmRec = crmMap[p.key] || {};
+                        const crmRec = getCrmRec(p.key) || {};
                         const crmProp = crmRec.proposta_feita === 'Sim';
                         const crmQuit = crmRec.quitado === true || crmRec.quitado === 'TRUE';
                         const c1 = fmtCRMDate(crmRec.contato1_data);
@@ -4504,7 +4515,7 @@
             doaPatients.forEach(p => {
                 if (kpiSeen2.has(p.key)) return;
                 kpiSeen2.add(p.key);
-                const cls = (crmMap[p.key]?.classificacao) || '';
+                const cls = (getCrmRec(p.key)?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
                 else if (cls === 'FIV Compartilhada') nComp++;
                 else if (cls === 'Receptora') nRec++;
@@ -4763,7 +4774,8 @@
         function dnGetPendingPatients() {
             const pending = [];
             doaPatients.forEach(p => {
-                const cls = (crmMap[p.key]?.classificacao) || '';
+                const rec = getCrmRec(p.key);
+                const cls = rec?.classificacao || '';
                 if (cls === 'FIV Compartilhada') {
                     // Check if already has a donor profile
                     const pKey = p.key;
@@ -4775,7 +4787,8 @@
                         }
                         const dpKey = d.paciente_key || dp.paciente_key || '';
                         const dpNome = normalizeKey(d.paciente_nome || dp.paciente_nome || '');
-                        return dpKey === pKey || dpNome === pKey;
+                        return dpKey === pKey || dpNome === pKey ||
+                               (dpNome.length > 10 && pKey.length > 10 && dpNome.split(' ').slice(0,3).join(' ') === pKey.split(' ').slice(0,3).join(' '));
                     });
                     if (!hasProfile) {
                         pending.push({ ...p, classificacao: cls });
@@ -6057,7 +6070,7 @@
                 const pending = [];
                 srcPatients.forEach(p => {
                     // classFilters: check CRM classification. patientSource: patients already pre-filtered by proc
-                    const cls = (crmMap[p.key]?.classificacao) || (cfg.patientSource ? 'Avaliação Doadora' : '');
+                    const cls = (getCrmRec(p.key)?.classificacao) || (cfg.patientSource ? 'Avaliação Doadora' : '');
                     const include = cfg.patientSource ? true : cfg.classFilters.includes(cls);
                     if (!include) return;
                     const hasP = profiles.some(dp => {
