@@ -5604,8 +5604,8 @@
                 const data = await resp.json();
                 if (!resultsDiv) return;
                 if (!data.success || !data.responses || data.responses.length === 0) {
-                    const dbg = `sheet:${data.debug_sheet||'?'} | linhas:${data.debug_rows||'?'} | buscou:"${data.debug_search||name}" | amostra:[${(data.debug_sample||[]).join(' / ')}]`;
-                    resultsDiv.innerHTML = `<div style="padding:14px;color:var(--muted);text-align:center">Nenhuma resposta encontrada para "<strong>${name}</strong>"<br><small style="font-size:10px;opacity:0.6">${dbg}</small></div>`;
+                    const dbg = `sheet:${data.debug_sheet||'?'} | linhas:${data.debug_rows||'?'} | abas:[${(data.debug_all_sheets||[]).join(' | ')}]`;
+                    resultsDiv.innerHTML = `<div style="padding:14px;color:var(--muted);text-align:center">Nenhuma resposta encontrada para "<strong>${name}</strong>"<br><small style="font-size:10px;opacity:0.6;word-break:break-all">${dbg}</small></div>`;
                     return;
                 }
                 window._dnQuestResponses = data.responses;
