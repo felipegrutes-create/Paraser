@@ -726,12 +726,20 @@ function handleGetFormResponses(params) {
       matches.push(obj);
     }
 
+    // Últimas 10 entradas da coluna de nome para diagnóstico
+    var lastNames = [];
+    for (var li = Math.max(1, data.length - 10); li < data.length; li++) {
+      var lv = data[li][NAME_COL];
+      lastNames.push((lv || '').toString().trim());
+    }
+
     return jsonOk({ responses: matches, total: matches.length, headers: headers,
                     debug_rows: data.length, debug_sheet: sheet.getName(),
                     debug_all_sheets: sheetList,
                     debug_name_col: NAME_COL,
                     debug_name_col_header: headers[NAME_COL] || '?',
-                    debug_sample: sampleRows });
+                    debug_sample: sampleRows,
+                    debug_last_names: lastNames });
   } catch(err) {
     return jsonErr('Erro ao ler formulário: ' + err.message);
   }

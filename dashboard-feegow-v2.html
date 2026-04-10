@@ -5605,10 +5605,13 @@
                 if (!resultsDiv) return;
                 if (!data.success || !data.responses || data.responses.length === 0) {
                     const sampleHtml = data.debug_sample && data.debug_sample.length
-                        ? `<br><small style="font-size:10px;opacity:0.5">Amostra col${data.debug_name_col||'?'}(${data.debug_name_col_header||'?'}): ${data.debug_sample.map(r=>(r[data.debug_name_col||2]||'vazio')).join(' | ')}</small>`
+                        ? `<br><small style="font-size:10px;opacity:0.5">Primeiras: ${data.debug_sample.map(r=>(r[data.debug_name_col||2]||'vazio')).join(' | ')}</small>`
+                        : '';
+                    const lastHtml = data.debug_last_names && data.debug_last_names.length
+                        ? `<br><small style="font-size:10px;opacity:0.5">Últimas: ${data.debug_last_names.join(' | ')}</small>`
                         : '';
                     const dbg = `aba:${data.debug_sheet||'?'} | linhas:${data.debug_rows||'?'} | col_nome:${data.debug_name_col!=null?data.debug_name_col:'?'}(${data.debug_name_col_header||'?'})`;
-                    resultsDiv.innerHTML = `<div style="padding:14px;color:var(--muted);text-align:center">Nenhuma resposta encontrada para "<strong>${name}</strong>"<br><small style="font-size:10px;opacity:0.6;word-break:break-all">${dbg}</small>${sampleHtml}</div>`;
+                    resultsDiv.innerHTML = `<div style="padding:14px;color:var(--muted);text-align:center">Nenhuma resposta encontrada para "<strong>${name}</strong>"<br><small style="font-size:10px;opacity:0.6;word-break:break-all">${dbg}</small>${sampleHtml}${lastHtml}</div>`;
                     return;
                 }
                 window._dnQuestResponses = data.responses;
