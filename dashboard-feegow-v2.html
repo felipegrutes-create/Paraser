@@ -5506,7 +5506,7 @@
             const consultaEl = document.getElementById(p+'data_consulta_1vez');
             if (submDateISO && consultaEl && !consultaEl.value) consultaEl.value = submDateISO;
             const idadePac = calcAge(row[4], row[0]);
-            if (idadePac) setVal(p+'idade_paciente', idadePac);
+            if (idadePac) { setVal(p+'idade_paciente', idadePac); const ovIdEl=document.getElementById('dn-ov-idade'); if(ovIdEl&&!ovIdEl.value) ovIdEl.value=idadePac; }
             const idadeConj = calcAge(row[47], row[0]);
             if (idadeConj) setVal(p+'idade_conjuge', idadeConj);
 
@@ -6470,7 +6470,7 @@
                 const consultaEl = document.getElementById(p+'data_consulta_1vez');
                 if (submDateISO && consultaEl && !consultaEl.value) consultaEl.value = submDateISO;
                 const idadePac = calcAge(row[4], row[0]);
-                if (idadePac) setVal(p+'idade_paciente', idadePac);
+                if (idadePac) { setVal(p+'idade_paciente', idadePac); const ovIdEl=document.getElementById(T+'-ov-idade'); if(ovIdEl&&!ovIdEl.value) ovIdEl.value=idadePac; }
                 const idadeConj = calcAge(row[47], row[0]);
                 if (idadeConj) setVal(p+'idade_conjuge', idadeConj);
 
