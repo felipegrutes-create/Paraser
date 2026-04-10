@@ -3852,7 +3852,10 @@
             const nowDate = new Date();
             const currentMK = nowDate.getFullYear() + '-' + String(nowDate.getMonth()+1).padStart(2,'0');
             const mesAgend = raw.filter(r => monthKey(r[d.C.data]) === currentMK).length;
-            const mesVez = vezRows.filter(r => monthKey(r[d.C.dcri]) === currentMK).length;
+            const mesVez = vezRows.filter(r => {
+                const proc = (r[d.C.proc] || '').trim().toLowerCase();
+                return proc.includes('vez') && monthKey(r[d.C.dcri]) === currentMK;
+            }).length;
             const mesNomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
             const mesLabel = mesNomes[nowDate.getMonth()] + '/' + nowDate.getFullYear();
             set("headerSubtitle", `${mesLabel} · ${fmt(mesAgend)} agendamentos · ${fmt(mesVez)} consultas 1ª vez`);
