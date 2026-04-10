@@ -5604,8 +5604,11 @@
                 const data = await resp.json();
                 if (!resultsDiv) return;
                 if (!data.success || !data.responses || data.responses.length === 0) {
-                    const dbg = `sheet:${data.debug_sheet||'?'} | linhas:${data.debug_rows||'?'} | abas:[${(data.debug_all_sheets||[]).join(' | ')}]`;
-                    resultsDiv.innerHTML = `<div style="padding:14px;color:var(--muted);text-align:center">Nenhuma resposta encontrada para "<strong>${name}</strong>"<br><small style="font-size:10px;opacity:0.6;word-break:break-all">${dbg}</small></div>`;
+                    const sampleHtml = data.debug_sample && data.debug_sample.length
+                        ? `<br><small style="font-size:10px;opacity:0.5">Amostra col${data.debug_name_col||'?'}(${data.debug_name_col_header||'?'}): ${data.debug_sample.map(r=>(r[data.debug_name_col||2]||'vazio')).join(' | ')}</small>`
+                        : '';
+                    const dbg = `aba:${data.debug_sheet||'?'} | linhas:${data.debug_rows||'?'} | col_nome:${data.debug_name_col!=null?data.debug_name_col:'?'}(${data.debug_name_col_header||'?'})`;
+                    resultsDiv.innerHTML = `<div style="padding:14px;color:var(--muted);text-align:center">Nenhuma resposta encontrada para "<strong>${name}</strong>"<br><small style="font-size:10px;opacity:0.6;word-break:break-all">${dbg}</small>${sampleHtml}</div>`;
                     return;
                 }
                 window._dnQuestResponses = data.responses;

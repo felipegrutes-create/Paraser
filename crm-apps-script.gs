@@ -634,52 +634,104 @@ function handleSaveBackup(body) {
 // Questionário de Anamnese — busca por nome na planilha do Forms
 // =========================================================
 function handleGetFormResponses(params) {
-  const name = (params.nome || '').toString().trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (!name || name.length < 2) return jsonErr('nome deve ter pelo menos 2 caracteres');
+  var rawName = (params.nome || '').toString().trim();
+  if (!rawName || rawName.length < 2) return jsonErr('nome deve ter pelo menos 2 caracteres');
+  var name = rawName.toLowerCase();
 
   try {
-    const FORM_SS_ID    = '1h9Jhjpv-SRmOGX6rXypHgTy_9YaAhr2WvqA8G8EpwrY';
-    const FORM_SHEET_GID = 1452374010;
+    var FORM_SS_ID = '1h9Jhjpv-SRmOGX6rXypHgTy_9YaAhr2WvqA8G8EpwrY';
+    var ss = SpreadsheetApp.openById(FORM_SS_ID);
+    var allSheets = ss.getSheets();
 
-    const ss = SpreadsheetApp.openById(FORM_SS_ID);
-    let sheet = null;
-    const allSheets = ss.getSheets();
-    for (let i = 0; i < allSheets.length; i++) {
-      if (allSheets[i].getSheetId() === FORM_SHEET_GID) { sheet = allSheets[i]; break; }
+    // Lista todas as abas para diagnóstico
+    var sheetList = allSheets.map(function(s) {
+      return s.getName() + '(id:' + s.getSheetId() + ')';
+    });
+
+    var FORM_SHEET_GID = 1452374010;
+    var sheet = null;
+    for (var si = 0; si < allSheets.length; si++) {
+      if (allSheets[si].getSheetId() === FORM_SHEET_GID) { sheet = allSheets[si]; break; }
     }
+    if (!sheet) sheet = ss.getSheetByName('Form_Responses1');
+    if (!sheet) sheet = ss.getSheetByName('Respostas ao formulário 1');
     if (!sheet) sheet = allSheets[0];
 
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return jsonOk({ responses: [], total: 0 });
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return jsonOk({ responses: [], total: 0, debug: 'sheet vazia', debug_all_sheets: sheetList });
 
-    const headers = data[0].map(function(h) { return h.toString().trim(); });
-    const NAME_COL = 2; // coluna C = "Nome Completo" da paciente
+    var headers = data[0].map(function(h) { return h ? h.toString().trim() : ''; });
 
-    const nameParts = name.split(/\s+/).filter(function(p) { return p.length > 2; });
+    // Descoberta dinâmica da coluna de nome — não depende de índice fixo
+    var NAME_COL = -1;
+    var normalizeStr = function(s) {
+      return s.toLowerCase().replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
+               .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o').replace(/[ùúûü]/g,'u')
+               .replace(/[ç]/g,'c').trim();
+    };
+    // Prioridade 1: "nome completo" ou "nome da doadora/paciente"
+    for (var hi = 0; hi < headers.length; hi++) {
+      var hn = normalizeStr(headers[hi]);
+      if (hn.indexOf('nome completo') >= 0 || hn.indexOf('nome da doadora') >= 0 || hn.indexOf('nome da paciente') >= 0) {
+        NAME_COL = hi; break;
+      }
+    }
+    // Prioridade 2: qualquer coluna com "nome" exceto parceiro/companheiro/conjuge
+    if (NAME_COL < 0) {
+      for (var hi2 = 0; hi2 < headers.length; hi2++) {
+        var hn2 = normalizeStr(headers[hi2]);
+        if (hn2.indexOf('nome') >= 0 && !/parceiro|companheiro|conjuge|esposo|esposa|marido/.test(hn2)) {
+          NAME_COL = hi2; break;
+        }
+      }
+    }
+    // Fallback: col 2 (padrão Google Forms com coleta de e-mail ativa)
+    if (NAME_COL < 0) NAME_COL = 2;
 
-    const matches = [];
-    for (let i = 1; i < data.length; i++) {
-      const rowName = (data[i][NAME_COL] || '').toString().trim().toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var nameParts = name.split(/\s+/).filter(function(p) { return p.length > 2; });
+
+    // Amostra das 3 primeiras linhas de dados (cols 0..5) para diagnóstico
+    var sampleRows = [];
+    for (var si2 = 1; si2 <= Math.min(3, data.length - 1); si2++) {
+      var sr = [];
+      for (var sc = 0; sc < Math.min(6, data[si2].length); sc++) {
+        var sv = data[si2][sc];
+        sr.push(sv instanceof Date ? Utilities.formatDate(sv,'America/Sao_Paulo','dd/MM/yyyy') : (sv||'').toString());
+      }
+      sampleRows.push(sr);
+    }
+
+    var matches = [];
+    for (var i = 1; i < data.length; i++) {
+      var cell = data[i][NAME_COL];
+      if (!cell) continue;
+      var rowName = normalizeStr(cell.toString());
       if (!rowName) continue;
-      const hit = rowName.includes(name) ||
-        (nameParts.length >= 2 && nameParts.every(function(p) { return rowName.includes(p); }));
+      var normSearch = normalizeStr(name);
+      var hit = rowName.indexOf(normSearch) >= 0;
+      if (!hit && nameParts.length >= 2) {
+        var normParts = nameParts.map(normalizeStr);
+        hit = normParts.every(function(p) { return rowName.indexOf(p) >= 0; });
+      }
       if (!hit) continue;
-
-      const obj = {};
-      headers.forEach(function(h, j) {
-        const val = data[i][j];
+      var obj = {};
+      for (var j = 0; j < headers.length; j++) {
+        var val = data[i][j];
         if (val instanceof Date) {
           obj[j] = Utilities.formatDate(val, 'America/Sao_Paulo', 'dd/MM/yyyy');
         } else {
           obj[j] = (val !== undefined && val !== null) ? val.toString() : '';
         }
-      });
+      }
       matches.push(obj);
     }
 
-    return jsonOk({ responses: matches, total: matches.length, headers: headers });
+    return jsonOk({ responses: matches, total: matches.length, headers: headers,
+                    debug_rows: data.length, debug_sheet: sheet.getName(),
+                    debug_all_sheets: sheetList,
+                    debug_name_col: NAME_COL,
+                    debug_name_col_header: headers[NAME_COL] || '?',
+                    debug_sample: sampleRows });
   } catch(err) {
     return jsonErr('Erro ao ler formulário: ' + err.message);
   }
