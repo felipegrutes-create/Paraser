@@ -665,9 +665,13 @@ function handleGetFormResponses(params) {
     // Descoberta dinâmica da coluna de nome — não depende de índice fixo
     var NAME_COL = -1;
     var normalizeStr = function(s) {
-      return s.toLowerCase().replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
+      return s.toLowerCase()
+               .replace(/[\u00a0\u200b\ufeff\u200c\u200d\u2060\u00ad]/g, ' ')
+               .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
                .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o').replace(/[ùúûü]/g,'u')
-               .replace(/[ç]/g,'c').trim();
+               .replace(/[ç]/g,'c')
+               .replace(/\s+/g, ' ')
+               .trim();
     };
     // Prioridade 1: "nome completo" ou "nome da doadora/paciente"
     for (var hi = 0; hi < headers.length; hi++) {
