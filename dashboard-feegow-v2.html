@@ -5507,13 +5507,22 @@
             setVal(p+'pf_alergia', row[27]);
             setVal(p+'pf_profissao', row[72]);
             const fumaRaw=(row[30]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-            if(/nao fuma/.test(fumaRaw)) setVal(p+'pf_fumante','Não');
+            if(/nao fuma|nao fum/.test(fumaRaw)) setVal(p+'pf_fumante','Não');
             else if(/fuma|fumante|cigarro/.test(fumaRaw)) setVal(p+'pf_fumante','Sim');
-            if(/nao ingere|nao bebe/.test(fumaRaw)) setVal(p+'pf_etilista','Não');
+            else if(/^nao$|^n$/.test(fumaRaw)) { setVal(p+'pf_fumante','Não'); setVal(p+'pf_etilista','Não'); }
+            if(/nao ingere|nao bebe|nao consome alcool/.test(fumaRaw)) setVal(p+'pf_etilista','Não');
             else if(/ingere|bebe|alcool/.test(fumaRaw)) setVal(p+'pf_etilista','Sim');
+            // OV chips + sliders
             parseAndSetChips('dn', 'ov', (row[39]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
             if(altN){let alt=parseFloat(altN);if(alt>3)alt=alt/100;const sl=document.getElementById('dn-ov-altura');if(sl&&alt>=1.40&&alt<=2.10){sl.value=alt.toFixed(2);const v=document.getElementById('dn-ov-altura-val');if(v)v.textContent=alt.toFixed(2);dnCalcIMC('ov','dn');}}
             if(pesoN){const wt=parseFloat(pesoN);const sl=document.getElementById('dn-ov-peso');if(sl&&wt>=40&&wt<=160){sl.value=wt;const v=document.getElementById('dn-ov-peso-val');if(v)v.textContent=wt;dnCalcIMC('ov','dn');}}
+            // SP chips + sliders (parceiro)
+            const caracSP=(row[67]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+            if(caracSP) parseAndSetChips('dn', 'sp', caracSP);
+            const spPeso=numStr(row[51]); const spAlt=numStr(row[52]);
+            if(spPeso){const wt=parseFloat(spPeso);const sl=document.getElementById('dn-sp-peso');if(sl&&wt>=40&&wt<=160){sl.value=wt;const v=document.getElementById('dn-sp-peso-val');if(v)v.textContent=wt;dnCalcIMC('sp','dn');}}
+            if(spAlt){let alt=parseFloat(spAlt);if(alt>3)alt=alt/100;const sl=document.getElementById('dn-sp-altura');if(sl&&alt>=1.40&&alt<=2.10){sl.value=alt.toFixed(2);const v=document.getElementById('dn-sp-altura-val');if(v)v.textContent=alt.toFixed(2);dnCalcIMC('sp','dn');}}
+            // Características familiares
             const caracParts=[];
             if(row[39]) caracParts.push('📝 Características pessoais: '+row[39]);
             if(row[40]) caracParts.push('👩 Mãe: '+row[40]);
@@ -5521,6 +5530,7 @@
             if(row[42]) caracParts.push('👴👵 Avós maternos: '+row[42]);
             if(row[43]) caracParts.push('👴👵 Avós paternos: '+row[43]);
             if(caracParts.length){const el=document.getElementById(p+'pf_caracteristicas');if(el)el.value=caracParts.join('\n\n');}
+            // Info adicional
             const infoLines=[];
             if(row[20]) infoLines.push('📋 Histórico tentativas/tratamentos: '+row[20]);
             if(row[19]) infoLines.push('🏥 Histórico parto/aborto: '+row[19]);
@@ -5531,9 +5541,25 @@
             if(row[25]) infoLines.push('🧒 Doenças na infância: '+row[25]);
             if(row[26]) infoLines.push('💊 Medicação regular: '+row[26]);
             if(row[28]) infoLines.push('🔪 Cirurgias: '+row[28]);
+            if(row[29]) infoLines.push('⚠️ Drogas/anabolizantes: '+row[29]);
             if(row[36]) infoLines.push('🦠 Histórico IST: '+row[36]);
             if(row[37]) infoLines.push('🧬 Histórico familiar doenças: '+row[37]);
             if(row[38]) infoLines.push('🧬 Histórico familiar infertilidade: '+row[38]);
+            if(row[31]) infoLines.push('📅 Idade 1ª menstruação: '+row[31]);
+            if(row[32]) infoLines.push('📅 Ciclos menstruais: '+row[32]);
+            if(row[33]) infoLines.push('📅 Última menstruação: '+row[33]);
+            if(row[34]) infoLines.push('❓ Dor na relação/exames: '+row[34]);
+            if(row[35]) infoLines.push('💊 Anticoncepcional: '+row[35]);
+            if(row[15]) infoLines.push('💍 Tempo de união: '+row[15]);
+            if(row[16]) infoLines.push('⏳ Tempo de tentativa: '+row[16]);
+            if(row[55]) infoLines.push('🏃 [Parceiro] Atividades físicas: '+row[55]);
+            if(row[57]) infoLines.push('💊 [Parceiro] Diagnósticos: '+row[57]);
+            if(row[59]) infoLines.push('💊 [Parceiro] Medicação: '+row[59]);
+            if(row[60]) infoLines.push('🤧 [Parceiro] Alergia: '+row[60]);
+            if(row[61]) infoLines.push('🔪 [Parceiro] Cirurgias: '+row[61]);
+            if(row[64]) infoLines.push('🦠 [Parceiro] Histórico IST: '+row[64]);
+            if(row[65]) infoLines.push('🧬 [Parceiro] Hist. familiar doenças: '+row[65]);
+            if(row[73]) infoLines.push('💼 [Parceiro] Profissão: '+row[73]);
             if(infoLines.length){const el=document.getElementById('dnInfoAdicional');if(el){const ex=el.value?el.value+'\n\n':'';el.value=ex+'--- Dados do Questionário ---\n'+infoLines.join('\n');}}
             const btn=document.getElementById('dnFormSearchBtn');
             if(btn){btn.textContent='✅ Preenchido';btn.style.background='rgba(16,185,129,0.15)';btn.style.color='#10b981';btn.style.borderColor='rgba(16,185,129,0.3)';setTimeout(()=>{btn.textContent='📋 Questionário';btn.style.background='';btn.style.color='';btn.style.borderColor='';},3000);}
