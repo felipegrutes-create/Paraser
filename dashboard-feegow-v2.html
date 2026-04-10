@@ -5489,6 +5489,27 @@
             const cvDate = str => { if (!str) return ''; const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : str; };
             const numStr = str => (str||'').replace(/[^\d.,]/g,'').replace(',','.');
 
+            // Data submissão do forms → data_consulta_1vez (só se vazio) + referência para idade
+            const calcAge = (birthStr, refStr) => {
+                const bm = (birthStr||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                if (!bm) return '';
+                const birth = new Date(+bm[3], +bm[2]-1, +bm[1]);
+                const rm = (refStr||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                const ref = rm ? new Date(+rm[3], +rm[2]-1, +rm[1]) : new Date();
+                let age = ref.getFullYear() - birth.getFullYear();
+                const dm = ref.getMonth() - birth.getMonth();
+                if (dm < 0 || (dm === 0 && ref.getDate() < birth.getDate())) age--;
+                return (age > 0 && age < 100) ? age.toString() : '';
+            };
+            const submDateMatch = (row[0]||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            const submDateISO = submDateMatch ? `${submDateMatch[3]}-${submDateMatch[2].padStart(2,'0')}-${submDateMatch[1].padStart(2,'0')}` : '';
+            const consultaEl = document.getElementById(p+'data_consulta_1vez');
+            if (submDateISO && consultaEl && !consultaEl.value) consultaEl.value = submDateISO;
+            const idadePac = calcAge(row[4], row[0]);
+            if (idadePac) setVal(p+'idade_paciente', idadePac);
+            const idadeConj = calcAge(row[47], row[0]);
+            if (idadeConj) setVal(p+'idade_conjuge', idadeConj);
+
             setVal(p+'nome_paciente', row[2]);
             setVal(p+'pf_data_nascimento', cvDate(row[4]));
             setVal(p+'nome_conjuge', row[5] || row[44]);
@@ -6431,6 +6452,27 @@
                 };
                 // Number extract
                 const numStr = str => (str||'').replace(/[^\d.,]/g,'').replace(',','.');
+
+                // Data submissão do forms → data_consulta_1vez (só se vazio) + referência para idade
+                const calcAge = (birthStr, refStr) => {
+                    const bm = (birthStr||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                    if (!bm) return '';
+                    const birth = new Date(+bm[3], +bm[2]-1, +bm[1]);
+                    const rm = (refStr||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                    const ref = rm ? new Date(+rm[3], +rm[2]-1, +rm[1]) : new Date();
+                    let age = ref.getFullYear() - birth.getFullYear();
+                    const dm = ref.getMonth() - birth.getMonth();
+                    if (dm < 0 || (dm === 0 && ref.getDate() < birth.getDate())) age--;
+                    return (age > 0 && age < 100) ? age.toString() : '';
+                };
+                const submDateMatch = (row[0]||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                const submDateISO = submDateMatch ? `${submDateMatch[3]}-${submDateMatch[2].padStart(2,'0')}-${submDateMatch[1].padStart(2,'0')}` : '';
+                const consultaEl = document.getElementById(p+'data_consulta_1vez');
+                if (submDateISO && consultaEl && !consultaEl.value) consultaEl.value = submDateISO;
+                const idadePac = calcAge(row[4], row[0]);
+                if (idadePac) setVal(p+'idade_paciente', idadePac);
+                const idadeConj = calcAge(row[47], row[0]);
+                if (idadeConj) setVal(p+'idade_conjuge', idadeConj);
 
                 // --- PERFIL PACIENTE ---
                 setVal(p + 'nome_paciente', row[2]);
