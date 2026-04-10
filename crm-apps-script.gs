@@ -666,11 +666,11 @@ function handleGetFormResponses(params) {
     var NAME_COL = -1;
     var normalizeStr = function(s) {
       return s.toLowerCase()
-               .replace(/[\u00a0\u200b\ufeff\u200c\u200d\u2060\u00ad]/g, ' ')
                .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
                .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o').replace(/[ùúûü]/g,'u')
                .replace(/[ç]/g,'c')
-               .replace(/\s+/g, ' ')
+               .replace(/[^a-z0-9 ]/g,' ')
+               .replace(/\s+/g,' ')
                .trim();
     };
     // Prioridade 1: "nome completo" ou "nome da doadora/paciente"
