@@ -5862,6 +5862,7 @@
                     });
                     statusEl.textContent = '✓ Salvo com sucesso';
                     statusEl.style.color = 'var(--success)';
+                    setTimeout(() => closeDonorForm(), 1500);
                 } catch(e) {
                     statusEl.textContent = '✗ Erro ao salvar';
                     statusEl.style.color = 'var(--danger)';
@@ -5869,6 +5870,7 @@
             } else {
                 statusEl.textContent = '⚠️ Salvo localmente';
                 statusEl.style.color = '#f59e0b';
+                setTimeout(() => closeDonorForm(), 1500);
             }
             setTimeout(() => { statusEl.textContent = ''; }, 3000);
         }
@@ -6294,11 +6296,13 @@
                     try {
                         await fetch(CRM_SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'save_donor', ...profile, dados: JSON.stringify(data) }) });
                         if (statusEl) { statusEl.textContent = '✓ Salvo com sucesso'; statusEl.style.color = 'var(--success)'; }
+                        setTimeout(() => closeForm(), 1500);
                     } catch(e) {
                         if (statusEl) { statusEl.textContent = '✗ Erro ao salvar'; statusEl.style.color = 'var(--danger)'; }
                     }
                 } else {
                     if (statusEl) { statusEl.textContent = '⚠️ Salvo localmente'; statusEl.style.color = '#f59e0b'; }
+                    setTimeout(() => closeForm(), 1500);
                 }
                 setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
             }
