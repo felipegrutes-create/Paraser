@@ -5985,6 +5985,7 @@
                 </div>`;
             }).join('');
             dnRenderPendingCards();
+            if (typeof updateDonorTabBadges === 'function') updateDonorTabBadges();
         }
 
         async function loadDonorProfiles() {
@@ -6381,6 +6382,7 @@
                     </div>`;
                 }).join('');
                 renderPending();
+                if (typeof updateDonorTabBadges === 'function') updateDonorTabBadges();
             }
 
             function newFromPending(key, nome) {
