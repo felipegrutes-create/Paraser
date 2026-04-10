@@ -5423,7 +5423,10 @@
                 </div>
             </div>`;
             wrap.style.display = 'block';
-            wrap.scrollIntoView({behavior:'smooth'});
+            requestAnimationFrame(() => {
+                const top = wrap.getBoundingClientRect().top + window.scrollY - 115;
+                window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+            });
         }
 
         function dnPreviewPhoto(input, idx) {
@@ -6168,7 +6171,10 @@
                     </div>
                 </div>`;
                 wrap.style.display = 'block';
-                wrap.scrollIntoView({ behavior: 'smooth' });
+                requestAnimationFrame(() => {
+                    const top = wrap.getBoundingClientRect().top + window.scrollY - 115;
+                    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+                });
             }
 
             function previewPhoto(input, idx) {
