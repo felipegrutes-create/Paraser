@@ -3857,7 +3857,7 @@
                     .filter(r => {
                         const s = (r[d.C.sta] || '').toLowerCase().trim();
                         if (['cancelado','desmarcado','remarcado'].includes(s)) return false;
-                        return (monthKey(r[d.C.dcri]) || monthKey(r[d.C.data])) === currentMK;
+                        return monthKey(r[d.C.data]) === currentMK;
                     })
                     .map(r => normalizeKey(r[d.C.pac]))
             ).size;
