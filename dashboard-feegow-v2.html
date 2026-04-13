@@ -3779,10 +3779,12 @@
             // Incluir consultas 1ª vez (inclui "Consulta - Presencial")
             vezRows.forEach(r => doaAdd(r, 'vez'));
 
-            // Incluir consultas de retorno
+            // Incluir consultas de retorno (apenas profissionais autorizados)
             raw.filter(r => {
                 const proc = (r[d.C.proc]||'').toLowerCase();
-                return proc.includes('retorno') || proc.includes('retor');
+                if (!proc.includes('retorno') && !proc.includes('retor')) return false;
+                const prof = (r[d.C.prof]||'').trim().toLowerCase();
+                return CONSULTA_PRESENCIAL_PROFS.some(p => prof.includes(p));
             }).forEach(r => doaAdd(r, 'retorno'));
 
             // Ordenar por data desc (mais recente primeiro)
