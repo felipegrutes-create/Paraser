@@ -3185,10 +3185,16 @@
                 allStatus[s]++;
             });
 
+            const CONSULTA_PRESENCIAL_PROFS = ['mario barroso','priscila loyola','rejane santana','rodolfo salvato','joselmo salvato','marcelle moura'];
             const vezRows   = raw.filter(r => {
                 if (!r[C.proc]) return false;
                 const proc = r[C.proc].trim().toLowerCase().replace(/\s+/g, ' ');
-                return proc.includes("vez") || proc === 'consulta - presencial';
+                if (proc.includes("vez")) return true;
+                if (proc === 'consulta - presencial') {
+                    const prof = (r[C.prof] || '').trim().toLowerCase();
+                    return CONSULTA_PRESENCIAL_PROFS.some(p => prof.includes(p));
+                }
+                return false;
             });
             const pvByMonth = {};
             const pvByProf  = {};
