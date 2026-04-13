@@ -2975,6 +2975,7 @@
         // ===================== GLOBALS =====================
         let chartInstances = {};
         const PEND_PER_PAGE = 30;
+        const CONSULTA_PRESENCIAL_PROFS = ['mario barroso','priscila loyola','rejane santana','rodolfo salvato','joselmo salvato','marcelle moura'];
 
         // ===== CRM KANBAN GLOBALS =====
         let crmMap     = {};   // paciente_key → registro CRM
@@ -3185,7 +3186,6 @@
                 allStatus[s]++;
             });
 
-            const CONSULTA_PRESENCIAL_PROFS = ['mario barroso','priscila loyola','rejane santana','rodolfo salvato','joselmo salvato','marcelle moura'];
             const vezRows   = raw.filter(r => {
                 if (!r[C.proc]) return false;
                 const proc = r[C.proc].trim().toLowerCase().replace(/\s+/g, ' ');
