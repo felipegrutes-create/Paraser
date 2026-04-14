@@ -4557,21 +4557,28 @@
             const mesNomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
             // Coletar dados mensais a partir de Abril/2026
             const START_MK = '2026-04';
-            const byMonth = {}; // mk → { atendidos: Set, quitados: Set }
+            const byMonth = {}; // mk → { atendidos: Set, quitados: Set, propostas: Set, valorTotal: number }
 
             doaPatients.forEach(p => {
                 const mk = monthKey(p.dataAp);
                 if (!mk || mk < START_MK) return;
                 if ((p.statusRaw || '').toLowerCase() !== 'atendido') return;
-                if (!byMonth[mk]) byMonth[mk] = { atendidos: new Set(), quitados: new Set() };
+                if (!byMonth[mk]) byMonth[mk] = { atendidos: new Set(), quitados: new Set(), propostas: new Set(), valorTotal: 0 };
                 byMonth[mk].atendidos.add(p.key);
                 const crm = getCrmRec(p.key);
-                if (crm && (crm.quitado === true || crm.quitado === 'TRUE')) {
-                    byMonth[mk].quitados.add(p.key);
+                if (crm) {
+                    if (crm.quitado === true || crm.quitado === 'TRUE') {
+                        byMonth[mk].quitados.add(p.key);
+                        byMonth[mk].valorTotal += parseValorFloat(crm.valor);
+                    }
+                    if (crm.proposta_feita === 'Sim') {
+                        byMonth[mk].propostas.add(p.key);
+                    }
                 }
             });
 
             const months = Object.keys(byMonth).sort();
+            const fmtBRL = v => v > 0 ? 'R$\u00a0' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
 
             // KPIs do mês mais recente
             const kpiEl = document.getElementById('conv-comercial-kpis');
@@ -4580,7 +4587,9 @@
                 const last = byMonth[lastMk];
                 const atend = last.atendidos.size;
                 const quit = last.quitados.size;
+                const prop = last.propostas.size;
                 const tx = atend ? ((quit / atend) * 100).toFixed(1) : '0';
+                const txProp = atend ? ((prop / atend) * 100).toFixed(1) : '0';
                 const [yr, mo] = lastMk.split('-');
                 const label = mesNomes[parseInt(mo) - 1] + '/' + yr;
                 const txColor = parseFloat(tx) >= 50 ? '#10b981' : parseFloat(tx) >= 25 ? '#f59e0b' : '#ef4444';
@@ -4589,13 +4598,17 @@
                         <div style="font-size:28px;font-weight:800;color:#fbbf24">${atend}</div>
                         <div style="font-size:12px;color:var(--muted);margin-top:4px">Atendidos em ${label}</div>
                     </div>
+                    <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:16px;text-align:center">
+                        <div style="font-size:28px;font-weight:800;color:#818cf8">${prop}</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Propostas (${txProp}%)</div>
+                    </div>
                     <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px;text-align:center">
                         <div style="font-size:28px;font-weight:800;color:#10b981">${quit}</div>
-                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Quitados em ${label}</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Quitados (${tx}%)</div>
                     </div>
-                    <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:16px;text-align:center">
-                        <div style="font-size:28px;font-weight:800;color:${txColor}">${tx}%</div>
-                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Taxa de Conversão</div>
+                    <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:12px;padding:16px;text-align:center">
+                        <div style="font-size:20px;font-weight:800;color:#10b981">${fmtBRL(last.valorTotal)}</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Valor Total Quitado</div>
                     </div>`;
             }
 
@@ -4605,28 +4618,61 @@
                 data: {
                     labels: months.map(mk => { const [yr,mo] = mk.split('-'); return mesNomes[parseInt(mo)-1].slice(0,3)+'/'+yr.slice(2); }),
                     datasets: [
-                        { label: 'Atendidos', data: months.map(mk => byMonth[mk].atendidos.size), backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 6 },
-                        { label: 'Quitados',  data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: 'rgba(16,185,129,0.8)', borderRadius: 6 }
+                        { label: 'Atendidos', data: months.map(mk => byMonth[mk].atendidos.size), backgroundColor: 'rgba(251,191,36,0.7)', borderRadius: 6 },
+                        { label: 'Propostas', data: months.map(mk => byMonth[mk].propostas.size), backgroundColor: 'rgba(99,102,241,0.75)', borderRadius: 6 },
+                        { label: 'Quitados',  data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 6 }
                     ]
                 },
-                options: { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#e2e8f4' } } }, scales: { x: { ticks: { color: '#6b7a99' } }, y: { ticks: { color: '#6b7a99', stepSize: 1 }, beginAtZero: true } } }
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#e2e8f4' } },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: (ctx) => {
+                                    const mk = months[ctx.dataIndex];
+                                    if (!mk) return '';
+                                    const d = byMonth[mk];
+                                    if (ctx.datasetIndex === 2) return `Valor: ${fmtBRL(d.valorTotal)}`;
+                                    if (ctx.datasetIndex === 1) { const at = d.atendidos.size; return at ? `${((d.propostas.size/at)*100).toFixed(1)}% dos atendidos` : ''; }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: { x: { ticks: { color: '#6b7a99' } }, y: { ticks: { color: '#6b7a99', stepSize: 1 }, beginAtZero: true } }
+                }
             });
 
             // Tabela
             const tbl = document.getElementById('convComercialTable');
             if (tbl) {
+                // Atualiza cabeçalho para incluir Propostas e Valor
+                const thead = tbl.closest('table')?.querySelector('thead tr');
+                if (thead && thead.children.length < 6) {
+                    thead.innerHTML = `
+                        <th style="text-align:left;padding:6px 8px">MÊS</th>
+                        <th style="text-align:center;padding:6px 8px">ATENDIDOS</th>
+                        <th style="text-align:center;padding:6px 8px">PROPOSTAS</th>
+                        <th style="text-align:center;padding:6px 8px">QUITADOS</th>
+                        <th style="text-align:center;padding:6px 8px">TX CONV.</th>
+                        <th style="text-align:right;padding:6px 8px">VALOR</th>`;
+                }
                 tbl.innerHTML = months.map(mk => {
                     const [yr, mo] = mk.split('-');
                     const label = mesNomes[parseInt(mo) - 1] + '/' + yr;
                     const atend = byMonth[mk].atendidos.size;
+                    const prop = byMonth[mk].propostas.size;
                     const quit = byMonth[mk].quitados.size;
                     const tx = atend ? ((quit / atend) * 100).toFixed(1) : '0';
                     const txColor = parseFloat(tx) >= 50 ? '#10b981' : parseFloat(tx) >= 25 ? '#f59e0b' : '#ef4444';
                     return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
                         <td style="padding:8px;font-weight:600">${label}</td>
-                        <td style="padding:8px;text-align:center;color:#818cf8">${atend}</td>
+                        <td style="padding:8px;text-align:center;color:#fbbf24">${atend}</td>
+                        <td style="padding:8px;text-align:center;color:#818cf8">${prop}</td>
                         <td style="padding:8px;text-align:center;color:#10b981">${quit}</td>
                         <td style="padding:8px;text-align:center;font-weight:700;color:${txColor}">${tx}%</td>
+                        <td style="padding:8px;text-align:right;color:#10b981;font-weight:600">${fmtBRL(byMonth[mk].valorTotal)}</td>
                     </tr>`;
                 }).join('');
             }
