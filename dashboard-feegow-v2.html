@@ -3518,10 +3518,13 @@
                 if (s.includes('cancelado') || s.includes('desmarcado')) profMap[pr].cancel++;
             });
 
-            // 1ª vez por profissional (mês atual)
+            // 1ª vez por profissional (mês atual) — exclui cancelado/desmarcado/remarcado
+            const doaExclude = ['cancelado','desmarcado','remarcado'];
             vezRows.forEach(r => {
                 const mk = monthKey(r[C.data]);
                 if (mk !== curMK) return;
+                const s = (r[C.sta]||'').toLowerCase().trim();
+                if (doaExclude.includes(s)) return;
                 const pr = (r[C.prof] || 'Outros').trim();
                 if (!profMap[pr]) profMap[pr] = { total:0, atendido:0, pv:0, retorno:0, receita:0, naoComp:0, cancel:0 };
                 profMap[pr].pv++;
