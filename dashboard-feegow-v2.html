@@ -1070,6 +1070,53 @@
         .fin-group-row:hover { background: rgba(255,255,255,0.04); }
         .fin-detail-row td { padding: 5px 12px; border-bottom: 1px solid rgba(255,255,255,0.02); }
 
+        /* Contas a Receber */
+        .cr-top-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
+        .cr-month-nav { display:flex; align-items:center; gap:10px; }
+        .cr-nav-btn {
+            background:var(--surface2); border:1px solid var(--border); color:var(--text);
+            width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:18px;
+            display:flex; align-items:center; justify-content:center; transition:background 0.15s;
+        }
+        .cr-nav-btn:hover { background:var(--dim); }
+        .cr-reload-btn {
+            background:rgba(0,212,170,0.1); border:1px solid rgba(0,212,170,0.2);
+            color:var(--accent); padding:6px 14px; border-radius:8px; cursor:pointer;
+            font-size:12px; font-weight:600; font-family:inherit; transition:background 0.15s;
+        }
+        .cr-reload-btn:hover { background:rgba(0,212,170,0.18); }
+        .cr-search {
+            background:var(--surface2); border:1px solid var(--border); color:var(--text);
+            border-radius:8px; padding:8px 14px; font-family:inherit; font-size:13px; min-width:220px; outline:none;
+        }
+        .cr-search:focus { border-color:var(--accent); }
+        .cr-badge-pago    { background:rgba(16,185,129,0.15); color:#34d399; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
+        .cr-badge-parcial { background:rgba(245,158,11,0.15);  color:#fbbf24; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
+        .cr-badge-pendente{ background:rgba(239,68,68,0.15);   color:#f87171; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
+        .cr-badge-proc { background:rgba(99,102,241,0.15); color:#a5b4fc; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:600; }
+        .cr-badge-med  { background:rgba(236,72,153,0.15);  color:#f472b6; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:600; }
+        .cr-row-expand { cursor:pointer; }
+        .cr-row-expand:hover { background:rgba(255,255,255,0.025); }
+        .cr-expand-arrow { display:inline-block; transition:transform 0.2s; font-size:11px; color:var(--muted); }
+        .cr-detail-section td { padding:0; }
+        .cr-detail-inner {
+            padding:14px 20px 14px 40px; display:grid; grid-template-columns:1fr 1fr; gap:20px;
+            background:rgba(0,0,0,0.18);
+        }
+        .cr-detail-label { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--muted); letter-spacing:0.5px; margin-bottom:8px; }
+        .cr-detail-item {
+            display:flex; justify-content:space-between; align-items:center; gap:10px;
+            font-size:12px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+        }
+        .cr-detail-item:last-child { border-bottom:none; }
+        .cr-val-pago    { color:#34d399; font-weight:600; }
+        .cr-val-pendente{ color:#f87171; font-weight:600; }
+        .cr-charts-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:20px 0; }
+        @media (max-width:768px) {
+            .cr-charts-row { grid-template-columns:1fr; }
+            .cr-detail-inner { grid-template-columns:1fr; }
+        }
+
         /* Doadoras/Receptoras */
         .doa-list { display: flex; flex-direction: column; gap: 20px; }
         .doa-day-group {
@@ -2007,6 +2054,7 @@
         <button class="tab tab-donor" onclick="showSection('sec-receptoras',this)">Receptoras<span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
         <button class="tab tab-donor" onclick="showSection('sec-embriao',this)">Embrião Doado<span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
         <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
+        <button class="tab" onclick="showSection('sec-cr',this)">💳 Contas a Receber</button>
     </div>
 
     <div class="container">
@@ -2920,6 +2968,54 @@
                     <button class="fin-view-btn" onclick="setFinView('sede',this)">Visão Nova Sede</button>
                 </div>
                 <canvas id="finChartReceitaDespesa" height="120"></canvas>
+            </div>
+        </section>
+
+        <!-- CONTAS A RECEBER -->
+        <section id="sec-cr" class="section">
+            <div class="cr-top-bar">
+                <p class="section-title" style="margin:0">💳 Contas a Receber — Faturamento Feegow</p>
+                <div class="cr-month-nav">
+                    <button class="cr-nav-btn" onclick="crNavMonth(-1)">‹</button>
+                    <span id="crMonthLabel" style="font-size:15px;font-weight:600;min-width:130px;text-align:center">—</span>
+                    <button class="cr-nav-btn" onclick="crNavMonth(1)">›</button>
+                    <button class="cr-reload-btn" onclick="crReload()">↺ Recarregar</button>
+                </div>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card teal"><div class="value" id="cr-total">—</div><div class="label">Total Faturado</div></div>
+                <div class="kpi-card"><div class="value" id="cr-recebido" style="color:#34d399">—</div><div class="label">Recebido</div></div>
+                <div class="kpi-card"><div class="value" id="cr-pendente" style="color:#f87171">—</div><div class="label">Pendente</div></div>
+                <div class="kpi-card"><div class="value" id="cr-pacientes">—</div><div class="label">Pacientes</div></div>
+                <div class="kpi-card"><div class="value" id="cr-ticket">—</div><div class="label">Ticket Médio</div></div>
+            </div>
+
+            <div class="cr-charts-row">
+                <div class="chart-card">
+                    <h3>🍩 Status de Recebimento</h3>
+                    <canvas id="crChartStatus" height="200"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>📊 Top Procedimentos por Receita</h3>
+                    <canvas id="crChartProc" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="fin-filters">
+                <input type="text" id="crSearch" class="cr-search" placeholder="🔍 Buscar paciente..." oninput="renderCR()">
+                <select id="crStatus" onchange="renderCR()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;cursor:pointer;min-width:180px">
+                    <option value="">Todos os status</option>
+                    <option value="pago">Recebido</option>
+                    <option value="parcial">Parcialmente pago</option>
+                    <option value="pendente">Pendente</option>
+                </select>
+            </div>
+
+            <div class="fin-table-wrap">
+                <div id="crTableContent">
+                    <div style="text-align:center;padding:60px;color:var(--muted)">Clique na aba para carregar os dados do mês atual</div>
+                </div>
             </div>
         </section>
 
@@ -4091,6 +4187,7 @@
             if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
+            if (id === 'sec-cr') loadAndRenderCR();
             // Re-render abas dirty ao entrar
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
@@ -9099,6 +9196,213 @@
             checkForUpdates();
             setInterval(checkForUpdates, CHECK_INTERVAL);
         })();
+
+        // ===== CONTAS A RECEBER =====
+        let crData = [], crDataLoaded = false, crCurrentDate = new Date();
+        let crChartStatus = null, crChartProc = null;
+
+        function crFmt(cents) {
+            return 'R$ ' + (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function _crFmtDate(d) {
+            return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+        }
+        function crNavMonth(dir) {
+            crCurrentDate = new Date(crCurrentDate.getFullYear(), crCurrentDate.getMonth() + dir, 1);
+            crDataLoaded = false;
+            loadAndRenderCR();
+        }
+        function crReload() { crDataLoaded = false; loadAndRenderCR(); }
+        function crInvoiceStatus(inv) {
+            const det = inv.detalhes && inv.detalhes[0];
+            const total = det ? (det.valor || 0) : 0;
+            const pago = (inv.pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
+            return pago >= total && total > 0 ? 'pago' : pago > 0 ? 'parcial' : 'pendente';
+        }
+        function crStatusBadge(s) {
+            if (s === 'pago')    return '<span class="cr-badge-pago">RECEBIDO</span>';
+            if (s === 'parcial') return '<span class="cr-badge-parcial">PARCIAL</span>';
+            return '<span class="cr-badge-pendente">PENDENTE</span>';
+        }
+
+        async function loadAndRenderCR() {
+            if (crDataLoaded) { renderCR(); return; }
+            const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            document.getElementById('crMonthLabel').textContent = months[crCurrentDate.getMonth()] + ' ' + crCurrentDate.getFullYear();
+
+            const start = new Date(crCurrentDate.getFullYear(), crCurrentDate.getMonth(), 1);
+            const end   = new Date(crCurrentDate.getFullYear(), crCurrentDate.getMonth() + 1, 0);
+            const ds = _crFmtDate(start), de = _crFmtDate(end);
+
+            document.getElementById('crTableContent').innerHTML =
+                '<div style="text-align:center;padding:60px"><div class="spinner-ring" style="margin:0 auto"></div><p style="color:var(--muted);margin-top:12px">Carregando contas a receber…</p></div>';
+            ['cr-total','cr-recebido','cr-pendente','cr-pacientes','cr-ticket'].forEach(id => document.getElementById(id).textContent = '—');
+
+            try {
+                const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
+                const json = await fetch(url, { signal: AbortSignal.timeout(90000) }).then(r => r.json());
+                if (json.error) throw new Error(json.error);
+                crData = json.data || [];
+                crDataLoaded = true;
+                renderCR();
+            } catch(e) {
+                document.getElementById('crTableContent').innerHTML =
+                    `<div style="text-align:center;padding:40px;color:#ef4444">Erro: ${e.message}</div>`;
+            }
+        }
+
+        function renderCR() {
+            const search = (document.getElementById('crSearch')?.value || '').toLowerCase().trim();
+            const statusFilter = document.getElementById('crStatus')?.value || '';
+
+            const filtered = crData.filter(inv => {
+                if (statusFilter && crInvoiceStatus(inv) !== statusFilter) return false;
+                if (search && !(inv.nomePaciente || '').toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            // KPIs (always from full crData)
+            const totalFat  = crData.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
+            const totalPago = crData.reduce((s,inv) => s + (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0), 0);
+            const uniqPac   = new Set(crData.map(inv => inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].conta_id).filter(Boolean)).size;
+            document.getElementById('cr-total').textContent     = crFmt(totalFat);
+            document.getElementById('cr-recebido').textContent  = crFmt(totalPago);
+            document.getElementById('cr-pendente').textContent  = crFmt(Math.max(0, totalFat - totalPago));
+            document.getElementById('cr-pacientes').textContent = uniqPac;
+            document.getElementById('cr-ticket').textContent    = crData.length ? crFmt(totalFat / crData.length) : '—';
+
+            renderCRCharts();
+
+            if (!filtered.length) {
+                document.getElementById('crTableContent').innerHTML =
+                    '<div style="text-align:center;padding:40px;color:var(--muted)">Nenhuma fatura encontrada.</div>';
+                return;
+            }
+
+            filtered.sort((a,b) => {
+                const da = (a.detalhes&&a.detalhes[0]&&a.detalhes[0].data)||'';
+                const db = (b.detalhes&&b.detalhes[0]&&b.detalhes[0].data)||'';
+                return db.localeCompare(da);
+            });
+
+            let html = `<div class="fin-table-scroll"><table class="fin-table"><thead><tr>
+                <th style="width:96px">Data</th><th>Paciente</th><th>Procedimentos / Itens</th>
+                <th style="width:115px;text-align:right">Total</th>
+                <th style="width:115px;text-align:right">Pago</th>
+                <th style="width:96px">Status</th>
+                <th style="width:34px"></th>
+            </tr></thead><tbody>`;
+
+            filtered.forEach((inv, i) => {
+                const det  = inv.detalhes && inv.detalhes[0]; if (!det) return;
+                const data = (det.data||'').replace(/-/g,'/');
+                const pac  = inv.nomePaciente || `#${det.conta_id}`;
+                const total = det.valor || 0;
+                const pago  = (inv.pagamentos||[]).reduce((s,p)=>s+(p.valor||0),0);
+                const status = crInvoiceStatus(inv);
+                const itens = inv.itens || [];
+                const procs = itens.filter(it=>it.tipo==='S').map(it=>it.nomeResolvido||it.descricao||`ID${it.procedimento_id}`).filter(Boolean);
+                const meds  = itens.filter(it=>it.tipo==='M').map(it=>it.nomeResolvido||it.descricao||`ID${it.procedimento_id}`).filter(Boolean);
+                const rowId = `crr${i}`;
+
+                const procsHtml = procs.length
+                    ? `<div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${procs.join(', ')}">${procs[0]}${procs.length>1?' <span style="color:var(--muted)">+'+( procs.length-1)+'</span>':''}</div>`
+                    : '';
+                const medsHtml = meds.length
+                    ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:2px">${meds.slice(0,2).map(m=>`<span class="cr-badge-med">${m.length>20?m.slice(0,20)+'…':m}</span>`).join('')}${meds.length>2?`<span class="cr-badge-med">+${meds.length-2}</span>`:''}</div>`
+                    : '';
+
+                html += `<tr class="cr-row-expand" onclick="toggleCRRow('${rowId}')">
+                    <td>${data}</td>
+                    <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis" title="${pac}">${pac}</td>
+                    <td style="max-width:300px">${procsHtml}${medsHtml}${!procs.length&&!meds.length?'<span style="color:var(--muted)">—</span>':''}</td>
+                    <td class="fin-val">${crFmt(total)}</td>
+                    <td class="fin-val ${pago>=total?'cr-val-pago':pago>0?'':'cr-val-pendente'}">${crFmt(pago)}</td>
+                    <td>${crStatusBadge(status)}</td>
+                    <td style="text-align:center"><span class="cr-expand-arrow" id="arr-${rowId}">▶</span></td>
+                </tr>
+                <tr id="${rowId}" style="display:none" class="cr-detail-section"><td colspan="7"><div class="cr-detail-inner">
+                    <div>
+                        <div class="cr-detail-label">Itens Faturados</div>
+                        ${itens.length ? itens.map(it => {
+                            const cat   = it.tipo==='S'?'P':it.tipo==='M'?'M':it.tipo||'?';
+                            const badge = it.tipo==='S'?'cr-badge-proc':it.tipo==='M'?'cr-badge-med':'fin-badge-other';
+                            const nome  = it.nomeResolvido||it.descricao||`ID ${it.procedimento_id||'?'}`;
+                            return `<div class="cr-detail-item">
+                                <span style="display:flex;align-items:center;gap:6px">
+                                    <span class="${badge}">${cat}</span>
+                                    <span>${nome}</span>
+                                </span>
+                                <span style="font-variant-numeric:tabular-nums;flex-shrink:0">${crFmt(it.valor||0)}</span>
+                            </div>`;
+                        }).join('') : '<span style="color:var(--muted)">—</span>'}
+                    </div>
+                    <div>
+                        <div class="cr-detail-label">Pagamentos</div>
+                        ${(inv.pagamentos||[]).length ? (inv.pagamentos||[]).map(pg => {
+                            const pgData = (pg.data||'').replace(/-/g,'/');
+                            const pgDesc = pg.descricao||`Forma ${pg.forma_pagamento||'?'}`;
+                            return `<div class="cr-detail-item">
+                                <span style="display:flex;align-items:center;gap:6px">
+                                    <span style="color:var(--muted);font-size:11px">${pgData}</span>
+                                    <span>${pgDesc}</span>
+                                </span>
+                                <span class="cr-val-pago" style="font-variant-numeric:tabular-nums;flex-shrink:0">${crFmt(pg.valor||0)}</span>
+                            </div>`;
+                        }).join('') : '<span style="color:var(--muted)">Nenhum pagamento registrado</span>'}
+                    </div>
+                </div></td></tr>`;
+            });
+
+            html += '</tbody></table></div>';
+            document.getElementById('crTableContent').innerHTML = html;
+        }
+
+        function toggleCRRow(id) {
+            const row = document.getElementById(id);
+            const arr = document.getElementById('arr-' + id);
+            if (!row) return;
+            const open = row.style.display !== 'none';
+            row.style.display = open ? 'none' : '';
+            if (arr) arr.style.transform = open ? '' : 'rotate(90deg)';
+        }
+
+        function renderCRCharts() {
+            const pago    = crData.filter(inv=>crInvoiceStatus(inv)==='pago').reduce((s,inv)=>s+((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0),0);
+            const parcial = crData.filter(inv=>crInvoiceStatus(inv)==='parcial').reduce((s,inv)=>s+((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0),0);
+            const pend    = crData.filter(inv=>crInvoiceStatus(inv)==='pendente').reduce((s,inv)=>s+((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0),0);
+
+            const ctxS = document.getElementById('crChartStatus');
+            if (crChartStatus) crChartStatus.destroy();
+            if (ctxS) crChartStatus = new Chart(ctxS, {
+                type: 'doughnut',
+                data: { labels:['Recebido','Parcial','Pendente'], datasets:[{ data:[pago,parcial,pend], backgroundColor:['#10b981','#f59e0b','#ef4444'], borderWidth:0 }] },
+                options: { responsive:true, cutout:'65%',
+                    plugins: { legend:{ labels:{color:'#6b7a99',font:{size:11}} },
+                        tooltip:{ callbacks:{ label: ctx => ' '+crFmt(ctx.raw) } } } }
+            });
+
+            const procRev = {};
+            crData.forEach(inv => (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
+                const n = (it.nomeResolvido||it.descricao||`ID${it.procedimento_id}`).slice(0,28);
+                procRev[n] = (procRev[n]||0) + (it.valor||0);
+            }));
+            const top = Object.entries(procRev).sort((a,b)=>b[1]-a[1]).slice(0,7);
+
+            const ctxP = document.getElementById('crChartProc');
+            if (crChartProc) crChartProc.destroy();
+            if (ctxP && top.length) crChartProc = new Chart(ctxP, {
+                type: 'bar',
+                data: { labels: top.map(([k])=>k), datasets:[{ data: top.map(([,v])=>v/100), backgroundColor:'rgba(99,102,241,0.7)', borderRadius:5 }] },
+                options: { indexAxis:'y', responsive:true,
+                    plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>' R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2}) } } },
+                    scales:{
+                        x:{ ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} },
+                        y:{ ticks:{color:'#a0aec0',font:{size:10}}, grid:{display:false} }
+                    }
+                }
+            });
+        }
     </script>
 
     <!-- Dropdown Novo Perfil (fora de containers com transform/filter) -->

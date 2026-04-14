@@ -47,6 +47,10 @@ const LOG_HEADERS = [
   'dados_anteriores','coluna_origem','coluna_destino'
 ];
 const DONOR_SHEET = 'Doadoras_Perfis';
+
+// Mapa estático de procedimentos — preencha caso o list-sales não traga nomes
+// Exemplo: var PROCEDURE_NAMES = { '4': 'FIV com Óvulos Próprios', '7': 'Criopreservação' };
+var PROCEDURE_NAMES = {};
 const BACKUP_SHEET_NAME = 'Backup_Agendamentos';
 const DONOR_HEADERS = ['id','codigo_perfil','dados','ultima_atualizacao'];
 
@@ -62,6 +66,12 @@ function doGet(e) {
     // Teste de diagnóstico
     if (action === 'test_feegow') {
       return handleFeegowTest(e.parameter);
+    }
+    if (action === 'test_financial') {
+      return handleTestFinancial(e.parameter);
+    }
+    if (action === 'get_financial') {
+      return handleGetFinancial(e.parameter);
     }
 
     // Retornar fichas de pacientes
@@ -557,6 +567,201 @@ function handleFeegowTest(params) {
   return ContentService
     .createTextOutput(JSON.stringify(results, null, 2))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Teste endpoints financeiros - acesse via ?action=test_financial&data_start=01/01/2026&data_end=31/01/2026
+function handleTestFinancial(params) {
+  const ds = params.data_start || '01/01/2026';
+  const de = params.data_end   || '31/01/2026';
+  const headers = { 'x-access-token': FEEGOW_API_TOKEN };
+  const results = {};
+
+  const ds2 = ds.split('/').reverse().join('-'); // 01/01/2026 → 2026-01-01
+  const de2 = de.split('/').reverse().join('-');
+
+  const base = 'https://api.feegow.com/v1/api';
+
+  // Endpoint documentado: /financial/list-sales
+  const eps = [
+    '/financial/list-sales?date_start=' + ds2 + '&date_end=' + de2 + '&unidade_id=0',
+  ];
+
+  eps.forEach(ep => {
+    try {
+      const r = UrlFetchApp.fetch(base + ep, { headers, muteHttpExceptions: true });
+      results[ep] = { status: r.getResponseCode(), body: r.getContentText().slice(0, 500) };
+    } catch(e) {
+      results[ep] = { error: e.message };
+    }
+  });
+
+  return ContentService
+    .createTextOutput(JSON.stringify(results, null, 2))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// =========================================================
+// Contas a Receber — lista faturas com nome do paciente
+// Acesse via ?action=get_financial&data_start=01/01/2026&data_end=31/01/2026
+// =========================================================
+function handleGetFinancial(params) {
+  var ds = params.data_start || '';
+  var de = params.data_end   || '';
+  if (!ds || !de) return jsonErr('data_start e data_end obrigatórios (formato DD/MM/YYYY)');
+
+  // Converte DD/MM/YYYY → YYYY-MM-DD
+  var ds2 = ds.split('/').reverse().join('-');
+  var de2 = de.split('/').reverse().join('-');
+
+  var reqHeaders = { 'x-access-token': FEEGOW_API_TOKEN };
+  var base = FEEGOW_API_BASE;
+
+  // Passo 1: buscar faturas do período
+  var invoicesUrl = base + '/financial/list-invoice?data_start=' + ds2 + '&data_end=' + de2 + '&tipo_transacao=C&unidade_id=0';
+  var r1;
+  try {
+    r1 = UrlFetchApp.fetch(invoicesUrl, { headers: reqHeaders, muteHttpExceptions: true });
+  } catch(e) {
+    return jsonErr('Erro ao chamar list-invoice: ' + e.message);
+  }
+  if (r1.getResponseCode() !== 200) {
+    return jsonErr('list-invoice retornou ' + r1.getResponseCode() + ': ' + r1.getContentText().slice(0, 400));
+  }
+
+  var invoicesData;
+  try {
+    invoicesData = JSON.parse(r1.getContentText());
+  } catch(e) {
+    return jsonErr('Erro ao parsear list-invoice: ' + e.message);
+  }
+
+  var invoices = (invoicesData && invoicesData.content) ? invoicesData.content : [];
+  if (!invoices.length) return jsonOk({ success: true, total: 0, data: [] });
+
+  // Passo 2: buscar nomes de procedimentos (tipo S) e medicamentos/materiais (tipo M)
+  var procMap = {};
+  var prodMap = {};
+  // Seed com mapa estático do topo do arquivo
+  Object.keys(PROCEDURE_NAMES).forEach(function(k) { procMap[k] = PROCEDURE_NAMES[k]; });
+
+  // Coletar IDs únicos por tipo
+  var uniqueProcIds = {};
+  var uniqueProdIds = {};
+  invoices.forEach(function(invoice) {
+    (invoice.itens || []).forEach(function(item) {
+      if (item.tipo === 'S' && item.procedimento_id) uniqueProcIds[item.procedimento_id] = true;
+      if (item.tipo === 'M' && item.procedimento_id) uniqueProdIds[item.procedimento_id] = true;
+    });
+  });
+
+  // GET /procedures/list?procedimento_id=X — em paralelo
+  var procIds = Object.keys(uniqueProcIds);
+  if (procIds.length > 0) {
+    var procRequests = procIds.map(function(id) {
+      return { url: base + '/procedures/list?procedimento_id=' + id, headers: reqHeaders, muteHttpExceptions: true };
+    });
+    var procResps = UrlFetchApp.fetchAll(procRequests);
+    procResps.forEach(function(resp, i) {
+      if (resp.getResponseCode() === 200) {
+        try {
+          var pd = JSON.parse(resp.getContentText());
+          var nome = pd && pd.content && pd.content[0] && pd.content[0].nome;
+          if (nome) procMap[procIds[i]] = nome;
+        } catch(e) {}
+      }
+    });
+  }
+
+  // POST /core/financial/base/product/list — em paralelo (medicamentos/materiais)
+  var prodIds = Object.keys(uniqueProdIds);
+  if (prodIds.length > 0) {
+    var prodRequests = prodIds.map(function(id) {
+      return {
+        url: base + '/core/financial/base/product/list',
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({ id: parseInt(id, 10), page: 1, perPage: 1 }),
+        headers: reqHeaders,
+        muteHttpExceptions: true
+      };
+    });
+    var prodResps = UrlFetchApp.fetchAll(prodRequests);
+    prodResps.forEach(function(resp, i) {
+      if (resp.getResponseCode() === 200) {
+        try {
+          var pd = JSON.parse(resp.getContentText());
+          var nome = pd && pd.data && pd.data[0] && pd.data[0].NomeProduto;
+          if (nome) prodMap[prodIds[i]] = nome;
+        } catch(e) {}
+      }
+    });
+  }
+
+  // Passo 3: montar requisições paralelas para buscar nome do paciente
+  // Só busca quando detalhes[0].tipo_conta === 3 (paciente)
+  var fetchRequests = [];
+  var invoiceIndices = [];
+
+  invoices.forEach(function(invoice, idx) {
+    var detalhe = invoice.detalhes && invoice.detalhes[0];
+    if (detalhe && detalhe.tipo_conta === 3 && detalhe.conta_id) {
+      fetchRequests.push({
+        url: base + '/patient/search?paciente_id=' + detalhe.conta_id,
+        headers: reqHeaders,
+        muteHttpExceptions: true
+      });
+      invoiceIndices.push(idx);
+    }
+  });
+
+  // fetchAll faz todas as requisições em paralelo
+  var patientResponses = fetchRequests.length > 0 ? UrlFetchApp.fetchAll(fetchRequests) : [];
+
+  var nameMap = {};
+  patientResponses.forEach(function(resp, i) {
+    var invoiceIdx = invoiceIndices[i];
+    try {
+      if (resp.getResponseCode() === 200) {
+        var pd = JSON.parse(resp.getContentText());
+        nameMap[invoiceIdx] = (pd && pd.content && pd.content.nome) ? pd.content.nome : null;
+      } else {
+        nameMap[invoiceIdx] = null;
+      }
+    } catch(e) {
+      nameMap[invoiceIdx] = null;
+    }
+  });
+
+  // Montar resultado final
+  var result = invoices.map(function(invoice, idx) {
+    var out = {};
+    for (var k in invoice) {
+      if (invoice.hasOwnProperty(k)) out[k] = invoice[k];
+    }
+    out.nomePaciente = nameMap.hasOwnProperty(idx) ? nameMap[idx] : null;
+    // Enriquecer itens com categoria e nome resolvido
+    out.itens = (invoice.itens || []).map(function(item) {
+      var enriched = {};
+      for (var ki in item) { if (item.hasOwnProperty(ki)) enriched[ki] = item[ki]; }
+      if (item.tipo === 'S') {
+        enriched.categoria = 'Procedimento';
+        enriched.nomeResolvido = procMap[item.procedimento_id] || null;
+      } else if (item.tipo === 'M') {
+        enriched.categoria = 'Medicamento';
+        enriched.nomeResolvido = prodMap[item.procedimento_id] || null;
+      } else if (item.tipo === 'K') {
+        enriched.categoria = 'Kit';
+        enriched.nomeResolvido = item.descricao || null;
+      } else {
+        enriched.categoria = item.tipo || 'Outros';
+        enriched.nomeResolvido = item.descricao || null;
+      }
+      return enriched;
+    });
+    return out;
+  });
+
+  return jsonOk({ success: true, total: result.length, data: result });
 }
 
 function handleDeleteDonor(body) {
