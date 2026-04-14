@@ -3890,9 +3890,6 @@
                 txcProfYearTbl.innerHTML = rows.join('');
             }
 
-            // == CONVERSÃO COMERCIAL ==
-            renderConvComercial();
-
             // == CRM COMERCIAL (KANBAN) ==
             // retNao e retRet já declarados na seção Retorno acima
             const pendTotal = retDetails.length;
@@ -4014,6 +4011,7 @@
                     + profs.map(p => `<option value="${p}">${p}</option>`).join('');
             }
             renderDoadoras();
+            renderConvComercial();
 
             // Adicionar TODAS as pacientes do Fluxo Pacientes que não estão no CRM
             const pendKeys = new Set(retDetails.map(r => normalizeKey(r.pac)));
