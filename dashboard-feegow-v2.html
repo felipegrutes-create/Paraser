@@ -2461,6 +2461,8 @@
                         </table>
                     </div>
                 </div>
+                <!-- SIMULAÇÃO -->
+                <div id="conv-simulacao" style="margin-top:16px;background:rgba(251,191,36,0.06);border:1px dashed rgba(251,191,36,0.35);border-radius:12px;padding:16px"></div>
             </div>
         </section>
 
@@ -4698,6 +4700,49 @@
                         <td style="padding:8px;text-align:right;color:#10b981;font-weight:600">${fmtBRL(byMonth[mk].valorTotal)}</td>
                     </tr>`;
                 }).join('');
+            }
+
+            // SIMULAÇÃO — propostas pendentes
+            const simEl = document.getElementById('conv-simulacao');
+            if (simEl && months.length) {
+                const lastMk = months[months.length - 1];
+                const last = byMonth[lastMk];
+                const [yr, mo] = lastMk.split('-');
+                const label = mesNomes[parseInt(mo) - 1] + '/' + yr;
+
+                // Valor já quitado no mês
+                const valorQuitado = last.valorTotal;
+
+                // Valor pendente: propostas que NÃO estão quitadas
+                let valorPendente = 0;
+                let countPendente = 0;
+                last.propostas.forEach(key => {
+                    if (last.quitados.has(key)) return; // já quitou
+                    const crm = getCrmRec(key);
+                    if (crm) { valorPendente += parseValorFloat(crm.valor); countPendente++; }
+                });
+
+                const valorPotencial = valorQuitado + valorPendente;
+                const ganhoPct = valorQuitado > 0 ? (((valorPotencial / valorQuitado) - 1) * 100).toFixed(0) : null;
+
+                simEl.innerHTML = `
+                    <div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:12px">
+                        🔮 Simulação — Se todas as ${countPendente} proposta${countPendente !== 1 ? 's' : ''} pendentes forem quitadas (${label})
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+                        <div style="text-align:center;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px">
+                            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Já Quitado</div>
+                            <div style="font-size:18px;font-weight:800;color:#10b981">${fmtBRL(valorQuitado)}</div>
+                        </div>
+                        <div style="text-align:center;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px">
+                            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Potencial Pendente (${countPendente} prop.)</div>
+                            <div style="font-size:18px;font-weight:800;color:#818cf8">${fmtBRL(valorPendente)}</div>
+                        </div>
+                        <div style="text-align:center;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);border-radius:10px;padding:12px">
+                            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Total Potencial${ganhoPct ? ' (+'+ganhoPct+'%)' : ''}</div>
+                            <div style="font-size:18px;font-weight:800;color:#fbbf24">${fmtBRL(valorPotencial)}</div>
+                        </div>
+                    </div>`;
             }
         }
 
