@@ -2432,6 +2432,36 @@
                 </table>
                 <div class="info-note">* Convertidas = pacientes cuja 1ª vez foi naquele ano e que já tiveram punção (em qualquer ano). "Punções no ano" conta as punções realizadas naquele ano, independente de quando foi a 1ª vez — por isso 2026 pode ter punções de pacientes que vieram pela 1ª vez em 2025.</div>
             </div>
+
+            <!-- CONVERSÃO COMERCIAL -->
+            <div id="conv-comercial-wrap" style="margin-top:32px;background:linear-gradient(135deg,rgba(251,191,36,0.13) 0%,rgba(245,158,11,0.08) 100%);border:2px solid rgba(251,191,36,0.4);border-radius:16px;padding:24px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+                    <span style="font-size:20px">💛</span>
+                    <span style="font-size:17px;font-weight:700;color:#fbbf24;letter-spacing:0.5px">CONVERSÃO COMERCIAL</span>
+                    <span style="font-size:12px;color:var(--muted);margin-left:4px">Fluxo de Pacientes → Quitado</span>
+                </div>
+                <div id="conv-comercial-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+                    <div style="background:var(--surface2);border-radius:12px;padding:16px">
+                        <div style="font-size:13px;font-weight:600;color:#fbbf24;margin-bottom:12px">Atendidos vs Convertidos por Mês</div>
+                        <canvas id="convComercialChart" height="200"></canvas>
+                    </div>
+                    <div style="background:var(--surface2);border-radius:12px;padding:16px">
+                        <div style="font-size:13px;font-weight:600;color:#fbbf24;margin-bottom:12px">Detalhamento Mensal</div>
+                        <table style="width:100%;border-collapse:collapse;font-size:13px">
+                            <thead>
+                                <tr style="color:var(--muted);font-size:11px;text-transform:uppercase">
+                                    <th style="text-align:left;padding:6px 8px">Mês</th>
+                                    <th style="text-align:center;padding:6px 8px">Atendidos</th>
+                                    <th style="text-align:center;padding:6px 8px">Quitados</th>
+                                    <th style="text-align:center;padding:6px 8px">TX Conv.</th>
+                                </tr>
+                            </thead>
+                            <tbody id="convComercialTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- PENDENTES CRM KANBAN -->
@@ -3860,6 +3890,9 @@
                 txcProfYearTbl.innerHTML = rows.join('');
             }
 
+            // == CONVERSÃO COMERCIAL ==
+            renderConvComercial();
+
             // == CRM COMERCIAL (KANBAN) ==
             // retNao e retRet já declarados na seção Retorno acima
             const pendTotal = retDetails.length;
@@ -4522,6 +4555,85 @@
         }
 
         // ===================== DOADORAS/RECEPTORAS =====================
+        function renderConvComercial() {
+            const mesNomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+            // Coletar dados mensais a partir de Abril/2026
+            const START_MK = '2026-04';
+            const byMonth = {}; // mk → { atendidos: Set, quitados: Set }
+
+            doaPatients.forEach(p => {
+                const mk = monthKey(p.dataAp);
+                if (!mk || mk < START_MK) return;
+                if ((p.statusRaw || '').toLowerCase() !== 'atendido') return;
+                if (!byMonth[mk]) byMonth[mk] = { atendidos: new Set(), quitados: new Set() };
+                byMonth[mk].atendidos.add(p.key);
+                const crm = getCrmRec(p.key);
+                if (crm && (crm.quitado === true || crm.quitado === 'TRUE')) {
+                    byMonth[mk].quitados.add(p.key);
+                }
+            });
+
+            const months = Object.keys(byMonth).sort();
+
+            // KPIs do mês mais recente
+            const kpiEl = document.getElementById('conv-comercial-kpis');
+            if (kpiEl && months.length) {
+                const lastMk = months[months.length - 1];
+                const last = byMonth[lastMk];
+                const atend = last.atendidos.size;
+                const quit = last.quitados.size;
+                const tx = atend ? ((quit / atend) * 100).toFixed(1) : '0';
+                const [yr, mo] = lastMk.split('-');
+                const label = mesNomes[parseInt(mo) - 1] + '/' + yr;
+                const txColor = parseFloat(tx) >= 50 ? '#10b981' : parseFloat(tx) >= 25 ? '#f59e0b' : '#ef4444';
+                kpiEl.innerHTML = `
+                    <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:16px;text-align:center">
+                        <div style="font-size:28px;font-weight:800;color:#fbbf24">${atend}</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Atendidos em ${label}</div>
+                    </div>
+                    <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px;text-align:center">
+                        <div style="font-size:28px;font-weight:800;color:#10b981">${quit}</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Quitados em ${label}</div>
+                    </div>
+                    <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:16px;text-align:center">
+                        <div style="font-size:28px;font-weight:800;color:${txColor}">${tx}%</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:4px">Taxa de Conversão</div>
+                    </div>`;
+            }
+
+            // Gráfico
+            mkChart('convComercialChart', {
+                type: 'bar',
+                data: {
+                    labels: months.map(mk => { const [yr,mo] = mk.split('-'); return mesNomes[parseInt(mo)-1].slice(0,3)+'/'+yr.slice(2); }),
+                    datasets: [
+                        { label: 'Atendidos', data: months.map(mk => byMonth[mk].atendidos.size), backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 6 },
+                        { label: 'Quitados',  data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: 'rgba(16,185,129,0.8)', borderRadius: 6 }
+                    ]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#e2e8f4' } } }, scales: { x: { ticks: { color: '#6b7a99' } }, y: { ticks: { color: '#6b7a99', stepSize: 1 }, beginAtZero: true } } }
+            });
+
+            // Tabela
+            const tbl = document.getElementById('convComercialTable');
+            if (tbl) {
+                tbl.innerHTML = months.map(mk => {
+                    const [yr, mo] = mk.split('-');
+                    const label = mesNomes[parseInt(mo) - 1] + '/' + yr;
+                    const atend = byMonth[mk].atendidos.size;
+                    const quit = byMonth[mk].quitados.size;
+                    const tx = atend ? ((quit / atend) * 100).toFixed(1) : '0';
+                    const txColor = parseFloat(tx) >= 50 ? '#10b981' : parseFloat(tx) >= 25 ? '#f59e0b' : '#ef4444';
+                    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                        <td style="padding:8px;font-weight:600">${label}</td>
+                        <td style="padding:8px;text-align:center;color:#818cf8">${atend}</td>
+                        <td style="padding:8px;text-align:center;color:#10b981">${quit}</td>
+                        <td style="padding:8px;text-align:center;font-weight:700;color:${txColor}">${tx}%</td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
         function renderDoadoras() {
             const container = document.getElementById('doaList');
             if (!container || !doaPatients.length) return;
