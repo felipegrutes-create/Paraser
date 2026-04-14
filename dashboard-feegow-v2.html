@@ -4612,9 +4612,31 @@
                     </div>`;
             }
 
-            // Gráfico
+            // Plugin inline para labels nas barras
+            const convBarLabels = {
+                id: 'convBarLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    chart.data.datasets.forEach((ds, di) => {
+                        const meta = chart.getDatasetMeta(di);
+                        if (meta.hidden) return;
+                        meta.data.forEach((bar, i) => {
+                            const val = ds.data[i];
+                            if (!val) return;
+                            ctx.save();
+                            ctx.font = 'bold 12px Outfit, sans-serif';
+                            ctx.fillStyle = '#ffffff';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText(val, bar.x, bar.y - 3);
+                            ctx.restore();
+                        });
+                    });
+                }
+            };
             mkChart('convComercialChart', {
                 type: 'bar',
+                plugins: [convBarLabels],
                 data: {
                     labels: months.map(mk => { const [yr,mo] = mk.split('-'); return mesNomes[parseInt(mo)-1].slice(0,3)+'/'+yr.slice(2); }),
                     datasets: [
@@ -4625,6 +4647,7 @@
                 },
                 options: {
                     responsive: true,
+                    layout: { padding: { top: 20 } },
                     plugins: {
                         legend: { position: 'top', labels: { color: '#e2e8f4' } },
                         tooltip: {
