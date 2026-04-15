@@ -9368,13 +9368,12 @@
         }
 
         function renderCRCharts() {
-            // Usar soma de pagamentos (mesmo cálculo do KPI "Recebido")
-            const totalPagoChart = crData.reduce((s,inv) => s + (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0), 0);
-            const totalFatChart  = crData.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
-            const parcialFat = crData.filter(inv=>crInvoiceStatus(inv)==='parcial').reduce((s,inv)=>s+(inv.pagamentos||[]).reduce((sp,p)=>sp+(p.valor||0),0),0);
-            const pago    = totalPagoChart - parcialFat;
-            const parcial = parcialFat;
-            const pend    = Math.max(0, totalFatChart - totalPagoChart);
+            // Mesmos cálculos do KPI para consistência total
+            const totalRecebido = crData.reduce((s,inv) => s + (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0), 0);
+            const totalFaturado = crData.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
+            const pend = Math.max(0, totalFaturado - totalRecebido);
+            const pago = totalRecebido;
+            const parcial = 0; // parcial já incluso no recebido
 
             const ctxS = document.getElementById('crChartStatus');
             if (crChartStatus) crChartStatus.destroy();
