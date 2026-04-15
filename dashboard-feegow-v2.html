@@ -9646,8 +9646,13 @@
             });
 
             // KPIs (always from full crData)
+            // Pago = min(soma pagamentos, valor fatura) por fatura — mesmo cálculo do Feegow
             const totalFat  = crData.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
-            const totalPago = crData.reduce((s,inv) => s + (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0), 0);
+            const totalPago = crData.reduce((s,inv) => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0);
+                return s + Math.min(fatVal, pagSum);
+            }, 0);
             const uniqPac   = new Set(crData.map(inv => inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].conta_id).filter(Boolean)).size;
             document.getElementById('cr-total').textContent     = crFmt(totalFat);
             document.getElementById('cr-recebido').textContent  = crFmt(totalPago);
@@ -9753,12 +9758,16 @@
         }
 
         function renderCRCharts() {
-            // Mesmos cálculos do KPI para consistência total
-            const totalRecebido = crData.reduce((s,inv) => s + (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0), 0);
+            // Mesmos cálculos do KPI: pago = min(pagamentos, valor fatura)
+            const totalRecebido = crData.reduce((s,inv) => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0);
+                return s + Math.min(fatVal, pagSum);
+            }, 0);
             const totalFaturado = crData.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
             const pend = Math.max(0, totalFaturado - totalRecebido);
             const pago = totalRecebido;
-            const parcial = 0; // parcial já incluso no recebido
+            const parcial = 0;
 
             const ctxS = document.getElementById('crChartStatus');
             if (crChartStatus) crChartStatus.destroy();
