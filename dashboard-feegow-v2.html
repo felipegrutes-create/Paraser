@@ -3041,6 +3041,11 @@
                 </div>
             </div>
 
+            <div class="chart-card" style="margin-bottom:20px">
+                <h3>👨‍⚕️ Receita por Médico</h3>
+                <div id="crMedicoList" style="margin-top:12px"></div>
+            </div>
+
             <div class="fin-filters">
                 <input type="text" id="crSearch" class="cr-search" placeholder="🔍 Buscar paciente..." oninput="renderCR()">
                 <select id="crStatus" onchange="renderCR()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;cursor:pointer;min-width:180px">
@@ -9667,6 +9672,7 @@
             document.getElementById('cr-ticket').textContent    = crData.length ? crFmt(totalFat / crData.length) : '—';
 
             renderCRCharts();
+            renderCRMedicos();
             renderCRMedicamentos();
 
             if (!filtered.length) {
@@ -9893,6 +9899,87 @@
                     }
                 }
             });
+        }
+
+        function renderCRMedicos() {
+            const container = document.getElementById('crMedicoList');
+            if (!container || !crData.length) return;
+
+            // Agrupar receita por profissional (dos itens tipo S = procedimento)
+            const medSums = {};
+            const medItems = {};
+            crData.forEach(inv => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0);
+                const recebido = Math.min(fatVal, pagSum) / 100;
+                if (recebido <= 0) return;
+
+                // Extrair nome do médico dos itens (procedimentos tipo S geralmente têm o nome)
+                (inv.itens||[]).filter(it => it.tipo === 'S').forEach(it => {
+                    const nome = (it.nomeResolvido||it.descricao||'').toUpperCase();
+                    let medico = 'Outros';
+                    if (nome.includes('RODOLFO')) medico = 'Dr. Rodolfo Salvato';
+                    else if (nome.includes('PRISCILA') || nome.includes('PRISCILLA')) medico = 'Dra. Priscila Loyola';
+                    else if (nome.includes('MARCELLE')) medico = 'Dra. Marcelle Moura';
+                    else if (nome.includes('JOSELMO')) medico = 'Dr. Joselmo Salvato';
+                    else if (nome.includes('HELCE')) medico = 'Dr. Helce Junior';
+                    else if (nome.includes('MARIO') || nome.includes('MÁRIO')) medico = 'Dr. Mario Barroso';
+                    else if (nome.includes('BRUNA ORTIZ')) medico = 'Dra. Bruna Ortiz';
+                    else if (nome.includes('NUTRICIONISTA')) medico = 'Nutricionista';
+                    else if (nome.includes('ENDOCRINOLOGISTA') || nome.includes('MAGALI')) medico = 'Dra. Magali';
+                    else if (nome.includes('ACUPUNTURA') || nome.includes('PAULUS')) medico = 'Acupuntura';
+                    else return; // itens genéricos (USG, etc.) não atribuídos a médico
+                    const val = ((it.valor||0)/100);
+                    if (val <= 0) return;
+                    medSums[medico] = (medSums[medico]||0) + val;
+                    if (!medItems[medico]) medItems[medico] = [];
+                    medItems[medico].push({ data: (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].data)||'', paciente: inv.nomePaciente||'—', proc: it.nomeResolvido||it.descricao||'', valor: val });
+                });
+            });
+
+            const entries = Object.entries(medSums).sort((a,b) => b[1] - a[1]);
+            if (!entries.length) { container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Sem dados</div>'; return; }
+
+            const maxVal = entries[0][1];
+            const crFmtLocal = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const barColors = ['#10b981','#6366f1','#f59e0b','#ec4899','#3b82f6','#14b8a6','#8b5cf6','#ef4444','#06b6d4','#84cc16'];
+            window._crMedItems = medItems;
+
+            container.innerHTML = entries.map(([nome, val], i) => {
+                const pct = maxVal > 0 ? ((val / maxVal) * 100) : 0;
+                const color = barColors[i % barColors.length];
+                return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer" onclick="openCrMedDetail('${nome.replace(/'/g,"\\'")}')">
+                    <span style="font-size:12px;font-weight:600;color:#e2e8f4;min-width:180px;text-align:right">${nome}</span>
+                    <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:5px;height:28px;overflow:hidden;position:relative">
+                        <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,${color},${color}cc);border-radius:5px;transition:width .4s"></div>
+                    </div>
+                    <span style="font-size:12px;font-weight:700;color:#e2e8f4;min-width:110px;text-align:right">${crFmtLocal(val)}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function openCrMedDetail(medName) {
+            const items = (window._crMedItems || {})[medName] || [];
+            if (!items.length) return;
+            const total = items.reduce((s,d) => s + d.valor, 0);
+            const crFmtLocal = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+            document.getElementById('finModalTitle').textContent = medName;
+            document.getElementById('finModalSubtitle').innerHTML = `${items.length} lançamentos · Total: ${crFmtLocal(total)}`;
+            document.getElementById('finModalTheadRow').innerHTML =
+                '<th style="width:90px">Data</th><th>Paciente</th><th>Procedimento</th><th style="width:100px;text-align:right">Valor</th>';
+
+            const sorted = items.sort((a,b) => (b.data||'').localeCompare(a.data||''));
+            document.getElementById('finModalBody').innerHTML = sorted.map(d =>
+                `<tr>
+                    <td>${d.data}</td>
+                    <td>${d.paciente}</td>
+                    <td title="${d.proc}" style="max-width:250px;overflow:hidden;text-overflow:ellipsis">${d.proc}</td>
+                    <td class="fin-val">${crFmtLocal(d.valor)}</td>
+                </tr>`
+            ).join('');
+
+            document.getElementById('finModalOverlay').classList.add('open');
         }
 
         function openCrProcDetail(procName) {
