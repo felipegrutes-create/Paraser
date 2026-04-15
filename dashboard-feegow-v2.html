@@ -9803,14 +9803,14 @@
                     if (val <= 0) return;
                     let cat = 'Outros';
                     const nome = (it.nomeResolvido||it.descricao||'').toUpperCase();
-                    if (it.tipo === 'M') cat = 'Medicamentos';
+                    if (it.tipo === 'M' || nome.includes('MEDICAMENTO') || nome.includes('MEDICAÇÃO') || nome.includes('MEDICACAO')) cat = 'Medicamentos';
                     else if (nome.includes('CONSULTA 1') || nome.includes('CONSULTA -')) cat = 'Consultas 1ª Vez';
                     else if (nome.includes('RETORNO') || nome.includes('CONSULTA DE')) cat = 'Retornos';
                     else if (nome.includes('HONORARIO')) cat = 'Honorários';
                     else if (nome.includes('USG') || nome.includes('ULTRAS')) cat = 'Ultrassonografia';
                     else if (nome.includes('PACOTE')) cat = 'Pacotes';
                     else if (nome.includes('ACUPUNTURA')) cat = 'Acupuntura';
-                    else if (nome.includes('INJURIA') || nome.includes('COLETA') || nome.includes('RADIOFREQ')) cat = 'Procedimentos';
+                    else if (nome.includes('TEC') || nome.includes('INJUR') || nome.includes('COLETA') || nome.includes('RADIOFREQ') || nome.includes('FILGRASTIM') || nome.includes('PREVENTIVO')) cat = 'Procedimentos';
                     else if (nome.includes('CONSULTA')) cat = 'Outras Consultas';
                     catSums[cat] = (catSums[cat] || 0) + val;
                 });
