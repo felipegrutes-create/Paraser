@@ -9817,7 +9817,7 @@
                 const propPago = fatTotal > 0 ? Math.min(pagTotal / fatTotal, 1) : 0;
 
                 itens.forEach(it => {
-                    const valorItem = it.valor || 0;
+                    const valorItem = (it.valor || 0) / 100; // API retorna em centavos
                     totalFatMed += valorItem;
                     totalPagoMed += valorItem * propPago;
                     medItems.push({
