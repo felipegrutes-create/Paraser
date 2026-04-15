@@ -3050,6 +3050,21 @@
                     <div style="text-align:center;padding:60px;color:var(--muted)">Clique na aba para carregar os dados do mês atual</div>
                 </div>
             </div>
+
+            <!-- CONTROLE DE MEDICAMENTOS -->
+            <div class="chart-card" style="margin-top:20px">
+                <h3 style="display:flex;justify-content:space-between;align-items:center">
+                    💊 Controle de Medicamentos
+                    <span id="crMedTotal" style="font-size:12px;font-weight:600;color:#10b981"></span>
+                </h3>
+                <div class="kpi-grid" style="margin-bottom:16px">
+                    <div class="kpi-card"><div class="value" id="crMedFaturado" style="color:#00d4aa">—</div><div class="label">Faturado Medicamentos</div></div>
+                    <div class="kpi-card"><div class="value" id="crMedRecebido" style="color:#34d399">—</div><div class="label">Recebido</div></div>
+                    <div class="kpi-card"><div class="value" id="crMedPendente" style="color:#f87171">—</div><div class="label">Pendente</div></div>
+                    <div class="kpi-card purple"><div class="value" id="crMedQtd">—</div><div class="label">Itens de Medicamento</div></div>
+                </div>
+                <div id="crMedContent"></div>
+            </div>
         </section>
 
         <!-- CAIXA RECEPÇÃO -->
@@ -9641,6 +9656,7 @@
             document.getElementById('cr-ticket').textContent    = crData.length ? crFmt(totalFat / crData.length) : '—';
 
             renderCRCharts();
+            renderCRMedicamentos();
 
             if (!filtered.length) {
                 document.getElementById('crTableContent').innerHTML =
@@ -9774,6 +9790,106 @@
                     }
                 }
             });
+        }
+
+        function renderCRMedicamentos() {
+            const container = document.getElementById('crMedContent');
+            if (!container || !crData.length) {
+                if (container) container.innerHTML = '';
+                return;
+            }
+
+            // Extrair todos os itens de medicamento de todas as faturas
+            const medItems = [];
+            let totalFatMed = 0, totalPagoMed = 0;
+
+            crData.forEach(inv => {
+                const paciente = inv.nomePaciente || '—';
+                const dataFat = (inv.detalhes && inv.detalhes[0] && inv.detalhes[0].data) || '';
+                const status = crInvoiceStatus(inv);
+                const pagTotal = (inv.pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
+                const fatTotal = (inv.detalhes && inv.detalhes[0] && inv.detalhes[0].valor) || 0;
+
+                const itens = (inv.itens || []).filter(it => it.tipo === 'M');
+                if (!itens.length) return;
+
+                // Proporção paga desta fatura
+                const propPago = fatTotal > 0 ? Math.min(pagTotal / fatTotal, 1) : 0;
+
+                itens.forEach(it => {
+                    const valorItem = it.valor || 0;
+                    totalFatMed += valorItem;
+                    totalPagoMed += valorItem * propPago;
+                    medItems.push({
+                        paciente,
+                        data: dataFat,
+                        nome: it.nomeResolvido || it.descricao || `ID ${it.procedimento_id}`,
+                        valor: valorItem,
+                        quantidade: it.quantidade || 1,
+                        status,
+                        valorPago: valorItem * propPago,
+                    });
+                });
+            });
+
+            const crFmtLocal = v => 'R$\u00a0' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            // KPIs
+            document.getElementById('crMedFaturado').textContent = crFmtLocal(totalFatMed);
+            document.getElementById('crMedRecebido').textContent = crFmtLocal(totalPagoMed);
+            document.getElementById('crMedPendente').textContent = crFmtLocal(Math.max(0, totalFatMed - totalPagoMed));
+            document.getElementById('crMedQtd').textContent = medItems.length;
+            document.getElementById('crMedTotal').textContent = medItems.length + ' itens · ' + crFmtLocal(totalFatMed);
+
+            if (!medItems.length) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum medicamento faturado no período</div>';
+                return;
+            }
+
+            // Agrupar por medicamento para resumo
+            const medSums = {};
+            medItems.forEach(m => {
+                if (!medSums[m.nome]) medSums[m.nome] = { total: 0, qtd: 0, pago: 0 };
+                medSums[m.nome].total += m.valor;
+                medSums[m.nome].qtd += m.quantidade;
+                medSums[m.nome].pago += m.valorPago;
+            });
+            const medEntries = Object.entries(medSums).sort((a, b) => b[1].total - a[1].total);
+
+            // Tabela resumo por medicamento
+            let html = `<h4 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Resumo por Medicamento</h4>
+            <div class="fin-table-scroll" style="max-height:300px"><table class="fin-table"><thead><tr>
+                <th>Medicamento</th><th style="text-align:center">Qtd</th><th style="text-align:right">Faturado</th><th style="text-align:right">Recebido</th><th style="text-align:right">Pendente</th>
+            </tr></thead><tbody>${medEntries.map(([nome, d]) => {
+                const pend = Math.max(0, d.total - d.pago);
+                return `<tr>
+                    <td style="font-weight:600">${nome}</td>
+                    <td style="text-align:center">${d.qtd}</td>
+                    <td class="fin-val">${crFmtLocal(d.total)}</td>
+                    <td class="fin-val" style="color:#10b981">${crFmtLocal(d.pago)}</td>
+                    <td class="fin-val" style="color:${pend > 0 ? '#ef4444' : 'var(--muted)'}">${crFmtLocal(pend)}</td>
+                </tr>`;
+            }).join('')}</tbody></table></div>`;
+
+            // Tabela detalhada por paciente
+            html += `<h4 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 10px">Detalhamento por Paciente</h4>
+            <div class="fin-table-scroll" style="max-height:400px"><table class="fin-table"><thead><tr>
+                <th>Data</th><th>Paciente</th><th>Medicamento</th><th style="text-align:center">Qtd</th><th style="text-align:right">Valor</th><th>Status</th>
+            </tr></thead><tbody>${medItems.sort((a, b) => (b.data || '').localeCompare(a.data || '')).map(m => {
+                const statusBadge = m.status === 'pago' ? '<span class="fin-badge-pago">PAGO</span>'
+                    : m.status === 'parcial' ? '<span class="fin-badge-pendente">PARCIAL</span>'
+                    : '<span class="fin-badge-other">PENDENTE</span>';
+                return `<tr>
+                    <td>${m.data}</td>
+                    <td>${m.paciente}</td>
+                    <td style="font-weight:500">${m.nome}</td>
+                    <td style="text-align:center">${m.quantidade}</td>
+                    <td class="fin-val">${crFmtLocal(m.valor)}</td>
+                    <td>${statusBadge}</td>
+                </tr>`;
+            }).join('')}</tbody></table></div>`;
+
+            container.innerHTML = html;
         }
     </script>
 
