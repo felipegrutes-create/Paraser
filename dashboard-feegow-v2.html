@@ -9786,11 +9786,17 @@
             });
 
             const procRev = {};
+            const procItems = {};
             crData.forEach(inv => (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
                 const n = (it.nomeResolvido||it.descricao||`ID${it.procedimento_id}`).slice(0,28);
+                const nFull = it.nomeResolvido||it.descricao||'';
                 procRev[n] = (procRev[n]||0) + (it.valor||0);
+                if (!procItems[n]) procItems[n] = [];
+                procItems[n].push({ data: (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].data)||'', paciente: inv.nomePaciente||'—', nome: nFull, valor: (it.valor||0)/100, qtd: it.quantidade||1 });
             }));
             const top = Object.entries(procRev).sort((a,b)=>b[1]-a[1]).slice(0,7);
+            window._crProcItems = procItems;
+            window._crProcNames = top.map(t => t[0]);
 
             // Composição do Recebido por categoria
             const catSums = {};
@@ -9878,9 +9884,39 @@
                     scales:{
                         x:{ ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} },
                         y:{ ticks:{color:'#a0aec0',font:{size:10}}, grid:{display:false} }
+                    },
+                    onClick(evt, elements) {
+                        if (!elements.length) return;
+                        const idx = elements[0].index;
+                        const procName = window._crProcNames[idx];
+                        if (procName && window._crProcItems[procName]) openCrProcDetail(procName);
                     }
                 }
             });
+        }
+
+        function openCrProcDetail(procName) {
+            const items = (window._crProcItems || {})[procName] || [];
+            if (!items.length) return;
+            const total = items.reduce((s,d) => s + d.valor, 0);
+            const crFmtLocal = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+            document.getElementById('finModalTitle').textContent = procName;
+            document.getElementById('finModalSubtitle').innerHTML = `${items.length} lançamentos · Total: ${crFmtLocal(total)}`;
+            document.getElementById('finModalTheadRow').innerHTML =
+                '<th style="width:90px">Data</th><th>Paciente</th><th style="text-align:center">Qtd</th><th style="width:100px;text-align:right">Valor</th>';
+
+            const sorted = items.sort((a,b) => (b.data||'').localeCompare(a.data||''));
+            document.getElementById('finModalBody').innerHTML = sorted.map(d =>
+                `<tr>
+                    <td>${d.data}</td>
+                    <td>${d.paciente}</td>
+                    <td style="text-align:center">${d.qtd}</td>
+                    <td class="fin-val">${crFmtLocal(d.valor)}</td>
+                </tr>`
+            ).join('');
+
+            document.getElementById('finModalOverlay').classList.add('open');
         }
 
         function openCrCatDetail(catName) {
