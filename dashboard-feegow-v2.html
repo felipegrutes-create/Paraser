@@ -3030,8 +3030,14 @@
                     <canvas id="crChartStatus" height="200"></canvas>
                 </div>
                 <div class="chart-card">
+                    <h3>🍩 Composição do Recebido</h3>
+                    <canvas id="crChartComposicao" height="200"></canvas>
+                </div>
+            </div>
+            <div class="cr-charts-row">
+                <div class="chart-card" style="grid-column:1/-1">
                     <h3>📊 Top Procedimentos por Receita</h3>
-                    <canvas id="crChartProc" height="200"></canvas>
+                    <canvas id="crChartProc" height="140"></canvas>
                 </div>
             </div>
 
@@ -9583,7 +9589,7 @@
 
         // ===== CONTAS A RECEBER =====
         let crData = [], crDataLoaded = false, crCurrentDate = new Date();
-        let crChartStatus = null, crChartProc = null;
+        let crChartStatus = null, crChartProc = null, crChartComposicao = null;
 
         function crFmt(cents) {
             return 'R$ ' + (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -9785,6 +9791,49 @@
                 procRev[n] = (procRev[n]||0) + (it.valor||0);
             }));
             const top = Object.entries(procRev).sort((a,b)=>b[1]-a[1]).slice(0,7);
+
+            // Composição do Recebido por categoria
+            const catSums = {};
+            crData.forEach(inv => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0);
+                const propPago = fatVal > 0 ? Math.min(pagSum / fatVal, 1) : 0;
+                (inv.itens||[]).forEach(it => {
+                    const val = ((it.valor||0) / 100) * propPago;
+                    if (val <= 0) return;
+                    let cat = 'Outros';
+                    const nome = (it.nomeResolvido||it.descricao||'').toUpperCase();
+                    if (it.tipo === 'M') cat = 'Medicamentos';
+                    else if (nome.includes('CONSULTA 1') || nome.includes('CONSULTA -')) cat = 'Consultas 1ª Vez';
+                    else if (nome.includes('RETORNO') || nome.includes('CONSULTA DE')) cat = 'Retornos';
+                    else if (nome.includes('HONORARIO')) cat = 'Honorários';
+                    else if (nome.includes('USG') || nome.includes('ULTRAS')) cat = 'Ultrassonografia';
+                    else if (nome.includes('PACOTE')) cat = 'Pacotes';
+                    else if (nome.includes('ACUPUNTURA')) cat = 'Acupuntura';
+                    else if (nome.includes('INJURIA') || nome.includes('COLETA') || nome.includes('RADIOFREQ')) cat = 'Procedimentos';
+                    else if (nome.includes('CONSULTA')) cat = 'Outras Consultas';
+                    catSums[cat] = (catSums[cat] || 0) + val;
+                });
+            });
+            const catEntries = Object.entries(catSums).sort((a,b) => b[1] - a[1]);
+            const compColors = ['#10b981','#6366f1','#f59e0b','#ec4899','#3b82f6','#14b8a6','#8b5cf6','#ef4444','#06b6d4','#84cc16'];
+
+            const ctxC = document.getElementById('crChartComposicao');
+            if (crChartComposicao) crChartComposicao.destroy();
+            if (ctxC && catEntries.length) {
+                const compTotal = catEntries.reduce((s,e) => s+e[1], 0);
+                const compLabels = catEntries.map(e => {
+                    const pct = compTotal > 0 ? ((e[1]/compTotal)*100).toFixed(1) : 0;
+                    return e[0] + '  ' + pct + '%';
+                });
+                crChartComposicao = new Chart(ctxC, {
+                    type: 'doughnut',
+                    data: { labels: compLabels, datasets:[{ data: catEntries.map(e=>e[1]), backgroundColor: compColors, borderWidth:0 }] },
+                    options: { responsive:true, cutout:'60%',
+                        plugins: { legend:{ position:'right', labels:{color:'#fff',font:{size:11,weight:600},boxWidth:12} },
+                            tooltip:{ callbacks:{ label: ctx => ' ' + crFmt(ctx.raw * 100) } } } }
+                });
+            }
 
             const ctxP = document.getElementById('crChartProc');
             if (crChartProc) crChartProc.destroy();
