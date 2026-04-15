@@ -9825,12 +9825,46 @@
                     const pct = compTotal > 0 ? ((e[1]/compTotal)*100).toFixed(1) : 0;
                     return e[0] + '  ' + pct + '%';
                 });
+                // Guardar itens por categoria para modal de detalhe
+                const catItems = {};
+                crData.forEach(inv => {
+                    const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                    const pagSum = (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0);
+                    const propPago = fatVal > 0 ? Math.min(pagSum / fatVal, 1) : 0;
+                    const dataFat = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].data)||'';
+                    (inv.itens||[]).forEach(it => {
+                        const val = ((it.valor||0) / 100) * propPago;
+                        if (val <= 0) return;
+                        let cat = 'Outros';
+                        const nome = (it.nomeResolvido||it.descricao||'').toUpperCase();
+                        if (it.tipo === 'M' || nome.includes('MEDICAMENTO') || nome.includes('MEDICAÇÃO') || nome.includes('MEDICACAO')) cat = 'Medicamentos';
+                        else if (nome.includes('CONSULTA 1') || nome.includes('CONSULTA -')) cat = 'Consultas 1ª Vez';
+                        else if (nome.includes('RETORNO') || nome.includes('CONSULTA DE')) cat = 'Outras Consultas';
+                        else if (nome.includes('HONORARIO')) cat = 'Honorários';
+                        else if (nome.includes('USG') || nome.includes('ULTRAS') || (nome.includes('PACOTE') && !nome.includes('ACUPUNTURA'))) cat = 'Ultrassonografia';
+                        else if (nome.includes('ACUPUNTURA')) cat = 'Acupuntura';
+                        else if (nome.includes('TEC') || nome.includes('INJUR') || nome.includes('INJÚR') || nome.includes('COLETA') || nome.includes('RADIOFREQ') || nome.includes('FILGRASTIM') || nome.includes('PREVENTIVO')) cat = 'Procedimentos';
+                        else if (nome.includes('CONSULTA')) cat = 'Outras Consultas';
+                        if (!catItems[cat]) catItems[cat] = [];
+                        catItems[cat].push({ data: dataFat, paciente: inv.nomePaciente||'—', nome: it.nomeResolvido||it.descricao||'', valor: val, qtd: it.quantidade||1 });
+                    });
+                });
+                window._crCatItems = catItems;
+                window._crCatNames = catEntries.map(e => e[0]);
+
                 crChartComposicao = new Chart(ctxC, {
                     type: 'doughnut',
                     data: { labels: compLabels, datasets:[{ data: catEntries.map(e=>e[1]), backgroundColor: compColors, borderWidth:0 }] },
                     options: { responsive:true, cutout:'60%',
                         plugins: { legend:{ position:'right', labels:{color:'#fff',font:{size:11,weight:600},boxWidth:12} },
-                            tooltip:{ callbacks:{ label: ctx => ' ' + crFmt(ctx.raw * 100) } } } }
+                            tooltip:{ callbacks:{ label: ctx => ' ' + crFmt(ctx.raw * 100) } } },
+                        onClick(evt, elements) {
+                            if (!elements.length) return;
+                            const idx = elements[0].index;
+                            const catName = window._crCatNames[idx];
+                            if (catName) openCrCatDetail(catName);
+                        }
+                    }
                 });
             }
 
@@ -9847,6 +9881,32 @@
                     }
                 }
             });
+        }
+
+        function openCrCatDetail(catName) {
+            const items = (window._crCatItems || {})[catName] || [];
+            if (!items.length) return;
+
+            const total = items.reduce((s,d) => s + d.valor, 0);
+            const crFmtLocal = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+            document.getElementById('finModalTitle').textContent = catName;
+            document.getElementById('finModalSubtitle').innerHTML = `${items.length} itens · Total: ${crFmtLocal(total)}`;
+            document.getElementById('finModalTheadRow').innerHTML =
+                '<th style="width:90px">Data</th><th>Paciente</th><th>Descrição</th><th style="text-align:center">Qtd</th><th style="width:100px;text-align:right">Valor</th>';
+
+            const sorted = items.sort((a,b) => (b.data||'').localeCompare(a.data||''));
+            document.getElementById('finModalBody').innerHTML = sorted.map(d =>
+                `<tr>
+                    <td>${d.data}</td>
+                    <td>${d.paciente}</td>
+                    <td title="${d.nome}" style="max-width:250px;overflow:hidden;text-overflow:ellipsis">${d.nome}</td>
+                    <td style="text-align:center">${d.qtd}</td>
+                    <td class="fin-val">${crFmtLocal(d.valor)}</td>
+                </tr>`
+            ).join('');
+
+            document.getElementById('finModalOverlay').classList.add('open');
         }
 
         function renderCRMedicamentos() {
