@@ -673,97 +673,130 @@ function handleGetFinancial(params) {
   var invoices = (invoicesData && invoicesData.content) ? invoicesData.content : [];
   if (!invoices.length) return jsonOk({ success: true, total: 0, data: [] });
 
-  // Passo 2: buscar nomes de procedimentos (tipo S) e medicamentos/materiais (tipo M)
-  var procMap = {};
-  var prodMap = {};
-  // Seed com mapa estático do topo do arquivo
-  Object.keys(PROCEDURE_NAMES).forEach(function(k) { procMap[k] = PROCEDURE_NAMES[k]; });
+  // Passo 2: carregar cache de nomes (pacientes, procedimentos, produtos)
+  var CACHE_SHEET = 'Cache_Nomes';
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var cacheSheet = ss.getSheetByName(CACHE_SHEET);
+  var nameCache = {}; // tipo_id → nome
+  if (cacheSheet) {
+    var cacheData = cacheSheet.getDataRange().getValues();
+    for (var ci = 1; ci < cacheData.length; ci++) {
+      var ck = String(cacheData[ci][0] || '');
+      var cv = String(cacheData[ci][1] || '');
+      if (ck && cv) nameCache[ck] = cv;
+    }
+  } else {
+    cacheSheet = ss.insertSheet(CACHE_SHEET);
+    cacheSheet.getRange(1, 1, 1, 2).setValues([['chave', 'nome']]);
+    cacheSheet.getRange(1, 1, 1, 2).setFontWeight('bold');
+    cacheSheet.setFrozenRows(1);
+  }
 
-  // Coletar IDs únicos por tipo
-  var uniqueProcIds = {};
-  var uniqueProdIds = {};
+  // Coletar IDs únicos que precisam de lookup
+  var procMap = {}, prodMap = {};
+  Object.keys(PROCEDURE_NAMES).forEach(function(k) { procMap[k] = PROCEDURE_NAMES[k]; });
+  var needFetchProc = [], needFetchProd = [], needFetchPat = [];
+
   invoices.forEach(function(invoice) {
     (invoice.itens || []).forEach(function(item) {
-      if (item.tipo === 'S' && item.procedimento_id) uniqueProcIds[item.procedimento_id] = true;
-      if (item.tipo === 'M' && item.procedimento_id) uniqueProdIds[item.procedimento_id] = true;
-    });
-  });
-
-  // GET /procedures/list?procedimento_id=X — em paralelo
-  var procIds = Object.keys(uniqueProcIds);
-  if (procIds.length > 0) {
-    var procRequests = procIds.map(function(id) {
-      return { url: base + '/procedures/list?procedimento_id=' + id, headers: reqHeaders, muteHttpExceptions: true };
-    });
-    var procResps = UrlFetchApp.fetchAll(procRequests);
-    procResps.forEach(function(resp, i) {
-      if (resp.getResponseCode() === 200) {
-        try {
-          var pd = JSON.parse(resp.getContentText());
-          var nome = pd && pd.content && pd.content[0] && pd.content[0].nome;
-          if (nome) procMap[procIds[i]] = nome;
-        } catch(e) {}
+      var key = item.tipo + '_' + item.procedimento_id;
+      if (nameCache[key]) {
+        if (item.tipo === 'S') procMap[item.procedimento_id] = nameCache[key];
+        if (item.tipo === 'M') prodMap[item.procedimento_id] = nameCache[key];
+      } else {
+        if (item.tipo === 'S' && item.procedimento_id && !procMap[item.procedimento_id]) needFetchProc.push(item.procedimento_id);
+        if (item.tipo === 'M' && item.procedimento_id && !prodMap[item.procedimento_id]) needFetchProd.push(item.procedimento_id);
       }
     });
-  }
-
-  // POST /core/financial/base/product/list — em paralelo (medicamentos/materiais)
-  var prodIds = Object.keys(uniqueProdIds);
-  if (prodIds.length > 0) {
-    var prodRequests = prodIds.map(function(id) {
-      return {
-        url: base + '/core/financial/base/product/list',
-        method: 'post',
-        contentType: 'application/json',
-        payload: JSON.stringify({ id: parseInt(id, 10), page: 1, perPage: 1 }),
-        headers: reqHeaders,
-        muteHttpExceptions: true
-      };
-    });
-    var prodResps = UrlFetchApp.fetchAll(prodRequests);
-    prodResps.forEach(function(resp, i) {
-      if (resp.getResponseCode() === 200) {
-        try {
-          var pd = JSON.parse(resp.getContentText());
-          var nome = pd && pd.data && pd.data[0] && pd.data[0].NomeProduto;
-          if (nome) prodMap[prodIds[i]] = nome;
-        } catch(e) {}
-      }
-    });
-  }
-
-  // Passo 3: montar requisições paralelas para buscar nome do paciente
-  // Só busca quando detalhes[0].tipo_conta === 3 (paciente)
-  var fetchRequests = [];
-  var invoiceIndices = [];
-
-  invoices.forEach(function(invoice, idx) {
-    var detalhe = invoice.detalhes && invoice.detalhes[0];
-    if (detalhe && detalhe.tipo_conta === 3 && detalhe.conta_id) {
-      fetchRequests.push({
-        url: base + '/patient/search?paciente_id=' + detalhe.conta_id,
-        headers: reqHeaders,
-        muteHttpExceptions: true
-      });
-      invoiceIndices.push(idx);
+    var det = invoice.detalhes && invoice.detalhes[0];
+    if (det && det.tipo_conta === 3 && det.conta_id) {
+      var patKey = 'PAT_' + det.conta_id;
+      if (!nameCache[patKey]) needFetchPat.push(det.conta_id);
     }
   });
 
-  // fetchAll faz todas as requisições em paralelo
-  var patientResponses = fetchRequests.length > 0 ? UrlFetchApp.fetchAll(fetchRequests) : [];
+  // Deduplica
+  needFetchProc = [...new Set(needFetchProc)];
+  needFetchProd = [...new Set(needFetchProd)];
+  needFetchPat = [...new Set(needFetchPat)];
 
-  var nameMap = {};
-  patientResponses.forEach(function(resp, i) {
-    var invoiceIdx = invoiceIndices[i];
+  var newCacheRows = [];
+
+  // Buscar procedimentos não cacheados (em lotes de 30)
+  for (var pi = 0; pi < needFetchProc.length; pi += 30) {
+    var batch = needFetchProc.slice(pi, pi + 30);
+    var reqs = batch.map(function(id) {
+      return { url: base + '/procedures/list?procedimento_id=' + id, headers: reqHeaders, muteHttpExceptions: true };
+    });
     try {
-      if (resp.getResponseCode() === 200) {
-        var pd = JSON.parse(resp.getContentText());
-        nameMap[invoiceIdx] = (pd && pd.content && pd.content.nome) ? pd.content.nome : null;
-      } else {
-        nameMap[invoiceIdx] = null;
-      }
-    } catch(e) {
-      nameMap[invoiceIdx] = null;
+      var resps = UrlFetchApp.fetchAll(reqs);
+      resps.forEach(function(resp, i) {
+        if (resp.getResponseCode() === 200) {
+          try {
+            var pd = JSON.parse(resp.getContentText());
+            var nome = pd && pd.content && pd.content[0] && pd.content[0].nome;
+            if (nome) { procMap[batch[i]] = nome; newCacheRows.push(['S_' + batch[i], nome]); }
+          } catch(e) {}
+        }
+      });
+    } catch(e) { /* rate limit - skip */ }
+  }
+
+  // Buscar produtos não cacheados (em lotes de 30)
+  for (var mi = 0; mi < needFetchProd.length; mi += 30) {
+    var batchM = needFetchProd.slice(mi, mi + 30);
+    var reqsM = batchM.map(function(id) {
+      return { url: base + '/core/financial/base/product/list', method: 'post', contentType: 'application/json',
+               payload: JSON.stringify({ id: parseInt(id, 10), page: 1, perPage: 1 }), headers: reqHeaders, muteHttpExceptions: true };
+    });
+    try {
+      var respsM = UrlFetchApp.fetchAll(reqsM);
+      respsM.forEach(function(resp, i) {
+        if (resp.getResponseCode() === 200) {
+          try {
+            var pd = JSON.parse(resp.getContentText());
+            var nome = pd && pd.data && pd.data[0] && pd.data[0].NomeProduto;
+            if (nome) { prodMap[batchM[i]] = nome; newCacheRows.push(['M_' + batchM[i], nome]); }
+          } catch(e) {}
+        }
+      });
+    } catch(e) { /* rate limit - skip */ }
+  }
+
+  // Buscar pacientes não cacheados (em lotes de 30)
+  var patNameMap = {};
+  for (var pti = 0; pti < needFetchPat.length; pti += 30) {
+    var batchP = needFetchPat.slice(pti, pti + 30);
+    var reqsP = batchP.map(function(id) {
+      return { url: base + '/patient/search?paciente_id=' + id, headers: reqHeaders, muteHttpExceptions: true };
+    });
+    try {
+      var respsP = UrlFetchApp.fetchAll(reqsP);
+      respsP.forEach(function(resp, i) {
+        try {
+          if (resp.getResponseCode() === 200) {
+            var pd = JSON.parse(resp.getContentText());
+            var nome = (pd && pd.content && pd.content.nome) || null;
+            if (nome) { patNameMap[batchP[i]] = nome; newCacheRows.push(['PAT_' + batchP[i], nome]); }
+          }
+        } catch(e) {}
+      });
+    } catch(e) { /* rate limit - skip */ }
+  }
+
+  // Salvar novos nomes no cache
+  if (newCacheRows.length > 0) {
+    var lastRow = cacheSheet.getLastRow();
+    cacheSheet.getRange(lastRow + 1, 1, newCacheRows.length, 2).setValues(newCacheRows);
+  }
+
+  // Montar nameMap (índice da fatura → nome paciente)
+  var nameMap = {};
+  invoices.forEach(function(invoice, idx) {
+    var det = invoice.detalhes && invoice.detalhes[0];
+    if (det && det.tipo_conta === 3 && det.conta_id) {
+      var patKey = 'PAT_' + det.conta_id;
+      nameMap[idx] = patNameMap[det.conta_id] || nameCache[patKey] || null;
     }
   });
 
