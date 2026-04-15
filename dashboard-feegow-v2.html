@@ -9805,7 +9805,7 @@
                     const nome = (it.nomeResolvido||it.descricao||'').toUpperCase();
                     if (it.tipo === 'M' || nome.includes('MEDICAMENTO') || nome.includes('MEDICAÇÃO') || nome.includes('MEDICACAO')) cat = 'Medicamentos';
                     else if (nome.includes('CONSULTA 1') || nome.includes('CONSULTA -')) cat = 'Consultas 1ª Vez';
-                    else if (nome.includes('RETORNO') || nome.includes('CONSULTA DE')) cat = 'Retornos';
+                    else if (nome.includes('RETORNO') || nome.includes('CONSULTA DE')) cat = 'Outras Consultas';
                     else if (nome.includes('HONORARIO')) cat = 'Honorários';
                     else if (nome.includes('USG') || nome.includes('ULTRAS')) cat = 'Ultrassonografia';
                     else if (nome.includes('PACOTE')) cat = 'Pacotes';
