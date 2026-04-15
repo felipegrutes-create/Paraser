@@ -47,6 +47,12 @@ const LOG_HEADERS = [
   'dados_anteriores','coluna_origem','coluna_destino'
 ];
 const DONOR_SHEET = 'Doadoras_Perfis';
+const CAIXA_SHEET_NAME = 'Caixa_Recepcao';
+const CAIXA_HEADERS = [
+  'timestamp','data','paciente_nome','profissional','procedimento',
+  'valor_total','valor_antecipado','valor_pago','forma_pagamento',
+  'observacoes','registrado_por','nf_emitida','nf_numero'
+];
 
 // Mapa estático de procedimentos — preencha caso o list-sales não traga nomes
 // Exemplo: var PROCEDURE_NAMES = { '4': 'FIV com Óvulos Próprios', '7': 'Criopreservação' };
@@ -121,6 +127,27 @@ function doGet(e) {
       return jsonOk({ profiles });
     }
 
+    // Retornar pagamentos do Caixa Recepção
+    if (action === 'get_caixa') {
+      const cxSheet = getOrCreateCaixaSheet();
+      const cxData = cxSheet.getDataRange().getValues();
+      if (cxData.length <= 1) return jsonOk({ pagamentos: [] });
+      const cxHeaders = cxData[0];
+      const filterDate = (e && e.parameter && e.parameter.data) || '';
+      const pagamentos = cxData.slice(1).filter(row => {
+        if (filterDate) {
+          const rowDate = String(row[cxHeaders.indexOf('data')] || '');
+          return rowDate === filterDate;
+        }
+        return true;
+      }).map(row => {
+        const obj = {};
+        cxHeaders.forEach((h, i) => { obj[h] = row[i]; });
+        return obj;
+      });
+      return jsonOk({ pagamentos });
+    }
+
     // Retornar backup de agendamentos
     if (action === 'get_backup') {
       const bSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BACKUP_SHEET_NAME);
@@ -155,6 +182,14 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
+      if (action === 'save_caixa') {
+        return handleSaveCaixa(body);
+      }
+
+      if (action === 'update_caixa_nf') {
+        return handleUpdateCaixaNF(body);
+      }
+
       if (action === 'save_backup') {
         return handleSaveBackup(body);
       }
@@ -801,6 +836,52 @@ function handleDeleteDonor(body) {
   sheet.deleteRow(targetRow);
 
   return jsonOk({ success: true, logged: true });
+}
+
+function getOrCreateCaixaSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CAIXA_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(CAIXA_SHEET_NAME);
+    sheet.getRange(1, 1, 1, CAIXA_HEADERS.length).setValues([CAIXA_HEADERS]);
+    sheet.getRange(1, 1, 1, CAIXA_HEADERS.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function handleSaveCaixa(body) {
+  const sheet = getOrCreateCaixaSheet();
+  body.timestamp = new Date().toISOString();
+  if (!body.data) {
+    const now = new Date();
+    body.data = String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+  }
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const rowData = headers.map(h => body[h] !== undefined ? body[h] : '');
+  sheet.appendRow(rowData);
+  return jsonOk({ success: true });
+}
+
+function handleUpdateCaixaNF(body) {
+  const sheet = getOrCreateCaixaSheet();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const tsCol = headers.indexOf('timestamp');
+  const nfEmCol = headers.indexOf('nf_emitida');
+  const nfNumCol = headers.indexOf('nf_numero');
+
+  const ts = (body.timestamp || '').trim();
+  if (!ts) return jsonErr('timestamp obrigatório');
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][tsCol]).trim() === ts) {
+      if (nfEmCol >= 0) sheet.getRange(i+1, nfEmCol+1).setValue(body.nf_emitida || 'Sim');
+      if (nfNumCol >= 0) sheet.getRange(i+1, nfNumCol+1).setValue(body.nf_numero || '');
+      return jsonOk({ success: true });
+    }
+  }
+  return jsonErr('Registro não encontrado');
 }
 
 function handleSaveBackup(body) {

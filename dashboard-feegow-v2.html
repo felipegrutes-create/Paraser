@@ -441,6 +441,38 @@
             letter-spacing: 0.6px;
         }
 
+        /* Caixa Recepção */
+        .cx-sub-btn {
+            padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border);
+            background: transparent; color: var(--muted); cursor: pointer;
+            font-family: inherit; font-size: 13px; font-weight: 600; transition: all .2s;
+        }
+        .cx-sub-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .cx-method-btn {
+            padding: 14px; border-radius: 10px; border: 2px solid var(--border);
+            background: var(--surface2); color: var(--text); cursor: pointer;
+            font-family: inherit; font-size: 14px; font-weight: 600; transition: all .15s;
+        }
+        .cx-method-btn:hover { border-color: var(--accent); }
+        .cx-method-btn.selected { border-color: #10b981; background: rgba(16,185,129,0.1); color: #10b981; }
+        .cx-appt-row {
+            display: flex; align-items: center; gap: 12px; padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04); flex-wrap: wrap;
+        }
+        .cx-appt-row:last-child { border-bottom: none; }
+        .cx-appt-name { font-weight: 600; min-width: 200px; }
+        .cx-appt-meta { font-size: 11px; color: var(--muted); flex: 1; }
+        .cx-pay-btn {
+            padding: 6px 16px; border-radius: 6px; border: none;
+            background: #10b981; color: #fff; cursor: pointer;
+            font-family: inherit; font-size: 11px; font-weight: 700; white-space: nowrap;
+        }
+        .cx-pay-btn:hover { background: #059669; }
+        .cx-paid-badge {
+            padding: 4px 12px; border-radius: 6px; font-size: 10px; font-weight: 700;
+            background: rgba(16,185,129,0.15); color: #10b981;
+        }
+
         .prof-map-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -2055,6 +2087,7 @@
         <button class="tab tab-donor" onclick="showSection('sec-embriao',this)">Embrião Doado<span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
         <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
         <button class="tab" onclick="showSection('sec-cr',this)">💳 Contas a Receber</button>
+        <button class="tab" onclick="showSection('sec-caixa',this)">🏦 Caixa Recepção</button>
     </div>
 
     <div class="container">
@@ -3019,6 +3052,96 @@
             </div>
         </section>
 
+        <!-- CAIXA RECEPÇÃO -->
+        <section id="sec-caixa" class="section">
+            <p class="section-title">🏦 Caixa Recepção</p>
+
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+                <button class="cx-sub-btn active" id="cxSubRec" onclick="cxShowSub('rec')">🏦 Recepção</button>
+                <button class="cx-sub-btn" id="cxSubFin" onclick="cxShowSub('fin')">📋 Financeiro (NF)</button>
+            </div>
+
+            <!-- RECEPÇÃO -->
+            <div id="cxViewRec">
+                <div class="kpi-grid">
+                    <div class="kpi-card teal"><div class="value" id="cx-total-hoje">—</div><div class="label">Total Recebido Hoje</div></div>
+                    <div class="kpi-card"><div class="value" id="cx-pix" style="color:#8b5cf6">—</div><div class="label">PIX</div></div>
+                    <div class="kpi-card"><div class="value" id="cx-credito" style="color:#3b82f6">—</div><div class="label">Cartão Crédito</div></div>
+                    <div class="kpi-card"><div class="value" id="cx-debito" style="color:#f59e0b">—</div><div class="label">Cartão Débito</div></div>
+                    <div class="kpi-card"><div class="value" id="cx-dinheiro" style="color:#10b981">—</div><div class="label">Dinheiro</div></div>
+                    <div class="kpi-card purple"><div class="value" id="cx-qtd-hoje">0</div><div class="label">Pagamentos Hoje</div></div>
+                </div>
+
+                <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+                    <label style="font-size:13px;color:var(--muted)">Recepcionista:</label>
+                    <input id="cxRecepcionista" placeholder="Seu nome" oninput="localStorage.setItem('cx_recep',this.value)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;width:200px">
+                </div>
+
+                <div class="chart-card">
+                    <h3>📅 Agendamentos de Hoje</h3>
+                    <div id="cxTodayList" style="margin-top:12px">Carregando...</div>
+                </div>
+
+                <div class="chart-card" style="margin-top:16px">
+                    <h3>💰 Pagamentos Registrados Hoje</h3>
+                    <div id="cxPaymentsLog" style="margin-top:12px"></div>
+                </div>
+            </div>
+
+            <!-- FINANCEIRO NF -->
+            <div id="cxViewFin" style="display:none">
+                <div class="chart-card">
+                    <h3>📋 Pagamentos Pendentes de NF</h3>
+                    <div id="cxNfPending" style="margin-top:12px"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modal Pagamento Caixa -->
+        <div class="fin-modal-overlay" id="cxPayModal" onclick="if(event.target===this)closeCxPayModal()">
+            <div class="fin-modal" style="max-width:500px">
+                <button class="crm-modal-close" onclick="closeCxPayModal()">✕</button>
+                <div class="fin-modal-header" style="padding-bottom:16px">
+                    <div class="fin-modal-title" id="cxPayTitle">Registrar Pagamento</div>
+                    <div id="cxPayInfo" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+                </div>
+                <div class="fin-modal-body" style="padding:20px 24px">
+                    <div class="crm-form-grid">
+                        <div class="crm-field">
+                            <label>💰 Valor Total</label>
+                            <input type="text" class="crm-input" id="cxPayValorTotal" placeholder="R$ 0,00" oninput="cxCalcPagar()">
+                        </div>
+                        <div class="crm-field">
+                            <label>📥 Já Antecipado</label>
+                            <input type="text" class="crm-input" id="cxPayAntecipado" placeholder="R$ 0,00" value="0" oninput="cxCalcPagar()">
+                        </div>
+                    </div>
+                    <div class="crm-field" style="margin-top:12px">
+                        <label>💵 Valor a Pagar Agora</label>
+                        <input type="text" class="crm-input" id="cxPayValorPagar" placeholder="R$ 0,00" style="font-size:18px;font-weight:700;color:#10b981">
+                    </div>
+                    <div style="margin-top:16px">
+                        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:block">Forma de Pagamento</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                            <button class="cx-method-btn" onclick="cxSelectMethod(this,'PIX')">📱 PIX</button>
+                            <button class="cx-method-btn" onclick="cxSelectMethod(this,'Cartão Crédito')">💳 Crédito</button>
+                            <button class="cx-method-btn" onclick="cxSelectMethod(this,'Cartão Débito')">💳 Débito</button>
+                            <button class="cx-method-btn" onclick="cxSelectMethod(this,'Dinheiro')">💵 Dinheiro</button>
+                        </div>
+                    </div>
+                    <div class="crm-field" style="margin-top:12px">
+                        <label>💬 Observações</label>
+                        <textarea class="crm-textarea" id="cxPayObs" placeholder="Informações adicionais..." style="height:60px"></textarea>
+                    </div>
+                    <div style="display:flex;gap:12px;margin-top:16px">
+                        <button onclick="closeCxPayModal()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;font-size:14px">Cancelar</button>
+                        <button onclick="saveCxPayment()" style="flex:1;padding:12px;border-radius:8px;border:none;background:#10b981;color:#fff;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700">✅ Registrar Pagamento</button>
+                    </div>
+                    <div id="cxPayStatus" style="text-align:center;margin-top:8px;font-size:12px"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal Financeiro Detalhamento -->
         <div class="fin-modal-overlay" id="finModalOverlay" onclick="if(event.target===this)closeFinModal()">
             <div class="fin-modal">
@@ -3486,6 +3609,7 @@
         // ===================== BUILD UI =====================
         function buildUI(d) {
             const { raw, C, allByMonth, allByProf, allStatus, vezRows, pvByMonth, pvByProf, pvStatus, retDetails, firstVez, pvValByMonth } = d;
+            gRaw = raw; gC = C; // disponibilizar globalmente
             finPvValByMonth = pvValByMonth || {};
             const today    = new Date();
             const todayStr = today.toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" });
@@ -4187,6 +4311,7 @@
             if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
+            if (id === 'sec-caixa') loadAndRenderCaixa();
             if (id === 'sec-cr') loadAndRenderCR();
             // Re-render abas dirty ao entrar
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
@@ -7775,6 +7900,7 @@
         let finPvValByMonth = {};
         let finROIData = { receita: {}, ads: {} };
         let finTopCats = [];
+        let gRaw = [], gC = {}; // global refs to Feegow data
 
         const FIN_COLORS = [
             '#00d4aa','#6366f1','#f59e0b','#ef4444','#8b5cf6','#ec4899',
@@ -9094,6 +9220,249 @@
                 return json.backup;
             }
             return null;
+        }
+
+        // ===================== CAIXA RECEPÇÃO =====================
+        let cxPayments = [];
+        let cxDataLoaded = false;
+        let cxSelectedMethod = '';
+        let cxCurrentAppt = null;
+
+        function cxTodayStr() {
+            const d = new Date();
+            return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+        }
+
+        async function loadAndRenderCaixa() {
+            // Carregar nome da recepcionista
+            const recEl = document.getElementById('cxRecepcionista');
+            if (recEl) recEl.value = localStorage.getItem('cx_recep') || '';
+
+            // Carregar pagamentos do dia
+            if (!cxDataLoaded && CRM_SCRIPT_URL) {
+                try {
+                    const res = await fetch(CRM_SCRIPT_URL + '?action=get_caixa&data=' + encodeURIComponent(cxTodayStr()));
+                    const json = await res.json();
+                    cxPayments = json.pagamentos || [];
+                    cxDataLoaded = true;
+                } catch(e) { console.warn('Caixa load error:', e); }
+            }
+
+            renderCxToday();
+            renderCxSummary();
+            renderCxPaymentsLog();
+        }
+
+        function renderCxToday() {
+            const container = document.getElementById('cxTodayList');
+            if (!container || !gRaw.length) { if (container) container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Sem dados de agendamentos</div>'; return; }
+
+            const todayDDMM = cxTodayStr();
+            const todayAppts = gRaw.filter(r => {
+                const dt = (r[gC.data]||'').trim();
+                return dt === todayDDMM;
+            });
+
+            if (!todayAppts.length) {
+                container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Nenhum agendamento para hoje</div>';
+                return;
+            }
+
+            container.innerHTML = todayAppts.map((r, idx) => {
+                const nome = (r[gC.pac]||'').trim();
+                const prof = (r[gC.prof]||'').trim();
+                const proc = (r[gC.proc]||'').trim();
+                const status = (r[gC.sta]||'').trim();
+                const valor = (r[gC.val]||'').trim();
+                const hora = (r[gC.hora]||'').trim();
+
+                // Verificar se já tem pagamento registrado
+                const jaPago = cxPayments.some(p => p.paciente_nome === nome && p.procedimento === proc);
+
+                const statusClass = status.toLowerCase() === 'atendido' ? 'color:#10b981' :
+                    status.toLowerCase().includes('marcado') ? 'color:#fbbf24' :
+                    status.toLowerCase().includes('cancelado') ? 'color:#ef4444' : 'color:var(--muted)';
+
+                return `<div class="cx-appt-row">
+                    <span style="font-size:11px;color:var(--muted);min-width:40px">${hora.substring(0,5)}</span>
+                    <span class="cx-appt-name">${nome}</span>
+                    <span class="cx-appt-meta">${prof} · ${proc.substring(0,30)}${proc.length>30?'...':''}</span>
+                    <span style="font-size:11px;${statusClass};font-weight:600;min-width:80px">${status}</span>
+                    <span style="font-size:12px;font-weight:600;min-width:80px;text-align:right">${valor ? 'R$ '+valor : '—'}</span>
+                    ${jaPago
+                        ? '<span class="cx-paid-badge">✅ Pago</span>'
+                        : `<button class="cx-pay-btn" onclick='openCxPayModal(${JSON.stringify({nome,prof,proc,valor})})'>💰 Registrar</button>`
+                    }
+                </div>`;
+            }).join('');
+        }
+
+        function renderCxSummary() {
+            const fmtR = v => v ? 'R$\u00a0' + v.toLocaleString('pt-BR',{minimumFractionDigits:2}) : 'R$ 0,00';
+            let total = 0, pix = 0, credito = 0, debito = 0, dinheiro = 0;
+            cxPayments.forEach(p => {
+                const v = parseFloat(p.valor_pago) || 0;
+                total += v;
+                const m = (p.forma_pagamento||'').toLowerCase();
+                if (m.includes('pix')) pix += v;
+                else if (m.includes('créd') || m.includes('cred')) credito += v;
+                else if (m.includes('déb') || m.includes('deb')) debito += v;
+                else if (m.includes('dinh')) dinheiro += v;
+            });
+            document.getElementById('cx-total-hoje').textContent = fmtR(total);
+            document.getElementById('cx-pix').textContent = fmtR(pix);
+            document.getElementById('cx-credito').textContent = fmtR(credito);
+            document.getElementById('cx-debito').textContent = fmtR(debito);
+            document.getElementById('cx-dinheiro').textContent = fmtR(dinheiro);
+            document.getElementById('cx-qtd-hoje').textContent = cxPayments.length;
+        }
+
+        function renderCxPaymentsLog() {
+            const container = document.getElementById('cxPaymentsLog');
+            if (!container) return;
+            if (!cxPayments.length) {
+                container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Nenhum pagamento registrado hoje</div>';
+                return;
+            }
+            container.innerHTML = `<table class="fin-table"><thead><tr>
+                <th>Hora</th><th>Paciente</th><th>Procedimento</th><th>Forma</th><th style="text-align:right">Valor</th><th>Recepcionista</th>
+            </tr></thead><tbody>${cxPayments.map(p => {
+                const hora = p.timestamp ? new Date(p.timestamp).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+                return `<tr>
+                    <td>${hora}</td>
+                    <td>${p.paciente_nome||''}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${p.procedimento||''}</td>
+                    <td>${p.forma_pagamento||''}</td>
+                    <td class="fin-val">${fmtValor(p.valor_pago)}</td>
+                    <td style="color:var(--muted)">${p.registrado_por||''}</td>
+                </tr>`;
+            }).join('')}</tbody></table>`;
+        }
+
+        function openCxPayModal(appt) {
+            cxCurrentAppt = appt;
+            cxSelectedMethod = '';
+            document.getElementById('cxPayTitle').textContent = appt.nome;
+            document.getElementById('cxPayInfo').textContent = `${appt.prof} · ${appt.proc}`;
+            document.getElementById('cxPayValorTotal').value = appt.valor ? 'R$ ' + appt.valor : '';
+            document.getElementById('cxPayAntecipado').value = '';
+            document.getElementById('cxPayValorPagar').value = appt.valor ? 'R$ ' + appt.valor : '';
+            document.getElementById('cxPayObs').value = '';
+            document.getElementById('cxPayStatus').textContent = '';
+            document.querySelectorAll('.cx-method-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('cxPayModal').classList.add('open');
+        }
+
+        function closeCxPayModal() {
+            document.getElementById('cxPayModal').classList.remove('open');
+            cxCurrentAppt = null;
+        }
+
+        function cxSelectMethod(btn, method) {
+            cxSelectedMethod = method;
+            document.querySelectorAll('.cx-method-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+
+        function cxCalcPagar() {
+            const total = parseValorBR(document.getElementById('cxPayValorTotal').value) || 0;
+            const antec = parseValorBR(document.getElementById('cxPayAntecipado').value) || 0;
+            const pagar = Math.max(0, total - antec);
+            document.getElementById('cxPayValorPagar').value = 'R$ ' + pagar.toLocaleString('pt-BR',{minimumFractionDigits:2});
+        }
+
+        async function saveCxPayment() {
+            if (!cxSelectedMethod) { alert('Selecione a forma de pagamento'); return; }
+            const valorPagar = parseValorBR(document.getElementById('cxPayValorPagar').value) || 0;
+            if (valorPagar <= 0) { alert('Valor a pagar deve ser maior que zero'); return; }
+
+            const statusEl = document.getElementById('cxPayStatus');
+            statusEl.textContent = 'Salvando...';
+            statusEl.style.color = '#f59e0b';
+
+            const record = {
+                action: 'save_caixa',
+                data: cxTodayStr(),
+                paciente_nome: cxCurrentAppt?.nome || '',
+                profissional: cxCurrentAppt?.prof || '',
+                procedimento: cxCurrentAppt?.proc || '',
+                valor_total: parseValorBR(document.getElementById('cxPayValorTotal').value) || 0,
+                valor_antecipado: parseValorBR(document.getElementById('cxPayAntecipado').value) || 0,
+                valor_pago: valorPagar,
+                forma_pagamento: cxSelectedMethod,
+                observacoes: document.getElementById('cxPayObs').value,
+                registrado_por: document.getElementById('cxRecepcionista')?.value || '',
+            };
+
+            // Salvar local imediatamente
+            cxPayments.push({ ...record, timestamp: new Date().toISOString() });
+            renderCxSummary();
+            renderCxPaymentsLog();
+            renderCxToday();
+
+            statusEl.textContent = '✅ Registrado!';
+            statusEl.style.color = '#10b981';
+            setTimeout(() => closeCxPayModal(), 600);
+
+            // Salvar no servidor em background
+            if (CRM_SCRIPT_URL) {
+                fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(record),
+                }).catch(e => console.warn('Caixa save error:', e));
+            }
+        }
+
+        function cxShowSub(view) {
+            document.getElementById('cxViewRec').style.display = view === 'rec' ? '' : 'none';
+            document.getElementById('cxViewFin').style.display = view === 'fin' ? '' : 'none';
+            document.getElementById('cxSubRec').classList.toggle('active', view === 'rec');
+            document.getElementById('cxSubFin').classList.toggle('active', view === 'fin');
+            if (view === 'fin') renderCxNfPending();
+        }
+
+        async function renderCxNfPending() {
+            const container = document.getElementById('cxNfPending');
+            if (!container) return;
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Carregando...</div>';
+
+            try {
+                const res = await fetch(CRM_SCRIPT_URL + '?action=get_caixa');
+                const json = await res.json();
+                const all = (json.pagamentos || []).filter(p => !p.nf_emitida || p.nf_emitida === '');
+
+                if (!all.length) {
+                    container.innerHTML = '<div style="text-align:center;padding:20px;color:#10b981">✅ Nenhum pagamento pendente de NF</div>';
+                    return;
+                }
+
+                container.innerHTML = `<table class="fin-table"><thead><tr>
+                    <th>Data</th><th>Paciente</th><th>Procedimento</th><th>Forma</th><th style="text-align:right">Valor</th><th>NF</th>
+                </tr></thead><tbody>${all.map(p => `<tr>
+                    <td>${p.data||''}</td>
+                    <td>${p.paciente_nome||''}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${p.procedimento||''}</td>
+                    <td>${p.forma_pagamento||''}</td>
+                    <td class="fin-val">${fmtValor(p.valor_pago)}</td>
+                    <td><button class="cx-pay-btn" style="background:#6366f1" onclick="cxMarkNF('${(p.timestamp||'').replace(/'/g,"\\'")}')">Marcar NF</button></td>
+                </tr>`).join('')}</tbody></table>`;
+            } catch(e) {
+                container.innerHTML = `<div style="text-align:center;padding:20px;color:#ef4444">Erro: ${e.message}</div>`;
+            }
+        }
+
+        async function cxMarkNF(timestamp) {
+            const nfNum = prompt('Número da NF (opcional):') || '';
+            if (CRM_SCRIPT_URL) {
+                fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'update_caixa_nf', timestamp, nf_emitida: 'Sim', nf_numero: nfNum }),
+                }).catch(e => console.warn('NF update error:', e));
+            }
+            // Re-render after short delay
+            setTimeout(() => renderCxNfPending(), 2000);
         }
 
         function updateFeegowStatusBanner() {
