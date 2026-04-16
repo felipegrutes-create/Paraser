@@ -3082,6 +3082,17 @@
                     <div class="kpi-card"><div class="value" id="crAnaPacientes">—</div><div class="label">Pacientes ANA</div></div>
                     <div class="kpi-card"><div class="value" id="crAnaTicket">—</div><div class="label">Ticket Médio</div></div>
                 </div>
+                <!-- ANA Charts 2×2 -->
+                <div class="cr-charts-row" style="margin-bottom:0">
+                    <div class="chart-card" style="background:rgba(236,72,153,0.05);border-color:rgba(236,72,153,0.2)">
+                        <h3 style="color:#f472b6">📊 Status ANA</h3>
+                        <canvas id="crChartAnaStatus" height="200"></canvas>
+                    </div>
+                    <div class="chart-card" style="background:rgba(236,72,153,0.05);border-color:rgba(236,72,153,0.2)">
+                        <h3 style="color:#f472b6">🏥 Top Procedimentos ANA</h3>
+                        <canvas id="crChartAnaProc" height="200"></canvas>
+                    </div>
+                </div>
                 <div id="crAnaContent"></div>
             </div>
 
@@ -9625,6 +9636,7 @@
 
         let crData = [], crDataLoaded = false, crCurrentDate = new Date();
         let crChartStatus = null, crChartProc = null, crChartComposicao = null, crChartMedico = null;
+        let crChartAnaStatus = null, crChartAnaProc = null;
 
         function crFmt(cents) {
             return 'R$ ' + (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -10219,6 +10231,70 @@
             document.getElementById('crAnaPacientes').textContent = pacSet.size;
             document.getElementById('crAnaTicket').textContent    = crFmtL(pacSet.size > 0 ? totalFat / pacSet.size : 0);
             document.getElementById('crAnaTotal').textContent     = pacSet.size + ' pacientes · ' + crFmtL(totalFat);
+
+            // ── Gráficos ANA ──
+            (function renderAnaCharts() {
+                // Status donut
+                const statusCounts = { pago: 0, parcial: 0, pendente: 0 };
+                anaRows.forEach(r => { statusCounts[r.status] = (statusCounts[r.status]||0) + r.valor; });
+                const stEl = document.getElementById('crChartAnaStatus');
+                if (stEl) {
+                    if (crChartAnaStatus) crChartAnaStatus.destroy();
+                    crChartAnaStatus = new Chart(stEl.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Recebido', 'Parcial', 'Pendente'],
+                            datasets: [{ data: [statusCounts.pago, statusCounts.parcial, statusCounts.pendente],
+                                backgroundColor: ['#34d399cc','#fbbf24cc','#f87171cc'],
+                                borderColor: ['#34d399','#fbbf24','#f87171'],
+                                borderWidth: 1.5, hoverOffset: 8 }]
+                        },
+                        options: {
+                            responsive: true, cutout: '62%',
+                            plugins: {
+                                legend: { position:'bottom', labels:{ color:'#94a3b8', font:{size:11}, padding:14 } },
+                                tooltip: { callbacks: { label: ctx => ' ' + crFmtL(ctx.parsed) } }
+                            }
+                        }
+                    });
+                }
+                // Top procedimentos ANA bar
+                const procSums = {};
+                anaRows.forEach(r => {
+                    const k = r.nome.length > 36 ? r.nome.slice(0,34)+'…' : r.nome;
+                    procSums[k] = (procSums[k]||0) + r.valorPago;
+                });
+                const procEntries = Object.entries(procSums).sort((a,b)=>b[1]-a[1]).slice(0,8);
+                const barColors = ['#7c3aed','#6d28d9','#5b21b6','#4c1d95','#ec4899','#db2777','#be185d','#9d174d'];
+                const prEl = document.getElementById('crChartAnaProc');
+                if (prEl) {
+                    if (crChartAnaProc) crChartAnaProc.destroy();
+                    crChartAnaProc = new Chart(prEl.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: procEntries.map(([k])=>k),
+                            datasets: [{ data: procEntries.map(([,v])=>v),
+                                backgroundColor: procEntries.map((_,i)=>barColors[i%barColors.length]+'cc'),
+                                borderColor: procEntries.map((_,i)=>barColors[i%barColors.length]),
+                                borderWidth: 1.5, borderRadius: 5 }]
+                        },
+                        options: {
+                            indexAxis: 'y', responsive: true,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { callbacks: { label: ctx => ' ' + crFmtL(ctx.parsed.x) } }
+                            },
+                            scales: {
+                                x: { ticks: { color:'#94a3b8', font:{size:10},
+                                    callback: v => 'R$' + (v>=1000?(v/1000).toFixed(0)+'k':v) },
+                                    grid: { color:'rgba(255,255,255,0.05)' } },
+                                y: { ticks: { color:'#e2e8f0', font:{size:10} },
+                                    grid: { display:false } }
+                            }
+                        }
+                    });
+                }
+            })();
 
             if (!anaRows.length) {
                 container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum registro Projeto ANA no período.</div>';
