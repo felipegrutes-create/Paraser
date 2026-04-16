@@ -9295,6 +9295,10 @@
 
         function _resolveMedico(nome) {
             const n = (nome||'').toUpperCase();
+            // USG FIV e Pacote USG → Érica Stein (checar ANTES de RODOLFO porque o
+            // PACOTE DE USG TV tem o nome do médico responsável mas é executado pela Érica)
+            if (n.includes('USG FIV') || (n.includes('PACOTE') && n.includes('USG'))) return 'Érica Stein';
+            if (n.includes('STEIN'))                                   return 'Érica Stein';
             if (n.includes('RODOLFO'))                                 return 'Dr. Rodolfo Salvato';
             if (n.includes('PRISCILA')||n.includes('PRISCILLA'))      return 'Dra. Priscila Loyola';
             if (n.includes('MARCELLE'))                               return 'Dra. Marcelle Moura';
@@ -10213,17 +10217,8 @@
 
                 (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
                     const n = (it.nomeResolvido||it.descricao||'').toUpperCase();
-                    let med = null;
-                    if (n.includes('RODOLFO'))                                 med = 'Dr. Rodolfo Salvato';
-                    else if (n.includes('PRISCILA')||n.includes('PRISCILLA')) med = 'Dra. Priscila Loyola';
-                    else if (n.includes('MARCELLE'))                          med = 'Dra. Marcelle Moura';
-                    else if (n.includes('JOSELMO'))                           med = 'Dr. Joselmo Salvato';
-                    else if (n.includes('HELCE'))                             med = 'Dr. Helce Junior';
-                    else if (n.includes('MARIO')||n.includes('MÁRIO'))        med = 'Dr. Mario Barroso';
-                    else if (n.includes('BRUNA ORTIZ'))                       med = 'Dra. Bruna Ortiz';
-                    else if (n.includes('NUTRICIONISTA'))                     med = 'Nutricionista';
-                    else if (n.includes('ENDOCRINOLOGISTA')||n.includes('MAGALI')) med = 'Dra. Magali';
-                    else if (n.includes('ACUPUNTURA')||n.includes('PAULUS')) med = 'Acupuntura';
+                    // Usa _resolveMedico centralizado (USG FIV / PACOTE USG → Érica antes de RODOLFO)
+                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
                     if (!med) return;
                     const val      = (it.valor||0) / 100;
                     if (val <= 0) return;
