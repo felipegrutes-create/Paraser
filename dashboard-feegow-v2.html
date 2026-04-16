@@ -10042,35 +10042,46 @@
             const barColors = ['#10b981','#6366f1','#f59e0b','#ec4899','#3b82f6','#14b8a6','#8b5cf6','#ef4444','#06b6d4','#84cc16'];
 
             crData.forEach(inv => {
-                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const det    = inv.detalhes && inv.detalhes[0];
+                const fatVal = (det && det.valor) || 0;
                 const pagSum = (inv.pagamentos||[]).reduce((sp,p)=>sp+(p.valor||0),0);
-                const recebido = Math.min(fatVal, pagSum) / 100;
-                if (recebido <= 0) return;
+                const propPago = fatVal > 0 ? Math.min(pagSum / fatVal, 1) : 0;
+                const status   = crInvoiceStatus(inv);
+                const dataFat  = (det && det.data) || '';
+
                 (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
                     const n = (it.nomeResolvido||it.descricao||'').toUpperCase();
                     let med = null;
-                    if (n.includes('RODOLFO'))                              med = 'Dr. Rodolfo Salvato';
+                    if (n.includes('RODOLFO'))                                 med = 'Dr. Rodolfo Salvato';
                     else if (n.includes('PRISCILA')||n.includes('PRISCILLA')) med = 'Dra. Priscila Loyola';
-                    else if (n.includes('MARCELLE'))                        med = 'Dra. Marcelle Moura';
-                    else if (n.includes('JOSELMO'))                         med = 'Dr. Joselmo Salvato';
-                    else if (n.includes('HELCE'))                           med = 'Dr. Helce Junior';
-                    else if (n.includes('MARIO')||n.includes('MÁRIO'))      med = 'Dr. Mario Barroso';
-                    else if (n.includes('BRUNA ORTIZ'))                     med = 'Dra. Bruna Ortiz';
-                    else if (n.includes('NUTRICIONISTA'))                   med = 'Nutricionista';
+                    else if (n.includes('MARCELLE'))                          med = 'Dra. Marcelle Moura';
+                    else if (n.includes('JOSELMO'))                           med = 'Dr. Joselmo Salvato';
+                    else if (n.includes('HELCE'))                             med = 'Dr. Helce Junior';
+                    else if (n.includes('MARIO')||n.includes('MÁRIO'))        med = 'Dr. Mario Barroso';
+                    else if (n.includes('BRUNA ORTIZ'))                       med = 'Dra. Bruna Ortiz';
+                    else if (n.includes('NUTRICIONISTA'))                     med = 'Nutricionista';
                     else if (n.includes('ENDOCRINOLOGISTA')||n.includes('MAGALI')) med = 'Dra. Magali';
-                    else if (n.includes('ACUPUNTURA')||n.includes('PAULUS'))med = 'Acupuntura';
+                    else if (n.includes('ACUPUNTURA')||n.includes('PAULUS')) med = 'Acupuntura';
                     if (!med) return;
-                    const val = (it.valor||0)/100;
+                    const val      = (it.valor||0) / 100;
                     if (val <= 0) return;
-                    medSums[med] = (medSums[med]||0) + val;
+                    const valorPago = val * propPago;
+                    medSums[med]    = (medSums[med]||0) + val;
                     if (!medItemsMap[med]) medItemsMap[med] = [];
-                    medItemsMap[med].push({ data:(inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].data)||'', paciente:inv.nomePaciente||'—', proc:it.nomeResolvido||it.descricao||'', valor:val });
+                    medItemsMap[med].push({
+                        data: dataFat, paciente: inv.nomePaciente||'—',
+                        proc: it.nomeResolvido||it.descricao||'', qtd: it.quantidade||1,
+                        valor: val, valorPago, valorPendente: Math.max(0, val - valorPago),
+                        propPago, status,
+                        fatTotal: fatVal/100, pagTotal: pagSum/100,
+                        pagamentos: inv.pagamentos || []
+                    });
                 });
             });
 
             const entries = Object.entries(medSums).sort((a,b)=>b[1]-a[1]);
             if (!entries.length) return;
-            window._crMedItems = medItemsMap;
+            window._crMedicosItemsMap = medItemsMap;
 
             if (crChartMedico) crChartMedico.destroy();
             crChartMedico = new Chart(ctxEl, {
@@ -10098,7 +10109,7 @@
                     },
                     onClick(evt, elements) {
                         if (!elements.length) return;
-                        openCrMedDetail(entries[elements[0].index][0]);
+                        openCrMedicoDetail(entries[elements[0].index][0]);
                     },
                     onHover(evt, elements) {
                         evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
@@ -10107,47 +10118,86 @@
             });
         }
 
-        function openCrMedDetail(medName) {
-            const items = (window._crMedItems || {})[medName] || [];
+        function openCrMedicoDetail(medName) {
+            const items = (window._crMedicosItemsMap || {})[medName] || [];
             if (!items.length) return;
-            const total = items.reduce((s,d) => s + d.valor, 0);
-            const crFmtLocal = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const crFmtL = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+            const totalFat  = items.reduce((s,d) => s + d.valor, 0);
+            const totalPago = items.reduce((s,d) => s + d.valorPago, 0);
+            const totalPend = Math.max(0, totalFat - totalPago);
 
             // Agrupar por procedimento
-            const procSums = {};
-            const procDetail = {};
+            const procSums = {}, procPago = {}, procDetail = {};
             items.forEach(d => {
-                const p = d.proc || 'Sem procedimento';
-                procSums[p] = (procSums[p]||0) + d.valor;
+                const p = d.proc || '(sem nome)';
+                procSums[p]  = (procSums[p]||0)  + d.valor;
+                procPago[p]  = (procPago[p]||0)   + d.valorPago;
                 if (!procDetail[p]) procDetail[p] = [];
                 procDetail[p].push(d);
             });
             const procEntries = Object.entries(procSums).sort((a,b) => b[1] - a[1]);
 
             document.getElementById('finModalTitle').textContent = medName;
-            document.getElementById('finModalSubtitle').innerHTML = `${items.length} lançamentos · Total: ${crFmtLocal(total)}`;
-            document.getElementById('finModalTheadRow').innerHTML =
-                '<th>Procedimento</th><th style="text-align:center">Qtd</th><th style="text-align:right">%</th><th style="width:120px;text-align:right">Valor</th>';
+            document.getElementById('finModalSubtitle').innerHTML =
+                `${items.length} lançamentos &nbsp;·&nbsp; ` +
+                `Faturado: <strong>${crFmtL(totalFat)}</strong> &nbsp;·&nbsp; ` +
+                `Recebido: <strong style="color:#34d399">${crFmtL(totalPago)}</strong> &nbsp;·&nbsp; ` +
+                `Pendente: <strong style="color:#f87171">${crFmtL(totalPend)}</strong>`;
 
-            document.getElementById('finModalBody').innerHTML = procEntries.map(([proc, val], gi) => {
-                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+            document.getElementById('finModalTheadRow').innerHTML =
+                '<th>Procedimento</th>' +
+                '<th style="text-align:center;width:40px">Qtd</th>' +
+                '<th style="text-align:right;width:110px">Faturado</th>' +
+                '<th style="text-align:right;width:110px">Recebido</th>' +
+                '<th style="text-align:right;width:90px">Pendente</th>' +
+                '<th style="text-align:right;width:52px">%</th>';
+
+            document.getElementById('finModalBody').innerHTML = procEntries.map(([proc, fat], gi) => {
+                const pago = procPago[proc] || 0;
+                const pend = Math.max(0, fat - pago);
+                const pct  = fat > 0 ? ((pago / fat) * 100).toFixed(0) : 0;
                 const detailItems = (procDetail[proc] || []).sort((a,b) => (b.data||'').localeCompare(a.data||''));
-                const detailRows = detailItems.map(d =>
-                    `<tr class="fin-detail-row">
-                        <td style="padding-left:24px;color:var(--muted);font-size:11px">${d.data}</td>
-                        <td style="font-size:11px">${d.paciente}</td>
-                        <td></td>
-                        <td class="fin-val" style="font-size:11px">${crFmtLocal(d.valor)}</td>
-                    </tr>`
-                ).join('');
-                return `<tr class="fin-group-row" style="border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleFinDetail(${gi})">
-                    <td style="font-weight:600;padding:10px 12px"><span id="fin-arrow-${gi}" style="display:inline-block;transition:transform .2s;margin-right:6px">▶</span>${proc}</td>
+
+                const detailRows = detailItems.map(d => {
+                    const stBadge = d.status === 'pago'
+                        ? `<span class="fin-badge-pago" style="font-size:9px">PAGO</span>`
+                        : d.status === 'parcial'
+                        ? `<span class="fin-badge-pendente" style="font-size:9px">PARCIAL</span>`
+                        : `<span class="fin-badge-other" style="font-size:9px">PENDENTE</span>`;
+                    return `<tr class="fin-detail-row">
+                        <td style="padding-left:28px;color:var(--muted);font-size:11px;white-space:nowrap">${(d.data||'').replace(/-/g,'/')}</td>
+                        <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis">${d.paciente}</td>
+                        <td style="text-align:center;font-size:11px">${d.qtd}</td>
+                        <td class="fin-val" style="font-size:11px">${crFmtL(d.valor)}</td>
+                        <td class="fin-val" style="font-size:11px;color:#34d399">${crFmtL(d.valorPago)}</td>
+                        <td class="fin-val" style="font-size:11px;color:${d.valorPendente>0.01?'#f87171':'var(--muted)'}">${crFmtL(d.valorPendente)}</td>
+                        <td style="text-align:right">${stBadge}</td>
+                    </tr>`;
+                }).join('');
+
+                return `<tr class="fin-group-row" style="cursor:pointer" onclick="toggleFinDetail(${gi})">
+                    <td style="font-weight:600;padding:10px 12px">
+                        <span id="fin-arrow-${gi}" style="display:inline-block;transition:transform .2s;margin-right:6px">▶</span>${proc}
+                    </td>
                     <td style="text-align:center;color:var(--muted)">${detailItems.length}x</td>
-                    <td style="text-align:right;color:var(--muted)">${pct}%</td>
-                    <td class="fin-val" style="font-weight:600;padding:10px 12px">${crFmtLocal(val)}</td>
+                    <td class="fin-val" style="padding:10px 12px">${crFmtL(fat)}</td>
+                    <td class="fin-val" style="padding:10px 12px;color:#34d399">${crFmtL(pago)}</td>
+                    <td class="fin-val" style="padding:10px 12px;color:${pend>0.01?'#f87171':'var(--muted)'}">${crFmtL(pend)}</td>
+                    <td style="text-align:right;font-weight:700;color:${pct>=100?'#34d399':pct>0?'#fbbf24':'#f87171'}">${pct}%</td>
                 </tr>
-                <tr id="fin-detail-${gi}" style="display:none"><td colspan="4" style="padding:0">
-                    <table class="fin-table" style="background:rgba(255,255,255,0.02)"><tbody>${detailRows}</tbody></table>
+                <tr id="fin-detail-${gi}" style="display:none"><td colspan="6" style="padding:0">
+                    <table class="fin-table" style="background:rgba(255,255,255,0.02)">
+                        <thead><tr>
+                            <th style="padding-left:28px">Data</th><th>Paciente</th>
+                            <th style="text-align:center">Qtd</th>
+                            <th style="text-align:right">Valor</th>
+                            <th style="text-align:right">Recebido</th>
+                            <th style="text-align:right">Pendente</th>
+                            <th style="text-align:right">Status</th>
+                        </tr></thead>
+                        <tbody>${detailRows}</tbody>
+                    </table>
                 </td></tr>`;
             }).join('');
 
