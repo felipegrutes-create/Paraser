@@ -2093,7 +2093,7 @@
         <button class="tab tab-donor" onclick="showSection('sec-embriao',this)">Embrião Doado<span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
         <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
         <button class="tab" onclick="showSection('sec-cr',this)">💳 Contas a Receber</button>
-        <button class="tab" onclick="showSection('sec-caixa',this)">🏦 Caixa Recepção</button>
+        <button class="tab" onclick="showSection('sec-caixa',this)">👨‍⚕️ Médicos</button>
     </div>
 
     <div class="container">
@@ -3114,45 +3114,52 @@
 
         <!-- CAIXA RECEPÇÃO -->
         <section id="sec-caixa" class="section">
-            <p class="section-title">🏦 Caixa Recepção</p>
+            <p class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+                👨‍⚕️ Médicos — Receita por Ano
+                <button onclick="medAnnualReload()" style="background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit">
+                    ↺ Recarregar
+                </button>
+            </p>
 
-            <div style="display:flex;gap:8px;margin-bottom:16px">
-                <button class="cx-sub-btn active" id="cxSubRec" onclick="cxShowSub('rec')">🏦 Recepção</button>
-                <button class="cx-sub-btn" id="cxSubFin" onclick="cxShowSub('fin')">📋 Financeiro (NF)</button>
-            </div>
-
-            <!-- RECEPÇÃO -->
-            <div id="cxViewRec">
-                <div class="kpi-grid">
-                    <div class="kpi-card teal"><div class="value" id="cx-total-hoje">—</div><div class="label">Total Recebido Hoje</div></div>
-                    <div class="kpi-card"><div class="value" id="cx-pix" style="color:#8b5cf6">—</div><div class="label">PIX</div></div>
-                    <div class="kpi-card"><div class="value" id="cx-credito" style="color:#3b82f6">—</div><div class="label">Cartão Crédito</div></div>
-                    <div class="kpi-card"><div class="value" id="cx-debito" style="color:#f59e0b">—</div><div class="label">Cartão Débito</div></div>
-                    <div class="kpi-card"><div class="value" id="cx-dinheiro" style="color:#10b981">—</div><div class="label">Dinheiro</div></div>
-                    <div class="kpi-card purple"><div class="value" id="cx-qtd-hoje">0</div><div class="label">Pagamentos Hoje</div></div>
+            <!-- KPIs comparativos -->
+            <div class="kpi-grid" style="margin-bottom:20px">
+                <div class="kpi-card">
+                    <div class="value" id="med-total-2025" style="color:#6366f1">—</div>
+                    <div class="label">Total Recebido 2025</div>
                 </div>
-
-                <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
-                    <label style="font-size:13px;color:var(--muted)">Recepcionista:</label>
-                    <input id="cxRecepcionista" placeholder="Seu nome" oninput="localStorage.setItem('cx_recep',this.value)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;width:200px">
+                <div class="kpi-card teal">
+                    <div class="value" id="med-total-2026" style="color:#10b981">—</div>
+                    <div class="label">Total Recebido 2026</div>
                 </div>
-
-                <div class="chart-card">
-                    <h3>📅 Agendamentos de Hoje</h3>
-                    <div id="cxTodayList" style="margin-top:12px">Carregando...</div>
+                <div class="kpi-card">
+                    <div class="value" id="med-crescimento">—</div>
+                    <div class="label">Crescimento YoY</div>
                 </div>
-
-                <div class="chart-card" style="margin-top:16px">
-                    <h3>💰 Pagamentos Registrados Hoje</h3>
-                    <div id="cxPaymentsLog" style="margin-top:12px"></div>
+                <div class="kpi-card">
+                    <div class="value" id="med-melhor-2025" style="font-size:14px">—</div>
+                    <div class="label">Top Médico 2025</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="value" id="med-melhor-2026" style="font-size:14px">—</div>
+                    <div class="label">Top Médico 2026</div>
                 </div>
             </div>
 
-            <!-- FINANCEIRO NF -->
-            <div id="cxViewFin" style="display:none">
+            <!-- Gráficos lado a lado -->
+            <div class="cr-charts-row" style="grid-template-columns:1fr 1fr;align-items:start">
                 <div class="chart-card">
-                    <h3>📋 Pagamentos Pendentes de NF</h3>
-                    <div id="cxNfPending" style="margin-top:12px"></div>
+                    <h3 style="display:flex;justify-content:space-between;align-items:center">
+                        📊 2025 — Receita por Médico
+                        <span id="medStatus2025" style="font-size:11px;color:var(--muted);font-weight:400"></span>
+                    </h3>
+                    <canvas id="medChart2025" height="300"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3 style="display:flex;justify-content:space-between;align-items:center">
+                        📊 2026 — Receita por Médico
+                        <span id="medStatus2026" style="font-size:11px;color:var(--muted);font-weight:400"></span>
+                    </h3>
+                    <canvas id="medChart2026" height="300"></canvas>
                 </div>
             </div>
         </section>
@@ -4371,7 +4378,7 @@
             if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
-            if (id === 'sec-caixa') loadAndRenderCaixa();
+            if (id === 'sec-caixa') loadAndRenderMedicos();
             if (id === 'sec-cr') loadAndRenderCR();
             // Re-render abas dirty ao entrar
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
@@ -9280,6 +9287,138 @@
                 return json.backup;
             }
             return null;
+        }
+
+        // ===================== MÉDICOS — RECEITA ANUAL =====================
+        let _medAnnualLoaded = false;
+        let _medChart2025 = null, _medChart2026 = null;
+
+        function _resolveMedico(nome) {
+            const n = (nome||'').toUpperCase();
+            if (n.includes('RODOLFO'))                                 return 'Dr. Rodolfo Salvato';
+            if (n.includes('PRISCILA')||n.includes('PRISCILLA'))      return 'Dra. Priscila Loyola';
+            if (n.includes('MARCELLE'))                               return 'Dra. Marcelle Moura';
+            if (n.includes('JOSELMO'))                                return 'Dr. Joselmo Salvato';
+            if (n.includes('HELCE'))                                  return 'Dr. Helce Junior';
+            if (n.includes('MARIO')||n.includes('MÁRIO'))             return 'Dr. Mario Barroso';
+            if (n.includes('BRUNA ORTIZ'))                            return 'Dra. Bruna Ortiz';
+            if (n.includes('NUTRICIONISTA'))                          return 'Nutricionista';
+            if (n.includes('ENDOCRINOLOGISTA')||n.includes('MAGALI')) return 'Dra. Magali';
+            if (n.includes('ACUPUNTURA')||n.includes('PAULUS'))       return 'Acupuntura';
+            return null;
+        }
+
+        function _aggregateMedicos(data) {
+            const sums = {};
+            data.forEach(inv => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((s,p)=>s+(p.valor||0),0);
+                const propPago = fatVal > 0 ? Math.min(pagSum/fatVal, 1) : 0;
+                (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
+                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
+                    if (!med) return;
+                    const val = (it.valor||0)/100;
+                    if (val <= 0) return;
+                    sums[med] = (sums[med]||0) + val * propPago;
+                });
+            });
+            return Object.entries(sums).sort((a,b)=>b[1]-a[1]);
+        }
+
+        function _renderMedicoAnualChart(canvasId, chartRef, entries) {
+            const el = document.getElementById(canvasId);
+            if (!el) return null;
+            if (chartRef) { try { chartRef.destroy(); } catch(e){} }
+            const barColors = ['#10b981','#6366f1','#f59e0b','#ec4899','#3b82f6','#14b8a6','#8b5cf6','#ef4444','#06b6d4','#84cc16'];
+            return new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: entries.map(([k])=>k),
+                    datasets: [{ data: entries.map(([,v])=>v),
+                        backgroundColor: entries.map((_,i)=>barColors[i%barColors.length]+'cc'),
+                        borderColor:     entries.map((_,i)=>barColors[i%barColors.length]),
+                        borderWidth: 1.5, borderRadius: 6 }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => ' R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) } }
+                    },
+                    scales: {
+                        x: { ticks: { color:'#6b7a99', font:{size:10}, callback: v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v) }, grid:{color:'rgba(255,255,255,0.04)'} },
+                        y: { ticks: { color:'#e2e8f4', font:{size:11,weight:'600'} }, grid:{display:false} }
+                    }
+                }
+            });
+        }
+
+        function medAnnualReload() { _medAnnualLoaded = false; loadAndRenderMedicos(); }
+
+        async function loadAndRenderMedicos() {
+            if (_medAnnualLoaded) return;
+            const crFmtL = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const fmtDate = d => String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+
+            // Reset UI
+            ['med-total-2025','med-total-2026','med-crescimento','med-melhor-2025','med-melhor-2026']
+                .forEach(id => { const el=document.getElementById(id); if(el) el.textContent='—'; });
+            document.getElementById('medStatus2025').textContent = 'Carregando…';
+            document.getElementById('medStatus2026').textContent = 'Aguardando…';
+            if (_medChart2025) { try{_medChart2025.destroy();}catch(e){} _medChart2025=null; }
+            if (_medChart2026) { try{_medChart2026.destroy();}catch(e){} _medChart2026=null; }
+
+            const fetchYear = async (ds, de) => {
+                const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const json = await resp.json();
+                if (json.error) throw new Error(json.error);
+                return json.data || [];
+            };
+
+            let entries2025 = [], entries2026 = [];
+
+            // Carregar 2025
+            try {
+                const data = await fetchYear('01/01/2025','31/12/2025');
+                entries2025 = _aggregateMedicos(data);
+                const total = entries2025.reduce((s,[,v])=>s+v,0);
+                document.getElementById('med-total-2025').textContent = crFmtL(total);
+                document.getElementById('med-melhor-2025').textContent = entries2025.length ? entries2025[0][0] : '—';
+                document.getElementById('medStatus2025').textContent = entries2025.length + ' médicos';
+                _medChart2025 = _renderMedicoAnualChart('medChart2025', _medChart2025, entries2025);
+            } catch(e) {
+                document.getElementById('medStatus2025').textContent = '⚠ ' + e.message;
+            }
+
+            // Carregar 2026
+            document.getElementById('medStatus2026').textContent = 'Carregando…';
+            try {
+                const data = await fetchYear('01/01/2026', fmtDate(new Date()));
+                entries2026 = _aggregateMedicos(data);
+                const total = entries2026.reduce((s,[,v])=>s+v,0);
+                document.getElementById('med-total-2026').textContent = crFmtL(total);
+                document.getElementById('med-melhor-2026').textContent = entries2026.length ? entries2026[0][0] : '—';
+                document.getElementById('medStatus2026').textContent = entries2026.length + ' médicos';
+                _medChart2026 = _renderMedicoAnualChart('medChart2026', _medChart2026, entries2026);
+            } catch(e) {
+                document.getElementById('medStatus2026').textContent = '⚠ ' + e.message;
+            }
+
+            // YoY
+            const t25 = entries2025.reduce((s,[,v])=>s+v,0);
+            const t26 = entries2026.reduce((s,[,v])=>s+v,0);
+            if (t25 > 0 && t26 > 0) {
+                const pct = ((t26 - t25) / t25 * 100).toFixed(1);
+                const el  = document.getElementById('med-crescimento');
+                if (el) {
+                    el.textContent = (pct > 0 ? '+' : '') + pct + '%';
+                    el.style.color = pct >= 0 ? '#34d399' : '#f87171';
+                }
+            }
+
+            _medAnnualLoaded = true;
         }
 
         // ===================== CAIXA RECEPÇÃO =====================
