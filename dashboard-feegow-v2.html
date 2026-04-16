@@ -10216,8 +10216,6 @@
                 const dataFat  = (det && det.data) || '';
 
                 (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
-                    const n = (it.nomeResolvido||it.descricao||'').toUpperCase();
-                    // Usa _resolveMedico centralizado (USG FIV / PACOTE USG → Érica antes de RODOLFO)
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
                     if (!med) return;
                     const val      = (it.valor||0) / 100;
