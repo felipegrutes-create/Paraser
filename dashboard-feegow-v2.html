@@ -9593,6 +9593,13 @@
         })();
 
         // ===== CONTAS A RECEBER =====
+        // Critério unificado: medicamento por tipo OU por nome (usado no donut E no Controle)
+        function isCrMedItem(it) {
+            if (it.tipo === 'M') return true;
+            const n = (it.nomeResolvido || it.descricao || '').toUpperCase();
+            return n.includes('MEDICAMENTO') || n.includes('MEDICAÇÃO') || n.includes('MEDICACAO');
+        }
+
         let crData = [], crDataLoaded = false, crCurrentDate = new Date();
         let crChartStatus = null, crChartProc = null, crChartComposicao = null;
 
@@ -9815,7 +9822,7 @@
                     if (val <= 0) return;
                     let cat = 'Outros';
                     const nome = (it.nomeResolvido||it.descricao||'').toUpperCase();
-                    if (it.tipo === 'M' || nome.includes('MEDICAMENTO') || nome.includes('MEDICAÇÃO') || nome.includes('MEDICACAO')) cat = 'Medicamentos';
+                    if (isCrMedItem(it)) cat = 'Medicamentos';
                     else if (nome.includes('CONSULTA 1') || nome.includes('CONSULTA -')) cat = 'Consultas 1ª Vez';
                     else if (nome.includes('RETORNO') || nome.includes('CONSULTA DE')) cat = 'Outras Consultas';
                     else if (nome.includes('HONORARIO')) cat = 'Honorários';
@@ -9849,7 +9856,7 @@
                         if (val <= 0) return;
                         let cat = 'Outros';
                         const nome = (it.nomeResolvido||it.descricao||'').toUpperCase();
-                        if (it.tipo === 'M' || nome.includes('MEDICAMENTO') || nome.includes('MEDICAÇÃO') || nome.includes('MEDICACAO')) cat = 'Medicamentos';
+                        if (isCrMedItem(it)) cat = 'Medicamentos';
                         else if (nome.includes('CONSULTA 1') || nome.includes('CONSULTA -')) cat = 'Consultas 1ª Vez';
                         else if (nome.includes('RETORNO') || nome.includes('CONSULTA DE')) cat = 'Outras Consultas';
                         else if (nome.includes('HONORARIO')) cat = 'Honorários';
@@ -10073,7 +10080,7 @@
                 const pagTotal = (inv.pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
                 const fatTotal = (inv.detalhes && inv.detalhes[0] && inv.detalhes[0].valor) || 0;
 
-                const itens = (inv.itens || []).filter(it => it.tipo === 'M');
+                const itens = (inv.itens || []).filter(it => isCrMedItem(it));
                 if (!itens.length) return;
 
                 // Proporção paga desta fatura
