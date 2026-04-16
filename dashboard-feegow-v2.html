@@ -9309,23 +9309,35 @@
         }
 
         function _aggregateMedicos(data) {
-            const sums = {};
+            const sums = {}, itemsMap = {};
             data.forEach(inv => {
-                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const det    = inv.detalhes && inv.detalhes[0];
+                const fatVal = (det && det.valor) || 0;
                 const pagSum = (inv.pagamentos||[]).reduce((s,p)=>s+(p.valor||0),0);
                 const propPago = fatVal > 0 ? Math.min(pagSum/fatVal, 1) : 0;
+                const status   = crInvoiceStatus(inv);
+                const dataFat  = (det && det.data) || '';
                 (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
                     if (!med) return;
                     const val = (it.valor||0)/100;
                     if (val <= 0) return;
-                    sums[med] = (sums[med]||0) + val * propPago;
+                    const valorPago = val * propPago;
+                    sums[med] = (sums[med]||0) + valorPago;
+                    if (!itemsMap[med]) itemsMap[med] = [];
+                    itemsMap[med].push({
+                        data: dataFat, paciente: inv.nomePaciente||'—',
+                        proc: it.nomeResolvido||it.descricao||'', qtd: it.quantidade||1,
+                        valor: val, valorPago, valorPendente: Math.max(0, val - valorPago),
+                        propPago, status, fatTotal: fatVal/100, pagTotal: pagSum/100,
+                        pagamentos: inv.pagamentos || []
+                    });
                 });
             });
-            return Object.entries(sums).sort((a,b)=>b[1]-a[1]);
+            return { entries: Object.entries(sums).sort((a,b)=>b[1]-a[1]), itemsMap };
         }
 
-        function _renderMedicoAnualChart(canvasId, chartRef, entries) {
+        function _renderMedicoAnualChart(canvasId, chartRef, entries, itemsMap) {
             const el = document.getElementById(canvasId);
             if (!el) return null;
             if (chartRef) { try { chartRef.destroy(); } catch(e){} }
@@ -9348,6 +9360,15 @@
                     scales: {
                         x: { ticks: { color:'#6b7a99', font:{size:10}, callback: v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v) }, grid:{color:'rgba(255,255,255,0.04)'} },
                         y: { ticks: { color:'#e2e8f4', font:{size:11,weight:'600'} }, grid:{display:false} }
+                    },
+                    onClick(evt, elements) {
+                        if (!elements.length) return;
+                        const medName = entries[elements[0].index][0];
+                        window._crMedicosItemsMap = itemsMap;
+                        openCrMedicoDetail(medName);
+                    },
+                    onHover(evt, elements) {
+                        evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
                     }
                 }
             });
@@ -9382,12 +9403,13 @@
             // Carregar 2025
             try {
                 const data = await fetchYear('01/01/2025','31/12/2025');
-                entries2025 = _aggregateMedicos(data);
+                const agg = _aggregateMedicos(data);
+                entries2025 = agg.entries;
                 const total = entries2025.reduce((s,[,v])=>s+v,0);
                 document.getElementById('med-total-2025').textContent = crFmtL(total);
                 document.getElementById('med-melhor-2025').textContent = entries2025.length ? entries2025[0][0] : '—';
-                document.getElementById('medStatus2025').textContent = entries2025.length + ' médicos';
-                _medChart2025 = _renderMedicoAnualChart('medChart2025', _medChart2025, entries2025);
+                document.getElementById('medStatus2025').textContent = entries2025.length + ' médicos · clique para detalhar';
+                _medChart2025 = _renderMedicoAnualChart('medChart2025', _medChart2025, entries2025, agg.itemsMap);
             } catch(e) {
                 document.getElementById('medStatus2025').textContent = '⚠ ' + e.message;
             }
@@ -9396,12 +9418,13 @@
             document.getElementById('medStatus2026').textContent = 'Carregando…';
             try {
                 const data = await fetchYear('01/01/2026', fmtDate(new Date()));
-                entries2026 = _aggregateMedicos(data);
+                const agg = _aggregateMedicos(data);
+                entries2026 = agg.entries;
                 const total = entries2026.reduce((s,[,v])=>s+v,0);
                 document.getElementById('med-total-2026').textContent = crFmtL(total);
                 document.getElementById('med-melhor-2026').textContent = entries2026.length ? entries2026[0][0] : '—';
-                document.getElementById('medStatus2026').textContent = entries2026.length + ' médicos';
-                _medChart2026 = _renderMedicoAnualChart('medChart2026', _medChart2026, entries2026);
+                document.getElementById('medStatus2026').textContent = entries2026.length + ' médicos · clique para detalhar';
+                _medChart2026 = _renderMedicoAnualChart('medChart2026', _medChart2026, entries2026, agg.itemsMap);
             } catch(e) {
                 document.getElementById('medStatus2026').textContent = '⚠ ' + e.message;
             }
