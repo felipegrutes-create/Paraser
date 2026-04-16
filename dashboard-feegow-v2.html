@@ -9662,29 +9662,72 @@
             return '<span class="cr-badge-pendente">PENDENTE</span>';
         }
 
+        // Controla requisição em andamento (cancela anterior ao trocar mês)
+        let _crFetchController = null;
+
+        function _crClearCharts() {
+            [crChartStatus, crChartProc, crChartComposicao, crChartMedico, crChartAnaStatus, crChartAnaProc].forEach(c => { try { if (c) c.destroy(); } catch(e){} });
+            crChartStatus = crChartProc = crChartComposicao = crChartMedico = crChartAnaStatus = crChartAnaProc = null;
+            // Limpa canvas visualmente
+            ['crChartStatus','crChartProc','crChartComposicao','crChartMedico','crChartAnaStatus','crChartAnaProc'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0,0,el.width,el.height); }
+            });
+        }
+
         async function loadAndRenderCR() {
             if (crDataLoaded) { renderCR(); return; }
             const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-            document.getElementById('crMonthLabel').textContent = months[crCurrentDate.getMonth()] + ' ' + crCurrentDate.getFullYear();
+            const mesLabel = months[crCurrentDate.getMonth()] + ' ' + crCurrentDate.getFullYear();
+            document.getElementById('crMonthLabel').textContent = mesLabel;
 
             const start = new Date(crCurrentDate.getFullYear(), crCurrentDate.getMonth(), 1);
             const end   = new Date(crCurrentDate.getFullYear(), crCurrentDate.getMonth() + 1, 0);
             const ds = _crFmtDate(start), de = _crFmtDate(end);
 
-            document.getElementById('crTableContent').innerHTML =
-                '<div style="text-align:center;padding:60px"><div class="spinner-ring" style="margin:0 auto"></div><p style="color:var(--muted);margin-top:12px">Carregando contas a receber…</p></div>';
+            // Cancela fetch anterior se ainda estiver em curso
+            if (_crFetchController) { try { _crFetchController.abort(); } catch(e){} }
+            _crFetchController = new AbortController();
+            const signal = _crFetchController.signal;
+
+            // Limpa estado visual
+            _crClearCharts();
             ['cr-total','cr-recebido','cr-pendente','cr-pacientes','cr-ticket'].forEach(id => document.getElementById(id).textContent = '—');
+            ['crAnaFaturado','crAnaRecebido','crAnaPendente','crAnaPacientes','crAnaTicket','crAnaTotal'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '—'; });
+            ['crMedFaturado','crMedRecebido','crMedPendente','crMedQtd','crMedTotal'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '—'; });
+            const crAnaContent = document.getElementById('crAnaContent');
+            if (crAnaContent) crAnaContent.innerHTML = '';
+
+            document.getElementById('crTableContent').innerHTML =
+                `<div style="text-align:center;padding:60px">
+                    <div class="spinner-ring" style="margin:0 auto"></div>
+                    <p style="color:var(--muted);margin-top:12px">Carregando ${mesLabel}…</p>
+                    <p style="color:var(--muted);font-size:11px;margin-top:6px">Pode levar até 2 minutos na primeira vez</p>
+                </div>`;
 
             try {
+                // Timeout de 350s — Apps Script pode demorar até ~5min na 1ª vez (sem cache)
+                const timeoutId = setTimeout(() => { try { _crFetchController.abort(); } catch(e){} }, 350000);
                 const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
-                const json = await fetch(url, { signal: AbortSignal.timeout(90000) }).then(r => r.json());
+                const resp = await fetch(url, { signal });
+                clearTimeout(timeoutId);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const json = await resp.json();
                 if (json.error) throw new Error(json.error);
                 crData = json.data || [];
                 crDataLoaded = true;
                 renderCR();
             } catch(e) {
+                if (e.name === 'AbortError') return; // troca de mês antes de terminar — silencioso
+                const errMsg = e.message || 'Falha na requisição';
                 document.getElementById('crTableContent').innerHTML =
-                    `<div style="text-align:center;padding:40px;color:#ef4444">Erro: ${e.message}</div>`;
+                    `<div style="text-align:center;padding:40px">
+                        <div style="color:#ef4444;font-size:15px;font-weight:600;margin-bottom:8px">⚠ Erro ao carregar ${mesLabel}</div>
+                        <div style="color:var(--muted);font-size:12px;margin-bottom:20px">${errMsg}</div>
+                        <button onclick="crReload()" style="background:#6366f1;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">
+                            ↺ Tentar novamente
+                        </button>
+                    </div>`;
             }
         }
 
