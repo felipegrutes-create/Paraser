@@ -10131,8 +10131,6 @@
             if (!container || !crData.length) { if (container) container.innerHTML = ''; return; }
 
             const crFmtL = v => 'R$\u00a0' + (v||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
-
-            // Critério ANA: item tem "PROJETO ANA" no nome OU paciente está no CRM com projeto_ana=true
             const isAnaItem = it => (it.nomeResolvido||it.descricao||'').toUpperCase().includes('PROJETO ANA');
             const isAnaPaciente = nome => {
                 if (!nome) return false;
@@ -10140,9 +10138,10 @@
                 return crm && (crm.projeto_ana === true || crm.projeto_ana === 'TRUE');
             };
 
-            // Coletar rows ANA: um registro por item ANA em cada fatura
             const anaRows = [];
+            const anaMedItems = [];
             let totalFat = 0, totalPago = 0;
+            let totalFatMed = 0, totalPagoMed = 0;
             const pacSet = new Set();
 
             crData.forEach(inv => {
@@ -10156,38 +10155,46 @@
                 const status   = crInvoiceStatus(inv);
                 const pacAna   = isAnaPaciente(paciente);
 
-                // Items ANA: item com nome ANA OU (paciente ANA E qualquer procedimento tipo S)
                 const itensAna = (inv.itens||[]).filter(it =>
                     isAnaItem(it) || (pacAna && it.tipo === 'S')
                 );
+                if (!itensAna.length && !pacAna) return;
                 if (!itensAna.length) return;
 
                 pacSet.add(paciente);
                 itensAna.forEach(it => {
-                    const valorItem = (it.valor||0) / 100;
-                    totalFat  += valorItem;
-                    totalPago += valorItem * propPago;
+                    const v = (it.valor||0) / 100;
+                    totalFat  += v;
+                    totalPago += v * propPago;
                     anaRows.push({
                         paciente, dataFat, status, propPago,
                         nome: it.nomeResolvido || it.descricao || `ID${it.procedimento_id}`,
-                        valor: valorItem,
-                        valorPago: valorItem * propPago,
-                        quantidade: it.quantidade || 1,
-                        fatTotal: fatTotal / 100,
-                        pagTotal: pagTotal / 100,
+                        valor: v, valorPago: v * propPago, quantidade: it.quantidade || 1,
+                        fatTotal: fatTotal / 100, pagTotal: pagTotal / 100,
+                        pagamentos: inv.pagamentos || [],
                         origem: isAnaItem(it) ? 'proc' : 'crm',
+                    });
+                });
+
+                // Medicamentos da fatura ANA
+                (inv.itens||[]).filter(it => isCrMedItem(it)).forEach(it => {
+                    const v = (it.valor||0) / 100;
+                    totalFatMed  += v;
+                    totalPagoMed += v * propPago;
+                    anaMedItems.push({
+                        paciente, data: dataFat, status, propPago,
+                        nome: it.nomeResolvido || it.descricao || `ID${it.procedimento_id}`,
+                        valor: v, valorPago: v * propPago, quantidade: it.quantidade || 1,
+                        fatTotal: fatTotal / 100, pagTotal: pagTotal / 100,
                     });
                 });
             });
 
-            const totalPend = Math.max(0, totalFat - totalPago);
-            const ticket    = pacSet.size > 0 ? totalFat / pacSet.size : 0;
-
             document.getElementById('crAnaFaturado').textContent  = crFmtL(totalFat);
             document.getElementById('crAnaRecebido').textContent  = crFmtL(totalPago);
-            document.getElementById('crAnaPendente').textContent  = crFmtL(totalPend);
+            document.getElementById('crAnaPendente').textContent  = crFmtL(Math.max(0, totalFat - totalPago));
             document.getElementById('crAnaPacientes').textContent = pacSet.size;
-            document.getElementById('crAnaTicket').textContent    = crFmtL(ticket);
+            document.getElementById('crAnaTicket').textContent    = crFmtL(pacSet.size > 0 ? totalFat / pacSet.size : 0);
             document.getElementById('crAnaTotal').textContent     = pacSet.size + ' pacientes · ' + crFmtL(totalFat);
 
             if (!anaRows.length) {
@@ -10195,75 +10202,117 @@
                 return;
             }
 
-            // Agrupar por paciente para resumo
-            const pacSums = {};
-            anaRows.forEach(r => {
-                if (!pacSums[r.paciente]) pacSums[r.paciente] = { total:0, pago:0, qtd:0, procs:[] };
-                pacSums[r.paciente].total += r.valor;
-                pacSums[r.paciente].pago  += r.valorPago;
-                pacSums[r.paciente].qtd   += 1;
-                if (!pacSums[r.paciente].procs.includes(r.nome)) pacSums[r.paciente].procs.push(r.nome);
-            });
-            const pacEntries = Object.entries(pacSums).sort((a,b) => b[1].total - a[1].total);
-
-            // Resumo por paciente
-            let html = `<h4 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Resumo por Paciente</h4>
-            <div class="fin-table-scroll" style="max-height:300px"><table class="fin-table"><thead><tr>
-                <th>Paciente</th><th style="text-align:center">Itens</th>
-                <th>Procedimentos</th>
-                <th style="text-align:right">Faturado</th>
-                <th style="text-align:right">Recebido</th>
-                <th style="text-align:right">Pendente</th>
-            </tr></thead><tbody>
-            ${pacEntries.map(([pac, d]) => {
-                const pend = Math.max(0, d.total - d.pago);
-                return `<tr>
-                    <td style="font-weight:600">${pac}</td>
-                    <td style="text-align:center">${d.qtd}</td>
-                    <td style="font-size:11px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.procs.join(' | ')}">${d.procs.join(', ')}</td>
-                    <td class="fin-val">${crFmtL(d.total)}</td>
-                    <td class="fin-val" style="color:#34d399">${crFmtL(d.pago)}</td>
-                    <td class="fin-val" style="color:${pend>0.01?'#f87171':'var(--muted)'}">${crFmtL(pend)}</td>
-                </tr>`;
-            }).join('')}
-            </tbody></table></div>`;
-
-            // Detalhamento por data/item
-            html += `<h4 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 10px">Detalhamento por Item</h4>
-            <div class="fin-table-scroll" style="max-height:400px"><table class="fin-table"><thead><tr>
+            // ── Detalhamento por item (expandível) ──
+            const sortedRows = [...anaRows].sort((a,b)=>(b.dataFat||'').localeCompare(a.dataFat||''));
+            let html = `<h4 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Detalhamento por Item</h4>
+            <div class="fin-table-scroll" style="max-height:480px"><table class="fin-table"><thead><tr>
                 <th style="width:90px">Data</th><th>Paciente</th><th>Procedimento</th>
-                <th style="text-align:center;width:50px">Qtd</th>
-                <th style="text-align:right;width:110px">Valor Item</th>
-                <th style="text-align:right;width:110px">Fat. Total</th>
+                <th style="text-align:center;width:46px">Qtd</th>
+                <th style="text-align:right;width:108px">Valor</th>
+                <th style="text-align:right;width:108px">Recebido</th>
                 <th style="text-align:right;width:60px">% Pago</th>
-                <th style="text-align:right;width:110px">Recebido</th>
-                <th style="width:90px">Status</th>
-            </tr></thead><tbody>
-            ${[...anaRows].sort((a,b)=>(b.dataFat||'').localeCompare(a.dataFat||'')).map(r => {
+                <th style="width:88px">Status</th>
+                <th style="width:30px"></th>
+            </tr></thead><tbody>`;
+
+            sortedRows.forEach((r, i) => {
+                const rowId = `ana-row-${i}`;
                 const pct = (r.propPago*100).toFixed(0)+'%';
                 const badge = r.status==='pago'
                     ? '<span class="fin-badge-pago">PAGO</span>'
-                    : r.status==='parcial'
-                    ? '<span class="fin-badge-pendente">PARCIAL</span>'
+                    : r.status==='parcial' ? '<span class="fin-badge-pendente">PARCIAL</span>'
                     : '<span class="fin-badge-other">PENDENTE</span>';
-                const origem = r.origem==='crm'
-                    ? '<span style="font-size:9px;background:rgba(236,72,153,0.15);color:#f472b6;padding:1px 5px;border-radius:3px;margin-left:4px">CRM</span>'
-                    : '';
-                return `<tr>
+                const origemBadge = r.origem==='crm'
+                    ? '<span style="font-size:9px;background:rgba(236,72,153,0.15);color:#f472b6;padding:1px 5px;border-radius:3px;margin-left:4px">CRM</span>' : '';
+                const pgHtml = r.pagamentos.length
+                    ? r.pagamentos.map(pg => {
+                        const pgD = (pg.data||'').replace(/-/g,'/');
+                        const pgDesc = pg.descricao || `Forma ${pg.forma_pagamento||'?'}`;
+                        return `<div class="cr-detail-item">
+                            <span style="display:flex;gap:6px;align-items:center">
+                                <span style="color:var(--muted);font-size:11px">${pgD}</span>
+                                <span>${pgDesc}</span>
+                            </span>
+                            <span class="cr-val-pago" style="font-variant-numeric:tabular-nums">${crFmtL((pg.valor||0)/100)}</span>
+                        </div>`;
+                    }).join('')
+                    : '<span style="color:var(--muted)">Sem pagamentos registrados</span>';
+
+                html += `<tr class="cr-row-expand" onclick="toggleCRRow('${rowId}')">
                     <td>${(r.dataFat||'').replace(/-/g,'/')}</td>
-                    <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">${r.paciente}</td>
-                    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;font-size:11px" title="${r.nome}">${r.nome}${origem}</td>
+                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${r.paciente}</td>
+                    <td style="max-width:230px;overflow:hidden;text-overflow:ellipsis;font-size:11px" title="${r.nome}">${r.nome}${origemBadge}</td>
                     <td style="text-align:center">${r.quantidade}</td>
                     <td class="fin-val">${crFmtL(r.valor)}</td>
-                    <td class="fin-val" style="color:var(--muted)">${crFmtL(r.fatTotal)}</td>
-                    <td style="text-align:right;font-weight:700;color:${r.propPago>=1?'#34d399':r.propPago>0?'#fbbf24':'#f87171'}">${pct}</td>
                     <td class="fin-val" style="color:#34d399">${crFmtL(r.valorPago)}</td>
+                    <td style="text-align:right;font-weight:700;color:${r.propPago>=1?'#34d399':r.propPago>0?'#fbbf24':'#f87171'}">${pct}</td>
                     <td>${badge}</td>
-                </tr>`;
-            }).join('')}
-            </tbody></table></div>`;
+                    <td style="text-align:center"><span class="cr-expand-arrow" id="arr-${rowId}">▶</span></td>
+                </tr>
+                <tr id="${rowId}" style="display:none" class="cr-detail-section"><td colspan="9">
+                    <div class="cr-detail-inner" style="grid-template-columns:1fr 1fr">
+                        <div>
+                            <div class="cr-detail-label">Contexto da Fatura</div>
+                            <div class="cr-detail-item"><span>Fatura total</span><span>${crFmtL(r.fatTotal)}</span></div>
+                            <div class="cr-detail-item"><span>Total pago</span><span class="cr-val-pago">${crFmtL(r.pagTotal)}</span></div>
+                            <div class="cr-detail-item"><span>Pendente</span><span class="${r.fatTotal-r.pagTotal>0.01?'cr-val-pendente':''}">${crFmtL(Math.max(0,r.fatTotal-r.pagTotal))}</span></div>
+                        </div>
+                        <div>
+                            <div class="cr-detail-label">Pagamentos</div>
+                            ${pgHtml}
+                        </div>
+                    </div>
+                </td></tr>`;
+            });
+            html += '</tbody></table></div>';
+
+            // ── Medicamentos ANA ──
+            window._crAnaMedItems = anaMedItems;
+            if (anaMedItems.length) {
+                const medSums = {};
+                anaMedItems.forEach(m => {
+                    if (!medSums[m.nome]) medSums[m.nome] = { total:0, qtd:0, pago:0 };
+                    medSums[m.nome].total += m.valor;
+                    medSums[m.nome].qtd   += m.quantidade;
+                    medSums[m.nome].pago  += m.valorPago;
+                });
+                const medEntries = Object.entries(medSums).sort((a,b)=>b[1].total-a[1].total);
+
+                html += `<h4 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:24px 0 10px">
+                    Medicamentos ANA <span style="font-weight:400;text-transform:none;letter-spacing:0;opacity:0.6">(clique para ver por fatura)</span>
+                    <span style="float:right;font-size:11px;color:#f472b6;font-weight:600">${crFmtL(totalFatMed)} faturado · ${crFmtL(totalPagoMed)} recebido</span>
+                </h4>
+                <div class="fin-table-scroll" style="max-height:280px"><table class="fin-table"><thead><tr>
+                    <th>Medicamento</th><th style="text-align:center">Qtd</th>
+                    <th style="text-align:right">Faturado</th><th style="text-align:right">Recebido</th><th style="text-align:right">Pendente</th>
+                </tr></thead><tbody>
+                ${medEntries.map(([nome, d]) => {
+                    const pend = Math.max(0, d.total - d.pago);
+                    const safe = encodeURIComponent(nome);
+                    return `<tr style="cursor:pointer" onclick="openAnaMedDrillDown(decodeURIComponent('${safe}'))" title="Ver por fatura">
+                        <td style="font-weight:600;color:var(--accent)">${nome} <span style="color:var(--muted);font-size:10px">▶</span></td>
+                        <td style="text-align:center">${d.qtd}</td>
+                        <td class="fin-val">${crFmtL(d.total)}</td>
+                        <td class="fin-val" style="color:#34d399">${crFmtL(d.pago)}</td>
+                        <td class="fin-val" style="color:${pend>0.01?'#f87171':'var(--muted)'}">${crFmtL(pend)}</td>
+                    </tr>`;
+                }).join('')}
+                </tbody></table></div>`;
+            }
 
             container.innerHTML = html;
+        }
+
+        function openAnaMedDrillDown(nomeMed) {
+            // Reutiliza o mesmo modal do drill-down geral, mas filtrando anaMedItems
+            const allItems = (window._crAnaMedItems || []).filter(m => m.nome === nomeMed);
+            if (!allItems.length) return;
+            window._crMedItems = (window._crMedItems || []);
+            // Injeta temporariamente no _crMedItems para reusar openMedDrillDown
+            const backup = window._crMedItems;
+            window._crMedItems = allItems;
+            openMedDrillDown(nomeMed);
+            window._crMedItems = backup;
         }
 
         function renderCRMedicamentos() {
