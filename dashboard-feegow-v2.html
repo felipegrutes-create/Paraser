@@ -4961,10 +4961,10 @@
                 data: {
                     labels: months.map(mk => { const [yr,mo] = mk.split('-'); return mesNomes[parseInt(mo)-1].slice(0,3)+'/'+yr.slice(2); }),
                     datasets: [
-                        { label: '1ª Vez',            stack: 'atend', data: months.map(mk => byMonth[mk].vez.size), backgroundColor: 'rgba(251,191,36,0.9)',  borderRadius: 0 },
-                        { label: 'Retorno/Presencial', stack: 'atend', data: months.map(mk => byMonth[mk].ret.size), backgroundColor: 'rgba(59,130,246,0.9)',  borderRadius: 4 },
-                        { label: 'Propostas',           stack: 'prop',  data: months.map(mk => byMonth[mk].propostas.size), backgroundColor: 'rgba(99,102,241,0.85)', borderRadius: 6 },
-                        { label: 'Quitados',            stack: 'quit',  data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: 'rgba(16,185,129,0.9)',  borderRadius: 6 }
+                        { label: '1ª Vez',            stack: 'atend', data: months.map(mk => byMonth[mk].vez.size), backgroundColor: '#6366f1', borderColor: '#818cf8', borderWidth: 1, borderRadius: 0 },
+                        { label: 'Retorno/Presencial', stack: 'atend', data: months.map(mk => byMonth[mk].ret.size), backgroundColor: '#00d4aa', borderColor: '#34d9b8', borderWidth: 1, borderRadius: 5 },
+                        { label: 'Propostas',           stack: 'prop',  data: months.map(mk => byMonth[mk].propostas.size), backgroundColor: '#f59e0b', borderColor: '#fbbf24', borderWidth: 1, borderRadius: 6 },
+                        { label: 'Quitados',            stack: 'quit',  data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: '#10b981', borderColor: '#34d399', borderWidth: 1, borderRadius: 6 }
                     ]
                 },
                 options: {
