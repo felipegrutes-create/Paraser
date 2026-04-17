@@ -4853,14 +4853,16 @@
             const mesNomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
             // Coletar dados mensais a partir de Abril/2026
             const START_MK = '2026-04';
-            const byMonth = {}; // mk → { atendidos: Set, quitados: Set, propostas: Set, valorTotal: number }
+            // vez = consulta 1ª vez; ret = retorno/presencial
+            const byMonth = {}; // mk → { vez: Set, ret: Set, quitados: Set, propostas: Set, valorTotal: number }
 
             doaPatients.forEach(p => {
                 const mk = monthKey(p.dataAp);
                 if (!mk || mk < START_MK) return;
                 if ((p.statusRaw || '').toLowerCase() !== 'atendido') return;
-                if (!byMonth[mk]) byMonth[mk] = { atendidos: new Set(), quitados: new Set(), propostas: new Set(), valorTotal: 0 };
-                byMonth[mk].atendidos.add(p.key);
+                if (!byMonth[mk]) byMonth[mk] = { vez: new Set(), ret: new Set(), quitados: new Set(), propostas: new Set(), valorTotal: 0 };
+                if (p.tipo === 'vez') byMonth[mk].vez.add(p.key);
+                else                  byMonth[mk].ret.add(p.key);
                 const crm = getCrmRec(p.key);
                 if (crm) {
                     if (crm.quitado === true || crm.quitado === 'TRUE') {
@@ -4872,6 +4874,8 @@
                     }
                 }
             });
+            // helper: total atendidos no mês
+            const totalAtend = mk => byMonth[mk].vez.size + byMonth[mk].ret.size;
 
             const months = Object.keys(byMonth).sort();
             const fmtBRL = v => v > 0 ? 'R$\u00a0' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
@@ -4881,7 +4885,9 @@
             if (kpiEl && months.length) {
                 const lastMk = months[months.length - 1];
                 const last = byMonth[lastMk];
-                const atend = last.atendidos.size;
+                const atend = totalAtend(lastMk);
+                const vez  = last.vez.size;
+                const ret  = last.ret.size;
                 const quit = last.quitados.size;
                 const prop = last.propostas.size;
                 const tx = atend ? ((quit / atend) * 100).toFixed(1) : '0';
@@ -4893,6 +4899,9 @@
                     <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:16px;text-align:center">
                         <div style="font-size:28px;font-weight:800;color:#fbbf24">${atend}</div>
                         <div style="font-size:12px;color:var(--muted);margin-top:4px">Atendidos em ${label}</div>
+                        <div style="font-size:11px;color:var(--muted);margin-top:2px">
+                            <span style="color:#fbbf24">${vez} 1ªVez</span> · <span style="color:#f97316">${ret} Retorno</span>
+                        </div>
                     </div>
                     <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:16px;text-align:center">
                         <div style="font-size:28px;font-weight:800;color:#818cf8">${prop}</div>
@@ -4908,20 +4917,36 @@
                     </div>`;
             }
 
-            // Plugin inline para labels nas barras
+            // Plugin: label no topo de cada grupo (total atendidos no stack + valor nas demais)
             const convBarLabels = {
                 id: 'convBarLabels',
                 afterDatasetsDraw(chart) {
                     const { ctx } = chart;
-                    chart.data.datasets.forEach((ds, di) => {
+                    // Desenha total do stack "atend" no topo da barra de Retorno (di=1, que fica em cima)
+                    const metaRet = chart.getDatasetMeta(1);
+                    if (!metaRet.hidden) {
+                        metaRet.data.forEach((bar, i) => {
+                            const tot = (chart.data.datasets[0].data[i]||0) + (chart.data.datasets[1].data[i]||0);
+                            if (!tot) return;
+                            ctx.save();
+                            ctx.font = 'bold 12px Outfit, sans-serif';
+                            ctx.fillStyle = '#fff';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText(tot, bar.x, bar.y - 3);
+                            ctx.restore();
+                        });
+                    }
+                    // Labels nas barras de Propostas (di=2) e Quitados (di=3)
+                    [2, 3].forEach(di => {
                         const meta = chart.getDatasetMeta(di);
                         if (meta.hidden) return;
                         meta.data.forEach((bar, i) => {
-                            const val = ds.data[i];
+                            const val = chart.data.datasets[di].data[i];
                             if (!val) return;
                             ctx.save();
                             ctx.font = 'bold 12px Outfit, sans-serif';
-                            ctx.fillStyle = '#ffffff';
+                            ctx.fillStyle = '#fff';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'bottom';
                             ctx.fillText(val, bar.x, bar.y - 3);
@@ -4936,30 +4961,37 @@
                 data: {
                     labels: months.map(mk => { const [yr,mo] = mk.split('-'); return mesNomes[parseInt(mo)-1].slice(0,3)+'/'+yr.slice(2); }),
                     datasets: [
-                        { label: 'Atendidos', data: months.map(mk => byMonth[mk].atendidos.size), backgroundColor: 'rgba(251,191,36,0.7)', borderRadius: 6 },
-                        { label: 'Propostas', data: months.map(mk => byMonth[mk].propostas.size), backgroundColor: 'rgba(99,102,241,0.75)', borderRadius: 6 },
-                        { label: 'Quitados',  data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 6 }
+                        { label: '1ª Vez',           stack: 'atend', data: months.map(mk => byMonth[mk].vez.size), backgroundColor: 'rgba(251,191,36,0.85)', borderRadius: 4 },
+                        { label: 'Retorno/Presencial',stack: 'atend', data: months.map(mk => byMonth[mk].ret.size), backgroundColor: 'rgba(249,115,22,0.8)',  borderRadius: 4 },
+                        { label: 'Propostas',                         data: months.map(mk => byMonth[mk].propostas.size), backgroundColor: 'rgba(99,102,241,0.75)', borderRadius: 6 },
+                        { label: 'Quitados',                          data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 6 }
                     ]
                 },
                 options: {
                     responsive: true,
-                    layout: { padding: { top: 20 } },
+                    layout: { padding: { top: 24 } },
                     plugins: {
-                        legend: { position: 'top', labels: { color: '#e2e8f4' } },
+                        legend: { position: 'top', labels: { color: '#e2e8f4', boxWidth: 14, padding: 12 } },
                         tooltip: {
                             callbacks: {
                                 afterLabel: (ctx) => {
                                     const mk = months[ctx.dataIndex];
                                     if (!mk) return '';
                                     const d = byMonth[mk];
-                                    if (ctx.datasetIndex === 2) return `Valor: ${fmtBRL(d.valorTotal)}`;
-                                    if (ctx.datasetIndex === 1) { const at = d.atendidos.size; return at ? `${((d.propostas.size/at)*100).toFixed(1)}% dos atendidos` : ''; }
+                                    const at = totalAtend(mk);
+                                    if (ctx.datasetIndex === 0) return `${at ? ((d.vez.size/at)*100).toFixed(0) : 0}% dos atendidos`;
+                                    if (ctx.datasetIndex === 1) return `${at ? ((d.ret.size/at)*100).toFixed(0) : 0}% dos atendidos`;
+                                    if (ctx.datasetIndex === 2) return at ? `${((d.propostas.size/at)*100).toFixed(1)}% dos atendidos` : '';
+                                    if (ctx.datasetIndex === 3) return `Valor: ${fmtBRL(d.valorTotal)}`;
                                     return '';
                                 }
                             }
                         }
                     },
-                    scales: { x: { ticks: { color: '#6b7a99' } }, y: { ticks: { color: '#6b7a99', stepSize: 1 }, beginAtZero: true, grace: '15%' } }
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#6b7a99' } },
+                        y: { stacked: false, ticks: { color: '#6b7a99', stepSize: 1 }, beginAtZero: true, grace: '15%' }
+                    }
                 }
             });
 
@@ -4968,10 +5000,13 @@
             if (tbl) {
                 // Atualiza cabeçalho para incluir Propostas e Valor
                 const thead = tbl.closest('table')?.querySelector('thead tr');
-                if (thead && thead.children.length < 6) {
+                // Sempre recria o cabeçalho com colunas de origem
+                if (thead) {
                     thead.innerHTML = `
                         <th style="text-align:left;padding:6px 8px">MÊS</th>
-                        <th style="text-align:center;padding:6px 8px">ATENDIDOS</th>
+                        <th style="text-align:center;padding:6px 8px;color:#fbbf24">1ª VEZ</th>
+                        <th style="text-align:center;padding:6px 8px;color:#f97316">RETORNO</th>
+                        <th style="text-align:center;padding:6px 8px">TOTAL</th>
                         <th style="text-align:center;padding:6px 8px">PROPOSTAS</th>
                         <th style="text-align:center;padding:6px 8px">QUITADOS</th>
                         <th style="text-align:center;padding:6px 8px">TX CONV.</th>
@@ -4980,14 +5015,18 @@
                 tbl.innerHTML = months.map(mk => {
                     const [yr, mo] = mk.split('-');
                     const label = mesNomes[parseInt(mo) - 1] + '/' + yr;
-                    const atend = byMonth[mk].atendidos.size;
-                    const prop = byMonth[mk].propostas.size;
-                    const quit = byMonth[mk].quitados.size;
-                    const tx = atend ? ((quit / atend) * 100).toFixed(1) : '0';
+                    const vez   = byMonth[mk].vez.size;
+                    const ret   = byMonth[mk].ret.size;
+                    const atend = vez + ret;
+                    const prop  = byMonth[mk].propostas.size;
+                    const quit  = byMonth[mk].quitados.size;
+                    const tx    = atend ? ((quit / atend) * 100).toFixed(1) : '0';
                     const txColor = parseFloat(tx) >= 50 ? '#10b981' : parseFloat(tx) >= 25 ? '#f59e0b' : '#ef4444';
                     return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
                         <td style="padding:8px;font-weight:600">${label}</td>
-                        <td style="padding:8px;text-align:center;color:#fbbf24">${atend}</td>
+                        <td style="padding:8px;text-align:center;color:#fbbf24;font-weight:600">${vez}</td>
+                        <td style="padding:8px;text-align:center;color:#f97316;font-weight:600">${ret}</td>
+                        <td style="padding:8px;text-align:center;color:var(--muted)">${atend}</td>
                         <td style="padding:8px;text-align:center;color:#818cf8">${prop}</td>
                         <td style="padding:8px;text-align:center;color:#10b981">${quit}</td>
                         <td style="padding:8px;text-align:center;font-weight:700;color:${txColor}">${tx}%</td>
