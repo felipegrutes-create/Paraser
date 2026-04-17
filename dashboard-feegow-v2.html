@@ -4900,7 +4900,7 @@
                         <div style="font-size:28px;font-weight:800;color:#fbbf24">${atend}</div>
                         <div style="font-size:12px;color:var(--muted);margin-top:4px">Atendidos em ${label}</div>
                         <div style="font-size:11px;color:var(--muted);margin-top:2px">
-                            <span style="color:#fbbf24">${vez} 1ªVez</span> · <span style="color:#f97316">${ret} Retorno</span>
+                            <span style="color:#fbbf24">${vez} 1ªVez</span> · <span style="color:#3b82f6">${ret} Retorno</span>
                         </div>
                     </div>
                     <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:16px;text-align:center">
@@ -4961,8 +4961,8 @@
                 data: {
                     labels: months.map(mk => { const [yr,mo] = mk.split('-'); return mesNomes[parseInt(mo)-1].slice(0,3)+'/'+yr.slice(2); }),
                     datasets: [
-                        { label: '1ª Vez',           stack: 'atend', data: months.map(mk => byMonth[mk].vez.size), backgroundColor: 'rgba(251,191,36,0.85)', borderRadius: 4 },
-                        { label: 'Retorno/Presencial',stack: 'atend', data: months.map(mk => byMonth[mk].ret.size), backgroundColor: 'rgba(249,115,22,0.8)',  borderRadius: 4 },
+                        { label: '1ª Vez',           stack: 'atend', data: months.map(mk => byMonth[mk].vez.size), backgroundColor: 'rgba(251,191,36,0.9)',  borderRadius: 4 },
+                        { label: 'Retorno/Presencial',stack: 'atend', data: months.map(mk => byMonth[mk].ret.size), backgroundColor: 'rgba(59,130,246,0.85)', borderRadius: 4 },
                         { label: 'Propostas',                         data: months.map(mk => byMonth[mk].propostas.size), backgroundColor: 'rgba(99,102,241,0.75)', borderRadius: 6 },
                         { label: 'Quitados',                          data: months.map(mk => byMonth[mk].quitados.size),  backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 6 }
                     ]
@@ -5005,7 +5005,7 @@
                     thead.innerHTML = `
                         <th style="text-align:left;padding:6px 8px">MÊS</th>
                         <th style="text-align:center;padding:6px 8px;color:#fbbf24">1ª VEZ</th>
-                        <th style="text-align:center;padding:6px 8px;color:#f97316">RETORNO</th>
+                        <th style="text-align:center;padding:6px 8px;color:#3b82f6">RETORNO</th>
                         <th style="text-align:center;padding:6px 8px">TOTAL</th>
                         <th style="text-align:center;padding:6px 8px">PROPOSTAS</th>
                         <th style="text-align:center;padding:6px 8px">QUITADOS</th>
@@ -5025,7 +5025,7 @@
                     return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
                         <td style="padding:8px;font-weight:600">${label}</td>
                         <td style="padding:8px;text-align:center;color:#fbbf24;font-weight:600">${vez}</td>
-                        <td style="padding:8px;text-align:center;color:#f97316;font-weight:600">${ret}</td>
+                        <td style="padding:8px;text-align:center;color:#3b82f6;font-weight:600">${ret}</td>
                         <td style="padding:8px;text-align:center;color:var(--muted)">${atend}</td>
                         <td style="padding:8px;text-align:center;color:#818cf8">${prop}</td>
                         <td style="padding:8px;text-align:center;color:#10b981">${quit}</td>
