@@ -468,9 +468,12 @@ function resolveTemplateKey(ag) {
 
   // --- 2. Nome do procedimento (fallback, se API passar) ---
   if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                             return 'INJURIA';
-  if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))   return 'ULTRAS_OBSTETRICA';
-  if (proc.includes('POS BETA') || proc.includes('PÓS BETA'))                            return 'ULTRAS_OBSTETRICA';
-  if (proc.includes('USG') || proc.includes('ULTRASSOM') || proc.includes('ULTRA'))      return 'ULTRAS_TRATAMENTO';
+  if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))           return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('POS BETA') || proc.includes('PÓS BETA'))                                    return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('FOLICULO') || proc.includes('FOLÍCULO'))                                     return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('TRANSVAGINAL') || proc.includes('DOPPLER'))                                  return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('PREPARO TEC') || proc.includes('FIV'))                                       return 'ULTRAS_TRATAMENTO';
+  if (proc.includes('USG') || proc.includes('ULTRASSOM') || proc.includes('ULTRA'))               return 'ULTRAS_TRATAMENTO';
   if (proc.includes('ACUPUNTURA') || prof.includes('CRISTIANE'))                         return 'ACUPUNTURA';
 
   // --- 3. Profissional ---
@@ -974,6 +977,46 @@ function debugScanProcedimentos() {
     );
   });
   Logger.log('Total de combinações únicas: ' + lista.length);
+}
+
+// ================================================================
+// DEBUG — tenta buscar os nomes de vários procIds de uma vez via API Feegow.
+// Lista os IDs que obtiveram nome e os que precisam ser conferidos no calendário.
+// ================================================================
+function debugNomearProcedimentos() {
+  // procIDs ainda não identificados da Marcelle (resultado de debugMarcelleUSGProcIds)
+  var IDS_VERIFICAR = [33, 41, 58, 61, 74, 87, 93, 245, 247, 249, 281, 12];
+
+  var endpoints = [
+    function(id) { return '/procedure/detail?procedimento_id=' + id; },
+    function(id) { return '/procedure/get?procedimento_id='    + id; },
+    function(id) { return '/procedure/' + id; },
+  ];
+
+  Logger.log('=== Buscando nomes de ' + IDS_VERIFICAR.length + ' procIDs via API Feegow ===');
+
+  IDS_VERIFICAR.forEach(function(procId) {
+    var nome = null;
+    for (var i = 0; i < endpoints.length && !nome; i++) {
+      try {
+        var resp = UrlFetchApp.fetch(CF_FEEGOW_BASE + endpoints[i](procId), {
+          headers: { 'x-access-token': CF_FEEGOW_TOKEN },
+          muteHttpExceptions: true
+        });
+        if (resp.getResponseCode() === 200) {
+          var body = resp.getContentText();
+          var json = JSON.parse(body);
+          var obj  = json.content || json;
+          nome = obj.nome || obj.name || obj.descricao || obj.title || null;
+          if (!nome && typeof obj === 'string' && obj.length < 200) nome = obj;
+        }
+      } catch(e) {}
+    }
+    Logger.log('ProcID=' + procId + ' → ' + (nome || '⚠️ API não retornou nome'));
+    Utilities.sleep(200);
+  });
+
+  Logger.log('\nPara os IDs sem nome: rode debugEncontrarProcId() trocando PROC_ID e abra a data retornada no Feegow.');
 }
 
 // ================================================================
