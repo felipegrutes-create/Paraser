@@ -405,8 +405,14 @@ function getPatientData(pacienteId) {
 // procId=152 confirmado: APLICAÇÃO DE FILGRASTIM (Marcelle 05/08/2025 12:30)
 var IDS_INJURIA = [69, 152];
 
-// procId=42 confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
+// procId=42  confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
+// procId=???  USG 1 PÓS BETA, USG 2 PÓS BETA, USG Morfológica, USG Obstétrica c/ Doppler
+//             → rode debugMarcelleUSGProcIds() para descobrir os IDs e adicione aqui
 var IDS_OBSTETRICA = [42];
+
+// procIds de exames de acompanhamento de tratamento (USG Preparo TEC, USG FIV etc.)
+// → rode debugMarcelleUSGProcIds() para descobrir os IDs e preencha aqui
+var IDS_ULTRAS_TRATAMENTO = [];
 
 // procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
 // procId=252: "CONSULTA 1ª VEZ - DR. RODOLFO SALVATO - Online" (Rodolfo)
@@ -449,12 +455,14 @@ function resolveTemplateKey(ag) {
   if (IDS_SEM_CONFIRMACAO.indexOf(procId) >= 0) return null;
 
   // --- 1. IDs especiais hardcoded (mais confiável) ---
-  if (IDS_INJURIA.indexOf(procId)    >= 0) return 'INJURIA';
-  if (IDS_OBSTETRICA.indexOf(procId) >= 0) return 'ULTRAS_OBSTETRICA';
+  if (IDS_INJURIA.indexOf(procId)           >= 0) return 'INJURIA';
+  if (IDS_OBSTETRICA.indexOf(procId)        >= 0) return 'ULTRAS_OBSTETRICA';
+  if (IDS_ULTRAS_TRATAMENTO.indexOf(procId) >= 0) return 'ULTRAS_TRATAMENTO';
 
   // --- 2. Nome do procedimento (fallback, se API passar) ---
   if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                             return 'INJURIA';
   if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))   return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('POS BETA') || proc.includes('PÓS BETA'))                            return 'ULTRAS_OBSTETRICA';
   if (proc.includes('USG') || proc.includes('ULTRASSOM') || proc.includes('ULTRA'))      return 'ULTRAS_TRATAMENTO';
   if (proc.includes('ACUPUNTURA') || prof.includes('CRISTIANE'))                         return 'ACUPUNTURA';
 
@@ -962,12 +970,75 @@ function debugScanProcedimentos() {
 }
 
 // ================================================================
+// DEBUG — identifica os procIDs de USG da Dra Marcelle Moura.
+// Varre os últimos 90 dias e lista todos os procIDs dela que ainda
+// não estão em nenhuma lista conhecida.
+// Após rodar: identifique quais são USG Preparo TEC / USG FIV →
+//   adicione em IDS_ULTRAS_TRATAMENTO
+// Quais são USG Pós Beta / USG Obstétrica / USG Morfológica →
+//   adicione em IDS_OBSTETRICA
+// ================================================================
+function debugMarcelleUSGProcIds() {
+  var DIAS = 90;
+  var profMap  = carregarProfissionais();
+
+  // Encontra o ID da Marcelle no mapa
+  var marcelleId = null;
+  Object.keys(profMap).forEach(function(id) {
+    if ((profMap[id] || '').toUpperCase().indexOf('MARCELLE') >= 0) marcelleId = id;
+  });
+  if (!marcelleId) { Logger.log('Profissional Marcelle não encontrada.'); return; }
+  Logger.log('Marcelle ID: ' + marcelleId + ' (' + profMap[marcelleId] + ')');
+
+  var CONHECIDOS = IDS_INJURIA.concat(IDS_OBSTETRICA)
+                              .concat(IDS_ULTRAS_TRATAMENTO)
+                              .concat(IDS_ONLINE_PROCS)
+                              .concat(IDS_SEM_CONFIRMACAO);
+
+  var combos = {}; // procId → count
+
+  for (var offset = -DIAS; offset <= 7; offset++) {
+    var d  = new Date();
+    d.setDate(d.getDate() + offset);
+    var ds = fmtDataFeegow(d);
+    try {
+      var resp  = UrlFetchApp.fetch(
+        CF_FEEGOW_BASE + '/appoints/search?data_start=' + ds + '&data_end=' + ds,
+        { headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true }
+      );
+      var json  = JSON.parse(resp.getContentText());
+      var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
+      items.forEach(function(ag) {
+        if (String(ag.profissional_id) !== String(marcelleId)) return;
+        var prc = ag.procedimento_id;
+        if (!combos[prc]) combos[prc] = 0;
+        combos[prc]++;
+      });
+    } catch(e) {}
+  }
+
+  var lista = Object.keys(combos).map(function(k) {
+    return { procId: parseInt(k), count: combos[k], conhecido: CONHECIDOS.indexOf(parseInt(k)) >= 0 };
+  });
+  lista.sort(function(a, b) { return b.count - a.count; });
+
+  Logger.log('=== ProcIDs da Marcelle (últimos ' + DIAS + ' dias) ===');
+  lista.forEach(function(c) {
+    Logger.log('ProcID=' + c.procId + '  ocorrências=' + c.count +
+               (c.conhecido ? '  [JÁ MAPEADO]' : '  ← IDENTIFICAR'));
+  });
+  Logger.log('\nAbra agendamentos da Marcelle no Feegow para cada procId "IDENTIFICAR".');
+  Logger.log('USG Preparo TEC / USG FIV → IDS_ULTRAS_TRATAMENTO');
+  Logger.log('USG Pós Beta / Morfológica / Obstétrica → IDS_OBSTETRICA');
+}
+
+// ================================================================
 // DEBUG — lista todos os agendamentos de uma data específica com procIDs.
 // Útil para identificar IDs de procedimentos (punção, transferência etc.)
 // Altere DATA para a data desejada no formato DD-MM-YYYY e execute.
 // ================================================================
 function debugDiaEspecifico() {
-  var DATA = '10-01-2025'; // ← altere para a data desejada
+  var DATA = '05-05-2026'; // ← altere para a data desejada
 
   var profMap = carregarProfissionais();
   var resp = UrlFetchApp.fetch(
