@@ -406,13 +406,18 @@ function getPatientData(pacienteId) {
 var IDS_INJURIA = [69, 152];
 
 // procId=42  confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
-// procId=???  USG 1 PÓS BETA, USG 2 PÓS BETA, USG Morfológica, USG Obstétrica c/ Doppler
-//             → rode debugMarcelleUSGProcIds() para descobrir os IDs e adicione aqui
-var IDS_OBSTETRICA = [42];
+// procId=40  confirmado: USG 1 PÓS BETA (Marcelle 05/05/2026 12:00)
+// TODO: USG 2 Pós Beta, USG Morfológica, USG Obstétrica c/ Doppler, USG Contagem de Folículos Antrais
+//       → rode debugEncontrarProcId() para localizar os IDs e adicione aqui
+var IDS_OBSTETRICA = [42, 40];
 
-// procIds de exames de acompanhamento de tratamento (USG Preparo TEC, USG FIV etc.)
-// → rode debugMarcelleUSGProcIds() para descobrir os IDs e preencha aqui
-var IDS_ULTRAS_TRATAMENTO = [];
+// procIds de exames de acompanhamento de tratamento (USG Preparo TEC, USG FIV)
+// procId=244 confirmado: USG PREPARO TEC 1 - Medicado (Marcelle 05/05/2026 10:00 / 11:00)
+// procId=73  confirmado: USG PREPARO TEC 1 - Natural   (Marcelle 05/05/2026 10:40 / 11:20)
+// procId=4   confirmado: USG FIV 1ª                   (Marcelle 05/05/2026 11:40)
+// TODO: procId=59  (Marcelle 10:20, Priscila 16:20 em 05/05/2026) — não identificado
+//       procId=204 (12× Marcelle, mais frequente) — não identificado, rode debugEncontrarProcId(204)
+var IDS_ULTRAS_TRATAMENTO = [244, 73, 4];
 
 // procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
 // procId=252: "CONSULTA 1ª VEZ - DR. RODOLFO SALVATO - Online" (Rodolfo)
@@ -967,6 +972,47 @@ function debugScanProcedimentos() {
     );
   });
   Logger.log('Total de combinações únicas: ' + lista.length);
+}
+
+// ================================================================
+// DEBUG — encontra todas as datas em que um procId específico aparece.
+// Útil para localizar no Feegow o nome do procedimento de um ID desconhecido.
+// Troque PROC_ID e execute; anote uma das datas retornadas e abra no Feegow.
+// ================================================================
+function debugEncontrarProcId() {
+  var PROC_ID = 204; // ← troque pelo ID que quer identificar
+  var DIAS    = 90;
+
+  var profMap = carregarProfissionais();
+  var achados = [];
+
+  for (var offset = -DIAS; offset <= 7; offset++) {
+    var d  = new Date();
+    d.setDate(d.getDate() + offset);
+    var ds = fmtDataFeegow(d);
+    try {
+      var resp  = UrlFetchApp.fetch(
+        CF_FEEGOW_BASE + '/appoints/search?data_start=' + ds + '&data_end=' + ds,
+        { headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true }
+      );
+      var json  = JSON.parse(resp.getContentText());
+      var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
+      items.forEach(function(ag) {
+        if (ag.procedimento_id !== PROC_ID) return;
+        achados.push({
+          data:  ds,
+          hora:  formatHora(ag.horario || ''),
+          prof:  profMap[ag.profissional_id] || 'id=' + ag.profissional_id
+        });
+      });
+    } catch(e) {}
+  }
+
+  Logger.log('=== ProcID=' + PROC_ID + ' — ' + achados.length + ' ocorrências (últimos ' + DIAS + ' dias) ===');
+  achados.forEach(function(a) {
+    Logger.log(a.data + ' ' + a.hora + ' | ' + a.prof);
+  });
+  Logger.log('Abra uma dessas datas no Feegow para confirmar o nome do procedimento.');
 }
 
 // ================================================================
