@@ -415,8 +415,9 @@ var IDS_OBSTETRICA = [42, 40];
 // procId=244 confirmado: USG PREPARO TEC 1 - Medicado (Marcelle 05/05/2026 10:00 / 11:00)
 // procId=73  confirmado: USG PREPARO TEC 1 - Natural   (Marcelle 05/05/2026 10:40 / 11:20)
 // procId=4   confirmado: USG FIV 1ª                   (Marcelle 05/05/2026 11:40)
-// TODO: procId=59  (Marcelle 10:20, Priscila 16:20 em 05/05/2026) — não identificado
-//       procId=204 (12× Marcelle, mais frequente) — não identificado, rode debugEncontrarProcId(204)
+// procId=203 confirmado: Consulta 1ª Vez (Marcelle 15:00/16:00) — roteado por profissional, sem ação
+// procId=204 confirmado: Consulta 1ª Vez (Marcelle, 12×) — roteado por profissional, sem ação
+// TODO: procId=59  (Marcelle 10:20, Priscila 16:20 em 05/05/2026) — rode debugEncontrarProcId(59)
 var IDS_ULTRAS_TRATAMENTO = [244, 73, 4];
 
 // procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
