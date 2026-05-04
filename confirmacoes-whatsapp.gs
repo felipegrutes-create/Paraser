@@ -980,6 +980,54 @@ function debugScanProcedimentos() {
 }
 
 // ================================================================
+// DEBUG — para cada procId desconhecido, retorna a ocorrência mais recente
+// (data + hora + profissional) para você abrir no Feegow e confirmar o nome.
+// ================================================================
+function debugLocalizarProcsDesconhecidos() {
+  var IDS_VERIFICAR = [33, 41, 58, 61, 74, 87, 93, 245, 247, 249, 281, 12];
+  var DIAS = 90;
+  var profMap = carregarProfissionais();
+
+  // { procId: { data, hora, prof } } — guarda só a mais recente
+  var achados = {};
+  IDS_VERIFICAR.forEach(function(id) { achados[id] = null; });
+
+  for (var offset = -DIAS; offset <= 0; offset++) {
+    var d  = new Date();
+    d.setDate(d.getDate() + offset);
+    var ds = fmtDataFeegow(d);
+    try {
+      var resp  = UrlFetchApp.fetch(
+        CF_FEEGOW_BASE + '/appoints/search?data_start=' + ds + '&data_end=' + ds,
+        { headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true }
+      );
+      var json  = JSON.parse(resp.getContentText());
+      var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
+      items.forEach(function(ag) {
+        if (IDS_VERIFICAR.indexOf(ag.procedimento_id) < 0) return;
+        // Sobrescreve sempre — como percorremos do mais antigo ao mais novo, fica o mais recente
+        achados[ag.procedimento_id] = {
+          data: ds,
+          hora: formatHora(ag.horario || ''),
+          prof: profMap[ag.profissional_id] || 'id=' + ag.profissional_id
+        };
+      });
+    } catch(e) {}
+  }
+
+  Logger.log('=== Última ocorrência de cada procId desconhecido ===');
+  Logger.log('Abra cada data no Feegow (agenda do profissional) para confirmar o nome.\n');
+  IDS_VERIFICAR.forEach(function(id) {
+    var a = achados[id];
+    if (a) {
+      Logger.log('ProcID=' + id + ' → ' + a.data + ' ' + a.hora + ' | ' + a.prof);
+    } else {
+      Logger.log('ProcID=' + id + ' → ⚠️ não encontrado nos últimos ' + DIAS + ' dias');
+    }
+  });
+}
+
+// ================================================================
 // DEBUG — tenta buscar os nomes de vários procIds de uma vez via API Feegow.
 // Lista os IDs que obtiveram nome e os que precisam ser conferidos no calendário.
 // ================================================================
