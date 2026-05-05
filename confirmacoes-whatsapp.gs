@@ -407,12 +407,13 @@ var IDS_INJURIA = [69, 152];
 
 // procId=42  confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
 // procId=40  confirmado: USG 1 PÓS BETA (Marcelle 05/05/2026 12:00)
+// procId=41  confirmado: USG 2 PÓS BETA (Priscila 28/04/2026 15:20)
 // procId=59  confirmado: USG CONTAGEM DE FOLÍCULOS ANTRAIS (Marcelle + Priscila)
 // procId=61  confirmado: USG TRANSVAGINAL (Érica 29/04/2026 14:20)
 // procId=58  confirmado: USG TRANSVAGINAL (Priscila 27/04/2026 14:00)
 // TODO: USG 2 Pós Beta, USG Morfológica, USG Obstétrica c/ Doppler, USG Transvaginal 3D
 //       → rode debugEncontrarProcId() para localizar os IDs e adicione aqui
-var IDS_OBSTETRICA = [42, 40, 58, 59, 61];
+var IDS_OBSTETRICA = [40, 41, 42, 58, 59, 61];
 
 // procIds de exames de acompanhamento de tratamento (USG Preparo TEC, USG FIV)
 // procId=244 confirmado: USG PREPARO TEC 1 - Medicado (Marcelle 05/05/2026 10:00 / 11:00)
