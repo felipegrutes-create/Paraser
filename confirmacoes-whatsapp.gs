@@ -422,8 +422,9 @@ var IDS_OBSTETRICA = [42, 40, 59];
 // procId=249 confirmado: Consulta 1ª Vez (Marcelle 11/03/2026) — roteado por profissional, sem ação
 // procId=247 confirmado: Consulta 1ª Vez (Marcelle 25/02/2026) — roteado por profissional, sem ação
 // procId=12  confirmado: USG COITO PROGRAMADO (Érica 04/05/2026 15:20)
+// procId=245 confirmado: USG PREPARO TEC (Érica 04/05/2026 11:00)
 // procId=59  confirmado: USG CONTAGEM DE FOLÍCULOS ANTRAIS → movido para IDS_OBSTETRICA
-var IDS_ULTRAS_TRATAMENTO = [244, 73, 4, 12];
+var IDS_ULTRAS_TRATAMENTO = [244, 73, 4, 12, 245];
 
 // procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
 // procId=252: "CONSULTA 1ª VEZ - DR. RODOLFO SALVATO - Online" (Rodolfo)
