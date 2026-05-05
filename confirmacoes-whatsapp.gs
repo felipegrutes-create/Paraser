@@ -96,6 +96,13 @@ const TMPL = {
     '{ENDERECO}\n\n' +
     'Podemos confirmar? 💜',
 
+  JOSELMO_RADIOFREQUENCIA:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua sessão de radiofrequência com o Dr. Joselmo Salvato, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    '⛔ Caso não haja confirmação, a consulta será cancelada. ⛔\n\n' +
+    '{ENDERECO}\n\n' +
+    'Podemos confirmar? 💜',
+
   JOSELMO_ONLINE:
     'Olá! Tudo bem?\n' +
     'Passando para confirmar sua consulta ONLINE com o Dr. Joselmo Salvato, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -477,6 +484,10 @@ var IDS_OBSTETRICA = [40, 41, 42, 43, 44, 45, 51, 58, 59, 61, 171];
 // procId=246 confirmado: USG PREPARO TEC 3 (Érica 10/04/2026)
 var IDS_ULTRAS_TRATAMENTO = [4, 5, 6, 7, 8, 9, 11, 12, 13, 73, 74, 122, 244, 245, 246];
 
+// procId de sessão de radiofrequência do Dr. Joselmo Salvato
+// procId=307: Radiofrequência (Joselmo 04/05/2026 10:40 / 11:20)
+var IDS_JOSELMO_RADIO = [307];
+
 // procIds de consulta da Psicóloga Sara Estruc
 // procId=257: Consulta Psicóloga (Sara Estruc 04/05/2026 09:30) — presencial confirmado
 // TODO: identificar procId online de Sara se existir
@@ -543,6 +554,7 @@ function resolveTemplateKey(ag) {
   if (IDS_INJURIA.indexOf(procId)           >= 0) return 'INJURIA';
   if (IDS_OBSTETRICA.indexOf(procId)        >= 0) return 'ULTRAS_OBSTETRICA';
   if (IDS_ULTRAS_TRATAMENTO.indexOf(procId) >= 0) return 'ULTRAS_TRATAMENTO';
+  if (IDS_JOSELMO_RADIO.indexOf(procId)     >= 0) return 'JOSELMO_RADIOFREQUENCIA';
   if (IDS_BIANCA_RECEPTORA.indexOf(procId)  >= 0) return 'BIANCA_RECEPTORA_' + modal;
   if (IDS_SARA.indexOf(procId)              >= 0) return 'SARA_' + modal;
 
