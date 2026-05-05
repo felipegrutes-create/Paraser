@@ -453,10 +453,11 @@ var IDS_ULTRAS_TRATAMENTO = [4, 5, 6, 7, 12, 13, 73, 74, 244, 245];
 // procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
 // procId=252: "CONSULTA 1ª VEZ - DR. RODOLFO SALVATO - Online" (Rodolfo)
 // procId=256: "CONSULTA - Online" (usado por Priscila, Rodolfo, Marcelle e outros)
+// procId=322: "CONVERSA RECEPTORA - Online" (Bianca Salvato)
 // procId=255: "CONSULTA DE RETORNO - Presencial" → NÃO é online, não incluir aqui
 // Execute debugMapearOnlineProcIds() e confira agendamentos dos demais médicos
 // (Mario, Joselmo, Helce, Bruna, Graziela) para completar a lista se necessário.
-var IDS_ONLINE_PROCS = [252, 256];
+var IDS_ONLINE_PROCS = [252, 256, 322];
 
 // procIds de procedimentos que NÃO recebem confirmação por WhatsApp:
 // punção de óvulos, transferência, aspiração de cisto, PRP,
@@ -476,10 +477,10 @@ var IDS_ONLINE_PROCS = [252, 256];
 // TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
 var IDS_SEM_CONFIRMACAO = [87, 89, 91, 93, 120, 127, 139, 176, 234, 265, 268];
 
-// procIds de Conversa com Receptora (Bianca Salvato) — presencial e online
-// procId=322: Conversa Receptora Presencial (Bianca 04/05/2026)
-// TODO: identificar procId da versão Online se existir e adicionar aqui
-var IDS_BIANCA_RECEPTORA = [322];
+// procIds de Conversa com Receptora (Bianca Salvato)
+// procId=35:  CONVERSA RECEPTORA - Presencial (Bianca 04/05/2026 10:00)
+// procId=322: CONVERSA RECEPTORA - Online     (Bianca 04/05/2026 08:30)
+var IDS_BIANCA_RECEPTORA = [35, 322];
 
 // ================================================================
 // LÓGICA DE TEMPLATE
@@ -1216,7 +1217,7 @@ function debugMarcelleUSGProcIds() {
 // Altere DATA para a data desejada no formato DD-MM-YYYY e execute.
 // ================================================================
 function debugDiaEspecifico() {
-  var DATA = '06-05-2026'; // ← altere para a data desejada
+  var DATA = '04-05-2026'; // ← altere para a data desejada
 
   var profMap = carregarProfissionais();
   var resp = UrlFetchApp.fetch(
