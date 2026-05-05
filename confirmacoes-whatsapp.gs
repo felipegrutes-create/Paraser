@@ -445,8 +445,9 @@ var IDS_ONLINE_PROCS = [252, 256];
 // procId=139: SP — 1ª/2ª Tec Sp (confirmado 11/04/2026)
 // procId=234: 2ª Tec Embrion - Dr. Rodolfo Salvato (variante recente)
 // procId=265: Origen — 2ª Tec Laboratório Origen (confirmado 26/03/2026)
+// procId=93:  1ª TEC (Rodolfo 04/05/2026 12:30)
 // TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
-var IDS_SEM_CONFIRMACAO = [89, 91, 120, 127, 139, 234, 265];
+var IDS_SEM_CONFIRMACAO = [89, 91, 93, 120, 127, 139, 234, 265];
 
 // ================================================================
 // LÓGICA DE TEMPLATE
