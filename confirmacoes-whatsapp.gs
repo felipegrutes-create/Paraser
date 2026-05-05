@@ -423,6 +423,7 @@ var IDS_OBSTETRICA = [40, 41, 42, 58, 59, 61];
 // procId=204 confirmado: Consulta 1ª Vez (Marcelle, 12×) — roteado por profissional, sem ação
 // procId=281 confirmado: Consulta 1ª Vez (Marcelle 07/04/2026) — roteado por profissional, sem ação
 // procId=249 confirmado: Consulta 1ª Vez (Marcelle 11/03/2026) — roteado por profissional, sem ação
+// procId=33  confirmado: Consulta de Retorno (Priscila 04/05/2026) — roteado por profissional, sem ação
 // procId=247 confirmado: Consulta 1ª Vez (Marcelle 25/02/2026) — roteado por profissional, sem ação
 // procId=12  confirmado: USG COITO PROGRAMADO (Érica 04/05/2026 15:20)
 // procId=245 confirmado: USG PREPARO TEC (Érica 04/05/2026 11:00)
