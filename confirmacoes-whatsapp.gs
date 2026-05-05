@@ -175,6 +175,23 @@ const TMPL = {
     'A consulta será realizada através de chamada de vídeo no Whatsapp\n\n' +
     'Podemos confirmar? 💜',
 
+  SARA_PRESENCIAL:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua consulta PRESENCIAL com a psicóloga Sara, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    'Caso não possa comparecer, é importante que nos avise. Nosso serviço de psicologia é oferecido a todas as pacientes em tratamento de Reprodução Assistida, quando uma consulta não é realizada, outra paciente perde a oportunidade de ser atendida.\n\n' +
+    'Agradecemos muito pela compreensão e colaboração. Estamos aqui para oferecer todo suporte que vocês precisam!\n\n' +
+    '{ENDERECO}\n\n' +
+    'Podemos confirmar a sua consulta? 💜',
+
+  SARA_ONLINE:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua consulta ONLINE com a psicóloga Sara, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    'A CONSULTA SERÁ REALIZADA ATRAVÉS DO GOOGLE MEET.\n' +
+    'A PSICÓLOGA SARA ENVIARÁ UMA MENSAGEM COM O LINK PARA A CONSULTA.\n\n' +
+    'Caso não possa comparecer, é importante que nos avise. Nosso serviço de psicologia é oferecido a todas as pacientes em tratamento de Reprodução Assistida, quando uma consulta não é realizada, outra paciente perde a oportunidade de ser atendida.\n\n' +
+    'Agradecemos muito pela compreensão e colaboração. Estamos aqui para oferecer todo suporte que vocês precisam!\n\n' +
+    'Podemos confirmar a sua consulta? 💜',
+
   ACUPUNTURA:
     'Olá! Tudo bem?\n' +
     'Passando para confirmar sua sessão com a Acupunturista Cristiane, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -425,7 +442,12 @@ var IDS_INJURIA = [69, 152];
 // procId=58  confirmado: USG TRANSVAGINAL (Priscila 27/04/2026 14:00)
 // TODO: USG 2 Pós Beta, USG Morfológica, USG Obstétrica c/ Doppler, USG Transvaginal 3D
 //       → rode debugEncontrarProcId() para localizar os IDs e adicione aqui
-var IDS_OBSTETRICA = [40, 41, 42, 58, 59, 61];
+// procId=43  confirmado: USG OBSTÉTRICA COMUM (Érica 22/04/2026)
+// procId=44  confirmado: USG MORFOLÓGICA (Érica 27/04/2026)
+// procId=45  confirmado: USG OBSTÉTRICA COM DOPPLER (Érica 30/04/2026)
+// procId=51  confirmado: USG OBSTÉTRICA COM DOPPLER GEMELAR (Érica 26/02/2026)
+// procId=171 confirmado: USG PÓS BETA NEG/ABORTO (Rodolfo 28/04/2026)
+var IDS_OBSTETRICA = [40, 41, 42, 43, 44, 45, 51, 58, 59, 61, 171];
 
 // procIds de exames de acompanhamento de tratamento (USG Preparo TEC, USG FIV)
 // procId=244 confirmado: USG PREPARO TEC 1 - Medicado (Marcelle 05/05/2026 10:00 / 11:00)
@@ -448,16 +470,26 @@ var IDS_OBSTETRICA = [40, 41, 42, 58, 59, 61];
 // procId=244 confirmado: USG PREPARO TEC 1 - Medicado (Marcelle 05/05/2026)
 // procId=245 confirmado: USG PREPARO TEC (Érica 04/05/2026)
 // procId=59  confirmado: USG CONTAGEM DE FOLÍCULOS ANTRAIS → movido para IDS_OBSTETRICA
-var IDS_ULTRAS_TRATAMENTO = [4, 5, 6, 7, 12, 13, 73, 74, 244, 245];
+// procId=8   confirmado: USG FIV 5 (Érica 24/04/2026)
+// procId=9   confirmado: USG FIV (Priscila 29/04/2026)
+// procId=11  confirmado: USG PREPARO TEC 3 - Natural (Priscila 29/04/2026)
+// procId=122 confirmado: USG PREPARO INJÚRIA (Érica 27/04/2026)
+// procId=246 confirmado: USG PREPARO TEC 3 (Érica 10/04/2026)
+var IDS_ULTRAS_TRATAMENTO = [4, 5, 6, 7, 8, 9, 11, 12, 13, 73, 74, 122, 244, 245, 246];
+
+// procIds de consulta da Psicóloga Sara Estruc
+// procId=257: Consulta Psicóloga (Sara Estruc 04/05/2026 09:30) — presencial confirmado
+// TODO: identificar procId online de Sara se existir
+var IDS_SARA = [257];
 
 // procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
-// procId=252: "CONSULTA 1ª VEZ - DR. RODOLFO SALVATO - Online" (Rodolfo)
-// procId=256: "CONSULTA - Online" (usado por Priscila, Rodolfo, Marcelle e outros)
-// procId=322: "CONVERSA RECEPTORA - Online" (Bianca Salvato)
+// procId=252: "CONSULTA 1ª VEZ - Online" (Rodolfo)
+// procId=256: "CONSULTA - Online" (Priscila, Rodolfo, Marcelle e outros)
+// procId=322: "CONVERSA RECEPTORA - Online" (Bianca)
+// procId=323: "CONVERSA DOADORA - Online" (Bianca)
+// procId=347: "CONSULTA ONLINE" (Rodolfo 05/05/2026) — resolve o TODO do procId=168
 // procId=255: "CONSULTA DE RETORNO - Presencial" → NÃO é online, não incluir aqui
-// Execute debugMapearOnlineProcIds() e confira agendamentos dos demais médicos
-// (Mario, Joselmo, Helce, Bruna, Graziela) para completar a lista se necessário.
-var IDS_ONLINE_PROCS = [252, 256, 322];
+var IDS_ONLINE_PROCS = [252, 256, 322, 323, 347];
 
 // procIds de procedimentos que NÃO recebem confirmação por WhatsApp:
 // punção de óvulos, transferência, aspiração de cisto, PRP,
@@ -475,12 +507,19 @@ var IDS_ONLINE_PROCS = [252, 256, 322];
 // procId=176: Avaliação Doadora (Bianca Salvato) — sem confirmação
 // procId=268: FOT Receptora (Érica Freitas Cardoso) — sem confirmação
 // TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
-var IDS_SEM_CONFIRMACAO = [87, 89, 91, 93, 120, 127, 139, 176, 234, 265, 268];
+// procId=75:  slot vazio/bloqueio (Érica Stein)
+// procId=88:  Colocação DIU (Joselmo 20/04/2026)
+// procId=90:  Punção de Óvulos (Rodolfo 02/03/2026)
+// procId=147: PESA (Mario 29/04/2026)
+// procId=267: FOT Receptora (Érica Freitas Cardoso 08/04/2026)
+var IDS_SEM_CONFIRMACAO = [75, 87, 88, 89, 90, 91, 93, 120, 127, 139, 147, 176, 234, 265, 267, 268];
 
 // procIds de Conversa com Receptora (Bianca Salvato)
 // procId=35:  CONVERSA RECEPTORA - Presencial (Bianca 04/05/2026 10:00)
+// procId=36:  CONVERSA DOADORA - Presencial   (Bianca 14/04/2026 11:00)
 // procId=322: CONVERSA RECEPTORA - Online     (Bianca 04/05/2026 08:30)
-var IDS_BIANCA_RECEPTORA = [35, 322];
+// procId=323: CONVERSA DOADORA - Online       (Bianca 05/05/2026 08:30)
+var IDS_BIANCA_RECEPTORA = [35, 36, 322, 323];
 
 // ================================================================
 // LÓGICA DE TEMPLATE
@@ -505,6 +544,7 @@ function resolveTemplateKey(ag) {
   if (IDS_OBSTETRICA.indexOf(procId)        >= 0) return 'ULTRAS_OBSTETRICA';
   if (IDS_ULTRAS_TRATAMENTO.indexOf(procId) >= 0) return 'ULTRAS_TRATAMENTO';
   if (IDS_BIANCA_RECEPTORA.indexOf(procId)  >= 0) return 'BIANCA_RECEPTORA_' + modal;
+  if (IDS_SARA.indexOf(procId)              >= 0) return 'SARA_' + modal;
 
   // --- 2. Nome do procedimento (fallback, se API passar) ---
   if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                                      return 'INJURIA';
@@ -533,6 +573,7 @@ function resolveTemplateKey(ag) {
   if (prof.includes('HELCE'))                                       return 'HELCE_'     + modal;
   if (prof.includes('PRISCILA') || prof.includes('PRISCILLA'))      return 'PRISCILA_'  + modal;
   if (prof.includes('GRAZIELA') || prof.includes('NUTRI'))          return 'NUTRI_'     + modal;
+  if (prof.includes('SARA'))                                        return 'SARA_'      + modal;
   // Érica faz só exames; qualquer procId não identificado → tratamento
   if (prof.includes('ERICA') || prof.includes('ÉRICA'))             return 'ULTRAS_TRATAMENTO';
 
