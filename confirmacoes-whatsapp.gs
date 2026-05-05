@@ -459,10 +459,11 @@ var IDS_ONLINE_PROCS = [252, 256];
 // procId=265: Origen — 2ª Tec Laboratório Origen (confirmado 26/03/2026)
 // procId=93:  1ª TEC (Rodolfo 04/05/2026 12:30)
 // procId=87:  Coleta Preventivo (Marcelle 28/04/2026)
-// procId=176: Avaliação Doadora (Bianca Salvato) — sem template, sem confirmação
-// procId=268: FOT Receptora (Érica Freitas Cardoso) — sem template, sem confirmação
+// procId=176: Avaliação Doadora (Bianca Salvato) — sem confirmação
+// procId=268: FOT Receptora (Érica Freitas Cardoso) — sem confirmação
+// procId=322: Conversa Receptora (Bianca Salvato) — sem confirmação
 // TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
-var IDS_SEM_CONFIRMACAO = [87, 89, 91, 93, 120, 127, 139, 176, 234, 265, 268];
+var IDS_SEM_CONFIRMACAO = [87, 89, 91, 93, 120, 127, 139, 176, 234, 265, 268, 322];
 
 // ================================================================
 // LÓGICA DE TEMPLATE
