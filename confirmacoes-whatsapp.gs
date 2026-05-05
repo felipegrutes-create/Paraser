@@ -507,11 +507,19 @@ function resolveTemplateKey(ag) {
   if (IDS_BIANCA_RECEPTORA.indexOf(procId)  >= 0) return 'BIANCA_RECEPTORA_' + modal;
 
   // --- 2. Nome do procedimento (fallback, se API passar) ---
-  if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                             return 'INJURIA';
-  if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))           return 'ULTRAS_OBSTETRICA';
-  if (proc.includes('POS BETA') || proc.includes('PÓS BETA'))                                    return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                                      return 'INJURIA';
+  // TEC / punção — sem confirmação
+  if (proc.includes('PUNÇÃO') || proc.includes('PUNCAO'))                                         return null;
+  if (proc.match(/\bTEC\b/) && !proc.includes('PREPARO TEC'))                                     return null;
+  if (proc.includes('EMBRIÃO') || proc.includes('EMBRIAO'))                                       return null;
+  if (proc.includes('PRIMÓRDIA') || proc.includes('PRIMORDIA'))                                   return null;
+  if (proc.includes('ORIGEN'))                                                                     return null;
+  // USG obstétrica
+  if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))            return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('POS BETA') || proc.includes('PÓS BETA'))                                     return 'ULTRAS_OBSTETRICA';
   if (proc.includes('FOLICULO') || proc.includes('FOLÍCULO'))                                     return 'ULTRAS_OBSTETRICA';
   if (proc.includes('TRANSVAGINAL') || proc.includes('DOPPLER'))                                  return 'ULTRAS_OBSTETRICA';
+  // USG tratamento
   if (proc.includes('PREPARO TEC') || proc.includes('FIV'))                                       return 'ULTRAS_TRATAMENTO';
   if (proc.includes('USG') || proc.includes('ULTRASSOM') || proc.includes('ULTRA'))               return 'ULTRAS_TRATAMENTO';
   if (proc.includes('ACUPUNTURA') || prof.includes('CRISTIANE'))                         return 'ACUPUNTURA';
@@ -1146,6 +1154,69 @@ function debugEncontrarProcId() {
     Logger.log(a.data + ' ' + a.hora + ' | ' + a.prof);
   });
   Logger.log('Abra uma dessas datas no Feegow para confirmar o nome do procedimento.');
+}
+
+// ================================================================
+// DEBUG — encontra procIDs candidatos a TEC/punção ainda não mapeados.
+// Varre 90 dias e lista procIDs que aparecem cedo (08:00-09:30) para
+// médicos com template — horário típico de procedimentos de laboratório.
+// Adicione os confirmados em IDS_SEM_CONFIRMACAO.
+// ================================================================
+function debugTECProcIds() {
+  var DIAS    = 90;
+  var profMap = carregarProfissionais();
+  var CONHECIDOS = IDS_INJURIA.concat(IDS_OBSTETRICA)
+                              .concat(IDS_ULTRAS_TRATAMENTO)
+                              .concat(IDS_BIANCA_RECEPTORA)
+                              .concat(IDS_ONLINE_PROCS)
+                              .concat(IDS_SEM_CONFIRMACAO);
+
+  var combos = {}; // procId → { profs, count, exemplo }
+
+  for (var offset = -DIAS; offset <= 7; offset++) {
+    var d  = new Date();
+    d.setDate(d.getDate() + offset);
+    var ds = fmtDataFeegow(d);
+    try {
+      var resp  = UrlFetchApp.fetch(
+        CF_FEEGOW_BASE + '/appoints/search?data_start=' + ds + '&data_end=' + ds,
+        { headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true }
+      );
+      var json  = JSON.parse(resp.getContentText());
+      var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
+      items.forEach(function(ag) {
+        var hora = formatHora(ag.horario || '');
+        if (hora > '10:00') return; // TEC/punção são sempre de manhã cedo
+        var prc = ag.procedimento_id;
+        if (CONHECIDOS.indexOf(prc) >= 0) return;
+        var profNome = profMap[ag.profissional_id] || 'id=' + ag.profissional_id;
+        if (!combos[prc]) combos[prc] = { profs: {}, count: 0, data: ds, hora: hora };
+        combos[prc].profs[profNome] = true;
+        combos[prc].count++;
+        combos[prc].data = ds; // mantém a mais recente
+        combos[prc].hora = hora;
+      });
+    } catch(e) {}
+  }
+
+  var lista = Object.keys(combos).map(function(k) {
+    return {
+      procId: parseInt(k),
+      count:  combos[k].count,
+      profs:  Object.keys(combos[k].profs).join(', '),
+      data:   combos[k].data,
+      hora:   combos[k].hora
+    };
+  });
+  lista.sort(function(a, b) { return b.count - a.count; });
+
+  Logger.log('=== ProcIDs candidatos a TEC/punção (antes das 10h, últimos ' + DIAS + ' dias) ===');
+  lista.forEach(function(c) {
+    Logger.log('ProcID=' + c.procId + '  ×' + c.count +
+               '  última ocorrência: ' + c.data + ' ' + c.hora +
+               '  | ' + c.profs);
+  });
+  Logger.log('\nAbra as datas no Feegow, confirme o nome e adicione em IDS_SEM_CONFIRMACAO.');
 }
 
 // ================================================================
