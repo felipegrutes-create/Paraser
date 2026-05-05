@@ -163,6 +163,18 @@ const TMPL = {
     'A consulta será realizada pelo Google Meet.\n\n' +
     'Podemos confirmar? 💜',
 
+  BIANCA_RECEPTORA_PRESENCIAL:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua conversa PRESENCIAL com a Dra. Bianca Salvato, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    '{ENDERECO}\n\n' +
+    'Podemos confirmar? 💜',
+
+  BIANCA_RECEPTORA_ONLINE:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua conversa ONLINE com a Dra. Bianca Salvato, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    'A consulta será realizada através de chamada de vídeo no Whatsapp\n\n' +
+    'Podemos confirmar? 💜',
+
   ACUPUNTURA:
     'Olá! Tudo bem?\n' +
     'Passando para confirmar sua sessão com a Acupunturista Cristiane, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -461,9 +473,13 @@ var IDS_ONLINE_PROCS = [252, 256];
 // procId=87:  Coleta Preventivo (Marcelle 28/04/2026)
 // procId=176: Avaliação Doadora (Bianca Salvato) — sem confirmação
 // procId=268: FOT Receptora (Érica Freitas Cardoso) — sem confirmação
-// procId=322: Conversa Receptora (Bianca Salvato) — sem confirmação
 // TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
-var IDS_SEM_CONFIRMACAO = [87, 89, 91, 93, 120, 127, 139, 176, 234, 265, 268, 322];
+var IDS_SEM_CONFIRMACAO = [87, 89, 91, 93, 120, 127, 139, 176, 234, 265, 268];
+
+// procIds de Conversa com Receptora (Bianca Salvato) — presencial e online
+// procId=322: Conversa Receptora Presencial (Bianca 04/05/2026)
+// TODO: identificar procId da versão Online se existir e adicionar aqui
+var IDS_BIANCA_RECEPTORA = [322];
 
 // ================================================================
 // LÓGICA DE TEMPLATE
@@ -487,6 +503,7 @@ function resolveTemplateKey(ag) {
   if (IDS_INJURIA.indexOf(procId)           >= 0) return 'INJURIA';
   if (IDS_OBSTETRICA.indexOf(procId)        >= 0) return 'ULTRAS_OBSTETRICA';
   if (IDS_ULTRAS_TRATAMENTO.indexOf(procId) >= 0) return 'ULTRAS_TRATAMENTO';
+  if (IDS_BIANCA_RECEPTORA.indexOf(procId)  >= 0) return 'BIANCA_RECEPTORA_' + modal;
 
   // --- 2. Nome do procedimento (fallback, se API passar) ---
   if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                             return 'INJURIA';
