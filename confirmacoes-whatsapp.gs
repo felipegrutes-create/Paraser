@@ -251,6 +251,9 @@ function enviarConfirmacoes() {
   Logger.log('Agendamentos encontrados para ' + fmtDataBR(dia) + ': ' + agendamentos.length);
   if (!agendamentos.length) return;
 
+  agendamentos = deduplicarPorPaciente(agendamentos);
+  Logger.log('Após deduplicação por paciente: ' + agendamentos.length);
+
   var profMap = carregarProfissionais();
 
   var qrLink    = getQrLink();
@@ -339,6 +342,9 @@ function simularEnvio() {
     return;
   }
 
+  agendamentos = deduplicarPorPaciente(agendamentos);
+  Logger.log('Após deduplicação: ' + agendamentos.length + ' pacientes únicos');
+
   var profMap = carregarProfissionais();
 
   agendamentos.forEach(function(ag, i) {
@@ -391,6 +397,23 @@ function getAgendamentos(dia) {
   return items.filter(function(a) {
     var s = (a.status || '').toLowerCase();
     return s !== 'cancelado' && s !== 'bloqueado' && s !== 'bloqueio' && s !== 'desmarcado';
+  });
+}
+
+// ================================================================
+// Quando uma paciente tem mais de um agendamento no mesmo dia,
+// envia confirmação apenas para o PRIMEIRO horário — evita que
+// a paciente ignore o horário mais cedo por só ler a última mensagem.
+// ================================================================
+function deduplicarPorPaciente(agendamentos) {
+  agendamentos.sort(function(a, b) {
+    return (a.horario || '').localeCompare(b.horario || '');
+  });
+  var vistos = {};
+  return agendamentos.filter(function(ag) {
+    if (!ag.paciente_id || vistos[ag.paciente_id]) return false;
+    vistos[ag.paciente_id] = true;
+    return true;
   });
 }
 
