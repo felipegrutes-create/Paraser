@@ -1032,7 +1032,7 @@ function debugScanProcedimentos() {
 // (data + hora + profissional) para você abrir no Feegow e confirmar o nome.
 // ================================================================
 function debugLocalizarProcsDesconhecidos() {
-  var IDS_VERIFICAR = [5, 6, 7, 13, 32, 34, 176, 268, 273, 277, 284, 312];
+  var IDS_VERIFICAR = [8, 9, 11, 36, 43, 44, 45, 51, 75, 88, 90, 104, 122, 147, 156, 168, 171, 183, 246, 251, 257, 262, 267, 283, 285, 317, 323, 325, 328, 347];
   var DIAS = 90;
   var profMap = carregarProfissionais();
 
