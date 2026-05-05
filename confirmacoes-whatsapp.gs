@@ -262,7 +262,7 @@ function enviarConfirmacoes() {
       sendWhatsApp(phone, msg);
       Utilities.sleep(2500);
 
-      if (qrLink) {
+      if (qrLink && !tmplKey.endsWith('_ONLINE')) {
         var qrMsg = fillTemplate(TMPL.QR_CODE, { DATA_VISITA: dataStr, LINK_QR: qrLink });
         sendWhatsApp(phone, qrMsg);
         Utilities.sleep(1500);
