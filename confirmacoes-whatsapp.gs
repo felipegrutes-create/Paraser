@@ -425,11 +425,18 @@ var IDS_OBSTETRICA = [40, 41, 42, 58, 59, 61];
 // procId=249 confirmado: Consulta 1ª Vez (Marcelle 11/03/2026) — roteado por profissional, sem ação
 // procId=33  confirmado: Consulta de Retorno (Priscila 04/05/2026) — roteado por profissional, sem ação
 // procId=247 confirmado: Consulta 1ª Vez (Marcelle 25/02/2026) — roteado por profissional, sem ação
+// procId=4   confirmado: USG FIV 1ª (Marcelle 05/05/2026 11:40)
+// procId=5   confirmado: USG FIV 2 (Érica Stein 04/05/2026 17:20)
+// procId=6   confirmado: USG FIV 3 (Érica Stein 04/05 + Priscila 06/05)
+// procId=7   confirmado: USG FIV 4 (Érica Stein 04/05/2026 09:00)
 // procId=12  confirmado: USG COITO PROGRAMADO (Érica 04/05/2026 15:20)
-// procId=245 confirmado: USG PREPARO TEC (Érica 04/05/2026 11:00)
-// procId=74  confirmado: USG PREPARO TEC (Érica 30/04/2026 12:00)
+// procId=13  confirmado: USG COITO PROGRAMADO (Érica Stein 17/04/2026 11:10)
+// procId=73  confirmado: USG PREPARO TEC 1 - Natural (Marcelle 05/05/2026)
+// procId=74  confirmado: USG PREPARO TEC (Érica 30/04/2026)
+// procId=244 confirmado: USG PREPARO TEC 1 - Medicado (Marcelle 05/05/2026)
+// procId=245 confirmado: USG PREPARO TEC (Érica 04/05/2026)
 // procId=59  confirmado: USG CONTAGEM DE FOLÍCULOS ANTRAIS → movido para IDS_OBSTETRICA
-var IDS_ULTRAS_TRATAMENTO = [244, 73, 4, 12, 74, 245];
+var IDS_ULTRAS_TRATAMENTO = [4, 5, 6, 7, 12, 13, 73, 74, 244, 245];
 
 // procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
 // procId=252: "CONSULTA 1ª VEZ - DR. RODOLFO SALVATO - Online" (Rodolfo)
@@ -452,8 +459,10 @@ var IDS_ONLINE_PROCS = [252, 256];
 // procId=265: Origen — 2ª Tec Laboratório Origen (confirmado 26/03/2026)
 // procId=93:  1ª TEC (Rodolfo 04/05/2026 12:30)
 // procId=87:  Coleta Preventivo (Marcelle 28/04/2026)
+// procId=176: Avaliação Doadora (Bianca Salvato) — sem template, sem confirmação
+// procId=268: FOT Receptora (Érica Freitas Cardoso) — sem template, sem confirmação
 // TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
-var IDS_SEM_CONFIRMACAO = [89, 91, 93, 120, 127, 139, 234, 265, 87];
+var IDS_SEM_CONFIRMACAO = [87, 89, 91, 93, 120, 127, 139, 176, 234, 265, 268];
 
 // ================================================================
 // LÓGICA DE TEMPLATE
