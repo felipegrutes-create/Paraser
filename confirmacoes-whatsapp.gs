@@ -996,7 +996,7 @@ function debugScanProcedimentos() {
 // (data + hora + profissional) para você abrir no Feegow e confirmar o nome.
 // ================================================================
 function debugLocalizarProcsDesconhecidos() {
-  var IDS_VERIFICAR = [33, 41, 58, 61, 74, 87, 93, 245, 247, 249, 281, 12];
+  var IDS_VERIFICAR = [5, 6, 7, 13, 32, 34, 176, 268, 273, 277, 284, 312];
   var DIAS = 90;
   var profMap = carregarProfissionais();
 
@@ -1189,7 +1189,7 @@ function debugMarcelleUSGProcIds() {
 // Altere DATA para a data desejada no formato DD-MM-YYYY e execute.
 // ================================================================
 function debugDiaEspecifico() {
-  var DATA = '05-05-2026'; // ← altere para a data desejada
+  var DATA = '06-05-2026'; // ← altere para a data desejada
 
   var profMap = carregarProfissionais();
   var resp = UrlFetchApp.fetch(
