@@ -10,24 +10,21 @@
 //      Tipo: Por horário, Diário, entre 17h-18h
 // ================================================================
 
-// ---- CONFIG Feegow (já configurado no CRM) ----
-const CF_FEEGOW_BASE  = 'https://api.feegow.com/v1/api';
-const CF_FEEGOW_TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJmZWVnb3ciLCJhdWQiOiJwdWJsaWNhcGkiLCJpYXQiOjE3NDM0NzEyNDIsImxpY2Vuc2VJRCI6MTQ0MzR9.oh2VSWT5UPEfYRrPCv34IM1NuP8Aq_ehFYWhE8f5MuU';
+// ---- CONFIG — lidos do PropertiesService (nunca hardcode tokens no código) ----
+// Para configurar pela primeira vez: execute configurarPropriedades() uma vez.
+var _P = PropertiesService.getScriptProperties();
 
-// ---- CONFIG Z-API ----
-const CF_ZAPI_INSTANCE_ID   = '3F26C64C21E0847CDBB4AA151284BCC4';
-const CF_ZAPI_TOKEN         = '3DA7CC26C48283E4C3191295';
-const CF_ZAPI_CLIENT_TOKEN  = 'Fd4927cfde3bc4a2799c679493e01f164S';
-
-// ---- CONFIG Slack ----
-const CF_SLACK_TOKEN   = 'xoxb-8515459156870-8928400510806-AuvdtpMgOWthr6e8tGAaHafa';
-const CF_SLACK_CHANNEL = 'atendimento';
-
-// ---- CONFIG Planilha ----
-const CF_SPREADSHEET_ID = '1LO8shBkismiZQvl7kZUXroviFOw1RJqUJxkznVRk-DA';
-const CF_CONFIG_SHEET   = 'Config';
-const CF_QR_LINK_CELL   = 'B1';
-const CF_LOG_SHEET      = 'Confirmacoes_Log';
+const CF_FEEGOW_BASE       = 'https://api.feegow.com/v1/api';
+const CF_FEEGOW_TOKEN      = _P.getProperty('FEEGOW_TOKEN');
+const CF_ZAPI_INSTANCE_ID  = _P.getProperty('ZAPI_INSTANCE_ID');
+const CF_ZAPI_TOKEN        = _P.getProperty('ZAPI_TOKEN');
+const CF_ZAPI_CLIENT_TOKEN = _P.getProperty('ZAPI_CLIENT_TOKEN');
+const CF_SLACK_TOKEN       = _P.getProperty('SLACK_TOKEN');
+const CF_SLACK_CHANNEL     = 'atendimento';
+const CF_SPREADSHEET_ID    = _P.getProperty('SPREADSHEET_ID');
+const CF_CONFIG_SHEET      = 'Config';
+const CF_QR_LINK_CELL      = 'B1';
+const CF_LOG_SHEET         = 'Confirmacoes_Log';
 
 // ================================================================
 // ENDEREÇO (bloco fixo inserido nos templates presenciais)
@@ -1415,6 +1412,23 @@ function debugAgendamentos() {
 function debugMaps() {
   var profMap = carregarProfissionais();
   Logger.log('PROFISSIONAIS:\n' + JSON.stringify(profMap, null, 2));
+}
+
+// ================================================================
+// SETUP — execute UMA VEZ para salvar os tokens no PropertiesService.
+// Após executar, os valores ficam armazenados com segurança no Apps Script
+// e não precisam mais estar no código.
+// ================================================================
+function configurarPropriedades() {
+  PropertiesService.getScriptProperties().setProperties({
+    'FEEGOW_TOKEN':      '',  // ← cole o token Feegow
+    'ZAPI_INSTANCE_ID':  '',  // ← cole o Instance ID do Z-API
+    'ZAPI_TOKEN':        '',  // ← cole o Token do Z-API
+    'ZAPI_CLIENT_TOKEN': '',  // ← cole o Client-Token do Z-API
+    'SLACK_TOKEN':       '',  // ← cole o token Slack (xoxb-...)
+    'SPREADSHEET_ID':    '',  // ← cole o ID da planilha Google Sheets
+  });
+  Logger.log('✅ Propriedades salvas. Pode apagar os valores desta função.');
 }
 
 // ================================================================
