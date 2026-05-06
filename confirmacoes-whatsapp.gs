@@ -155,6 +155,19 @@ const TMPL = {
     'A consulta será realizada por vídeo chamada no WhatsApp.\n\n' +
     'Podemos confirmar? 💜',
 
+  MAGALI_PRESENCIAL:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua consulta PRESENCIAL com a Dra. Magali Miranda, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    '⛔ Caso não haja confirmação, a consulta será cancelada. ⛔\n\n' +
+    '{ENDERECO}\n\n' +
+    'Podemos confirmar? 💜',
+
+  MAGALI_ONLINE:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua consulta ONLINE com a Dra. Magali Miranda, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    '⛔ Caso não haja confirmação, a consulta será cancelada. ⛔\n\n' +
+    'Podemos confirmar? 💜',
+
   NUTRI_PRESENCIAL:
     'Olá! Tudo bem?\n\n' +
     'Estamos entrando em contato para confirmar sua CONSULTA PRESENCIAL com a Nutricionista Graziela Siqueira, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -485,6 +498,8 @@ var IDS_OBSTETRICA = [40, 41, 42, 43, 44, 45, 51, 58, 59, 61, 171];
 // procId=281 confirmado: Consulta 1ª Vez (Marcelle 07/04/2026) — roteado por profissional, sem ação
 // procId=249 confirmado: Consulta 1ª Vez (Marcelle 11/03/2026) — roteado por profissional, sem ação
 // procId=33  confirmado: Consulta de Retorno (Priscila 04/05/2026) — roteado por profissional, sem ação
+// procId=156 confirmado: Consulta Presencial (Priscila 07/05/2026 12:00) — roteado por profissional, sem ação
+// procId=313 confirmado: Consulta (Magali Miranda 07/05/2026) — roteado por profissional
 // procId=247 confirmado: Consulta 1ª Vez (Marcelle 25/02/2026) — roteado por profissional, sem ação
 // procId=4   confirmado: USG FIV 1ª (Marcelle 05/05/2026 11:40)
 // procId=5   confirmado: USG FIV 2 (Érica Stein 04/05/2026 17:20)
@@ -519,8 +534,9 @@ var IDS_SARA = [257];
 // procId=322: "CONVERSA RECEPTORA - Online" (Bianca)
 // procId=323: "CONVERSA DOADORA - Online" (Bianca)
 // procId=347: "CONSULTA ONLINE" (Rodolfo 05/05/2026) — resolve o TODO do procId=168
+// procId=251: "CONSULTA - Online" (Priscila 07/05/2026 11:00) — confirmado por agendamento real
 // procId=255: "CONSULTA DE RETORNO - Presencial" → NÃO é online, não incluir aqui
-var IDS_ONLINE_PROCS = [252, 256, 322, 323, 347];
+var IDS_ONLINE_PROCS = [251, 252, 256, 322, 323, 347];
 
 // procIds de procedimentos que NÃO recebem confirmação por WhatsApp:
 // punção de óvulos, transferência, aspiração de cisto, PRP,
@@ -604,6 +620,7 @@ function resolveTemplateKey(ag) {
   if (prof.includes('RODOLFO'))                                     return 'RODOLFO_'   + modal;
   if (prof.includes('HELCE'))                                       return 'HELCE_'     + modal;
   if (prof.includes('PRISCILA') || prof.includes('PRISCILLA'))      return 'PRISCILA_'  + modal;
+  if (prof.includes('MAGALI'))                                       return 'MAGALI_'    + modal;
   if (prof.includes('GRAZIELA') || prof.includes('NUTRI'))          return 'NUTRI_'     + modal;
   if (prof.includes('SARA'))                                        return 'SARA_'      + modal;
   // Érica faz só exames; qualquer procId não identificado → tratamento
