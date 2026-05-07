@@ -734,8 +734,10 @@
             display: flex;
             gap: 14px;
             overflow-x: auto;
-            padding-bottom: 16px;
-            align-items: flex-start;
+            overflow-y: hidden;
+            height: calc(100vh - 300px);
+            min-height: 400px;
+            align-items: stretch;
             scrollbar-width: thin;
             scrollbar-color: var(--dim) transparent;
         }
@@ -746,12 +748,19 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 12px;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: var(--dim) transparent;
         }
 
         .kanban-col-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--surface);
             padding: 12px 14px 10px;
             border-bottom: 1px solid var(--border);
             border-top: 2px solid var(--kcol-color, #475569);
