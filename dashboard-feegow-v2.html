@@ -182,6 +182,30 @@
         .tab.tab-donor.active { background: rgba(236,72,153,0.18); color: var(--accent); }
         .tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:17px; height:17px; border-radius:999px; background:#ec4899; color:#fff; font-size:10px; font-weight:700; padding:0 4px; margin-left:6px; line-height:1; vertical-align:middle; }
 
+        /* Tab groups com dropdown */
+        .tab-group { position: relative; display: inline-flex; }
+        .tab-group-trigger { display: flex; align-items: center; gap: 5px; }
+        .tab-group-arrow { font-size: 9px; opacity: .7; transition: transform .2s; }
+        .tab-group.open .tab-group-arrow { transform: rotate(180deg); }
+        .tab-dropdown {
+            display: none; position: absolute; top: calc(100% + 4px); left: 0;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 10px; padding: 6px; min-width: 200px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 200;
+            flex-direction: column; gap: 2px;
+        }
+        .tab-group.open .tab-dropdown { display: flex; }
+        .tab-dropdown-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; border-radius: 7px; cursor: pointer;
+            background: none; border: none; color: var(--muted);
+            font-family: inherit; font-size: 12px; font-weight: 500;
+            text-align: left; white-space: nowrap; width: 100%;
+            transition: background .15s, color .15s;
+        }
+        .tab-dropdown-item:hover { background: var(--border); color: var(--text); }
+        .tab-dropdown-item.active { color: var(--accent); background: rgba(0,212,170,.08); }
+
         .tab.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
@@ -2128,16 +2152,34 @@
         <button class="tab" onclick="showSection('sec-pv',this)">1ª Vez — Geral</button>
         <button class="tab" onclick="showSection('sec-txconv',this)">TX Conversão</button>
         <button class="tab" onclick="showSection('sec-ret',this)">Retorno</button>
-        <button class="tab" onclick="showSection('sec-pend',this)">CRM Comercial</button>
-        <button class="tab" onclick="showSection('sec-arquivo-morto',this)">📦 Arquivo Morto<span class="tab-badge" id="tabBadgeArquivo" style="display:none"></span></button>
-        <button class="tab" onclick="showSection('sec-doadoras',this)">Fluxo Pacientes</button>
-        <button class="tab tab-donor" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas<span class="tab-badge" id="tabBadgeDc" style="display:none"></span></button>
-        <button class="tab tab-donor" onclick="showSection('sec-doavol',this)">Doadoras Voluntárias<span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
-        <button class="tab tab-donor" onclick="showSection('sec-receptoras',this)">Receptoras<span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
-        <button class="tab tab-donor" onclick="showSection('sec-embriao',this)">Embrião Doado<span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
-        <button class="tab" onclick="showSection('sec-fin',this)">💰 Financeiro</button>
-        <button class="tab" onclick="showSection('sec-cr',this)">💳 Contas a Receber</button>
-        <button class="tab" onclick="showSection('sec-caixa',this)">👨‍⚕️ Médicos</button>
+
+        <div class="tab-group" id="group-crm">
+            <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-crm',event)">CRM <span class="tab-group-arrow">▾</span></button>
+            <div class="tab-dropdown">
+                <button class="tab-dropdown-item" onclick="showSection('sec-pend',null)">CRM Comercial</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-arquivo-morto',null)">📦 Arquivo Morto <span class="tab-badge" id="tabBadgeArquivo" style="display:none"></span></button>
+            </div>
+        </div>
+
+        <div class="tab-group" id="group-pacientes">
+            <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-pacientes',event)">Pacientes <span class="tab-group-arrow">▾</span></button>
+            <div class="tab-dropdown">
+                <button class="tab-dropdown-item" onclick="showSection('sec-doadoras',null)">Fluxo Pacientes</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-doashared',null)">Doadoras Compartilhadas <span class="tab-badge" id="tabBadgeDc" style="display:none"></span></button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-doavol',null)">Doadoras Voluntárias <span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-receptoras',null)">Receptoras <span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-embriao',null)">Embrião Doado <span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
+            </div>
+        </div>
+
+        <div class="tab-group" id="group-fin">
+            <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-fin',event)">Financeiro <span class="tab-group-arrow">▾</span></button>
+            <div class="tab-dropdown">
+                <button class="tab-dropdown-item" onclick="showSection('sec-fin',null)">💰 Financeiro</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
+            </div>
+        </div>
     </div>
 
     <div class="container">
@@ -4430,11 +4472,45 @@
 
         let _dirtyDoadoras = false, _dirtyKanban = false;
 
+        const SECTION_GROUP = {
+            'sec-pend':          'group-crm',
+            'sec-arquivo-morto': 'group-crm',
+            'sec-doadoras':      'group-pacientes',
+            'sec-doashared':     'group-pacientes',
+            'sec-doavol':        'group-pacientes',
+            'sec-receptoras':    'group-pacientes',
+            'sec-embriao':       'group-pacientes',
+            'sec-fin':           'group-fin',
+            'sec-cr':            'group-fin',
+            'sec-caixa':         'group-fin',
+        };
+
+        function toggleTabGroup(groupId, event) {
+            event.stopPropagation();
+            const group = document.getElementById(groupId);
+            const isOpen = group.classList.contains('open');
+            document.querySelectorAll('.tab-group').forEach(g => g.classList.remove('open'));
+            if (!isOpen) group.classList.add('open');
+        }
+
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.tab-group').forEach(g => g.classList.remove('open'));
+        });
+
         function showSection(id, el) {
-            document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-            document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+            document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+            document.querySelectorAll(".tab, .tab-group-trigger, .tab-dropdown-item").forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".tab-group").forEach(g => g.classList.remove("open"));
             document.getElementById(id)?.classList.add("active");
-            el?.classList.add("active");
+
+            const groupId = SECTION_GROUP[id];
+            if (groupId) {
+                document.querySelector(`#${groupId} .tab-group-trigger`)?.classList.add("active");
+                document.querySelector(`#${groupId} .tab-dropdown-item[onclick*="${id}"]`)?.classList.add("active");
+            } else {
+                el?.classList.add("active");
+            }
+
             if (id === 'sec-doashared') dnRenderPendingCards();
             if (id === 'sec-doavol') dvTab.renderPending();
             if (id === 'sec-receptoras') rcTab.renderPending();
@@ -4442,7 +4518,6 @@
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             if (id === 'sec-caixa') loadAndRenderMedicos();
             if (id === 'sec-cr') loadAndRenderCR();
-            // Re-render abas dirty ao entrar
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
             if (id === 'sec-arquivo-morto') renderArquivoMorto();
