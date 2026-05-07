@@ -4486,15 +4486,17 @@
         };
 
         function toggleTabGroup(groupId, event) {
-            event.stopPropagation();
             const group = document.getElementById(groupId);
             const isOpen = group.classList.contains('open');
             document.querySelectorAll('.tab-group').forEach(g => g.classList.remove('open'));
             if (!isOpen) group.classList.add('open');
+            event.stopPropagation();
         }
 
-        document.addEventListener('click', () => {
-            document.querySelectorAll('.tab-group').forEach(g => g.classList.remove('open'));
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.tab-group')) {
+                document.querySelectorAll('.tab-group').forEach(g => g.classList.remove('open'));
+            }
         });
 
         function showSection(id, el) {
