@@ -4982,14 +4982,14 @@
             const clas     = crm?.classificacao || '';
             const dataLine = patient.dataAp ? `1ª vez: ${patient.dataAp}` : '';
             return `
-                <div class="arquivo-card" style="border-left-color:${borderColor}">
+                <div class="arquivo-card" style="border-left-color:${borderColor}" onclick="openCRMModal('${safeKey}')">
                     <div class="arquivo-card-name">${patient.pac}</div>
                     <div class="arquivo-card-sub">${patient.prof}${dataLine ? ' · ' + dataLine : ''}</div>
                     ${clas   ? `<div class="arquivo-card-sub">🏷️ ${clas}</div>` : ''}
                     ${vend   ? `<div class="arquivo-card-sub">👤 ${vend}</div>` : ''}
                     ${valor !== '—' ? `<div class="arquivo-card-sub">💰 ${valor}</div>` : ''}
                     ${obsShort ? `<div class="arquivo-card-obs">💬 ${obsShort}</div>` : ''}
-                    <button class="arquivo-reativar-btn" onclick="reativarPaciente('${safeKey}')">↩ Reativar para o CRM</button>
+                    <button class="arquivo-reativar-btn" onclick="event.stopPropagation();reativarPaciente('${safeKey}')">↩ Reativar para o CRM</button>
                 </div>`;
         }
 
