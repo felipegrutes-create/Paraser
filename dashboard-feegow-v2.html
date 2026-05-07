@@ -186,11 +186,26 @@
         /* CRM header fixo */
         .crm-sticky-header {
             position: sticky;
-            top: 108px; /* header(62px) + tabs(46px) */
+            top: 108px;
             z-index: 50;
             background: var(--bg);
-            padding-bottom: 14px;
-            margin-bottom: 4px;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+        .kanban-col-headers-sticky {
+            display: flex;
+            gap: 14px;
+            overflow: hidden;
+            margin-top: 14px;
+        }
+        .kanban-col-header-sticky {
+            flex: 0 0 max(210px, calc((100% - 56px) / 5));
+            min-width: 210px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px 8px 0 0;
+            border-top: 2px solid var(--kcol-color, #475569);
+            padding: 12px 14px 10px;
         }
 
         /* Tab groups com dropdown */
@@ -2696,7 +2711,10 @@
                         <option value="Rayssa Guedes">Rayssa Guedes</option>
                     </select>
                 </div>
-            </div>
+
+                <!-- Cabeçalhos das colunas — travados junto com o header -->
+                <div id="kanbanColHeaders" class="kanban-col-headers-sticky"></div>
+            </div><!-- /crm-sticky-header -->
 
             <!-- Board Kanban — rola livremente -->
             <div class="kanban-board" id="kanbanBoard"></div>
@@ -4800,12 +4818,15 @@
                 return da - db;
             });
 
-            // Renderizar colunas
+            // Renderizar cabeçalhos sticky + colunas sem header
+            const headersEl = document.getElementById('kanbanColHeaders');
+            let stickyHeaders = '';
             board.innerHTML = KANBAN_COLS.map(col => {
                 const cards = groups[col.id];
                 const realCards = cards.filter(c => !c.ghost);
                 const count = realCards.length;
                 const ghostCount = cards.length - count;
+                const countLabel = ghostCount > 0 ? `${count} <span style="font-size:9px;opacity:.6">+${ghostCount}</span>` : count;
 
                 let totalHtml = '';
                 if (col.showTotal) {
@@ -4815,7 +4836,15 @@
                         <div class="kanban-col-total">${fmtValor(total)}</div>`;
                 }
 
-                const countLabel = ghostCount > 0 ? `${count} <span style="font-size:9px;opacity:.6">+${ghostCount}</span>` : count;
+                // Acumula cabeçalho sticky
+                stickyHeaders += `
+                    <div class="kanban-col-header-sticky" style="--kcol-color:${col.color}">
+                        <div class="kanban-col-top">
+                            <span class="kanban-col-title">${col.label}</span>
+                            <span class="kanban-col-count">${countLabel}</span>
+                        </div>
+                        ${totalHtml}
+                    </div>`;
 
                 const deletable = ['historico-contato','proposta-feita','quitado'].includes(col.id);
                 const cardsHtml = cards.length
@@ -4824,18 +4853,17 @@
                     }).join('')
                     : `<div class="crm-empty-col">Nenhum paciente</div>`;
 
+                // Coluna sem header (header está no sticky row acima)
                 return `
-                    <div class="kanban-col" style="--kcol-color:${col.color}">
-                        <div class="kanban-col-header">
-                            <div class="kanban-col-top">
-                                <span class="kanban-col-title">${col.label}</span>
-                                <span class="kanban-col-count">${countLabel}</span>
-                            </div>
-                            ${totalHtml}
-                        </div>
+                    <div class="kanban-col" style="--kcol-color:${col.color};border-top:2px solid ${col.color};border-radius:0 0 12px 12px">
                         <div class="kanban-col-body">${cardsHtml}</div>
                     </div>`;
             }).join('');
+
+            if (headersEl) headersEl.innerHTML = stickyHeaders;
+
+            // Sincronizar scroll horizontal do board com os cabeçalhos sticky
+            board.onscroll = () => { if (headersEl) headersEl.scrollLeft = board.scrollLeft; };
         }
 
         // ===== CRM MODAL =====
