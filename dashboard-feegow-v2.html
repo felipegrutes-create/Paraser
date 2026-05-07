@@ -1005,6 +1005,45 @@
         .badge-green  { background: rgba(16,185,129,0.15); color: #34d399; }
         .badge-yellow { background: rgba(250,204,21,0.15); color: #facc15; }
         .badge-pink   { background: rgba(236,72,153,0.15); color: #f472b6; }
+        .badge-gray   { background: rgba(148,163,184,0.15); color: #94a3b8; }
+
+        /* Arquivo Morto */
+        .arquivo-section { margin-bottom: 32px; }
+        .arquivo-section-title {
+            font-size: 15px; font-weight: 700; margin-bottom: 14px;
+            padding-bottom: 8px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .arquivo-section-count {
+            font-size: 11px; font-weight: 600; background: var(--surface2);
+            color: var(--muted); padding: 2px 8px; border-radius: 10px;
+        }
+        .arquivo-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 12px;
+        }
+        .arquivo-card {
+            background: var(--surface2); border-radius: 10px;
+            border-left: 3px solid var(--border);
+            padding: 12px 14px; cursor: pointer;
+            transition: transform .15s, box-shadow .15s;
+        }
+        .arquivo-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+        .arquivo-card-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+        .arquivo-card-sub  { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+        .arquivo-card-obs  { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 6px; }
+        .arquivo-reativar-btn {
+            margin-top: 10px; width: 100%; padding: 5px 0;
+            background: rgba(99,102,241,0.12); color: #818cf8;
+            border: 1px solid rgba(99,102,241,0.25); border-radius: 6px;
+            font-size: 11px; font-weight: 600; cursor: pointer;
+            transition: background .15s;
+        }
+        .arquivo-reativar-btn:hover { background: rgba(99,102,241,0.22); }
+        .crm-check-separator {
+            border: none; border-top: 1px solid var(--border); margin: 10px 0 8px;
+        }
 
         /* Financeiro */
         .fin-filters {
@@ -2086,6 +2125,7 @@
         <button class="tab" onclick="showSection('sec-txconv',this)">TX Conversão</button>
         <button class="tab" onclick="showSection('sec-ret',this)">Retorno</button>
         <button class="tab" onclick="showSection('sec-pend',this)">CRM Comercial</button>
+        <button class="tab" onclick="showSection('sec-arquivo-morto',this)">📦 Arquivo Morto<span class="tab-badge" id="tabBadgeArquivo" style="display:none"></span></button>
         <button class="tab" onclick="showSection('sec-doadoras',this)">Fluxo Pacientes</button>
         <button class="tab tab-donor" onclick="showSection('sec-doashared',this)">Doadoras Compartilhadas<span class="tab-badge" id="tabBadgeDc" style="display:none"></span></button>
         <button class="tab tab-donor" onclick="showSection('sec-doavol',this)">Doadoras Voluntárias<span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
@@ -2601,6 +2641,12 @@
 
             <!-- Board Kanban -->
             <div class="kanban-board" id="kanbanBoard"></div>
+        </section>
+
+        <!-- ARQUIVO MORTO -->
+        <section id="sec-arquivo-morto" class="section">
+            <p class="section-title">📦 Arquivo Morto — Pacientes Encerradas</p>
+            <div id="arquivoMortoBoard"></div>
         </section>
 
         <!-- DOADORAS / RECEPTORAS -->
@@ -3321,6 +3367,18 @@
                         <label class="crm-check-group">
                             <input type="checkbox" id="crmQuitado">
                             <span>Quitado</span>
+                        </label>
+                    </div>
+
+                    <hr class="crm-check-separator">
+                    <div class="crm-check-row">
+                        <label class="crm-check-group">
+                            <input type="checkbox" id="crmEngravidou" onchange="onArquivoCheck('engravidou')">
+                            <span>🤰 Engravidou</span>
+                        </label>
+                        <label class="crm-check-group">
+                            <input type="checkbox" id="crmDesistiu" onchange="onArquivoCheck('desistiu')">
+                            <span>🚫 Desistiu</span>
                         </label>
                     </div>
                 </div>
@@ -4383,6 +4441,7 @@
             // Re-render abas dirty ao entrar
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
+            if (id === 'sec-arquivo-morto') renderArquivoMorto();
         }
 
         // ===== CRM HELPERS =====
@@ -4603,9 +4662,11 @@
             const ano  = document.getElementById('kanbAno')?.value   || '';
             const vend = document.getElementById('kanbVend')?.value  || '';
 
-            // Filtrar pacientes
+            // Filtrar pacientes (excluir arquivadas)
             const filtered = pendPatients.filter(p => {
                 const crm = crmMap[normalizeKey(p.pac)] || {};
+                if (crm.engravidou === true || crm.engravidou === 'TRUE') return false;
+                if (crm.desistiu   === true || crm.desistiu   === 'TRUE') return false;
                 if (srch && !norm(p.pac).includes(srch)) return false;
                 if (prof && p.prof !== prof)           return false;
                 if (ano  && p.yearDcri !== ano)        return false;
@@ -4718,9 +4779,11 @@
             document.getElementById('crmVend').value     = crm.vendedora || '';
             document.getElementById('crmProposta').value = crm.proposta_feita  || '';
             document.getElementById('crmClassificacao').value = crm.classificacao || '';
-            document.getElementById('crmParcPago').checked  = crm.parc_pago === true || crm.parc_pago === 'TRUE';
-            document.getElementById('crmQuitado').checked   = crm.quitado   === true || crm.quitado   === 'TRUE';
-            document.getElementById('crmProjetoAna').checked = crm.projeto_ana === true || crm.projeto_ana === 'TRUE';
+            document.getElementById('crmParcPago').checked   = crm.parc_pago    === true || crm.parc_pago    === 'TRUE';
+            document.getElementById('crmQuitado').checked    = crm.quitado      === true || crm.quitado      === 'TRUE';
+            document.getElementById('crmProjetoAna').checked = crm.projeto_ana  === true || crm.projeto_ana  === 'TRUE';
+            document.getElementById('crmEngravidou').checked = crm.engravidou   === true || crm.engravidou   === 'TRUE';
+            document.getElementById('crmDesistiu').checked   = crm.desistiu     === true || crm.desistiu     === 'TRUE';
 
             const valorRaw = crm.valor ? parseValorFloat(crm.valor) : '';
             const input    = document.getElementById('crmValor');
@@ -4739,7 +4802,7 @@
                 const field = el.closest('.crm-field');
                 if (field) field.classList.remove('crm-field-disabled');
             });
-            ['crmParcPago', 'crmQuitado', 'crmProjetoAna'].forEach(id => {
+            ['crmParcPago', 'crmQuitado', 'crmProjetoAna', 'crmEngravidou', 'crmDesistiu'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.disabled = false;
@@ -4760,7 +4823,34 @@
         }
 
         async function saveCRMRecord() {
-            const statusEl = document.getElementById('crmSaveStatus');
+            const statusEl   = document.getElementById('crmSaveStatus');
+            const engravidou = document.getElementById('crmEngravidou').checked;
+            const desistiu   = document.getElementById('crmDesistiu').checked;
+
+            // Detecta se está sendo arquivada agora (não estava antes)
+            const prevRec    = crmMap[crmModalKey] || {};
+            const eraArquivada = prevRec.engravidou === true || prevRec.engravidou === 'TRUE' ||
+                                 prevRec.desistiu   === true || prevRec.desistiu   === 'TRUE';
+            const estaArquivando = (engravidou || desistiu) && !eraArquivada;
+
+            if (estaArquivando) {
+                const patient = pendPatients.find(p => normalizeKey(p.pac) === crmModalKey);
+                const nome    = patient?.pac || crmModalKey;
+                const motivo  = engravidou ? 'Engravidou 🤰' : 'Desistiu 🚫';
+                const ok = confirm(
+                    `Mover "${nome}" para o Arquivo Morto?\n\n` +
+                    `Motivo: ${motivo}\n\n` +
+                    `A paciente sairá do CRM Comercial.\n` +
+                    `Você poderá reativá-la a qualquer momento pelo Arquivo Morto.`
+                );
+                if (!ok) {
+                    document.getElementById('crmEngravidou').checked = false;
+                    document.getElementById('crmDesistiu').checked   = false;
+                    statusEl.textContent = '';
+                    return;
+                }
+            }
+
             statusEl.textContent = 'Salvando...';
             statusEl.style.color = 'var(--muted)';
 
@@ -4769,7 +4859,6 @@
             const valorStr = document.getElementById('crmValor').value;
             const valorNum = parseValorFloat(valorStr);
 
-            // Se campos restritos, preservar valores existentes
             const record = {
                 paciente_key:    crmModalKey,
                 contato1_data:   inputDateToDDMMYYYY(c1Raw),
@@ -4783,13 +4872,13 @@
                 projeto_ana:     document.getElementById('crmProjetoAna').checked,
                 observacoes:     document.getElementById('crmObs').value,
                 classificacao:   document.getElementById('crmClassificacao').value,
+                engravidou,
+                desistiu,
             };
 
-            // Atualiza estado local imediatamente (optimistic update)
             crmMap[crmModalKey] = record;
             crmSaveLocal();
 
-            // Salvar no servidor (no-cors por limitação do Apps Script)
             if (CRM_SCRIPT_URL) {
                 fetch(CRM_SCRIPT_URL, {
                     method: 'POST',
@@ -4804,6 +4893,7 @@
             setTimeout(() => {
                 closeCRMModal();
                 renderKanban();
+                renderArquivoMorto();
                 _dirtyDoadoras = true;
             }, 400);
         }
@@ -4846,6 +4936,101 @@
             } catch(e) {
                 console.warn('Delete fetch failed:', e.message);
             }
+        }
+
+        // ===================== ARQUIVO MORTO =====================
+
+        function onArquivoCheck(tipo) {
+            if (tipo === 'engravidou' && document.getElementById('crmEngravidou').checked) {
+                document.getElementById('crmDesistiu').checked = false;
+            } else if (tipo === 'desistiu' && document.getElementById('crmDesistiu').checked) {
+                document.getElementById('crmEngravidou').checked = false;
+            }
+        }
+
+        function reativarPaciente(key) {
+            const patient = pendPatients.find(p => normalizeKey(p.pac) === key);
+            const nome    = patient?.pac || key;
+            const ok = confirm(
+                `Reativar "${nome}"?\n\n` +
+                `Ela voltará para o CRM Comercial.`
+            );
+            if (!ok) return;
+
+            const record = { ...(crmMap[key] || {}), engravidou: false, desistiu: false, paciente_key: key };
+            crmMap[key] = record;
+            crmSaveLocal();
+
+            if (CRM_SCRIPT_URL) {
+                fetch(CRM_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(record),
+                }).catch(e => console.warn('CRM reativar error:', e));
+            }
+
+            renderKanban();
+            renderArquivoMorto();
+        }
+
+        function renderArquivoCard(patient, crm, safeKey, borderColor) {
+            const valor    = fmtValor(crm?.valor);
+            const vend     = crm?.vendedora || '';
+            const obs      = crm?.observacoes || '';
+            const obsShort = obs.length > 60 ? obs.slice(0, 60) + '…' : obs;
+            const clas     = crm?.classificacao || '';
+            const dataLine = patient.dataAp ? `1ª vez: ${patient.dataAp}` : '';
+            return `
+                <div class="arquivo-card" style="border-left-color:${borderColor}">
+                    <div class="arquivo-card-name">${patient.pac}</div>
+                    <div class="arquivo-card-sub">${patient.prof}${dataLine ? ' · ' + dataLine : ''}</div>
+                    ${clas   ? `<div class="arquivo-card-sub">🏷️ ${clas}</div>` : ''}
+                    ${vend   ? `<div class="arquivo-card-sub">👤 ${vend}</div>` : ''}
+                    ${valor !== '—' ? `<div class="arquivo-card-sub">💰 ${valor}</div>` : ''}
+                    ${obsShort ? `<div class="arquivo-card-obs">💬 ${obsShort}</div>` : ''}
+                    <button class="arquivo-reativar-btn" onclick="reativarPaciente('${safeKey}')">↩ Reativar para o CRM</button>
+                </div>`;
+        }
+
+        function renderArquivoMorto() {
+            const board = document.getElementById('arquivoMortoBoard');
+            if (!board) return;
+
+            const engravidaram = [];
+            const desistiram   = [];
+
+            pendPatients.forEach(p => {
+                const crm = crmMap[normalizeKey(p.pac)] || {};
+                if      (crm.engravidou === true || crm.engravidou === 'TRUE') engravidaram.push({ patient: p, crm });
+                else if (crm.desistiu   === true || crm.desistiu   === 'TRUE') desistiram.push({ patient: p, crm });
+            });
+
+            const total  = engravidaram.length + desistiram.length;
+            const badge  = document.getElementById('tabBadgeArquivo');
+            if (badge) { badge.textContent = total; badge.style.display = total ? '' : 'none'; }
+
+            const renderSecao = (titulo, cor, lista) => {
+                const count = lista.length;
+                const cardsHtml = count
+                    ? lista.map(({ patient, crm }) => {
+                        const key = normalizeKey(patient.pac);
+                        return renderArquivoCard(patient, crm, key.replace(/'/g, "\\'"), cor);
+                    }).join('')
+                    : `<div class="crm-empty-col" style="text-align:center;padding:20px 0">Nenhuma paciente aqui</div>`;
+                return `
+                    <div class="arquivo-section">
+                        <div class="arquivo-section-title" style="color:${cor}">
+                            ${titulo}
+                            <span class="arquivo-section-count">${count}</span>
+                        </div>
+                        <div class="arquivo-cards-grid">${cardsHtml}</div>
+                    </div>`;
+            };
+
+            board.innerHTML =
+                renderSecao('🤰 Engravidou', '#10b981', engravidaram) +
+                renderSecao('🚫 Desistiu',   '#94a3b8', desistiram);
         }
 
         // ===================== DOADORAS/RECEPTORAS =====================

@@ -40,7 +40,8 @@ const CRM_LOG_SHEET  = 'CRM_Log';
 const CRM_HEADERS = [
   'paciente_key','contato1_data','contato2_data',
   'vendedora','valor','retorno_marcado','proposta_feita',
-  'parc_pago','quitado','projeto_ana','observacoes','classificacao','ultima_atualizacao'
+  'parc_pago','quitado','projeto_ana','observacoes','classificacao',
+  'engravidou','desistiu','ultima_atualizacao'
 ];
 const LOG_HEADERS = [
   'timestamp','acao','paciente_key','usuario',
