@@ -1008,30 +1008,34 @@
         .badge-gray   { background: rgba(148,163,184,0.15); color: #94a3b8; }
 
         /* Arquivo Morto */
-        .arquivo-section { margin-bottom: 32px; }
+        .arquivo-board {
+            display: flex; gap: 16px; align-items: flex-start; overflow-x: auto;
+        }
+        .arquivo-section {
+            flex: 0 0 300px; background: var(--surface2);
+            border-radius: 12px; padding: 14px 12px; min-height: 120px;
+        }
         .arquivo-section-title {
-            font-size: 15px; font-weight: 700; margin-bottom: 14px;
+            font-size: 13px; font-weight: 700; margin-bottom: 12px;
             padding-bottom: 8px; border-bottom: 1px solid var(--border);
             display: flex; align-items: center; gap: 8px;
         }
         .arquivo-section-count {
-            font-size: 11px; font-weight: 600; background: var(--surface2);
+            font-size: 11px; font-weight: 600; background: var(--surface);
             color: var(--muted); padding: 2px 8px; border-radius: 10px;
         }
-        .arquivo-cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 12px;
+        .arquivo-cards-col {
+            display: flex; flex-direction: column; gap: 10px;
         }
         .arquivo-card {
-            background: var(--surface2); border-radius: 10px;
+            background: var(--surface); border-radius: 10px;
             border-left: 3px solid var(--border);
             padding: 12px 14px; cursor: pointer;
             transition: transform .15s, box-shadow .15s;
         }
         .arquivo-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.25); }
         .arquivo-card-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
-        .arquivo-card-sub  { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+        .arquivo-card-sub  { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
         .arquivo-card-obs  { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 6px; }
         .arquivo-reativar-btn {
             margin-top: 10px; width: 100%; padding: 5px 0;
@@ -5017,20 +5021,21 @@
                         const key = normalizeKey(patient.pac);
                         return renderArquivoCard(patient, crm, key.replace(/'/g, "\\'"), cor);
                     }).join('')
-                    : `<div class="crm-empty-col" style="text-align:center;padding:20px 0">Nenhuma paciente aqui</div>`;
+                    : `<div class="crm-empty-col" style="text-align:center;padding:20px 0;color:var(--muted);font-size:12px">Nenhuma paciente aqui</div>`;
                 return `
                     <div class="arquivo-section">
                         <div class="arquivo-section-title" style="color:${cor}">
                             ${titulo}
                             <span class="arquivo-section-count">${count}</span>
                         </div>
-                        <div class="arquivo-cards-grid">${cardsHtml}</div>
+                        <div class="arquivo-cards-col">${cardsHtml}</div>
                     </div>`;
             };
 
-            board.innerHTML =
-                renderSecao('🤰 Engravidou', '#10b981', engravidaram) +
-                renderSecao('🚫 Desistiu',   '#94a3b8', desistiram);
+            board.innerHTML = `<div class="arquivo-board">
+                ${renderSecao('🤰 Engravidou', '#10b981', engravidaram)}
+                ${renderSecao('🚫 Desistiu',   '#94a3b8', desistiram)}
+            </div>`;
         }
 
         // ===================== DOADORAS/RECEPTORAS =====================
