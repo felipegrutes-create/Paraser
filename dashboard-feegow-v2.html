@@ -183,6 +183,16 @@
         .tab.tab-donor.active { background: rgba(236,72,153,0.18); color: var(--accent); }
         .tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:17px; height:17px; border-radius:999px; background:#ec4899; color:#fff; font-size:10px; font-weight:700; padding:0 4px; margin-left:6px; line-height:1; vertical-align:middle; }
 
+        /* CRM header fixo */
+        .crm-sticky-header {
+            position: sticky;
+            top: 108px; /* header(62px) + tabs(46px) */
+            z-index: 50;
+            background: var(--bg);
+            padding-bottom: 14px;
+            margin-bottom: 4px;
+        }
+
         /* Tab groups com dropdown */
         .tab-group { position: relative; display: inline-flex; }
         .tab-group-trigger { display: flex; align-items: center; gap: 5px; }
@@ -2642,51 +2652,53 @@
 
         <!-- PENDENTES CRM KANBAN -->
         <section id="sec-pend" class="section">
-            <p class="section-title">CRM Comercial — Acompanhamento de Pacientes</p>
 
-            <!-- KPI cards (mantidos do original) -->
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="value" id="pend-total">—</div>
-                    <div class="label">Total no Board</div>
+            <!-- Cabeçalho fixo: título + KPIs + filtros -->
+            <div class="crm-sticky-header">
+                <p class="section-title" style="margin-bottom:12px">CRM Comercial — Acompanhamento de Pacientes</p>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="value" id="pend-total">—</div>
+                        <div class="label">Total no Board</div>
+                    </div>
+                    <div class="kpi-card red">
+                        <div class="value" id="pend-sem-ret">—</div>
+                        <div class="label">Sem Retorno</div>
+                    </div>
+                    <div class="kpi-card teal">
+                        <div class="value" id="pend-com-ret">—</div>
+                        <div class="label">Com Retorno</div>
+                    </div>
+                    <div class="kpi-card orange">
+                        <div class="value" id="pend-critico">—</div>
+                        <div class="label">Críticos (&gt;180 dias)</div>
+                    </div>
                 </div>
-                <div class="kpi-card red">
-                    <div class="value" id="pend-sem-ret">—</div>
-                    <div class="label">Sem Retorno</div>
-                </div>
-                <div class="kpi-card teal">
-                    <div class="value" id="pend-com-ret">—</div>
-                    <div class="label">Com Retorno</div>
-                </div>
-                <div class="kpi-card orange">
-                    <div class="value" id="pend-critico">—</div>
-                    <div class="label">Críticos (&gt;180 dias)</div>
+
+                <div class="search-box" style="margin-top:14px">
+                    <div style="position:relative;flex:1">
+                        <input type="text" id="kanbSearch" placeholder="Buscar paciente..." oninput="debounceKanban()" style="width:100%;padding-right:32px">
+                        <button onclick="document.getElementById('kanbSearch').value='';renderKanban()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px" title="Limpar busca">✕</button>
+                    </div>
+                    <select id="kanbProf" onchange="renderKanban()">
+                        <option value="">Todos os profissionais</option>
+                    </select>
+                    <select id="kanbAno" onchange="renderKanban()">
+                        <option value="">Todos os anos</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                    <select id="kanbVend" onchange="renderKanban()">
+                        <option value="">Todos os closers</option>
+                        <option value="Alice Valentim">Alice Valentim</option>
+                        <option value="Isabela Peres">Isabela Peres</option>
+                        <option value="Rayssa Guedes">Rayssa Guedes</option>
+                    </select>
                 </div>
             </div>
 
-            <!-- Filtros -->
-            <div class="search-box" style="margin-bottom:16px">
-                <div style="position:relative;flex:1">
-                    <input type="text" id="kanbSearch" placeholder="Buscar paciente..." oninput="debounceKanban()" style="width:100%;padding-right:32px">
-                    <button onclick="document.getElementById('kanbSearch').value='';renderKanban()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px" title="Limpar busca">✕</button>
-                </div>
-                <select id="kanbProf" onchange="renderKanban()">
-                    <option value="">Todos os profissionais</option>
-                </select>
-                <select id="kanbAno" onchange="renderKanban()">
-                    <option value="">Todos os anos</option>
-                    <option value="2025">2025</option>
-                    <option value="2026">2026</option>
-                </select>
-                <select id="kanbVend" onchange="renderKanban()">
-                    <option value="">Todos os closers</option>
-                    <option value="Alice Valentim">Alice Valentim</option>
-                    <option value="Isabela Peres">Isabela Peres</option>
-                    <option value="Rayssa Guedes">Rayssa Guedes</option>
-                </select>
-            </div>
-
-            <!-- Board Kanban -->
+            <!-- Board Kanban — rola livremente -->
             <div class="kanban-board" id="kanbanBoard"></div>
         </section>
 
