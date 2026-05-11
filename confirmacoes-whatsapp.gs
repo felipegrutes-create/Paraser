@@ -593,15 +593,25 @@ var IDS_JOSELMO_RADIO = [307];
 // TODO: identificar procId online de Sara se existir
 var IDS_SARA = [257];
 
-// procIds de consultas ONLINE — confirmados via tela do Feegow em 04/05/2026
-// procId=252: "CONSULTA 1ª VEZ - Online" (Rodolfo)
-// procId=256: "CONSULTA - Online" (Priscila, Rodolfo, Marcelle e outros)
-// procId=322: "CONVERSA RECEPTORA - Online" (Bianca)
-// procId=323: "CONVERSA DOADORA - Online" (Bianca)
-// procId=347: "CONSULTA ONLINE" (Rodolfo 05/05/2026) — resolve o TODO do procId=168
-// procId=251: "CONSULTA - Online" (Priscila 07/05/2026 11:00) — confirmado por agendamento real
-// procId=255: "CONSULTA DE RETORNO - Presencial" → NÃO é online, não incluir aqui
-var IDS_ONLINE_PROCS = [251, 252, 256, 322, 323, 347];
+// procIds de TODOS os procedimentos com "Online" no nome (fonte: /procedures/list).
+// Serve como fallback caso a busca de nomes (carregarNomesProcedimentos) falhe —
+// senão a regra `proc.indexOf('ONLINE')` no resolveTemplateKey já cobre tudo.
+// 33  = CONSULTA DE RETORNO - Online        | 37  = CONSULTA UROLOGISTA DR. HELCE - Online
+// 247-254, 266 = CONSULTA 1ª VEZ ... - Online (vários médicos / projetos)
+// 256 = CONSULTA - Online                   | 257 = CONSULTA PSICÓLOGA - Online
+// 262 = CONSULTA NUTRICIONISTA - Online     | 280,282,283,285 = 1ª VEZ Mario/Bruna - Online
+// 309,310,311 = GINECO/UROLOGISTA - Online  | 318,319,349 = JOSELMO - Online
+// 322 = CONVERSA RECEPTORA - Online         | 323 = CONVERSA DOADORA - Online
+// 327,331,333,334,337,338,341,342,347 = CONSULTA ONLINE - <médico> (e PROJETO ANA)
+// (procedimentos "...Presencial" NÃO entram aqui)
+var IDS_ONLINE_PROCS = [
+  33, 37,
+  247, 248, 249, 250, 251, 252, 253, 254, 256, 257, 262, 266,
+  280, 282, 283, 285,
+  309, 310, 311, 318, 319,
+  322, 323,
+  327, 331, 333, 334, 337, 338, 341, 342, 347, 349
+];
 
 // procIds de procedimentos que NÃO recebem confirmação por WhatsApp:
 // punção de óvulos, transferência, aspiração de cisto, PRP,
