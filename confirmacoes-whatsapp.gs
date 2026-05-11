@@ -613,29 +613,37 @@ var IDS_ONLINE_PROCS = [
   327, 331, 333, 334, 337, 338, 341, 342, 347, 349
 ];
 
-// procIds de procedimentos que NÃO recebem confirmação por WhatsApp:
-// punção de óvulos, transferência, aspiração de cisto, PRP,
-// EMBRION, PRIMORDIA, ORIGEN, SP — e qualquer outro cirúrgico/clínico sem aviso.
-// Execute debugProcsSemConfirmacao() para descobrir os IDs e adicione-os aqui.
-// procId=89:  Punção De Óvulos / Punção Doadora / 1ª Tec Primórdia (confirmado)
-// procId=91:  2ª Tec Embrion (confirmado 21/01/2025)
-// procId=120: Aspiração De Cisto (confirmado 09/02/2026 — 11:30 Rodolfo)
-// procId=127: PRP (confirmado 27/01/2025)
-// procId=139: SP — 1ª/2ª Tec Sp (confirmado 11/04/2026)
-// procId=234: 2ª Tec Embrion - Dr. Rodolfo Salvato (variante recente)
-// procId=265: Origen — 2ª Tec Laboratório Origen (confirmado 26/03/2026)
-// procId=93:  1ª TEC (Rodolfo 04/05/2026 12:30)
-// procId=87:  Coleta Preventivo (Marcelle 28/04/2026)
-// procId=176: Avaliação Doadora (Bianca Salvato) — sem confirmação
-// procId=268: FOT Receptora (Érica Freitas Cardoso) — sem confirmação
-// TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
-// procId=88:  Colocação DIU (Joselmo 20/04/2026)
-// procId=90:  Punção de Óvulos (Rodolfo 02/03/2026)
-// procId=147: PESA (Mario 29/04/2026)
-// procId=267: FOT Receptora (Érica Freitas Cardoso 08/04/2026)
-// OBS: procId=75 foi REMOVIDO desta lista — é "USG PREPARO TEC 3 - Natural"
-//      (não era slot vazio); agora vai para ULTRAS_TRATAMENTO.
-var IDS_SEM_CONFIRMACAO = [87, 88, 89, 90, 91, 93, 120, 127, 139, 147, 176, 234, 265, 267, 268];
+// procIds de procedimentos que NÃO recebem confirmação por WhatsApp.
+// (A regra por nome em resolveTemplateKey já barra qualquer "...TEC..." que não
+//  seja "USG PREPARO TEC..."; esta lista é o override garantido / fallback.)
+//
+// PUNÇÃO:
+//   89 = PUNÇÃO DE ÓVULOS | 90 = PUNÇÃO DE ÓVULOS - DOADORA
+// TEC / TRANSFERÊNCIA DE EMBRIÃO (todas as variantes, fonte /procedures/list):
+//   93  = 1ª TEC
+//   124 = 2ª TEC - SP                  | 139 = 1° TEC - SP
+//   138 = TEC EMBRIÃO DOADO - Rodolfo  | 225,226 = TEC EMBRIÃO DOADO - Priscila
+//   143 = TEC (EMBRIÃO FORMADO COM OUTRO MÉDICO) - Rodolfo
+//   232 = ... - Priscila               | 233 = ... - Marcelle
+//   234 = 2ª TEC EMBRION - Rodolfo     | 235 = ... - Priscila | 236 = ... - Marcelle
+//   305 = 2ª TEC EMBRION - Bruna       | 346 = 2ª TEC EMBRION - Joselmo
+//   202 = 2ª TEC EMBRION (PROJETO ANA) - Rodolfo | 227 = ... - Priscila
+//   228 = ... - Marcelle               | 304 = ... - Mario
+//   258 = 1ª TEC - LAB. ORIGEN         | 259 = 1ª TEC - LAB. PRIMÓRDIA
+//   264 = 2ª TEC - LAB. PRIMÓRDIA      | 265 = 2ª TEC - LAB. ORIGEN
+//   91  = 2ª Tec Embrion (variante antiga)
+// OUTROS (cirúrgico/clínico sem aviso):
+//   120 = Aspiração De Cisto | 127 = PRP | 147 = PESA | 88 = Colocação DIU
+//   87  = Coleta Preventivo  | 176 = Avaliação Doadora | 267,268 = FOT Receptora
+// OBS: procId=75 ("USG PREPARO TEC 3 - Natural") NÃO entra aqui — vai p/ ULTRAS_TRATAMENTO.
+var IDS_SEM_CONFIRMACAO = [
+  87, 88, 89, 90, 91, 93,
+  120, 124, 127, 138, 139, 143, 147,
+  176,
+  202, 225, 226, 227, 228, 232, 233, 234, 235, 236,
+  258, 259, 264, 265, 267, 268,
+  304, 305, 346
+];
 
 // procIds de Conversa com Receptora (Bianca Salvato)
 // procId=35:  CONVERSA RECEPTORA - Presencial (Bianca 04/05/2026 10:00)
@@ -674,12 +682,12 @@ function resolveTemplateKey(ag) {
   // Itens de cobrança/honorário/pacote — não são agendamentos de exame
   if (proc.includes('HONORARIO') || proc.includes('HONORÁRIO') || proc.startsWith('PACOTE'))      return null;
   if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                                      return 'INJURIA';
-  // TEC / punção — sem confirmação
+  // TEC (transferência de embrião) / punção — NUNCA recebem confirmação.
+  // Qualquer "...TEC..." cai aqui, EXCETO "USG PREPARO TEC..." (contém "PREPARO").
   if (proc.includes('PUNÇÃO') || proc.includes('PUNCAO'))                                         return null;
-  if (proc.match(/\bTEC\b/) && !proc.includes('PREPARO TEC'))                                     return null;
-  if (proc.includes('EMBRIÃO') || proc.includes('EMBRIAO'))                                       return null;
-  if (proc.includes('PRIMÓRDIA') || proc.includes('PRIMORDIA'))                                   return null;
-  if (proc.includes('ORIGEN'))                                                                     return null;
+  if (proc.indexOf('TEC') >= 0 && proc.indexOf('PREPARO') < 0)                                    return null;
+  if (proc.includes('EMBRIÃO') || proc.includes('EMBRIAO') || proc.includes('EMBRION'))           return null;
+  if (proc.includes('PRIMÓRDIA') || proc.includes('PRIMORDIA') || proc.includes('ORIGEN'))        return null;
   // USG obstétrica
   if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))            return 'ULTRAS_OBSTETRICA';
   if (proc.includes('POS BETA') || proc.includes('PÓS BETA') || proc.includes('PÓS-BETA'))        return 'ULTRAS_OBSTETRICA';
