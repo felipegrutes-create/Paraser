@@ -2202,90 +2202,84 @@
         .salas-legend-dot {
             width: 10px; height: 10px; border-radius: 3px;
         }
-        .salas-grid-wrap {
-            overflow-x: auto;
-            border-radius: 12px;
+        .salas-time-slider {
+            -webkit-appearance: none; appearance: none;
+            width: 180px; height: 6px; border-radius: 3px;
+            background: var(--surface2); border: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .salas-time-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: var(--accent); cursor: pointer; border: 2px solid var(--surface);
+        }
+        .salas-time-slider::-moz-range-thumb {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: var(--accent); cursor: pointer; border: 2px solid var(--surface);
+        }
+        .salas-fp-wrap { overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px; }
+        .salas-floorplan {
+            display: grid;
+            grid-template-columns: repeat(8, minmax(98px, 1fr));
+            grid-auto-rows: 80px;
+            gap: 6px;
+            min-width: 840px;
+            grid-template-areas:
+                "esperaVIP esperaVIP psico     reproH    gineco    concierge adm       gerencia"
+                "enferm1   drRodolfo drRodolfo usgErica  usgErica  esperaGer esperaGer caixa"
+                "enferm1   drRodolfo drRodolfo usgGen    usgGen    esperaGer esperaGer wcMF"
+                "enferm2   usgDrSalv usgDrSalv enferm3   multiuso  recepcao  recepcao  wcPCD"
+                "drJoselmo drJoselmo fisioAcup fisioAcup multiuso  recepcao  recepcao  lounge"
+                "drJoselmo drJoselmo almox     copa      vestiario hallGr    hallGr    elevad"
+                "procedim  procedim  almox     dml       vestiario hallGr    hallGr    areaADM";
+        }
+        .salas-room {
+            border-radius: 8px;
             border: 1px solid var(--border);
-        }
-        .salas-grid {
-            border-collapse: collapse;
-            min-width: 100%;
-            font-size: 12px;
-        }
-        .salas-grid th {
-            background: var(--surface);
-            padding: 8px 12px;
-            text-align: center;
-            font-weight: 600;
+            padding: 6px 8px;
+            display: flex; flex-direction: column; gap: 2px;
+            overflow: hidden;
             font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--muted);
-            border: 1px solid var(--border);
-            white-space: nowrap;
-            position: sticky;
-            top: 0;
-            z-index: 2;
+            transition: transform 0.08s;
         }
-        .salas-grid th.sala-header {
-            color: var(--accent);
-            font-size: 12px;
-            min-width: 160px;
+        .salas-room-name {
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.3px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .salas-grid td.time-col {
+        .salas-room-aux {
             background: var(--surface);
-            color: var(--muted);
-            font-size: 11px;
-            font-weight: 600;
-            padding: 0 8px;
-            text-align: right;
-            white-space: nowrap;
-            border: 1px solid var(--border);
-            position: sticky;
-            left: 0;
-            z-index: 1;
-            min-width: 50px;
-        }
-        .salas-grid td.sala-cell {
-            border: 1px solid var(--border);
-            vertical-align: top;
-            padding: 0;
-            min-width: 160px;
-            height: 36px;
-        }
-        .salas-grid td.sala-cell.has-appt {
-            background: rgba(0,212,170,0.06);
-        }
-        .salas-appt-block {
-            padding: 4px 8px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            gap: 1px;
+            border-color: var(--border);
             cursor: default;
-            border-left: 3px solid var(--accent);
         }
-        .salas-appt-block.status-atendido   { border-color: #10b981; background: rgba(16,185,129,0.08); }
-        .salas-appt-block.status-aguardando { border-color: #f59e0b; background: rgba(245,158,11,0.07); }
-        .salas-appt-block.status-cancelado  { border-color: #ef4444; background: rgba(239,68,68,0.07); opacity: 0.6; }
-        .salas-appt-name {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 150px;
+        .salas-room-aux .salas-room-name { color: var(--muted); opacity: 0.8; }
+        .salas-room-free {
+            background: rgba(16,185,129,0.10);
+            border-color: rgba(16,185,129,0.45);
+            cursor: help;
         }
-        .salas-appt-meta {
-            font-size: 10px;
-            color: var(--muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 150px;
+        .salas-room-free:hover { transform: scale(1.02); }
+        .salas-room-free .salas-room-name { color: #10b981; }
+        .salas-room-busy {
+            background: rgba(239,68,68,0.13);
+            border-color: rgba(239,68,68,0.5);
+            cursor: help;
         }
+        .salas-room-busy:hover { transform: scale(1.02); }
+        .salas-room-busy .salas-room-name { color: #ef4444; }
+        .salas-room-status { font-size: 10px; color: #10b981; font-weight: 600; opacity: 0.8; }
+        .salas-room-appt {
+            font-size: 10px; color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            line-height: 1.35;
+        }
+        .salas-room-appt .salas-room-prof { color: var(--muted); }
+        .salas-room-more { color: var(--muted); font-style: italic; }
+        .salas-summary {
+            display: flex; gap: 18px; flex-wrap: wrap;
+            font-size: 13px; color: var(--muted);
+        }
+        .salas-summary b { color: var(--text); }
         .salas-empty {
             text-align: center;
             padding: 60px 20px;
@@ -2868,16 +2862,20 @@
 
         <!-- MAPA DE SALAS -->
         <section id="sec-salas" class="section">
-            <p class="section-title">🗺️ Mapa de Salas — Grade de Horários</p>
+            <p class="section-title">🗺️ Mapa de Salas</p>
             <div class="salas-controls">
                 <button class="salas-nav-btn" onclick="salasNavDate(-1)">‹</button>
                 <span class="salas-date-label" id="salasDateLabel">—</span>
                 <button class="salas-nav-btn" onclick="salasNavDate(+1)">›</button>
                 <input type="date" class="salas-date-input" id="salasDatePicker" oninput="salasSetDate(this.value)">
+                <span style="font-size:13px;color:var(--muted);margin-left:8px;">⏱</span>
+                <input type="range" class="salas-time-slider" id="salasTimeSlider" min="0" max="26" step="1" value="6" oninput="salasSetTime(this.value)">
+                <span class="salas-date-label" id="salasTimeLabel" style="min-width:96px;">—</span>
+                <button class="salas-nav-btn" onclick="salasSetNow()" title="Hoje, neste horário" style="font-size:12px;">⏱ Agora</button>
                 <div class="salas-legend">
-                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#10b981"></div> Atendido</div>
-                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#f59e0b"></div> Aguardando</div>
-                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#ef4444"></div> Cancelado</div>
+                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#10b981"></div> Livre</div>
+                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#ef4444"></div> Ocupada</div>
+                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#475569"></div> Apoio</div>
                 </div>
             </div>
             <div id="salasGrid"></div>
@@ -5316,12 +5314,24 @@
         }
 
         // ===================== MAPA DE SALAS =====================
-        let _salasDate = null; // YYYY-MM-DD
+        let _salasDate = null;   // YYYY-MM-DD
+        let _salasSlot = null;   // índice 0..26 → 07:00 .. 20:00 (passos de 30 min)
+
+        function salasSlotMin(idx) { return 7*60 + idx*30; }
+        function salasFmtMin(m) { const h=Math.floor(m/60), mm=m%60; return String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
 
         function salasInitDate() {
             if (!_salasDate) {
-                const d = new Date();
-                _salasDate = d.toISOString().slice(0, 10);
+                _salasDate = new Date().toISOString().slice(0, 10);
+            }
+            if (_salasSlot === null) {
+                const now = new Date();
+                if (_salasDate === now.toISOString().slice(0,10)) {
+                    const m = now.getHours()*60 + now.getMinutes();
+                    _salasSlot = Math.min(26, Math.max(0, Math.round((m - 7*60)/30)));
+                } else {
+                    _salasSlot = 4; // 09:00
+                }
             }
         }
 
@@ -5332,9 +5342,82 @@
             _salasDate = d.toISOString().slice(0, 10);
             renderMapaSalas();
         }
+        function salasSetDate(val) { if (val) { _salasDate = val; renderMapaSalas(); } }
+        function salasSetTime(idx) { _salasSlot = Math.max(0, Math.min(26, parseInt(idx)||0)); renderMapaSalas(); }
+        function salasSetNow() {
+            const now = new Date();
+            _salasDate = now.toISOString().slice(0,10);
+            const m = now.getHours()*60 + now.getMinutes();
+            _salasSlot = Math.min(26, Math.max(0, Math.round((m - 7*60)/30)));
+            renderMapaSalas();
+        }
 
-        function salasSetDate(val) {
-            if (val) { _salasDate = val; renderMapaSalas(); }
+        // Layout do mapa (corresponde ao grid-template-areas no CSS). clinical=true recebe cor verde/vermelho.
+        const SALAS_LAYOUT = [
+            { area:'drRodolfo', nome:'Sala Dr. Rodolfo',     clinical:true },
+            { area:'usgDrSalv', nome:'Sala USG Dr. Salvato',  clinical:true },
+            { area:'drJoselmo', nome:'Sala Dr. Joselmo',      clinical:true },
+            { area:'procedim',  nome:'Sala Procedimento',     clinical:true },
+            { area:'usgErica',  nome:'Sala USG',              clinical:true },
+            { area:'usgGen',    nome:'Sala USG 2',            clinical:true },
+            { area:'reproH',    nome:'Sala Reprodução H.',    clinical:true },
+            { area:'gineco',    nome:'Sala Ginecologia',      clinical:true },
+            { area:'psico',     nome:'Sala Psicologia',       clinical:true },
+            { area:'fisioAcup', nome:'Sala Físio e Acup.',    clinical:true },
+            { area:'enferm1',   nome:'Enfermagem 1',          clinical:true },
+            { area:'enferm2',   nome:'Enfermagem 2',          clinical:true },
+            { area:'enferm3',   nome:'Enfermagem 3',          clinical:true },
+            { area:'esperaVIP', nome:'Espera VIP',            clinical:false },
+            { area:'esperaGer', nome:'Espera Geral',          clinical:false },
+            { area:'recepcao',  nome:'Recepção / Entrada',    clinical:false },
+            { area:'concierge', nome:'Concierge',             clinical:false },
+            { area:'adm',       nome:'ADM',                   clinical:false },
+            { area:'caixa',     nome:'Caixa',                 clinical:false },
+            { area:'gerencia',  nome:'Gerência',              clinical:false },
+            { area:'copa',      nome:'Copa',                  clinical:false },
+            { area:'lounge',    nome:'Lounge Café',           clinical:false },
+            { area:'vestiario', nome:'Vestiário',             clinical:false },
+            { area:'almox',     nome:'Almoxarifado',          clinical:false },
+            { area:'dml',       nome:'DML',                   clinical:false },
+            { area:'multiuso',  nome:'Multiuso / Espera',     clinical:false },
+            { area:'wcMF',      nome:'WC M / F',              clinical:false },
+            { area:'wcPCD',     nome:'WC PCD',                clinical:false },
+            { area:'hallGr',    nome:'Hall / Espera',         clinical:false },
+            { area:'elevad',    nome:'Elevadores',            clinical:false },
+            { area:'areaADM',   nome:'Área ADM',              clinical:false },
+        ];
+
+        // Dado um agendamento, retorna lista de áreas-alvo (round-robin se >1) ou null se não ocupa sala física.
+        function salasRotaAgendamento(prof, proc) {
+            const P = (prof||'').toUpperCase();
+            const C = (proc||'').toUpperCase();
+            if (C.includes('ONLINE')) return null;                          // online não ocupa sala
+            if (C.includes('ACUPUNTURA') || C.includes('FISIO') || P.includes('CRISTIANE')) return ['fisioAcup'];
+            if (C.includes('PSIC') || P.includes('SARA'))                   return ['psico'];
+            if (C.match(/\bTEC\b/) && !C.includes('PREPARO TEC'))           return ['procedim'];
+            if (C.includes('PUNÇÃO')||C.includes('PUNCAO')||C.includes('INJÚR')||C.includes('INJUR')||
+                C.includes('FILGRASTIM')||C.includes('PRP')||C.includes('DIU')||C.includes('PESA')||
+                C.includes('ASPIRAÇÃO')||C.includes('ASPIRACAO')||C.includes('EMBRION')||C.includes('EMBRIÃO')||
+                C.includes('FOT ')||C.includes('ORIGEN')||C.includes('PRIMÓRDIA')||C.includes('PRIMORDIA'))
+                return ['procedim'];
+            if (C.includes('COLETA')||C.includes('PREVENTIVO')||C.includes('VITAMINA')||C.includes('ENFERMAGEM'))
+                return ['enferm1','enferm2','enferm3'];
+            // USG sempre em sala de USG
+            if (C.includes('USG')||C.includes('ULTRASSOM')||C.includes('ULTRASSONOG')) {
+                if (P.includes('RODOLFO'))                  return ['usgDrSalv'];
+                if (P.includes('ÉRICA')||P.includes('ERICA')) return ['usgErica'];
+                return ['usgErica','usgGen'];
+            }
+            // por médico
+            if (P.includes('JOSELMO'))                      return ['drJoselmo'];
+            if (P.includes('RODOLFO'))                      return ['drRodolfo'];
+            if (P.includes('BIANCA'))                       return ['usgDrSalv'];   // conversa receptora/doadora
+            if (P.includes('ÉRICA')||P.includes('ERICA'))   return ['usgErica'];
+            if (P.includes('PRISCIL')||P.includes('MARCELLE')||P.includes('MARIO')||P.includes('MÁRIO')||
+                P.includes('BRUNA')||P.includes('HELCE')||P.includes('MAGALI')||P.includes('ANA CAROL'))
+                return ['reproH','gineco'];
+            if (C.includes('CONSULTA'))                     return ['reproH','gineco'];  // consulta genérica
+            return null;
         }
 
         function renderMapaSalas() {
@@ -5342,113 +5425,92 @@
             const container = document.getElementById('salasGrid');
             if (!container) return;
 
-            // Sync controls
+            // sincroniza controles de data
             const picker = document.getElementById('salasDatePicker');
             if (picker) picker.value = _salasDate;
             const [yr, mo, dy] = _salasDate.split('-');
             const dtObj = new Date(_salasDate + 'T12:00:00');
             const diasSemana = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
             const mesesNome  = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-            const label = document.getElementById('salasDateLabel');
-            if (label) label.textContent = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
+            const dLabel = document.getElementById('salasDateLabel');
+            if (dLabel) dLabel.textContent = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
+            // sincroniza controles de horário
+            const slider = document.getElementById('salasTimeSlider');
+            if (slider) { slider.max = 26; slider.value = _salasSlot; }
+            const slotMin = salasSlotMin(_salasSlot);
+            const tLabel = document.getElementById('salasTimeLabel');
+            if (tLabel) tLabel.textContent = salasFmtMin(slotMin) + '–' + salasFmtMin(slotMin+30);
 
             if (!gRaw.length) {
                 container.innerHTML = '<div class="salas-empty">Aguardando dados dos agendamentos...</div>';
                 return;
             }
 
-            // Filter rows for this date (DD/MM/YYYY format)
-            const dateFmt = dy + '/' + mo + '/' + yr;
+            const dateFmt = dy + '/' + mo + '/' + yr; // DD/MM/YYYY
             const dayRows = gRaw.filter(r => (r[gC.data] || '').trim() === dateFmt);
 
-            if (!dayRows.length) {
-                container.innerHTML = '<div class="salas-empty">Nenhum agendamento para este dia.</div>';
-                return;
-            }
-
-            // Collect rooms (normalize empty → "Sem sala")
-            const roomSet = new Set();
+            // aloca agendamentos do SLOT selecionado nas salas
+            const roomAppts = {}; SALAS_LAYOUT.forEach(s => roomAppts[s.area] = []);
+            const rr = {};   // contadores round-robin (chave = grupo de salas)
+            let totalDia = 0, totalSlot = 0;
             dayRows.forEach(r => {
-                const loc = (r[gC.local] || '').trim() || 'Sem sala';
-                roomSet.add(loc);
-            });
-            const rooms = [...roomSet].sort((a, b) => {
-                if (a === 'Sem sala') return 1;
-                if (b === 'Sem sala') return -1;
-                return a.localeCompare(b, 'pt-BR');
-            });
-
-            // Build time slots 07:00 – 20:00 every 30 min
-            const slots = [];
-            for (let h = 7; h <= 20; h++) {
-                slots.push(String(h).padStart(2,'0') + ':00');
-                if (h < 20) slots.push(String(h).padStart(2,'0') + ':30');
-            }
-
-            // Map: room → slot → [appts]
-            const grid = {};
-            rooms.forEach(r => { grid[r] = {}; slots.forEach(s => { grid[r][s] = []; }); });
-
-            dayRows.forEach(r => {
-                const loc  = (r[gC.local] || '').trim() || 'Sem sala';
-                const hora = (r[gC.hora]  || '').trim().slice(0, 5); // HH:MM
-                if (!hora) return;
-                const [hh, mm] = hora.split(':').map(Number);
-                // snap to nearest 30-min slot
-                const slotMin = mm < 30 ? 0 : 30;
-                const slotKey = String(hh).padStart(2,'0') + ':' + String(slotMin).padStart(2,'0');
-                if (grid[loc] && grid[loc][slotKey] !== undefined) {
-                    const sta = (r[gC.sta] || '').toLowerCase().trim();
-                    const statusClass = sta === 'atendido' ? 'status-atendido'
-                        : (sta.includes('marcado') || sta.includes('aguardando') || sta.includes('confirmado') || sta.includes('em atend')) ? 'status-aguardando'
-                        : (sta.includes('cancelado') || sta.includes('desmarcado')) ? 'status-cancelado'
-                        : 'status-aguardando';
-                    grid[loc][slotKey].push({
-                        pac:    (r[gC.pac]  || '').trim(),
-                        prof:   (r[gC.prof] || '').trim(),
-                        proc:   (r[gC.proc] || '').trim(),
-                        hora:   hora,
-                        statusClass,
-                    });
+                const hm = (r[gC.hora] || '').trim().slice(0, 5); // HH:MM
+                if (!/^\d{1,2}:\d{2}/.test(hm)) return;
+                const sta = (r[gC.sta] || '').toLowerCase().trim();
+                if (sta.includes('cancelado') || sta.includes('desmarcado')) return; // cancelado não ocupa sala
+                const [hh, mm] = hm.split(':').map(Number);
+                const apptSlot = Math.floor((hh*60 + mm) / 30) * 30;
+                const targets = salasRotaAgendamento(r[gC.prof], r[gC.proc]);
+                if (targets) {
+                    totalDia++;
+                    if (apptSlot === slotMin) {
+                        let area;
+                        if (targets.length === 1) area = targets[0];
+                        else { const k = targets.join('|'); const i = (rr[k]||0) % targets.length; rr[k] = (rr[k]||0)+1; area = targets[i]; }
+                        if (roomAppts[area]) {
+                            roomAppts[area].push({
+                                pac:  (r[gC.pac]  || '').trim(),
+                                prof: (r[gC.prof] || '').trim(),
+                                proc: (r[gC.proc] || '').trim(),
+                                hora: hm
+                            });
+                            totalSlot++;
+                        }
+                    }
                 }
             });
 
-            // Remove slots where ALL rooms are empty
-            const activeSlots = slots.filter(s => rooms.some(room => grid[room][s].length > 0));
-
-            if (!activeSlots.length) {
-                container.innerHTML = '<div class="salas-empty">Nenhum agendamento com sala definida para este dia.</div>';
-                return;
-            }
-
-            // Build table
-            const headerCells = rooms.map(r => `<th class="sala-header">${r}</th>`).join('');
-            const bodyRows = activeSlots.map(slot => {
-                const cells = rooms.map(room => {
-                    const appts = grid[room][slot];
-                    if (!appts.length) return '<td class="sala-cell"></td>';
-                    const blocks = appts.map(a => `
-                        <div class="salas-appt-block ${a.statusClass}" title="${a.pac} · ${a.proc} · ${a.prof}">
-                            <div class="salas-appt-name">${a.pac}</div>
-                            <div class="salas-appt-meta">${a.hora} · ${a.prof.split(' ')[0]}</div>
-                        </div>`).join('');
-                    return `<td class="sala-cell has-appt">${blocks}</td>`;
-                }).join('');
-                return `<tr>
-                    <td class="time-col">${slot}</td>
-                    ${cells}
-                </tr>`;
+            const escAttr = s => (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+            let busy = 0, freeC = 0;
+            const cells = SALAS_LAYOUT.map(s => {
+                const appts = (roomAppts[s.area] || []).slice().sort((a,b)=>a.hora.localeCompare(b.hora));
+                let cls = 'salas-room';
+                if (!s.clinical) cls += ' salas-room-aux';
+                else if (appts.length) { cls += ' salas-room-busy'; busy++; }
+                else { cls += ' salas-room-free'; freeC++; }
+                let inner = `<div class="salas-room-name">${s.nome}</div>`;
+                if (appts.length) {
+                    inner += appts.slice(0,3).map(a => {
+                        const nome = a.pac.split(' ').slice(0,2).join(' ');
+                        const pn   = (a.prof||'').replace(/^Dr[a]?\.?\s*/i,'').split(' ')[0];
+                        return `<div class="salas-room-appt">${a.hora} ${nome}<span class="salas-room-prof"> · ${pn}</span></div>`;
+                    }).join('');
+                    if (appts.length > 3) inner += `<div class="salas-room-appt salas-room-more">+${appts.length-3} agend.</div>`;
+                } else if (s.clinical) {
+                    inner += `<div class="salas-room-status">livre</div>`;
+                }
+                const tip = appts.length
+                    ? s.nome + '\n' + appts.map(a=>`${a.hora}  ${a.pac}  (${a.proc})  —  ${a.prof}`).join('\n')
+                    : (s.clinical ? s.nome + '\nLivre neste horário' : s.nome);
+                return `<div class="${cls}" style="grid-area:${s.area}" title="${escAttr(tip)}">${inner}</div>`;
             }).join('');
 
             container.innerHTML = `
-                <div class="salas-grid-wrap">
-                    <table class="salas-grid">
-                        <thead><tr>
-                            <th style="min-width:50px">Horário</th>
-                            ${headerCells}
-                        </tr></thead>
-                        <tbody>${bodyRows}</tbody>
-                    </table>
+                <div class="salas-fp-wrap"><div class="salas-floorplan">${cells}</div></div>
+                <div class="salas-summary">
+                    <span>Atendimentos presenciais no dia: <b>${totalDia}</b></span>
+                    <span>Neste horário (${salasFmtMin(slotMin)}–${salasFmtMin(slotMin+30)}): <b>${totalSlot}</b></span>
+                    <span>Salas clínicas: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
                 </div>`;
         }
 
