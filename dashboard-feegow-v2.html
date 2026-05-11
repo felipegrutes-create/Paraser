@@ -2294,6 +2294,41 @@
         .salas-room-heat-empty .salas-room-name { color: #10b981; }
         .salas-room-heat-val { font-size: 14px; font-weight: 800; color: #fecaca; }
         .salas-room-heat-empty .salas-room-heat-val { color: #10b981; font-weight: 600; font-size: 11px; }
+        .salas-exec {
+            margin: 22px 0; padding: 16px 18px;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        }
+        .salas-exec-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
+        .salas-exec-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 12px; margin-bottom: 18px;
+        }
+        .salas-exec-kpi {
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px 14px;
+        }
+        .salas-exec-num { font-size: 26px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+        .salas-exec-lab {
+            font-size: 10.5px; color: var(--muted); text-transform: uppercase;
+            letter-spacing: 0.4px; margin: 5px 0 8px;
+        }
+        .salas-exec-bar { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+        .salas-exec-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #ef4444); border-radius: 3px; }
+        .salas-exec-sub { font-size: 10.5px; color: var(--muted); margin-top: 7px; line-height: 1.4; }
+        .salas-exec-months-title {
+            font-size: 11px; color: var(--muted); text-transform: uppercase;
+            letter-spacing: 0.4px; margin-bottom: 9px;
+        }
+        .salas-mb { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .salas-mb-lab { width: 50px; font-size: 11.5px; color: var(--muted); text-align: right; }
+        .salas-mb-cur .salas-mb-lab { color: var(--text); font-weight: 700; }
+        .salas-mb-track {
+            flex: 1; height: 16px; background: rgba(255,255,255,0.05);
+            border-radius: 4px; overflow: hidden;
+        }
+        .salas-mb-fill { height: 100%; background: rgba(0,212,170,0.5); border-radius: 4px; transition: width 0.3s; }
+        .salas-mb-cur .salas-mb-fill { background: linear-gradient(90deg, var(--accent), #ef4444); }
+        .salas-mb-val { width: 40px; font-size: 11.5px; font-weight: 600; color: var(--text); }
         .salas-empty {
             text-align: center;
             padding: 60px 20px;
@@ -5378,9 +5413,9 @@
             { area:'gineco',    nome:'Sala Ginecologia',      clinical:true },
             { area:'psico',     nome:'Sala Psicologia',       clinical:true },
             { area:'fisioAcup', nome:'Sala Físio e Acup.',    clinical:true },
-            { area:'enferm1',   nome:'Enfermagem 1',          clinical:true },
-            { area:'enferm2',   nome:'Enfermagem 2',          clinical:true },
-            { area:'enferm3',   nome:'Enfermagem 3',          clinical:true },
+            { area:'enferm1',   nome:'Enfermagem 1',          clinical:false },
+            { area:'enferm2',   nome:'Enfermagem 2',          clinical:false },
+            { area:'enferm3',   nome:'Enfermagem 3',          clinical:false },
             { area:'esperaVIP', nome:'Espera VIP',            clinical:false },
             { area:'esperaGer', nome:'Espera Geral',          clinical:false },
             { area:'recepcao',  nome:'Recepção / Entrada',    clinical:false },
@@ -5415,7 +5450,7 @@
                 C.includes('FOT ')||C.includes('ORIGEN')||C.includes('PRIMÓRDIA')||C.includes('PRIMORDIA'))
                 return ['procedim'];
             if (C.includes('COLETA')||C.includes('PREVENTIVO')||C.includes('VITAMINA')||C.includes('ENFERMAGEM'))
-                return ['enferm1','enferm2','enferm3'];
+                return null;   // salas de enfermagem não são exibidas no mapa
             // USG sempre em sala de USG
             if (C.includes('USG')||C.includes('ULTRASSOM')||C.includes('ULTRASSONOG')) {
                 if (P.includes('RODOLFO'))                  return ['usgDrSalv'];
@@ -5432,6 +5467,65 @@
                 return ['reproH','gineco'];
             if (C.includes('CONSULTA'))                     return ['reproH','gineco'];  // consulta genérica
             return null;
+        }
+
+        // Calcula ocupação de UM dia: distribui os agendamentos nas salas clínicas (round-robin contínuo)
+        // e retorna, por sala, o conjunto de faixas de 30 min ocupadas + a janela do dia + totais.
+        function salasComputeDia(rows) {
+            const clinicalAreas = SALAS_LAYOUT.filter(s => s.clinical).map(s => s.area);
+            const roomSlots = {}; clinicalAreas.forEach(a => roomSlots[a] = new Set());
+            const daySlots = new Set();
+            const rr = {};
+            let total = 0;
+            rows.map(r => ({ r, hm: (r[gC.hora] || '').trim().slice(0, 5) }))
+                .filter(o => {
+                    if (!/^\d{1,2}:\d{2}/.test(o.hm)) return false;
+                    const sta = (o.r[gC.sta] || '').toLowerCase().trim();
+                    if (sta.includes('cancelado') || sta.includes('desmarcado')) return false;
+                    return !!salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
+                })
+                .map(o => { const [hh, mm] = o.hm.split(':').map(Number); o.slot = Math.floor((hh*60+mm)/30)*30; return o; })
+                .sort((a, b) => a.slot - b.slot || a.hm.localeCompare(b.hm))
+                .forEach(o => {
+                    total++;
+                    daySlots.add(o.slot);
+                    const t = salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
+                    let area;
+                    if (t.length === 1) area = t[0];
+                    else { const k = t.join('|'); const i = (rr[k]||0) % t.length; rr[k] = (rr[k]||0)+1; area = t[i]; }
+                    if (roomSlots[area]) roomSlots[area].add(o.slot);
+                });
+            const slotsArr = [...daySlots].sort((a,b)=>a-b);
+            const win = slotsArr.length ? (slotsArr[slotsArr.length-1] - slotsArr[0]) / 30 + 1 : 0;
+            let occ = 0; clinicalAreas.forEach(a => occ += roomSlots[a].size);
+            return { roomSlots, slotsArr, win, total, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
+        }
+
+        // Ocupação média por mês (a partir de TODO o gRaw). Cacheado — gRaw não muda após carregar.
+        let _salasMonthlyStats = null;
+        function salasMonthlyStats() {
+            if (_salasMonthlyStats) return _salasMonthlyStats;
+            const byMonth = {};   // 'YYYY-MM' → { 'DD': [rows] }
+            (gRaw || []).forEach(r => {
+                const m = ((r[gC.data] || '').trim()).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (!m) return;
+                const mk = m[3] + '-' + m[2].padStart(2,'0');
+                (byMonth[mk] = byMonth[mk] || {});
+                const dk = m[1].padStart(2,'0');
+                (byMonth[mk][dk] = byMonth[mk][dk] || []).push(r);
+            });
+            const stats = {};
+            Object.keys(byMonth).forEach(mk => {
+                let occ = 0, cap = 0, total = 0, ndias = 0;
+                Object.values(byMonth[mk]).forEach(dr => {
+                    const c = salasComputeDia(dr);
+                    occ += c.occ; cap += c.cap; total += c.total;
+                    if (c.total > 0) ndias++;
+                });
+                stats[mk] = { occ, cap, total, ndias, pct: cap ? Math.round(occ/cap*100) : 0 };
+            });
+            _salasMonthlyStats = stats;
+            return stats;
         }
 
         function renderMapaSalas() {
@@ -5519,34 +5613,11 @@
                 return `<div class="${cls}" style="grid-area:${s.area}" title="${escAttr(tip)}">${inner}</div>`;
             }).join('');
 
-            // ===== HEATMAP DO DIA INTEIRO =====
-            // p/ cada faixa de 30 min do dia, distribui os agendamentos nas salas (round-robin contínuo)
-            const roomSlots = {}; SALAS_LAYOUT.forEach(s => { if (s.clinical) roomSlots[s.area] = new Set(); });
-            const daySlots = new Set();
-            const rrDay = {};
-            dayRows
-                .map(r => {
-                    const hm = (r[gC.hora] || '').trim().slice(0, 5);
-                    return { r, hm };
-                })
-                .filter(o => {
-                    if (!/^\d{1,2}:\d{2}/.test(o.hm)) return false;
-                    const sta = (o.r[gC.sta] || '').toLowerCase().trim();
-                    if (sta.includes('cancelado') || sta.includes('desmarcado')) return false;
-                    return !!salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
-                })
-                .map(o => { const [hh, mm] = o.hm.split(':').map(Number); o.slot = Math.floor((hh*60+mm)/30)*30; return o; })
-                .sort((a, b) => a.slot - b.slot || a.hm.localeCompare(b.hm))
-                .forEach(o => {
-                    daySlots.add(o.slot);
-                    const targets = salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
-                    let area;
-                    if (targets.length === 1) area = targets[0];
-                    else { const k = targets.join('|'); const i = (rrDay[k]||0) % targets.length; rrDay[k] = (rrDay[k]||0)+1; area = targets[i]; }
-                    if (roomSlots[area]) roomSlots[area].add(o.slot);
-                });
-            const slotsArr = [...daySlots].sort((a,b)=>a-b);
-            const dayWindow = slotsArr.length ? ((slotsArr[slotsArr.length-1] - slotsArr[0]) / 30 + 1) : 1;
+            // ===== OCUPAÇÃO DO DIA INTEIRO (mesmo cálculo da planta) =====
+            const dayComp  = salasComputeDia(dayRows);
+            const roomSlots = dayComp.roomSlots, slotsArr = dayComp.slotsArr;
+            const dayWindow = dayComp.win || 1;
+            const dayPct   = dayComp.cap ? Math.round(dayComp.occ / dayComp.cap * 100) : 0;
             let topRoom = null, topPct = -1;
             const heatCells = SALAS_LAYOUT.map(s => {
                 if (!s.clinical) {
@@ -5569,8 +5640,68 @@
                     <div class="salas-room-heat-val">${pct}%<span class="salas-room-prof"> · ${occ} faixa${occ===1?'':'s'}</span></div>
                 </div>`;
             }).join('');
-            const dayLabel = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
+            const dayLabel  = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
             const janelaTxt = slotsArr.length ? `${salasFmtMin(slotsArr[0])}–${salasFmtMin(slotsArr[slotsArr.length-1]+30)}` : '—';
+
+            // ===== SUMÁRIO EXECUTIVO (entre os dois mapas) =====
+            const mStats = salasMonthlyStats();
+            const curMK  = yr + '-' + mo;                       // mês do dia selecionado (YYYY-MM)
+            const cur    = mStats[curMK] || { occ:0, cap:0, total:0, ndias:0, pct:0 };
+            const mesNomeFull = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(mo)-1];
+            const mesCurto = mk => { const p = mk.split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][parseInt(p[1])-1] + '/' + p[0].slice(2); };
+            const allMK  = Object.keys(mStats).sort();
+            const idxCur = allMK.indexOf(curMK);
+            const prevMK = idxCur > 0 ? allMK[idxCur-1] : null;
+            const prev   = prevMK ? mStats[prevMK] : null;
+            const deltaPP = prev ? (cur.pct - prev.pct) : null;
+            const mediaDiaCur = cur.ndias ? Math.round(cur.total / cur.ndias) : 0;
+            // barras: até 8 meses (só meses com volume razoável), terminando no mês atual
+            const okMK = allMK.filter(mk => mStats[mk].total >= 15 || mk === curMK);
+            const idxOk = okMK.indexOf(curMK);
+            const chartMK = idxOk >= 0 ? okMK.slice(Math.max(0, idxOk-7), idxOk+1) : okMK.slice(-8);
+            const maxChartPct = Math.max(1, ...chartMK.map(mk => mStats[mk].pct));
+            const monthBars = chartMK.map(mk => {
+                const st = mStats[mk], w = Math.round(st.pct / maxChartPct * 100), isCur = (mk === curMK);
+                return `<div class="salas-mb ${isCur?'salas-mb-cur':''}" title="${escAttr(mesCurto(mk)+': '+st.pct+'% de ocupação média · '+st.total+' atendimentos em '+st.ndias+' dias')}">
+                    <span class="salas-mb-lab">${mesCurto(mk)}</span>
+                    <div class="salas-mb-track"><div class="salas-mb-fill" style="width:${w}%"></div></div>
+                    <span class="salas-mb-val">${st.pct}%</span>
+                </div>`;
+            }).join('');
+            const trendTxt = deltaPP === null ? '—'
+                : deltaPP > 0 ? `<span style="color:#ef4444">▲ +${deltaPP} pp</span> vs ${mesCurto(prevMK)}`
+                : deltaPP < 0 ? `<span style="color:#f59e0b">▼ ${deltaPP} pp</span> vs ${mesCurto(prevMK)}`
+                : `igual a ${mesCurto(prevMK)}`;
+            const execHTML = `
+                <div class="salas-exec">
+                    <div class="salas-exec-title">📈 Sumário executivo — ocupação das salas</div>
+                    <div class="salas-exec-row">
+                        <div class="salas-exec-kpi">
+                            <div class="salas-exec-num">${dayPct}%</div>
+                            <div class="salas-exec-lab">Ocupação do dia (${parseInt(dy)}/${mo})</div>
+                            <div class="salas-exec-bar"><div class="salas-exec-bar-fill" style="width:${Math.min(100,dayPct)}%"></div></div>
+                            <div class="salas-exec-sub">média das ${dayComp.nClin} salas clínicas${cur.pct ? ' · '+(dayPct>=cur.pct?'acima':'abaixo')+' da média do mês ('+cur.pct+'%)' : ''}</div>
+                        </div>
+                        <div class="salas-exec-kpi">
+                            <div class="salas-exec-num">${cur.pct}%</div>
+                            <div class="salas-exec-lab">Ocupação média — ${mesNomeFull}</div>
+                            <div class="salas-exec-bar"><div class="salas-exec-bar-fill" style="width:${Math.min(100,cur.pct)}%"></div></div>
+                            <div class="salas-exec-sub">${trendTxt}</div>
+                        </div>
+                        <div class="salas-exec-kpi">
+                            <div class="salas-exec-num">${totalDia}</div>
+                            <div class="salas-exec-lab">Atendimentos no dia</div>
+                            <div class="salas-exec-sub">${cur.total} no mês · ~${mediaDiaCur}/dia (${cur.ndias} dia${cur.ndias===1?'':'s'} com atendimento)</div>
+                        </div>
+                        <div class="salas-exec-kpi">
+                            <div class="salas-exec-num" style="font-size:17px;line-height:1.3;">${topRoom || '—'}</div>
+                            <div class="salas-exec-lab">Sala mais usada no dia</div>
+                            <div class="salas-exec-sub">${topPct >= 0 ? topPct+'% do dia ocupada' : 'sem atendimentos'}</div>
+                        </div>
+                    </div>
+                    <div class="salas-exec-months-title">Ocupação média por mês — comparativo (barra cheia = mês mais ocupado da série)</div>
+                    ${monthBars || '<div style="font-size:12px;color:var(--muted)">Sem dados mensais suficientes.</div>'}
+                </div>`;
 
             container.innerHTML = `
                 <div class="salas-fp-wrap"><div class="salas-floorplan">${cells}</div></div>
@@ -5579,7 +5710,8 @@
                     <span>Neste horário (${salasFmtMin(slotMin)}–${salasFmtMin(slotMin+30)}): <b>${totalSlot}</b></span>
                     <span>Salas clínicas agora: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
                 </div>
-                <div class="salas-heat-title">📊 Ocupação do dia inteiro — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(quanto mais cheia/viva a sala, mais tempo ficou ocupada)</span></div>
+                ${execHTML}
+                <div class="salas-heat-title">📊 Mapa de ocupação do dia inteiro — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(quanto mais cheia/viva a sala, mais tempo ficou ocupada)</span></div>
                 <div class="salas-fp-wrap"><div class="salas-floorplan">${heatCells}</div></div>
                 <div class="salas-summary">
                     <span>Janela do dia: <b>${dayWindow} faixas de 30 min</b>${slotsArr.length?` (${janelaTxt})`:''}</span>
