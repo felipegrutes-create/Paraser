@@ -2280,6 +2280,20 @@
             font-size: 13px; color: var(--muted);
         }
         .salas-summary b { color: var(--text); }
+        .salas-heat-title {
+            font-size: 14px; font-weight: 700; color: var(--text);
+            margin: 26px 0 10px;
+        }
+        .salas-room-heat {
+            cursor: help; position: relative;
+        }
+        .salas-room-heat:hover { transform: scale(1.02); }
+        .salas-room-heat .salas-room-name { color: #fda4af; }
+        .salas-room-heat-empty { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.30); cursor: help; }
+        .salas-room-heat-empty:hover { transform: scale(1.02); }
+        .salas-room-heat-empty .salas-room-name { color: #10b981; }
+        .salas-room-heat-val { font-size: 14px; font-weight: 800; color: #fecaca; }
+        .salas-room-heat-empty .salas-room-heat-val { color: #10b981; font-weight: 600; font-size: 11px; }
         .salas-empty {
             text-align: center;
             padding: 60px 20px;
@@ -5505,12 +5519,71 @@
                 return `<div class="${cls}" style="grid-area:${s.area}" title="${escAttr(tip)}">${inner}</div>`;
             }).join('');
 
+            // ===== HEATMAP DO DIA INTEIRO =====
+            // p/ cada faixa de 30 min do dia, distribui os agendamentos nas salas (round-robin contínuo)
+            const roomSlots = {}; SALAS_LAYOUT.forEach(s => { if (s.clinical) roomSlots[s.area] = new Set(); });
+            const daySlots = new Set();
+            const rrDay = {};
+            dayRows
+                .map(r => {
+                    const hm = (r[gC.hora] || '').trim().slice(0, 5);
+                    return { r, hm };
+                })
+                .filter(o => {
+                    if (!/^\d{1,2}:\d{2}/.test(o.hm)) return false;
+                    const sta = (o.r[gC.sta] || '').toLowerCase().trim();
+                    if (sta.includes('cancelado') || sta.includes('desmarcado')) return false;
+                    return !!salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
+                })
+                .map(o => { const [hh, mm] = o.hm.split(':').map(Number); o.slot = Math.floor((hh*60+mm)/30)*30; return o; })
+                .sort((a, b) => a.slot - b.slot || a.hm.localeCompare(b.hm))
+                .forEach(o => {
+                    daySlots.add(o.slot);
+                    const targets = salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
+                    let area;
+                    if (targets.length === 1) area = targets[0];
+                    else { const k = targets.join('|'); const i = (rrDay[k]||0) % targets.length; rrDay[k] = (rrDay[k]||0)+1; area = targets[i]; }
+                    if (roomSlots[area]) roomSlots[area].add(o.slot);
+                });
+            const slotsArr = [...daySlots].sort((a,b)=>a-b);
+            const dayWindow = slotsArr.length ? ((slotsArr[slotsArr.length-1] - slotsArr[0]) / 30 + 1) : 1;
+            let topRoom = null, topPct = -1;
+            const heatCells = SALAS_LAYOUT.map(s => {
+                if (!s.clinical) {
+                    return `<div class="salas-room salas-room-aux" style="grid-area:${s.area}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
+                }
+                const occ = (roomSlots[s.area] || new Set()).size;
+                const pct = Math.round(occ / dayWindow * 100);
+                if (pct > topPct) { topPct = pct; topRoom = s.nome; }
+                if (occ === 0) {
+                    return `<div class="salas-room salas-room-heat-empty" style="grid-area:${s.area}" title="${escAttr(s.nome+'\nSem uso neste dia')}">
+                        <div class="salas-room-name">${s.nome}</div><div class="salas-room-heat-val">livre o dia</div></div>`;
+                }
+                const ratio = Math.min(1, occ / dayWindow);
+                const alpha = (0.16 + 0.64 * ratio).toFixed(3);   // mais ocupado = vermelho mais vivo
+                const bg = `linear-gradient(to top, rgba(239,68,68,${alpha}) ${pct}%, rgba(255,255,255,0.025) ${pct}%)`;
+                const bc = pct >= 60 ? 'rgba(239,68,68,0.65)' : pct >= 30 ? 'rgba(239,68,68,0.45)' : 'rgba(239,68,68,0.28)';
+                const tip = `${s.nome}\n${occ} de ${dayWindow} faixas de 30 min ocupadas (${pct}% do dia)`;
+                return `<div class="salas-room salas-room-heat" style="grid-area:${s.area}; background:${bg}; border-color:${bc};" title="${escAttr(tip)}">
+                    <div class="salas-room-name">${s.nome}</div>
+                    <div class="salas-room-heat-val">${pct}%<span class="salas-room-prof"> · ${occ} faixa${occ===1?'':'s'}</span></div>
+                </div>`;
+            }).join('');
+            const dayLabel = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
+            const janelaTxt = slotsArr.length ? `${salasFmtMin(slotsArr[0])}–${salasFmtMin(slotsArr[slotsArr.length-1]+30)}` : '—';
+
             container.innerHTML = `
                 <div class="salas-fp-wrap"><div class="salas-floorplan">${cells}</div></div>
                 <div class="salas-summary">
                     <span>Atendimentos presenciais no dia: <b>${totalDia}</b></span>
                     <span>Neste horário (${salasFmtMin(slotMin)}–${salasFmtMin(slotMin+30)}): <b>${totalSlot}</b></span>
-                    <span>Salas clínicas: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
+                    <span>Salas clínicas agora: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
+                </div>
+                <div class="salas-heat-title">📊 Ocupação do dia inteiro — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(quanto mais cheia/viva a sala, mais tempo ficou ocupada)</span></div>
+                <div class="salas-fp-wrap"><div class="salas-floorplan">${heatCells}</div></div>
+                <div class="salas-summary">
+                    <span>Janela do dia: <b>${dayWindow} faixas de 30 min</b>${slotsArr.length?` (${janelaTxt})`:''}</span>
+                    ${slotsArr.length ? `<span>Sala mais ocupada: <b style="color:#ef4444">${topRoom} (${topPct}%)</b></span>` : ''}
                 </div>`;
         }
 
