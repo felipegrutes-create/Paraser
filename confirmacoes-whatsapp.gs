@@ -255,6 +255,15 @@ const TMPL = {
 // FUNÇÃO PRINCIPAL — configurar trigger diário entre 17h-18h
 // ================================================================
 function enviarConfirmacoes() {
+  // NÃO envia confirmações aos sábados, domingos e feriados
+  var hoje = new Date();
+  if (hoje.getDay() === 0 || hoje.getDay() === 6 || ehFeriado(hoje)) {
+    Logger.log('Hoje é ' + DIAS_SEMANA[hoje.getDay()] +
+               (ehFeriado(hoje) ? ' / feriado' : '') +
+               ' — nenhuma confirmação será enviada.');
+    return;
+  }
+
   var dia = getDiaAlvo();
   var agendamentos = getAgendamentos(dia);
 
@@ -670,6 +679,15 @@ function sendWhatsApp(phone, message) {
 // para a recepção usar no Keyaccess antes das 10h30
 // ================================================================
 function listarPacientesAmanha() {
+  // NÃO gera lista / posta no Slack aos sábados, domingos e feriados
+  var hoje = new Date();
+  if (hoje.getDay() === 0 || hoje.getDay() === 6 || ehFeriado(hoje)) {
+    Logger.log('Hoje é ' + DIAS_SEMANA[hoje.getDay()] +
+               (ehFeriado(hoje) ? ' / feriado' : '') +
+               ' — lista de pacientes não será gerada.');
+    return;
+  }
+
   var dia          = getDiaAlvo();
   var agendamentos = getAgendamentos(dia);
   var dataStr      = fmtDataBR(dia);
