@@ -396,6 +396,7 @@ function resolveNomeProc(ag) {
     ag.procedimento      ||
     ag.descricao_procedimento ||
     ag.nome_procedimento ||
+    (carregarNomesProcedimentos()[ag.procedimento_id] || '') ||
     ''
   );
 }
@@ -403,6 +404,12 @@ function resolveNomeProc(ag) {
 // ================================================================
 // FEEGOW — agendamentos do dia
 // ================================================================
+// status_id do Feegow (/appoints/status) que NÃO devem receber confirmação:
+//   3 = Atendido | 6 = Não compareceu | 11 = Desmarcado pelo paciente
+//   15 = Remarcado | 22 = Cancelado pelo profissional
+// Os demais (1 = Marcado-não confirmado, 7 = Marcado-confirmado, etc.) recebem.
+var STATUS_NAO_ENVIAR = [3, 6, 11, 15, 22];
+
 function getAgendamentos(dia) {
   var ds   = fmtDataFeegow(dia);
   var url  = CF_FEEGOW_BASE + '/appoints/search?data_start=' + ds + '&data_end=' + ds;
@@ -414,6 +421,8 @@ function getAgendamentos(dia) {
   var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
 
   return items.filter(function(a) {
+    if (a.status_id != null) return STATUS_NAO_ENVIAR.indexOf(Number(a.status_id)) < 0;
+    // fallback antigo (caso a API pare de mandar status_id)
     var s = (a.status || '').toLowerCase();
     return s !== 'cancelado' && s !== 'bloqueado' && s !== 'bloqueio' && s !== 'desmarcado';
   });
@@ -457,6 +466,32 @@ function carregarProfissionais() {
 }
 
 // ================================================================
+// FEEGOW — mapa de procedimentos {procId: nome}
+// A API /appoints/search só devolve o ID do procedimento, não o nome.
+// /procedures/list devolve todos os ~289 procedimentos com nome.
+// Buscamos uma vez por execução (memoizado em _procNomeMap) — assim a
+// lógica de template pode casar pelo NOME e não depende só de IDs chumbados.
+// ================================================================
+var _procNomeMap = null;
+function carregarNomesProcedimentos() {
+  if (_procNomeMap) return _procNomeMap;
+  _procNomeMap = {};
+  try {
+    var resp = UrlFetchApp.fetch(CF_FEEGOW_BASE + '/procedures/list', {
+      headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true
+    });
+    var json  = JSON.parse(resp.getContentText());
+    var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
+    items.forEach(function(p) {
+      var id = p.procedimento_id || p.id;
+      if (id) _procNomeMap[id] = p.nome || p.name || '';
+    });
+    Logger.log('Nomes de procedimentos carregados: ' + Object.keys(_procNomeMap).length);
+  } catch(e) { Logger.log('carregarNomesProcedimentos erro: ' + e.message); }
+  return _procNomeMap;
+}
+
+// ================================================================
 // FEEGOW — dados do paciente (nome + telefone)
 // ================================================================
 function getPatientData(pacienteId) {
@@ -475,13 +510,16 @@ function getPatientData(pacienteId) {
 
 // ================================================================
 // MAPA DE IDs DE PROCEDIMENTOS ESPECIAIS
-// A API Feegow não retorna nomes nos agendamentos, só IDs.
-// Adicione aqui os IDs conforme forem identificados.
+// A API /appoints/search só devolve o ID do procedimento, não o nome —
+// por isso resolveNomeProc() agora busca o nome em /procedures/list
+// (carregarNomesProcedimentos). Estas listas continuam servindo como
+// override rápido e como fallback caso a busca de nomes falhe.
 // ================================================================
 
 // procId=69  confirmado: INJÚRIA ENDOMETRIAL (Priscila 29/07/2025 14:45)
 // procId=152 confirmado: APLICAÇÃO DE FILGRASTIM (Marcelle 05/08/2025 12:30)
-var IDS_INJURIA = [69, 152];
+// procId=153 USG REAPLICAÇÃO DE FILGRASTIM
+var IDS_INJURIA = [69, 152, 153];
 
 // procId=42  confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
 // procId=40  confirmado: USG 1 PÓS BETA (Marcelle 05/05/2026 12:00)
@@ -522,11 +560,29 @@ var IDS_OBSTETRICA = [40, 41, 42, 43, 44, 45, 51, 58, 59, 61, 171];
 // procId=245 confirmado: USG PREPARO TEC (Érica 04/05/2026)
 // procId=59  confirmado: USG CONTAGEM DE FOLÍCULOS ANTRAIS → movido para IDS_OBSTETRICA
 // procId=8   confirmado: USG FIV 5 (Érica 24/04/2026)
-// procId=9   confirmado: USG FIV (Priscila 29/04/2026)
-// procId=11  confirmado: USG PREPARO TEC 3 - Natural (Priscila 29/04/2026)
+// procId=9   confirmado: USG FIV 6 (Priscila 29/04/2026)
 // procId=122 confirmado: USG PREPARO INJÚRIA (Érica 27/04/2026)
-// procId=246 confirmado: USG PREPARO TEC 3 (Érica 10/04/2026)
-var IDS_ULTRAS_TRATAMENTO = [4, 5, 6, 7, 8, 9, 11, 12, 13, 73, 74, 122, 244, 245, 246];
+// Nomes reais (via /procedures/list):
+//   4-9   = USG FIV 1º..6º
+//   11-16 = USG COITO PROGRAMADO 1º..6º
+//   17-23 = USG INSEMINAÇÃO 1º..6º
+//   24-31 = USG MONITORIZAÇÃO OVULAÇÃO 1º..6º (e variantes)
+//   65-67 = USG PREPARO ERA 1..3
+//   73-75 = USG PREPARO TEC 1..3 - Natural
+//   100   = USG 3D PREP ENDOMETRIAL
+//   122   = USG PREPARO INJÚRIA
+//   167   = USG PREPARO PRP
+//   244-246 = USG PREPARO TEC 1..3 - Medicado
+var IDS_ULTRAS_TRATAMENTO = [
+  4, 5, 6, 7, 8, 9,
+  11, 12, 13, 14, 15, 16,
+  17, 18, 19, 20, 21, 22, 23,
+  24, 25, 26, 27, 28, 29, 30, 31,
+  65, 66, 67,
+  73, 74, 75,
+  100, 122, 167,
+  244, 245, 246
+];
 
 // procId de sessão de radiofrequência do Dr. Joselmo Salvato
 // procId=307: Radiofrequência (Joselmo 04/05/2026 10:40 / 11:20)
@@ -563,12 +619,13 @@ var IDS_ONLINE_PROCS = [251, 252, 256, 322, 323, 347];
 // procId=176: Avaliação Doadora (Bianca Salvato) — sem confirmação
 // procId=268: FOT Receptora (Érica Freitas Cardoso) — sem confirmação
 // TODO: procId=168 (11× Rodolfo, 08:00-09:00 manhã) — não identificado, monitorar via simularEnvio
-// procId=75:  slot vazio/bloqueio (Érica Stein)
 // procId=88:  Colocação DIU (Joselmo 20/04/2026)
 // procId=90:  Punção de Óvulos (Rodolfo 02/03/2026)
 // procId=147: PESA (Mario 29/04/2026)
 // procId=267: FOT Receptora (Érica Freitas Cardoso 08/04/2026)
-var IDS_SEM_CONFIRMACAO = [75, 87, 88, 89, 90, 91, 93, 120, 127, 139, 147, 176, 234, 265, 267, 268];
+// OBS: procId=75 foi REMOVIDO desta lista — é "USG PREPARO TEC 3 - Natural"
+//      (não era slot vazio); agora vai para ULTRAS_TRATAMENTO.
+var IDS_SEM_CONFIRMACAO = [87, 88, 89, 90, 91, 93, 120, 127, 139, 147, 176, 234, 265, 267, 268];
 
 // procIds de Conversa com Receptora (Bianca Salvato)
 // procId=35:  CONVERSA RECEPTORA - Presencial (Bianca 04/05/2026 10:00)
@@ -603,7 +660,9 @@ function resolveTemplateKey(ag) {
   if (IDS_BIANCA_RECEPTORA.indexOf(procId)  >= 0) return 'BIANCA_RECEPTORA_' + modal;
   if (IDS_SARA.indexOf(procId)              >= 0) return 'SARA_' + modal;
 
-  // --- 2. Nome do procedimento (fallback, se API passar) ---
+  // --- 2. Nome do procedimento (vem de /procedures/list — ver resolveNomeProc) ---
+  // Itens de cobrança/honorário/pacote — não são agendamentos de exame
+  if (proc.includes('HONORARIO') || proc.includes('HONORÁRIO') || proc.startsWith('PACOTE'))      return null;
   if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                                      return 'INJURIA';
   // TEC / punção — sem confirmação
   if (proc.includes('PUNÇÃO') || proc.includes('PUNCAO'))                                         return null;
@@ -613,11 +672,12 @@ function resolveTemplateKey(ag) {
   if (proc.includes('ORIGEN'))                                                                     return null;
   // USG obstétrica
   if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))            return 'ULTRAS_OBSTETRICA';
-  if (proc.includes('POS BETA') || proc.includes('PÓS BETA'))                                     return 'ULTRAS_OBSTETRICA';
+  if (proc.includes('POS BETA') || proc.includes('PÓS BETA') || proc.includes('PÓS-BETA'))        return 'ULTRAS_OBSTETRICA';
   if (proc.includes('FOLICULO') || proc.includes('FOLÍCULO'))                                     return 'ULTRAS_OBSTETRICA';
   if (proc.includes('TRANSVAGINAL') || proc.includes('DOPPLER'))                                  return 'ULTRAS_OBSTETRICA';
-  // USG tratamento
-  if (proc.includes('PREPARO TEC') || proc.includes('FIV'))                                       return 'ULTRAS_TRATAMENTO';
+  // USG de tratamento (preparo TEC/ERA, FIV, coito programado, inseminação, monitorização...)
+  if (proc.includes('PREPARO') || proc.includes('FIV'))                                           return 'ULTRAS_TRATAMENTO';
+  if (proc.includes('COITO') || proc.includes('INSEMINA') || proc.includes('MONITORIZA'))         return 'ULTRAS_TRATAMENTO';
   if (proc.includes('USG') || proc.includes('ULTRASSOM') || proc.includes('ULTRA'))               return 'ULTRAS_TRATAMENTO';
   if (proc.includes('ACUPUNTURA') || prof.includes('CRISTIANE'))                         return 'ACUPUNTURA';
 
