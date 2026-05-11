@@ -5473,7 +5473,7 @@
         // e retorna, por sala, o conjunto de faixas de 30 min ocupadas + a janela do dia + totais.
         function salasComputeDia(rows) {
             const clinicalAreas = SALAS_LAYOUT.filter(s => s.clinical).map(s => s.area);
-            const roomSlots = {}; clinicalAreas.forEach(a => roomSlots[a] = new Set());
+            const roomSlots = {}, roomCount = {}; clinicalAreas.forEach(a => { roomSlots[a] = new Set(); roomCount[a] = 0; });
             const daySlots = new Set();
             const rr = {};
             let total = 0;
@@ -5493,12 +5493,12 @@
                     let area;
                     if (t.length === 1) area = t[0];
                     else { const k = t.join('|'); const i = (rr[k]||0) % t.length; rr[k] = (rr[k]||0)+1; area = t[i]; }
-                    if (roomSlots[area]) roomSlots[area].add(o.slot);
+                    if (roomSlots[area]) { roomSlots[area].add(o.slot); roomCount[area]++; }
                 });
             const slotsArr = [...daySlots].sort((a,b)=>a-b);
             const win = slotsArr.length ? (slotsArr[slotsArr.length-1] - slotsArr[0]) / 30 + 1 : 0;
             let occ = 0; clinicalAreas.forEach(a => occ += roomSlots[a].size);
-            return { roomSlots, slotsArr, win, total, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
+            return { roomSlots, roomCount, slotsArr, win, total, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
         }
 
         // Ocupação média por mês (a partir de TODO o gRaw). Cacheado — gRaw não muda após carregar.
@@ -5516,13 +5516,14 @@
             });
             const stats = {};
             Object.keys(byMonth).forEach(mk => {
-                let occ = 0, cap = 0, total = 0, ndias = 0;
-                Object.values(byMonth[mk]).forEach(dr => {
-                    const c = salasComputeDia(dr);
+                let occ = 0, cap = 0, total = 0, ndias = 0, maxC = 0, maxD = null;
+                Object.keys(byMonth[mk]).sort().forEach(dk => {
+                    const c = salasComputeDia(byMonth[mk][dk]);
                     occ += c.occ; cap += c.cap; total += c.total;
                     if (c.total > 0) ndias++;
+                    if (c.total > maxC) { maxC = c.total; maxD = dk; }
                 });
-                stats[mk] = { occ, cap, total, ndias, pct: cap ? Math.round(occ/cap*100) : 0 };
+                stats[mk] = { occ, cap, total, ndias, maxC, maxD, pct: cap ? Math.round(occ/cap*100) : 0 };
             });
             _salasMonthlyStats = stats;
             return stats;
@@ -5618,14 +5619,14 @@
             const roomSlots = dayComp.roomSlots, slotsArr = dayComp.slotsArr;
             const dayWindow = dayComp.win || 1;
             const dayPct   = dayComp.cap ? Math.round(dayComp.occ / dayComp.cap * 100) : 0;
-            let topRoom = null, topPct = -1;
+            let topRoom = null, topPct = -1, topRoomArea = null;
             const heatCells = SALAS_LAYOUT.map(s => {
                 if (!s.clinical) {
                     return `<div class="salas-room salas-room-aux" style="grid-area:${s.area}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
                 }
                 const occ = (roomSlots[s.area] || new Set()).size;
                 const pct = Math.round(occ / dayWindow * 100);
-                if (pct > topPct) { topPct = pct; topRoom = s.nome; }
+                if (pct > topPct) { topPct = pct; topRoom = s.nome; topRoomArea = s.area; }
                 if (occ === 0) {
                     return `<div class="salas-room salas-room-heat-empty" style="grid-area:${s.area}" title="${escAttr(s.nome+'\nSem uso neste dia')}">
                         <div class="salas-room-name">${s.nome}</div><div class="salas-room-heat-val">livre o dia</div></div>`;
@@ -5643,63 +5644,74 @@
             const dayLabel  = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
             const janelaTxt = slotsArr.length ? `${salasFmtMin(slotsArr[0])}–${salasFmtMin(slotsArr[slotsArr.length-1]+30)}` : '—';
 
-            // ===== SUMÁRIO EXECUTIVO (entre os dois mapas) =====
+            // ===== SUMÁRIO EXECUTIVO (entre os dois mapas) — em ATENDIMENTOS, não %  =====
             const mStats = salasMonthlyStats();
             const curMK  = yr + '-' + mo;                       // mês do dia selecionado (YYYY-MM)
-            const cur    = mStats[curMK] || { occ:0, cap:0, total:0, ndias:0, pct:0 };
+            const cur    = mStats[curMK] || { total:0, ndias:0, maxC:0, maxD:null };
             const mesNomeFull = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(mo)-1];
             const mesCurto = mk => { const p = mk.split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][parseInt(p[1])-1] + '/' + p[0].slice(2); };
             const allMK  = Object.keys(mStats).sort();
             const idxCur = allMK.indexOf(curMK);
             const prevMK = idxCur > 0 ? allMK[idxCur-1] : null;
             const prev   = prevMK ? mStats[prevMK] : null;
-            const deltaPP = prev ? (cur.pct - prev.pct) : null;
             const mediaDiaCur = cur.ndias ? Math.round(cur.total / cur.ndias) : 0;
-            // barras: até 8 meses (só meses com volume razoável), terminando no mês atual
+            // hoje vs média do mês (em atendimentos)
+            const hojeVsMedia = mediaDiaCur
+                ? (totalDia >= mediaDiaCur ? `<span style="color:#10b981">▲ acima</span>` : `<span style="color:#f59e0b">▼ abaixo</span>`) + ` da média (~${mediaDiaCur}/dia)`
+                : '—';
+            // mês vs mês anterior (variação % do total de atendimentos)
+            let mesTrend = '—';
+            if (prev && prev.total) {
+                const d = Math.round((cur.total - prev.total) / prev.total * 100);
+                mesTrend = d > 0 ? `<span style="color:#10b981">▲ +${d}%</span> vs ${mesCurto(prevMK)} (${prev.total})`
+                         : d < 0 ? `<span style="color:#f59e0b">▼ ${d}%</span> vs ${mesCurto(prevMK)} (${prev.total})`
+                         : `igual a ${mesCurto(prevMK)} (${prev.total})`;
+            }
+            // dia mais cheio do mês
+            const diaMaisCheio = cur.maxD ? `${parseInt(cur.maxD)}/${mo}` : '—';
+            // sala mais usada hoje (qtd de atendimentos)
+            const topRoomCount = topRoomArea ? (dayComp.roomCount[topRoomArea] || 0) : 0;
+            // barras: ATENDIMENTOS por mês — até 8 meses (só meses com volume razoável), terminando no mês atual
             const okMK = allMK.filter(mk => mStats[mk].total >= 15 || mk === curMK);
             const idxOk = okMK.indexOf(curMK);
             const chartMK = idxOk >= 0 ? okMK.slice(Math.max(0, idxOk-7), idxOk+1) : okMK.slice(-8);
-            const maxChartPct = Math.max(1, ...chartMK.map(mk => mStats[mk].pct));
+            const maxTotal = Math.max(1, ...chartMK.map(mk => mStats[mk].total));
+            const hojeMK = (new Date()).toISOString().slice(0,7);
             const monthBars = chartMK.map(mk => {
-                const st = mStats[mk], w = Math.round(st.pct / maxChartPct * 100), isCur = (mk === curMK);
-                return `<div class="salas-mb ${isCur?'salas-mb-cur':''}" title="${escAttr(mesCurto(mk)+': '+st.pct+'% de ocupação média · '+st.total+' atendimentos em '+st.ndias+' dias')}">
+                const st = mStats[mk], w = Math.round(st.total / maxTotal * 100), isCur = (mk === curMK);
+                const parc = (mk === hojeMK) ? ' (parcial)' : '';
+                return `<div class="salas-mb ${isCur?'salas-mb-cur':''}" title="${escAttr(mesCurto(mk)+': '+st.total+' atendimentos · '+st.ndias+' dias · ~'+(st.ndias?Math.round(st.total/st.ndias):0)+'/dia'+(parc?' (mês em andamento)':''))}">
                     <span class="salas-mb-lab">${mesCurto(mk)}</span>
                     <div class="salas-mb-track"><div class="salas-mb-fill" style="width:${w}%"></div></div>
-                    <span class="salas-mb-val">${st.pct}%</span>
+                    <span class="salas-mb-val">${st.total}${parc}</span>
                 </div>`;
             }).join('');
-            const trendTxt = deltaPP === null ? '—'
-                : deltaPP > 0 ? `<span style="color:#ef4444">▲ +${deltaPP} pp</span> vs ${mesCurto(prevMK)}`
-                : deltaPP < 0 ? `<span style="color:#f59e0b">▼ ${deltaPP} pp</span> vs ${mesCurto(prevMK)}`
-                : `igual a ${mesCurto(prevMK)}`;
             const execHTML = `
                 <div class="salas-exec">
-                    <div class="salas-exec-title">📈 Sumário executivo — ocupação das salas</div>
+                    <div class="salas-exec-title">📈 Sumário executivo — movimento das salas</div>
                     <div class="salas-exec-row">
                         <div class="salas-exec-kpi">
-                            <div class="salas-exec-num">${dayPct}%</div>
-                            <div class="salas-exec-lab">Ocupação do dia (${parseInt(dy)}/${mo})</div>
-                            <div class="salas-exec-bar"><div class="salas-exec-bar-fill" style="width:${Math.min(100,dayPct)}%"></div></div>
-                            <div class="salas-exec-sub">média das ${dayComp.nClin} salas clínicas${cur.pct ? ' · '+(dayPct>=cur.pct?'acima':'abaixo')+' da média do mês ('+cur.pct+'%)' : ''}</div>
-                        </div>
-                        <div class="salas-exec-kpi">
-                            <div class="salas-exec-num">${cur.pct}%</div>
-                            <div class="salas-exec-lab">Ocupação média — ${mesNomeFull}</div>
-                            <div class="salas-exec-bar"><div class="salas-exec-bar-fill" style="width:${Math.min(100,cur.pct)}%"></div></div>
-                            <div class="salas-exec-sub">${trendTxt}</div>
-                        </div>
-                        <div class="salas-exec-kpi">
                             <div class="salas-exec-num">${totalDia}</div>
-                            <div class="salas-exec-lab">Atendimentos no dia</div>
-                            <div class="salas-exec-sub">${cur.total} no mês · ~${mediaDiaCur}/dia (${cur.ndias} dia${cur.ndias===1?'':'s'} com atendimento)</div>
+                            <div class="salas-exec-lab">Atendimentos hoje (${parseInt(dy)}/${mo})</div>
+                            <div class="salas-exec-sub">${hojeVsMedia}</div>
+                        </div>
+                        <div class="salas-exec-kpi">
+                            <div class="salas-exec-num">${cur.total}</div>
+                            <div class="salas-exec-lab">Atendimentos em ${mesNomeFull}</div>
+                            <div class="salas-exec-sub">${cur.ndias} dia${cur.ndias===1?'':'s'} com atendimento · ${mesTrend}</div>
+                        </div>
+                        <div class="salas-exec-kpi">
+                            <div class="salas-exec-num">${cur.maxC || '—'}</div>
+                            <div class="salas-exec-lab">Dia mais cheio de ${mesNomeFull}</div>
+                            <div class="salas-exec-sub">${cur.maxD ? diaMaisCheio + ' — recorde do mês' : 'sem dados'}</div>
                         </div>
                         <div class="salas-exec-kpi">
                             <div class="salas-exec-num" style="font-size:17px;line-height:1.3;">${topRoom || '—'}</div>
-                            <div class="salas-exec-lab">Sala mais usada no dia</div>
-                            <div class="salas-exec-sub">${topPct >= 0 ? topPct+'% do dia ocupada' : 'sem atendimentos'}</div>
+                            <div class="salas-exec-lab">Sala mais usada hoje</div>
+                            <div class="salas-exec-sub">${topRoomCount ? topRoomCount+' atendimento'+(topRoomCount===1?'':'s')+' · '+(topPct>=0?topPct+'% do dia ocupada':'') : 'sem atendimentos hoje'}</div>
                         </div>
                     </div>
-                    <div class="salas-exec-months-title">Ocupação média por mês — comparativo (barra cheia = mês mais ocupado da série)</div>
+                    <div class="salas-exec-months-title">Atendimentos por mês — comparativo (barra cheia = mês com mais atendimentos)</div>
                     ${monthBars || '<div style="font-size:12px;color:var(--muted)">Sem dados mensais suficientes.</div>'}
                 </div>`;
 
