@@ -1212,20 +1212,29 @@ function handleParseNFs() {
   }
 }
 
+// Extrai as 2 primeiras palavras do nome como chave de matching (ex: "ORGALUTRAN 0,25MG/0,5ML")
+function _estoqueKey(nome) {
+  var partes = String(nome || '').trim().toUpperCase().split(/[\s–—\-]+/);
+  return partes.slice(0, 2).filter(Boolean).join(' ');
+}
+
 function handleGetEstoque() {
   try {
     const nfData = getOrCreateEstoqueNFSheet().getDataRange().getValues();
     const ajData = getOrCreateAjustesSheet().getDataRange().getValues();
 
     const estoque = {};
+    const keyToNF = {}; // chave curta → nome completo da NF (para matching de ajustes)
 
-    // Soma entradas das NFs
+    // Soma entradas das NFs (agrupado pelo nome exato da NF)
     for (var i = 1; i < nfData.length; i++) {
       const row     = nfData[i];
       const produto = String(row[4] || '').trim();
       if (!produto) continue;
       if (!estoque[produto]) {
         estoque[produto] = { produto, unidade: String(row[6] || ''), qtd_nf: 0, qtd_ajuste: 0, valor_unit: 0, ultima_entrada: '', fornecedor: '' };
+        const k = _estoqueKey(produto);
+        if (!keyToNF[k]) keyToNF[k] = produto; // registra chave curta → nome NF
       }
       estoque[produto].qtd_nf    += parseFloat(row[5] || 0);
       estoque[produto].valor_unit = parseFloat(row[7] || 0);
@@ -1236,15 +1245,26 @@ function handleGetEstoque() {
       }
     }
 
-    // Aplica ajustes manuais
+    // Aplica ajustes — tenta match exato, depois match por chave curta
     for (var j = 1; j < ajData.length; j++) {
       const row     = ajData[j];
       const produto = String(row[1] || '').trim();
       if (!produto) continue;
-      if (!estoque[produto]) {
-        estoque[produto] = { produto, unidade: '', qtd_nf: 0, qtd_ajuste: 0, valor_unit: 0, ultima_entrada: '', fornecedor: '' };
+      const qtd = parseFloat(row[2] || 0);
+
+      if (estoque[produto]) {
+        // Match exato
+        estoque[produto].qtd_ajuste += qtd;
+      } else {
+        // Fallback: match por 2 primeiras palavras
+        const nfMatch = keyToNF[_estoqueKey(produto)];
+        if (nfMatch) {
+          estoque[nfMatch].qtd_ajuste += qtd;
+        } else {
+          // Sem correspondência — cria entrada standalone
+          estoque[produto] = { produto, unidade: '', qtd_nf: 0, qtd_ajuste: qtd, valor_unit: 0, ultima_entrada: '', fornecedor: '' };
+        }
       }
-      estoque[produto].qtd_ajuste += parseFloat(row[2] || 0);
     }
 
     const lista = Object.values(estoque).map(function(e) {
