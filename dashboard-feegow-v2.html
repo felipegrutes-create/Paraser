@@ -10348,13 +10348,11 @@
                 const propPago = fatVal > 0 ? Math.min(pagSum/fatVal, 1) : 0;
                 const status   = crInvoiceStatus(inv);
                 const dataFat  = (det && det.data) || '';
-                // dataFat pode ser YYYY-MM-DD (Feegow) ou DD/MM/YYYY
+                // dataFat é DD-MM-YYYY (Feegow) ou DD/MM/YYYY
                 let anoItem, mesItem;
-                if (dataFat.includes('-')) {
-                    const p = dataFat.split('-'); anoItem = parseInt(p[0]); mesItem = parseInt(p[1]);
-                } else {
-                    const p = dataFat.split('/'); anoItem = parseInt(p[2]); mesItem = parseInt(p[1]);
-                }
+                const sep = dataFat.includes('-') ? '-' : '/';
+                const p = dataFat.split(sep);
+                anoItem = parseInt(p[2]); mesItem = parseInt(p[1]);
                 if (mesItem !== mes || anoItem !== ano) return;
                 (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
@@ -10381,14 +10379,6 @@
             const data = _medMesAno === 2025 ? _medData2025 : _medData2026;
             const statusEl = document.getElementById('medMesStatus');
             if (!data) { if (statusEl) statusEl.textContent = 'Aguardando carregamento...'; return; }
-
-            // DEBUG temporário — abra F12 > Console para ver
-            if (data.length > 0) {
-                const d0 = data[0]; const det0 = d0.detalhes && d0.detalhes[0];
-                console.log('[MedMes] campos det:', det0 ? Object.keys(det0) : 'sem detalhes');
-                console.log('[MedMes] det.data:', det0 && det0.data, '| data_vencimento:', det0 && det0.data_vencimento);
-                console.log('[MedMes] itens[0]:', d0.itens && JSON.stringify(d0.itens[0]));
-            }
 
             const agg = _aggregateMedicosMes(data, _medMesAno, _medMes);
             const { entries, itemsMap } = agg;
