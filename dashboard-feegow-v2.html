@@ -4068,10 +4068,10 @@
                 if (!r[C.proc]) return false;
                 const proc = r[C.proc].trim().toLowerCase().replace(/\s+/g, ' ');
                 if (proc.includes("vez")) return true;
-                if (proc === 'consulta - presencial') {
-                    const prof = (r[C.prof] || '').trim().toLowerCase();
-                    return CONSULTA_PRESENCIAL_PROFS.some(p => prof.includes(p));
-                }
+                const prof = (r[C.prof] || '').trim().toLowerCase();
+                if (proc === 'consulta - presencial') return CONSULTA_PRESENCIAL_PROFS.some(p => prof.includes(p));
+                // Consulta Online ou "consulta" plain com Dr. Rodolfo — remarcação de 1ª vez
+                if ((proc === 'consulta - online' || proc === 'consulta') && prof.includes('rodolfo')) return true;
                 return false;
             });
             const pvByMonth = {};
