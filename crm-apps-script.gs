@@ -1298,17 +1298,15 @@ function handleEnviarPipelineSlack(body) {
       return 'R$ ' + (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
-    // Filtra R$ 0,00 (lançamentos sem valor definido)
-    var itensFiltrados = itens.filter(function(it) { return it.valor > 0; });
-
-    var linhasTodas = itensFiltrados.map(function(it) {
+    var linhasTodas = itens.map(function(it) {
       var data = (it.data || '').replace(/-/g, '/');
       var proc = (it.procedimento || '—').substring(0, 40);
-      return '🔸 *' + it.paciente + '* — ' + proc + ' — ' + fmtR(it.valor) + ' — ' + data;
+      var val  = it.valor > 0 ? fmtR(it.valor) : '_sem valor_';
+      return '🔸 *' + it.paciente + '* — ' + proc + ' — ' + val + ' — ' + data;
     });
 
     // Envia cabeçalho + itens em blocos de 30 (limite seguro do Slack)
-    var cabecalho = '📊 *Pipeline Comercial — ' + periodo + '*\n*' + itensFiltrados.length + ' orçamentos · ' + fmtR(total) + '*';
+    var cabecalho = '📊 *Pipeline Comercial — ' + periodo + '*\n*' + itens.length + ' orçamentos · ' + fmtR(total) + '*';
     var blocos = [];
     for (var i = 0; i < linhasTodas.length; i += 30) {
       blocos.push(linhasTodas.slice(i, i + 30).join('\n'));
@@ -1331,7 +1329,7 @@ function handleEnviarPipelineSlack(body) {
       });
     }
 
-    return jsonOk({ success: true, enviados: itensFiltrados.length, ignorados_zero: itens.length - itensFiltrados.length });
+    return jsonOk({ success: true, enviados: itens.length });
   } catch(e) {
     return jsonErr('Erro ao enviar para Slack: ' + e.message);
   }
