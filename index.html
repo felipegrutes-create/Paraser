@@ -11027,6 +11027,42 @@
         // ===================== ESTOQUE MEDICAMENTOS =====================
         let _estoqueData = null; // cache
 
+        // Blocklist de itens que não são medicamentos/insumos clínicos
+        const _ESTOQUE_BLOCKLIST = /^(BALA[S]?|ÁGUA|AGUA|CUBA[S]?|LUVA[S]?|SERINGA[S]?|AGULHA[S]?|ALGODÃO|ALGODAO|CANETA[S]?|PAPEL|COPO[S]?|EMBALAGEM|SACO[S]?\s|FITA[S]?\s|ETIQUETA|PROMOCION|PERSONALI|BRINDE|PRESENTE)\b/i;
+
+        function isMedicamento(nome) {
+            return !_ESTOQUE_BLOCKLIST.test((nome || '').trim());
+        }
+
+        // Extrai nome comercial + dosagem do nome verboso da NF-e
+        // Formato típico: "NOME GENÉRICO – DOSAGEM – NOME COMERCIAL DOSAGEM FORMA – FABRICANTE"
+        function normalizarNomeMed(raw) {
+            // Remove "Lote: X Val: X" que vem no final de alguns itens
+            let s = raw.replace(/\s*Lote:\s*\S+/gi, '').replace(/\s*Val:\s*\S+/gi, '').trim();
+
+            // Divide pelo separador " – " (travessão) ou " - "
+            const partes = s.split(/\s+[–\-]\s+/);
+
+            let nome;
+            if (partes.length >= 3) {
+                // parte[2] = nome comercial (já pode incluir dosagem)
+                nome = partes[2];
+            } else if (partes.length === 2) {
+                // parte[0] = nome genérico, parte[1] = dosagem
+                nome = partes[0] + ' ' + partes[1];
+            } else {
+                nome = partes[0];
+            }
+
+            // Remove formas farmacêuticas e descrições de embalagem do final
+            nome = nome.replace(/\s+(SOL\.?\s*INJ|SOLUCAO|SOLUÇÃO|INJETAVEL|INJETÁVEL|COMPRIMIDO[S]?|CAPSULAS?|CÁPSULAS?|DRAGEAS?|DRÁGEAS?|PREENCH?|1?SER|SERINGA[S]?|PRATI-D)\b.*/i, '');
+
+            // Remove indicador de genérico "(G)" do final
+            nome = nome.replace(/\s*\(G\)\s*$/, '').trim();
+
+            return nome || raw;
+        }
+
         async function loadAndRenderEstoque() {
             document.getElementById('estoqueTbody').innerHTML =
                 '<tr><td colspan="7" style="padding:20px;color:var(--muted);text-align:center">Carregando…</td></tr>';
@@ -11064,7 +11100,14 @@
 
         function estoqueRenderTabela() {
             const busca = (document.getElementById('estoqueBusca')?.value || '').toLowerCase();
-            const dados = (_estoqueData || []).filter(e => !busca || e.produto.toLowerCase().includes(busca));
+            const dados = (_estoqueData || []).filter(e => {
+                if (!isMedicamento(e.produto)) return false;
+                if (busca) {
+                    const nome = normalizarNomeMed(e.produto).toLowerCase();
+                    return nome.includes(busca) || e.produto.toLowerCase().includes(busca);
+                }
+                return true;
+            });
             if (!dados.length) {
                 document.getElementById('estoqueTbody').innerHTML =
                     '<tr><td colspan="7" style="padding:20px;color:var(--muted);text-align:center">Nenhum item encontrado.</td></tr>';
@@ -11073,11 +11116,12 @@
             const fmtR = v => v > 0 ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
             document.getElementById('estoqueTbody').innerHTML = dados.map(e => {
                 const saldo = e.saldo || 0;
+                const nomeMed = normalizarNomeMed(e.produto);
                 const badge = saldo <= 0 ? '<span style="background:#ef4444;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">SEM ESTOQUE</span>'
                             : saldo <= 2 ? '<span style="background:#f59e0b;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">BAIXO</span>'
                             : '<span style="background:#10b981;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">OK</span>';
                 return `<tr style="border-bottom:1px solid var(--border)">
-                    <td style="padding:9px 12px;font-weight:500">${e.produto}</td>
+                    <td style="padding:9px 12px;font-weight:500" title="${e.produto}">${nomeMed}</td>
                     <td style="padding:9px 12px;font-variant-numeric:tabular-nums;font-weight:600">${saldo}</td>
                     <td style="padding:9px 12px;color:var(--muted)">${e.unidade||'—'}</td>
                     <td style="padding:9px 12px;font-variant-numeric:tabular-nums">${fmtR(e.valor_unit)}</td>
