@@ -3593,6 +3593,7 @@
                 <p class="section-title" style="margin:0">💊 Estoque de Medicamentos</p>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <button class="cr-reload-btn" id="estoqueImportBtn" onclick="estoqueImportarNFs()">📥 Importar NFs do Drive</button>
+                    <button class="cr-reload-btn" onclick="estoqueAbrirInventario()" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#a5b4fc">📋 Inventário</button>
                     <button class="cr-reload-btn" onclick="estoqueAbrirAjuste()">✏️ Ajuste Manual</button>
                     <button class="cr-reload-btn" onclick="loadAndRenderEstoque()">↺ Recarregar</button>
                 </div>
@@ -3625,6 +3626,28 @@
                 </table>
             </div>
         </section>
+
+        <!-- Modal Inventário Inicial -->
+        <div id="estoqueInventarioModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+            <div style="background:var(--card);border-radius:16px;padding:28px;width:100%;max-width:560px;margin:20px">
+                <h3 style="margin:0 0 8px;font-size:16px">📋 Inventário — Aplicar Contagem Física</h3>
+                <p style="font-size:12px;color:var(--muted);margin:0 0 16px">Uma linha por medicamento: <code>NOME_BUSCA,QUANTIDADE</code><br>O sistema calcula o ajuste automaticamente (real − saldo NF).</p>
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Data do inventário</label>
+                        <input id="invData" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:inherit;font-size:13px;box-sizing:border-box">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Medicamentos e quantidades</label>
+                        <textarea id="invTexto" rows="16" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box;resize:vertical"></textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:8px">
+                        <button onclick="estoqueSalvarInventario()" style="flex:1;background:var(--accent);color:#000;border:none;border-radius:8px;padding:11px;font-weight:700;font-size:13px;cursor:pointer">✅ Aplicar Inventário</button>
+                        <button onclick="document.getElementById('estoqueInventarioModal').style.display='none'" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 18px;cursor:pointer;font-size:13px">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Modal Ajuste Estoque -->
         <div id="estoqueAjusteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
@@ -11149,6 +11172,61 @@
                 alert('⚠ Erro: ' + e.message);
             } finally {
                 if (btn) btn.textContent = '📥 Importar NFs do Drive';
+            }
+        }
+
+        const _INVENTARIO_PADRAO = `ORGALUTRAN,35
+DUPHASTON,36
+MENOPUR,290
+CHORIOMON,17
+UTROGESTAN,184
+MERIONAL,56
+PERGOVERIS 300,0
+PERGOVERIS 900,47
+REKOVELLE,158
+OVIDREL,57
+PUREGON,77
+TRACTOCILE,13
+ELONVA,8
+FILGRASTIM,5
+GONAPEPTYL,56`;
+
+        function estoqueAbrirInventario() {
+            const d = new Date();
+            const ontem = new Date(d.setDate(d.getDate()-1));
+            document.getElementById('invData').value = ontem.toISOString().substring(0,10);
+            document.getElementById('invTexto').value = _INVENTARIO_PADRAO;
+            document.getElementById('estoqueInventarioModal').style.display = 'flex';
+        }
+
+        async function estoqueSalvarInventario() {
+            const data  = document.getElementById('invData').value;
+            const texto = document.getElementById('invTexto').value.trim();
+            if (!data || !texto) { alert('Preencha a data e os medicamentos.'); return; }
+
+            const itens = texto.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+                const [busca, qtd] = l.split(',');
+                return { busca: (busca||'').trim().toUpperCase(), nome: (busca||'').trim(), quantidade: Number((qtd||'0').trim()) };
+            }).filter(it => it.busca);
+
+            if (!itens.length) { alert('Nenhum item válido. Formato: NOME,QUANTIDADE'); return; }
+            if (!confirm(`Aplicar inventário de ${itens.length} medicamentos com data ${data}?\n\nIsso criará ajustes na planilha para acertar o saldo ao valor real.`)) return;
+
+            try {
+                const resp = await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'inventario_inicial', data, itens })
+                });
+                const json = await resp.json();
+                if (json.error) throw new Error(json.error);
+                document.getElementById('estoqueInventarioModal').style.display = 'none';
+                const resumo = (json.resultados||[]).map(r =>
+                    `${r.nome}: saldo=${r.saldoAtual} → real=${r.qtdReal} (ajuste ${r.diff > 0 ? '+' : ''}${r.diff})`
+                ).join('\n');
+                alert(`✅ Inventário aplicado!\n${json.ajustes} ajustes criados.\n\n${resumo}`);
+                await loadAndRenderEstoque();
+            } catch(e) {
+                alert('⚠ Erro: ' + e.message);
             }
         }
 

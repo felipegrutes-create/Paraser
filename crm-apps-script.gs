@@ -189,6 +189,7 @@ function doPost(e) {
     try {
       if (action === 'ajuste_estoque')       return handleAjusteEstoque(body);
       if (action === 'enviar_pipeline_slack') return handleEnviarPipelineSlack(body);
+      if (action === 'inventario_inicial')   return handleInventarioInicial(body);
 
       if (action === 'save_caixa') {
         return handleSaveCaixa(body);
@@ -1282,6 +1283,59 @@ function handleAjusteEstoque(body) {
     return jsonOk({ success: true, message: 'Ajuste registrado: ' + produto + ' (' + (qtd > 0 ? '+' : '') + qtd + ')' });
   } catch(e) {
     return jsonErr('Erro ao registrar ajuste: ' + e.message);
+  }
+}
+
+function handleInventarioInicial(body) {
+  try {
+    var dataInv = body.data || new Date().toISOString().substring(0, 10);
+    var itens   = body.itens || [];
+
+    var nfSheet = getOrCreateEstoqueNFSheet();
+    var ajSheet = getOrCreateAjustesSheet();
+    var nfData  = nfSheet.getDataRange().getValues();
+    var ajData  = ajSheet.getDataRange().getValues();
+
+    var novasLinhas = [];
+    var resultados  = [];
+
+    itens.forEach(function(item) {
+      var busca   = (item.busca || '').toUpperCase().trim();
+      var qtdReal = Number(item.quantidade);
+
+      // Soma entradas de NF que contenham o termo de busca
+      var saldoNF = 0;
+      for (var i = 1; i < nfData.length; i++) {
+        if (String(nfData[i][4] || '').toUpperCase().indexOf(busca) >= 0) {
+          saldoNF += Number(nfData[i][5]) || 0;
+        }
+      }
+
+      // Soma ajustes existentes
+      var saldoAj = 0;
+      for (var j = 1; j < ajData.length; j++) {
+        if (String(ajData[j][1] || '').toUpperCase().indexOf(busca) >= 0) {
+          saldoAj += Number(ajData[j][2]) || 0;
+        }
+      }
+
+      var saldoAtual = saldoNF + saldoAj;
+      var diff       = qtdReal - saldoAtual;
+
+      novasLinhas.push([dataInv, item.nome, diff, 'inventario_inicial',
+                        'Contagem física ' + dataInv, 'dashboard', '']);
+      resultados.push({ nome: item.nome, busca: busca, qtdReal: qtdReal,
+                        saldoNF: saldoNF, saldoAj: saldoAj, saldoAtual: saldoAtual, diff: diff });
+    });
+
+    if (novasLinhas.length > 0) {
+      ajSheet.getRange(ajSheet.getLastRow() + 1, 1, novasLinhas.length,
+                       ESTOQUE_AJUSTES_HEADERS.length).setValues(novasLinhas);
+    }
+
+    return jsonOk({ success: true, ajustes: novasLinhas.length, resultados: resultados });
+  } catch(e) {
+    return jsonErr('Erro no inventário: ' + e.message);
   }
 }
 
