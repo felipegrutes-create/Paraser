@@ -2154,6 +2154,93 @@
         .fin-view-btn:hover { border-color: var(--accent); color: var(--accent); }
         .fin-view-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 600; }
 
+        /* ===== ANÁLISE EXECUTIVA CR ===== */
+        .exec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .exec-kpi {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 18px;
+            position: relative;
+            overflow: hidden;
+        }
+        .exec-kpi::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+        .exec-kpi.green::before  { background: #10b981; }
+        .exec-kpi.yellow::before { background: #f59e0b; }
+        .exec-kpi.red::before    { background: #ef4444; }
+        .exec-kpi.blue::before   { background: #6366f1; }
+        .exec-kpi-val {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
+        }
+        .exec-kpi.green  .exec-kpi-val { color: #34d399; }
+        .exec-kpi.yellow .exec-kpi-val { color: #fbbf24; }
+        .exec-kpi.red    .exec-kpi-val { color: #f87171; }
+        .exec-kpi.blue   .exec-kpi-val { color: #818cf8; }
+        .exec-kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+        .exec-kpi-bench { font-size: 10px; color: var(--muted); margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; }
+        .exec-kpi-bench b { color: var(--text); }
+        .exec-insights {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 22px;
+            margin-bottom: 14px;
+        }
+        .exec-insights h4 {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--muted);
+            margin-bottom: 14px;
+        }
+        .exec-insight-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .exec-insight-row:last-child { border-bottom: none; }
+        .exec-tag {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .exec-tag.ok      { background: rgba(16,185,129,0.15); color: #34d399; }
+        .exec-tag.alert   { background: rgba(245,158,11,0.15); color: #fbbf24; }
+        .exec-tag.danger  { background: rgba(239,68,68,0.15);  color: #f87171; }
+        .exec-tag.info    { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .exec-rec {
+            background: rgba(0,212,170,0.04);
+            border: 1px solid rgba(0,212,170,0.15);
+            border-radius: 10px;
+            padding: 16px 20px;
+        }
+        .exec-rec h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 12px; }
+        .exec-rec ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .exec-rec li { font-size: 12px; color: var(--text); display: flex; gap: 8px; }
+        .exec-rec li::before { content: '→'; color: var(--accent); flex-shrink: 0; }
+
         /* ===== MAPA DE SALAS ===== */
         .salas-controls {
             display: flex;
@@ -3436,6 +3523,15 @@
                     <div class="kpi-card purple"><div class="value" id="crMedQtd">—</div><div class="label">Itens de Medicamento</div></div>
                 </div>
                 <div id="crMedContent"></div>
+            </div>
+
+            <!-- ANÁLISE EXECUTIVA -->
+            <div id="crExecWrap" style="margin-top:24px;display:none">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                    <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin:0">🧠 Análise Executiva do Mês</p>
+                    <span id="crExecMesLabel" style="font-size:12px;color:var(--accent);font-weight:600"></span>
+                </div>
+                <div id="crExecContent"></div>
             </div>
         </section>
 
@@ -10497,6 +10593,151 @@
             renderMedMensal();
         }
 
+        // ===================== ANÁLISE EXECUTIVA CR =====================
+        function renderCRExecAnalysis() {
+            const wrap = document.getElementById('crExecWrap');
+            const cont = document.getElementById('crExecContent');
+            const label = document.getElementById('crExecMesLabel');
+            if (!wrap || !cont || !crData.length) { if (wrap) wrap.style.display = 'none'; return; }
+
+            const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            if (label) label.textContent = months[crCurrentDate.getMonth()] + ' ' + crCurrentDate.getFullYear();
+            wrap.style.display = '';
+
+            const R = v => 'R$ ' + (v/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const pct = (a,b) => b > 0 ? (a/b*100).toFixed(1) : '0.0';
+
+            // ── Métricas base ──
+            const totalFat  = crData.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
+            const totalPago = crData.reduce((s,inv) => {
+                const fat = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0;
+                const pag = (inv.pagamentos||[]).reduce((sp,p)=>sp+(p.valor||0),0);
+                return s + Math.min(fat, pag);
+            }, 0);
+            const totalPend  = Math.max(0, totalFat - totalPago);
+            const uniqPac    = new Set(crData.map(inv=>inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].conta_id).filter(Boolean)).size;
+            const txReceb    = totalFat > 0 ? totalPago/totalFat*100 : 0;
+            const txInadimpl = 100 - txReceb;
+            const ticketMed  = uniqPac > 0 ? totalFat/uniqPac : 0;
+
+            // ── Mix por tipo ──
+            let totalMed = 0, totalServ = 0, totalOutros = 0;
+            const medSums = {}, servSums = {};
+            crData.forEach(inv => {
+                const fat = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0;
+                const pag = (inv.pagamentos||[]).reduce((s,p)=>s+(p.valor||0),0);
+                const prop = fat > 0 ? Math.min(pag/fat,1) : 0;
+                (inv.itens||[]).forEach(it => {
+                    const val = (it.valor||0);
+                    if (it.tipo === 'M') { totalMed += val; const n=it.nomeResolvido||it.descricao||'Medicamento'; medSums[n]=(medSums[n]||0)+val; }
+                    else if (it.tipo === 'S') { totalServ += val; const n=_resolveMedico(it.nomeResolvido||it.descricao||''); if(n) servSums[n]=(servSums[n]||0)+(val*prop); }
+                    else totalOutros += val;
+                });
+            });
+            const pctMed  = pct(totalMed,  totalFat);
+            const pctServ = pct(totalServ, totalFat);
+
+            // ── Concentração por médico ──
+            const medEntries = Object.entries(servSums).sort((a,b)=>b[1]-a[1]);
+            const totalServPago = medEntries.reduce((s,[,v])=>s+v,0);
+            const top1 = medEntries[0];
+            const top1pct = top1 && totalServPago > 0 ? top1[1]/totalServPago*100 : 0;
+
+            // ── Faturas pendentes / parciais ──
+            const nPendente = crData.filter(inv => crInvoiceStatus(inv) === 'pendente').length;
+            const nParcial  = crData.filter(inv => crInvoiceStatus(inv) === 'parcial').length;
+            const nTotal    = crData.length;
+
+            // ── Ticket médio benchmark (clínica fertilidade Brasil) ──
+            // Benchmark: SBRH/CFM — consulta ~R$300-600, FIV completo ~R$15k-35k
+            // Ticket médio por fatura (não por tratamento) ~R$2.000-5.000 é normal
+            const ticketBench = ticketMed / 100;
+            const ticketStatus = ticketBench >= 4000 ? 'green' : ticketBench >= 2000 ? 'yellow' : 'red';
+
+            // ── KPI Cards ──
+            const txRecebStatus = txReceb >= 92 ? 'green' : txReceb >= 80 ? 'yellow' : 'red';
+            const inadimplStatus = txInadimpl <= 8 ? 'green' : txInadimpl <= 20 ? 'yellow' : 'red';
+            const concStatus = top1pct <= 50 ? 'green' : top1pct <= 70 ? 'yellow' : 'red';
+            const medStatus2 = parseFloat(pctMed) <= 35 ? 'green' : parseFloat(pctMed) <= 50 ? 'yellow' : 'red';
+
+            const kpiHtml = `<div class="exec-grid">
+                <div class="exec-kpi ${txRecebStatus}">
+                    <div class="exec-kpi-val">${txReceb.toFixed(1)}%</div>
+                    <div class="exec-kpi-label">Taxa de Recebimento</div>
+                    <div class="exec-kpi-bench">Benchmark clínica: <b>&gt;92%</b> ótimo · 80–92% aceitável · &lt;80% crítico</div>
+                </div>
+                <div class="exec-kpi ${inadimplStatus}">
+                    <div class="exec-kpi-val">${txInadimpl.toFixed(1)}%</div>
+                    <div class="exec-kpi-label">Inadimplência do Mês</div>
+                    <div class="exec-kpi-bench">Benchmark saúde: <b>&lt;8%</b> saudável · 8–20% atenção · &gt;20% crítico</div>
+                </div>
+                <div class="exec-kpi ${ticketStatus}">
+                    <div class="exec-kpi-val">${R(ticketMed)}</div>
+                    <div class="exec-kpi-label">Ticket Médio / Paciente</div>
+                    <div class="exec-kpi-bench">Benchmark fertilidade: <b>R$ 4k–8k</b>/fatura · FIV completo R$ 15k–35k</div>
+                </div>
+                <div class="exec-kpi ${concStatus}">
+                    <div class="exec-kpi-val">${top1pct.toFixed(0)}%</div>
+                    <div class="exec-kpi-label">Concentração — ${top1?top1[0]:'—'}</div>
+                    <div class="exec-kpi-bench">Risco operacional: <b>&lt;50%</b> saudável · &gt;70% dependência crítica</div>
+                </div>
+                <div class="exec-kpi ${medStatus2}">
+                    <div class="exec-kpi-val">${pctMed}%</div>
+                    <div class="exec-kpi-label">Share de Medicamentos</div>
+                    <div class="exec-kpi-bench">Clínica FIV normal: <b>20–35%</b> · &gt;45% reduz margem operacional</div>
+                </div>
+                <div class="exec-kpi blue">
+                    <div class="exec-kpi-val">${nPendente + nParcial}</div>
+                    <div class="exec-kpi-label">Faturas em Aberto</div>
+                    <div class="exec-kpi-bench">${nPendente} pendentes · ${nParcial} parciais · de ${nTotal} faturas totais</div>
+                </div>
+            </div>`;
+
+            // ── Insights ──
+            const insights = [];
+
+            if (txReceb >= 92) insights.push({ tag:'ok', text:`<b>Recebimento saudável (${txReceb.toFixed(1)}%).</b> A clínica está recebendo quase tudo que fatura — excelente gestão de cobrança.` });
+            else if (txReceb >= 80) insights.push({ tag:'alert', text:`<b>Recebimento abaixo do ideal (${txReceb.toFixed(1)}%).</b> Há ${R(totalPend)} pendentes. Acionar régua de cobrança para faturas em aberto pode recuperar parte desse valor ainda no mês.` });
+            else insights.push({ tag:'danger', text:`<b>Recebimento crítico (${txReceb.toFixed(1)}%).</b> ${R(totalPend)} não recebidos. Revisar política de adiantamento e cobrança pré-procedimento com urgência.` });
+
+            if (top1pct > 70) insights.push({ tag:'danger', text:`<b>Alta concentração em ${top1?top1[0]:'1 médico'} (${top1pct.toFixed(0)}% da receita de serviços).</b> Saída ou afastamento desse profissional impacta diretamente o faturamento. Diversificar agenda de captação.` });
+            else if (top1pct > 50) insights.push({ tag:'alert', text:`<b>${top1?top1[0]:'Top médico'} responde por ${top1pct.toFixed(0)}% da receita de serviços.</b> Concentração moderada — saudável desde que a agenda esteja crescendo para outros profissionais.` });
+            else insights.push({ tag:'ok', text:`<b>Receita bem distribuída entre os médicos (top: ${top1pct.toFixed(0)}%).</b> Menor risco operacional de dependência de um único profissional.` });
+
+            const pctMedNum = parseFloat(pctMed);
+            if (pctMedNum > 45) insights.push({ tag:'alert', text:`<b>Medicamentos representam ${pctMed}% do faturamento.</b> Alto share reduz margem — medicamento tem custo direto alto. Avaliar se o repasse ao paciente cobre o custo real + overhead de estoque.` });
+            else insights.push({ tag:'info', text:`<b>Mix medicamentos × serviços:</b> ${pctMed}% med · ${pctServ}% serviços. Dentro do padrão de clínicas de reprodução assistida (benchmark: 20–35% med).` });
+
+            if (ticketBench < 2000) insights.push({ tag:'alert', text:`<b>Ticket médio baixo (${R(ticketMed)}/paciente).</b> Pode indicar muitas consultas avulsas sem conversão para tratamento. Verificar taxa de conversão consulta → FIV/protocolo.` });
+            else if (ticketBench >= 4000) insights.push({ tag:'ok', text:`<b>Ticket médio saudável (${R(ticketMed)}/paciente).</b> Indica boa conversão para procedimentos de maior valor (FIV, protocolos de estimulação).` });
+            else insights.push({ tag:'info', text:`<b>Ticket médio de ${R(ticketMed)}/paciente.</b> Crescimento passa por aumentar procedimentos completos (FIV, ICSI) em relação a consultas isoladas.` });
+
+            if (nPendente > nTotal * 0.15) insights.push({ tag:'alert', text:`<b>${nPendente} faturas 100% pendentes (${pct(nPendente,nTotal)}% do total).</b> Concentração de inadimplência — verificar se são casos novos ou recorrentes e acionar cobrança ativa.` });
+
+            const insightHtml = `<div class="exec-insights">
+                <h4>💡 Insights do Mês</h4>
+                ${insights.map(i => `<div class="exec-insight-row">
+                    <span class="exec-tag ${i.tag}">${i.tag==='ok'?'✓ BOM':i.tag==='alert'?'⚠ ATENÇÃO':i.tag==='danger'?'✕ CRÍTICO':'ℹ INFO'}</span>
+                    <span>${i.text}</span>
+                </div>`).join('')}
+            </div>`;
+
+            // ── Recomendações ──
+            const recs = [];
+            if (txInadimpl > 8) recs.push(`Implementar cobrança pré-procedimento (sinal de 30–50%) para reduzir inadimplência — prática padrão em clínicas de FIV no Brasil.`);
+            if (top1pct > 60) recs.push(`Investir em captação para os demais médicos — ${top1?top1[0]:'médico líder'} domina ${top1pct.toFixed(0)}% da receita, o que é risco operacional real.`);
+            if (ticketBench < 3000) recs.push(`Criar pacotes fechados de tratamento (FIV + medicamento + consultas) aumenta ticket e melhora previsibilidade de receita.`);
+            if (pctMedNum > 40) recs.push(`Revisar markup de medicamentos — share acima de 40% comprime margem. Negociar com distribuidores ou avaliar farmácia própria.`);
+            recs.push(`Monitorar mês a mês a taxa de conversão consulta 1ª vez → protocolo de tratamento. É o principal driver de crescimento de receita em fertilidade.`);
+
+            const recHtml = `<div class="exec-rec">
+                <h4>→ Recomendações para este mês</h4>
+                <ul>${recs.map(r=>`<li>${r}</li>`).join('')}</ul>
+            </div>`;
+
+            cont.innerHTML = kpiHtml + insightHtml + recHtml;
+        }
+
         // ===================== CAIXA RECEPÇÃO =====================
         let cxPayments = [];
         let cxDataLoaded = false;
@@ -10975,6 +11216,7 @@
             renderCRMedicos();
             renderCRProjetoAna();
             renderCRMedicamentos();
+            renderCRExecAnalysis();
 
             if (!filtered.length) {
                 document.getElementById('crTableContent').innerHTML =
