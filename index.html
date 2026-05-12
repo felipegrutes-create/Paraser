@@ -11701,7 +11701,7 @@
             if (!pipeline.length) { alert('Nenhum orçamento em pipeline para este mês.'); return; }
             const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
             const periodo = months[crCurrentDate.getMonth()] + '/' + crCurrentDate.getFullYear();
-            const PIPELINE_EXCLUIR = /^USG\b|ULTRASSOM|ULTRASSONOGRAFIA|ECOGRAFIA/i;
+            const PIPELINE_EXCLUIR = /^USG\b|ULTRASSOM|ULTRASSONOGRAFIA|ECOGRAFIA|CONSULTA/i;
             const itens = pipeline.map(inv => {
                 const det = inv.detalhes && inv.detalhes[0];
                 const fatVal = det ? (det.valor || 0) : 0;
@@ -11713,7 +11713,7 @@
                     data: data,
                     procedimento: proc ? (proc.nomeResolvido || proc.descricao || '') : ''
                 };
-            }).filter(it => it.valor > 0 && !PIPELINE_EXCLUIR.test(it.procedimento))
+            }).filter(it => it.valor > 0 && it.procedimento && !PIPELINE_EXCLUIR.test(it.procedimento))
               .sort((a,b) => b.valor - a.valor);
             const total = itens.reduce((s,i) => s + i.valor, 0);
             const btn = document.getElementById('crSlackPipelineBtn');
