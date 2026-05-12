@@ -1218,6 +1218,7 @@
         .cr-badge-pago    { background:rgba(16,185,129,0.15); color:#34d399; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
         .cr-badge-parcial { background:rgba(245,158,11,0.15);  color:#fbbf24; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
         .cr-badge-pendente{ background:rgba(239,68,68,0.15);   color:#f87171; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
+        .cr-badge-pipeline{ background:rgba(168,85,247,0.15);  color:#c084fc; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
         .cr-badge-proc { background:rgba(99,102,241,0.15); color:#a5b4fc; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:600; }
         .cr-badge-med  { background:rgba(236,72,153,0.15);  color:#f472b6; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:600; }
         .cr-row-expand { cursor:pointer; }
@@ -3441,7 +3442,8 @@
             <div class="kpi-grid">
                 <div class="kpi-card teal"><div class="value" id="cr-total">—</div><div class="label">Total Faturado</div></div>
                 <div class="kpi-card"><div class="value" id="cr-recebido" style="color:#34d399">—</div><div class="label">Recebido</div></div>
-                <div class="kpi-card"><div class="value" id="cr-pendente" style="color:#f87171">—</div><div class="label">Pendente</div></div>
+                <div class="kpi-card"><div class="value" id="cr-areceber" style="color:#fbbf24">—</div><div class="label">A Receber</div></div>
+                <div class="kpi-card purple"><div class="value" id="cr-pipeline" style="color:#c084fc">—</div><div class="label">Pipeline (Orçamentos)</div></div>
                 <div class="kpi-card"><div class="value" id="cr-pacientes">—</div><div class="label">Pacientes</div></div>
                 <div class="kpi-card"><div class="value" id="cr-ticket">—</div><div class="label">Ticket Médio</div></div>
             </div>
@@ -3474,8 +3476,8 @@
                 <select id="crStatus" onchange="renderCR()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:inherit;font-size:13px;cursor:pointer;min-width:180px">
                     <option value="">Todos os status</option>
                     <option value="pago">Recebido</option>
-                    <option value="parcial">Parcialmente pago</option>
-                    <option value="pendente">Pendente</option>
+                    <option value="parcial">A Receber (tem parcial)</option>
+                    <option value="pipeline">Pipeline (orçamento)</option>
                 </select>
             </div>
 
@@ -10787,7 +10789,7 @@
             const txReceb = fat>0 ? pago/fat*100 : 0;
             return { fat, pago, pend, pac, ticket: pac>0?fat/pac:0, txReceb, txInad:100-txReceb,
                      totalMed, totalServ, totalOutros, servSums, procSums,
-                     nPend: data.filter(inv=>crInvoiceStatus(inv)==='pendente').length,
+                     nPend: data.filter(inv=>crInvoiceStatus(inv)==='pipeline').length,
                      nParc: data.filter(inv=>crInvoiceStatus(inv)==='parcial').length,
                      nTotal: data.length };
         }
@@ -11230,7 +11232,7 @@
             const top1pct = top1 && totalServPago > 0 ? top1[1]/totalServPago*100 : 0;
 
             // ── Faturas pendentes / parciais ──
-            const nPendente = crData.filter(inv => crInvoiceStatus(inv) === 'pendente').length;
+            const nPendente = crData.filter(inv => crInvoiceStatus(inv) === 'pipeline').length;
             const nParcial  = crData.filter(inv => crInvoiceStatus(inv) === 'parcial').length;
             const nTotal    = crData.length;
 
@@ -11696,12 +11698,14 @@
             const det = inv.detalhes && inv.detalhes[0];
             const total = det ? (det.valor || 0) : 0;
             const pago = (inv.pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
-            return pago >= total && total > 0 ? 'pago' : pago > 0 ? 'parcial' : 'pendente';
+            if (pago >= total && total > 0) return 'pago';
+            if (pago > 0) return 'parcial';
+            return 'pipeline'; // nenhuma baixa = orçamento
         }
         function crStatusBadge(s) {
-            if (s === 'pago')    return '<span class="cr-badge-pago">RECEBIDO</span>';
-            if (s === 'parcial') return '<span class="cr-badge-parcial">PARCIAL</span>';
-            return '<span class="cr-badge-pendente">PENDENTE</span>';
+            if (s === 'pago')     return '<span class="cr-badge-pago">RECEBIDO</span>';
+            if (s === 'parcial')  return '<span class="cr-badge-parcial">A RECEBER</span>';
+            return '<span class="cr-badge-pipeline">PIPELINE</span>';
         }
 
         // Controla requisição em andamento (cancela anterior ao trocar mês)
@@ -11734,7 +11738,7 @@
 
             // Limpa estado visual
             _crClearCharts();
-            ['cr-total','cr-recebido','cr-pendente','cr-pacientes','cr-ticket'].forEach(id => document.getElementById(id).textContent = '—');
+            ['cr-total','cr-recebido','cr-areceber','cr-pipeline','cr-pacientes','cr-ticket'].forEach(id => document.getElementById(id).textContent = '—');
             ['crAnaFaturado','crAnaRecebido','crAnaPendente','crAnaPacientes','crAnaTicket','crAnaTotal'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '—'; });
             ['crMedFaturado','crMedRecebido','crMedPendente','crMedQtd','crMedTotal'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '—'; });
             const crAnaContent = document.getElementById('crAnaContent');
@@ -11792,9 +11796,20 @@
                 return s + Math.min(fatVal, pagSum);
             }, 0);
             const uniqPac   = new Set(crData.map(inv => inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].conta_id).filter(Boolean)).size;
+            const totalAReceber = crData.reduce((s, inv) => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p)=>sp+(p.valor||0),0);
+                return pagSum > 0 && pagSum < fatVal ? s + (fatVal - pagSum) : s;
+            }, 0);
+            const totalPipeline = crData.reduce((s, inv) => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p)=>sp+(p.valor||0),0);
+                return pagSum === 0 && fatVal > 0 ? s + fatVal : s;
+            }, 0);
             document.getElementById('cr-total').textContent     = crFmt(totalFat);
             document.getElementById('cr-recebido').textContent  = crFmt(totalPago);
-            document.getElementById('cr-pendente').textContent  = crFmt(Math.max(0, totalFat - totalPago));
+            document.getElementById('cr-areceber').textContent  = crFmt(totalAReceber);
+            document.getElementById('cr-pipeline').textContent  = crFmt(totalPipeline);
             document.getElementById('cr-pacientes').textContent = uniqPac;
             document.getElementById('cr-ticket').textContent    = crData.length ? crFmt(totalFat / crData.length) : '—';
 
@@ -11952,15 +11967,23 @@
                 return s + Math.min(fatVal, pagSum);
             }, 0);
             const totalFaturado = crData.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
-            const pend = Math.max(0, totalFaturado - totalRecebido);
+            const aReceber = crData.reduce((s, inv) => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p)=>sp+(p.valor||0),0);
+                return pagSum > 0 && pagSum < fatVal ? s + (fatVal - pagSum) : s;
+            }, 0);
+            const pipeline = crData.reduce((s, inv) => {
+                const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
+                const pagSum = (inv.pagamentos||[]).reduce((sp,p)=>sp+(p.valor||0),0);
+                return pagSum === 0 && fatVal > 0 ? s + fatVal : s;
+            }, 0);
             const pago = totalRecebido;
-            const parcial = 0;
 
             const ctxS = document.getElementById('crChartStatus');
             if (crChartStatus) crChartStatus.destroy();
             if (ctxS) crChartStatus = new Chart(ctxS, {
                 type: 'doughnut',
-                data: { labels:['Recebido','Parcial','Pendente'], datasets:[{ data:[pago,parcial,pend], backgroundColor:['#10b981','#f59e0b','#ef4444'], borderWidth:0 }] },
+                data: { labels:['Recebido','A Receber','Pipeline'], datasets:[{ data:[pago,aReceber,pipeline], backgroundColor:['#10b981','#f59e0b','#a855f7'], borderWidth:0 }] },
                 options: { responsive:true, cutout:'65%',
                     plugins: { legend:{ labels:{color:'#6b7a99',font:{size:11}} },
                         tooltip:{ callbacks:{ label: ctx => ' '+crFmt(ctx.raw) } } } }
