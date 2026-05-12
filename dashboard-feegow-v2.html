@@ -3489,6 +3489,22 @@
                     <canvas id="medChart2026" height="300"></canvas>
                 </div>
             </div>
+
+            <!-- Mensal -->
+            <div style="margin-top:36px">
+                <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+                    <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:0">📅 Receita por Médico — Mensal</p>
+                    <div style="display:flex;gap:6px">
+                        <button id="medMesY2025" class="fin-view-btn" onclick="medMesSetAno(2025)">2025</button>
+                        <button id="medMesY2026" class="fin-view-btn active" onclick="medMesSetAno(2026)">2026</button>
+                    </div>
+                    <div id="medMesBtns" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+                    <span id="medMesStatus" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
+                </div>
+                <div class="chart-card">
+                    <canvas id="medChartMes" height="220"></canvas>
+                </div>
+            </div>
         </section>
 
         <!-- Modal Pagamento Caixa -->
@@ -10214,6 +10230,9 @@
         // ===================== MÉDICOS — RECEITA ANUAL =====================
         let _medAnnualLoaded = false;
         let _medChart2025 = null, _medChart2026 = null;
+        let _medData2025 = null, _medData2026 = null;
+        let _medMesAno = new Date().getFullYear(), _medMes = new Date().getMonth() + 1;
+        let _medChartMes = null;
 
         function _resolveMedico(nome) {
             const n = (nome||'').toUpperCase();
@@ -10300,7 +10319,107 @@
             });
         }
 
-        function medAnnualReload() { _medAnnualLoaded = false; loadAndRenderMedicos(); }
+        function medAnnualReload() { _medAnnualLoaded = false; _medData2025 = null; _medData2026 = null; loadAndRenderMedicos(); }
+
+        const _MESES_NOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+        function _medMesRenderBtns() {
+            const wrap = document.getElementById('medMesBtns');
+            if (!wrap) return;
+            wrap.innerHTML = _MESES_NOMES.map((nm, i) => {
+                const m = i + 1;
+                const active = m === _medMes ? 'active' : '';
+                return `<button class="fin-view-btn ${active}" onclick="medMesSetMes(${m})">${nm}</button>`;
+            }).join('');
+            // Atualiza pills de ano
+            document.getElementById('medMesY2025')?.classList.toggle('active', _medMesAno === 2025);
+            document.getElementById('medMesY2026')?.classList.toggle('active', _medMesAno === 2026);
+        }
+
+        function medMesSetAno(ano) { _medMesAno = ano; _medMesRenderBtns(); renderMedMensal(); }
+        function medMesSetMes(mes) { _medMes = mes; _medMesRenderBtns(); renderMedMensal(); }
+
+        function _aggregateMedicosMes(data, ano, mes) {
+            const sums = {}, itemsMap = {};
+            data.forEach(inv => {
+                const det    = inv.detalhes && inv.detalhes[0];
+                const fatVal = (det && det.valor) || 0;
+                const pagSum = (inv.pagamentos||[]).reduce((s,p)=>s+(p.valor||0),0);
+                const propPago = fatVal > 0 ? Math.min(pagSum/fatVal, 1) : 0;
+                const status   = crInvoiceStatus(inv);
+                const dataFat  = (det && det.data) || '';
+                // dataFat é DD/MM/YYYY — filtrar pelo mês/ano selecionado
+                const parts = dataFat.split('/');
+                if (parts.length < 3) return;
+                if (parseInt(parts[1]) !== mes || parseInt(parts[2]) !== ano) return;
+                (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
+                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
+                    if (!med) return;
+                    const val = (it.valor||0)/100;
+                    if (val <= 0) return;
+                    const valorPago = val * propPago;
+                    sums[med] = (sums[med]||0) + valorPago;
+                    if (!itemsMap[med]) itemsMap[med] = [];
+                    itemsMap[med].push({
+                        data: dataFat, paciente: inv.nomePaciente||'—',
+                        proc: it.nomeResolvido||it.descricao||'', qtd: it.quantidade||1,
+                        valor: val, valorPago, valorPendente: Math.max(0, val - valorPago),
+                        propPago, status, fatTotal: fatVal/100, pagTotal: pagSum/100,
+                        pagamentos: inv.pagamentos || []
+                    });
+                });
+            });
+            return { entries: Object.entries(sums).sort((a,b)=>b[1]-a[1]), itemsMap };
+        }
+
+        function renderMedMensal() {
+            const crFmtL = v => 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const data = _medMesAno === 2025 ? _medData2025 : _medData2026;
+            const statusEl = document.getElementById('medMesStatus');
+            if (!data) { if (statusEl) statusEl.textContent = 'Aguardando carregamento...'; return; }
+
+            const agg = _aggregateMedicosMes(data, _medMesAno, _medMes);
+            const { entries, itemsMap } = agg;
+            const total = entries.reduce((s,[,v])=>s+v,0);
+            if (statusEl) statusEl.textContent = entries.length
+                ? `${entries.length} médicos · ${crFmtL(total)}`
+                : 'Sem dados para este mês';
+
+            const el = document.getElementById('medChartMes');
+            if (!el) return;
+            if (_medChartMes) { try { _medChartMes.destroy(); } catch(e){} _medChartMes = null; }
+            if (!entries.length) { el.style.display='none'; return; }
+            el.style.display = '';
+
+            const barColors = ['#10b981','#6366f1','#f59e0b','#ec4899','#3b82f6','#14b8a6','#8b5cf6','#ef4444','#06b6d4','#84cc16'];
+            _medChartMes = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: entries.map(([k])=>k),
+                    datasets: [{ data: entries.map(([,v])=>v),
+                        backgroundColor: entries.map((_,i)=>barColors[i%barColors.length]+'cc'),
+                        borderColor:     entries.map((_,i)=>barColors[i%barColors.length]),
+                        borderWidth: 1.5, borderRadius: 6 }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => ' R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) } }
+                    },
+                    scales: {
+                        x: { ticks: { color:'#6b7a99', font:{size:10}, callback: v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v) }, grid:{color:'rgba(255,255,255,0.04)'} },
+                        y: { ticks: { color:'#e2e8f4', font:{size:11,weight:'600'} }, grid:{display:false} }
+                    },
+                    onClick(evt, elements) {
+                        if (!elements.length) return;
+                        window._crMedicosItemsMap = itemsMap;
+                        openCrMedicoDetail(entries[elements[0].index][0]);
+                    },
+                    onHover(evt, elements) { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
+                }
+            });
+        }
 
         async function loadAndRenderMedicos() {
             if (_medAnnualLoaded) return;
@@ -10329,6 +10448,7 @@
             // Carregar 2025
             try {
                 const data = await fetchYear('01/01/2025','31/12/2025');
+                _medData2025 = data;
                 const agg = _aggregateMedicos(data);
                 entries2025 = agg.entries;
                 const total = entries2025.reduce((s,[,v])=>s+v,0);
@@ -10344,6 +10464,7 @@
             document.getElementById('medStatus2026').textContent = 'Carregando…';
             try {
                 const data = await fetchYear('01/01/2026', fmtDate(new Date()));
+                _medData2026 = data;
                 const agg = _aggregateMedicos(data);
                 entries2026 = agg.entries;
                 const total = entries2026.reduce((s,[,v])=>s+v,0);
@@ -10368,6 +10489,10 @@
             }
 
             _medAnnualLoaded = true;
+            _medMesAno = new Date().getFullYear();
+            _medMes    = new Date().getMonth() + 1;
+            _medMesRenderBtns();
+            renderMedMensal();
         }
 
         // ===================== CAIXA RECEPÇÃO =====================
