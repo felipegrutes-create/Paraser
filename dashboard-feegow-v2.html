@@ -2474,6 +2474,7 @@
                 <button class="tab-dropdown-item" onclick="showSection('sec-fin',null)">💰 Financeiro</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-exec',null)">🧠 Análise Executiva</button>
             </div>
         </div>
     </div>
@@ -3525,14 +3526,61 @@
                 <div id="crMedContent"></div>
             </div>
 
-            <!-- ANÁLISE EXECUTIVA -->
-            <div id="crExecWrap" style="margin-top:24px;display:none">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-                    <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin:0">🧠 Análise Executiva do Mês</p>
-                    <span id="crExecMesLabel" style="font-size:12px;color:var(--accent);font-weight:600"></span>
+        </section>
+
+        <!-- ANÁLISE EXECUTIVA -->
+        <section id="sec-exec" class="section">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+                <p class="section-title" style="margin:0">🧠 Análise Executiva — Faturamento Feegow</p>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <button class="cr-nav-btn" onclick="execNavMonth(-1)">‹</button>
+                    <span id="execMonthLabel" style="font-size:15px;font-weight:600;min-width:130px;text-align:center">—</span>
+                    <button class="cr-nav-btn" onclick="execNavMonth(+1)">›</button>
+                    <button class="cr-reload-btn" onclick="execReload()">↺ Recarregar</button>
                 </div>
-                <div id="crExecContent"></div>
             </div>
+
+            <!-- KPIs -->
+            <div id="execKpiGrid" class="exec-grid" style="margin-bottom:24px"></div>
+
+            <!-- Linha 1: Tendência 6 meses + Gauge de recebimento -->
+            <div class="cr-charts-row" style="margin-bottom:16px">
+                <div class="chart-card" style="flex:2">
+                    <h3>📈 Tendência de Faturamento — Últimos 6 Meses</h3>
+                    <canvas id="execChartTrend" height="220"></canvas>
+                </div>
+                <div class="chart-card" style="flex:1">
+                    <h3>🍩 Composição da Receita</h3>
+                    <canvas id="execChartComposicao" height="220"></canvas>
+                </div>
+            </div>
+
+            <!-- Linha 2: Top procedimentos + Receita por médico -->
+            <div class="cr-charts-row" style="margin-bottom:16px">
+                <div class="chart-card">
+                    <h3>🏆 Top Procedimentos por Receita</h3>
+                    <canvas id="execChartProc" height="220"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>👨‍⚕️ Receita por Médico — Mês Selecionado</h3>
+                    <canvas id="execChartMedico" height="220"></canvas>
+                </div>
+            </div>
+
+            <!-- Linha 3: Mês atual vs anterior -->
+            <div class="cr-charts-row" style="margin-bottom:20px">
+                <div class="chart-card">
+                    <h3>📊 Comparativo Mês Atual vs Anterior <span id="execCompLabel" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <canvas id="execChartComp" height="200"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>💊 Share Medicamentos vs Procedimentos</h3>
+                    <canvas id="execChartMix" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Insights -->
+            <div id="execInsights"></div>
         </section>
 
         <!-- CAIXA RECEPÇÃO -->
@@ -4831,6 +4879,7 @@
             'sec-fin':           'group-fin',
             'sec-cr':            'group-fin',
             'sec-caixa':         'group-fin',
+            'sec-exec':          'group-fin',
         };
 
         function toggleTabGroup(groupId, event) {
@@ -4867,6 +4916,7 @@
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             if (id === 'sec-caixa') loadAndRenderMedicos();
+            if (id === 'sec-exec') loadAndRenderExec();
             if (id === 'sec-cr') loadAndRenderCR();
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
@@ -10593,6 +10643,304 @@
             renderMedMensal();
         }
 
+        // ===================== ANÁLISE EXECUTIVA (aba própria) =====================
+        let _execDate   = new Date();
+        let _execCache  = {};   // 'YYYY-MM' → data[]
+        let _execCharts = {};   // id → Chart instance
+        const _MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+        function _execKey(d)    { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+        function _execFmtDate(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+        function execNavMonth(dir) { _execDate = new Date(_execDate.getFullYear(), _execDate.getMonth()+dir, 1); loadAndRenderExec(); }
+        function execReload()   { delete _execCache[_execKey(_execDate)]; loadAndRenderExec(); }
+
+        function _execDestroyCharts() {
+            Object.values(_execCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+            _execCharts = {};
+        }
+
+        async function _execLoadMonth(d) {
+            const key = _execKey(d);
+            if (_execCache[key]) return _execCache[key];
+            const start = new Date(d.getFullYear(), d.getMonth(), 1);
+            const end   = new Date(d.getFullYear(), d.getMonth()+1, 0);
+            const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(_execFmtDate(start))}&data_end=${encodeURIComponent(_execFmtDate(end))}`;
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const json = await resp.json();
+            if (json.error) throw new Error(json.error);
+            _execCache[key] = json.data || [];
+            return _execCache[key];
+        }
+
+        function _execMetrics(data) {
+            if (!data || !data.length) return { fat:0, pago:0, pend:0, pac:0, ticket:0, txReceb:0, txInad:0, totalMed:0, totalServ:0, totalOutros:0, servSums:{}, procSums:{}, nPend:0, nParc:0, nTotal:0 };
+            const fat  = data.reduce((s,inv) => s + ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0), 0);
+            const pago = data.reduce((s,inv) => {
+                const f = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0;
+                const p = (inv.pagamentos||[]).reduce((sp,pg)=>sp+(pg.valor||0),0);
+                return s + Math.min(f,p);
+            }, 0);
+            const pac = new Set(data.map(inv=>inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].conta_id).filter(Boolean)).size;
+            let totalMed=0, totalServ=0, totalOutros=0;
+            const servSums={}, procSums={};
+            data.forEach(inv => {
+                const f = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0;
+                const p = (inv.pagamentos||[]).reduce((s,pg)=>s+(pg.valor||0),0);
+                const prop = f>0 ? Math.min(p/f,1) : 0;
+                (inv.itens||[]).forEach(it => {
+                    const val = it.valor||0;
+                    const nome = it.nomeResolvido||it.descricao||'';
+                    if (it.tipo==='M') { totalMed+=val; }
+                    else if (it.tipo==='S') {
+                        totalServ+=val;
+                        const med = _resolveMedico(nome);
+                        if (med) servSums[med] = (servSums[med]||0) + val*prop;
+                        if (nome) procSums[nome] = (procSums[nome]||0) + val;
+                    } else totalOutros+=val;
+                });
+            });
+            const pend = Math.max(0, fat-pago);
+            const txReceb = fat>0 ? pago/fat*100 : 0;
+            return { fat, pago, pend, pac, ticket: pac>0?fat/pac:0, txReceb, txInad:100-txReceb,
+                     totalMed, totalServ, totalOutros, servSums, procSums,
+                     nPend: data.filter(inv=>crInvoiceStatus(inv)==='pendente').length,
+                     nParc: data.filter(inv=>crInvoiceStatus(inv)==='parcial').length,
+                     nTotal: data.length };
+        }
+
+        async function loadAndRenderExec() {
+            const lbl = document.getElementById('execMonthLabel');
+            if (lbl) lbl.textContent = _MONTHS_PT[_execDate.getMonth()] + ' ' + _execDate.getFullYear();
+            _execDestroyCharts();
+            document.getElementById('execKpiGrid').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Carregando dados…</div>';
+            document.getElementById('execInsights').innerHTML = '';
+
+            // Carrega mês atual + anterior em paralelo
+            const prevDate = new Date(_execDate.getFullYear(), _execDate.getMonth()-1, 1);
+            let cur, prev;
+            try {
+                [cur, prev] = await Promise.all([_execLoadMonth(_execDate), _execLoadMonth(prevDate)]);
+            } catch(e) {
+                document.getElementById('execKpiGrid').innerHTML = `<div style="color:#ef4444;padding:20px">⚠ Erro: ${e.message}</div>`;
+                return;
+            }
+
+            const m  = _execMetrics(cur);
+            const mp = _execMetrics(prev);
+
+            // Carrega últimos 6 meses para tendência (background, sem bloquear render)
+            const trendMonths = Array.from({length:6},(_,i)=>new Date(_execDate.getFullYear(),_execDate.getMonth()-5+i,1));
+            Promise.all(trendMonths.map(d=>_execLoadMonth(d).catch(()=>[])))
+                .then(datasets => {
+                    const trendMetrics = datasets.map(d=>_execMetrics(d));
+                    _execRenderTrend(trendMonths, trendMetrics);
+                    _execRenderComp(m, mp);
+                });
+
+            _execRenderKPIs(m, mp);
+            _execRenderComposicao(m);
+            _execRenderTopProc(m);
+            _execRenderMedico(m);
+            _execRenderMix(m);
+            _execRenderInsights(m, mp);
+        }
+
+        function _execRenderKPIs(m, mp) {
+            const R  = v => 'R$ ' + (v/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const d  = (cur,prev,inv) => { if(!prev) return ''; const pct=((cur-prev)/Math.abs(prev)*100); const up=inv?pct<0:pct>0; return `<span style="font-size:10px;color:${up?'#34d399':'#f87171'}">${pct>0?'▲':'▼'} ${Math.abs(pct).toFixed(1)}% vs mês ant.</span>`; };
+            const recS = m.txReceb>=92?'green':m.txReceb>=80?'yellow':'red';
+            const inaS = m.txInad<=8?'green':m.txInad<=20?'yellow':'red';
+            const tkS  = (m.ticket/100)>=4000?'green':(m.ticket/100)>=2000?'yellow':'red';
+            const top1 = Object.entries(m.servSums).sort((a,b)=>b[1]-a[1])[0];
+            const totSrv = Object.values(m.servSums).reduce((s,v)=>s+v,0);
+            const concPct = top1&&totSrv>0?top1[1]/totSrv*100:0;
+            const concS = concPct<=50?'green':concPct<=70?'yellow':'red';
+            const medPct = m.fat>0?m.totalMed/m.fat*100:0;
+            const medS  = medPct<=35?'green':medPct<=50?'yellow':'red';
+            document.getElementById('execKpiGrid').innerHTML = `
+                <div class="exec-kpi ${recS}">
+                    <div class="exec-kpi-val">${m.txReceb.toFixed(1)}%</div>
+                    <div class="exec-kpi-label">Taxa de Recebimento</div>
+                    ${d(m.txReceb,mp.txReceb,false)}
+                    <div class="exec-kpi-bench">Benchmark: <b>&gt;92%</b> ótimo</div>
+                </div>
+                <div class="exec-kpi ${inaS}">
+                    <div class="exec-kpi-val">${m.txInad.toFixed(1)}%</div>
+                    <div class="exec-kpi-label">Inadimplência</div>
+                    ${d(m.txInad,mp.txInad,true)}
+                    <div class="exec-kpi-bench">Benchmark: <b>&lt;8%</b> saudável</div>
+                </div>
+                <div class="exec-kpi ${tkS}">
+                    <div class="exec-kpi-val">${R(m.ticket)}</div>
+                    <div class="exec-kpi-label">Ticket Médio / Paciente</div>
+                    ${d(m.ticket,mp.ticket,false)}
+                    <div class="exec-kpi-bench">Fertilidade: <b>R$4k–8k</b>/fatura</div>
+                </div>
+                <div class="exec-kpi ${concS}">
+                    <div class="exec-kpi-val">${concPct.toFixed(0)}%</div>
+                    <div class="exec-kpi-label">Conc. ${top1?top1[0].split(' ').slice(-1)[0]:'Médico'}</div>
+                    <div class="exec-kpi-bench">Risco: <b>&gt;70%</b> dependência crítica</div>
+                </div>
+                <div class="exec-kpi ${medS}">
+                    <div class="exec-kpi-val">${medPct.toFixed(1)}%</div>
+                    <div class="exec-kpi-label">Share Medicamentos</div>
+                    <div class="exec-kpi-bench">Normal FIV: <b>20–35%</b></div>
+                </div>
+                <div class="exec-kpi blue">
+                    <div class="exec-kpi-val">${m.nPend+m.nParc}</div>
+                    <div class="exec-kpi-label">Faturas em Aberto</div>
+                    <div class="exec-kpi-bench">${m.nPend} pendentes · ${m.nParc} parciais · ${m.nTotal} total</div>
+                </div>`;
+        }
+
+        function _execRenderTrend(months, metrics) {
+            const el = document.getElementById('execChartTrend'); if (!el) return;
+            if (_execCharts.trend) { try{_execCharts.trend.destroy();}catch(e){} }
+            const R100 = v => v/100;
+            _execCharts.trend = new Chart(el.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: months.map(d => _MONTHS_PT[d.getMonth()].slice(0,3) + '/' + String(d.getFullYear()).slice(-2)),
+                    datasets: [
+                        { label:'Faturado', data: metrics.map(m=>R100(m.fat)), borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.08)', fill:true, tension:0.35, pointRadius:4, pointHoverRadius:6 },
+                        { label:'Recebido', data: metrics.map(m=>R100(m.pago)), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.08)', fill:true, tension:0.35, pointRadius:4, pointHoverRadius:6 },
+                        { label:'Pendente', data: metrics.map(m=>R100(m.pend)), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.05)', fill:true, tension:0.35, pointRadius:4, borderDash:[4,4] }
+                    ]
+                },
+                options: {
+                    responsive:true,
+                    plugins: { legend:{ labels:{ color:'#9ca3af', font:{size:11} } }, tooltip:{ callbacks:{ label: ctx=>' R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2}) } } },
+                    scales: {
+                        x: { ticks:{color:'#6b7a99',font:{size:11}}, grid:{color:'rgba(255,255,255,0.04)'} },
+                        y: { ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} }
+                    }
+                }
+            });
+        }
+
+        function _execRenderComposicao(m) {
+            const el = document.getElementById('execChartComposicao'); if (!el) return;
+            if (_execCharts.comp) { try{_execCharts.comp.destroy();}catch(e){} }
+            const labels = ['Serviços','Medicamentos','Outros'];
+            const vals   = [m.totalServ, m.totalMed, m.totalOutros].map(v=>v/100);
+            _execCharts.comp = new Chart(el.getContext('2d'), {
+                type:'doughnut',
+                data:{ labels, datasets:[{ data:vals, backgroundColor:['#6366f1cc','#10b981cc','#f59e0bcc'], borderWidth:0 }] },
+                options:{ responsive:true, cutout:'60%', plugins:{ legend:{ position:'bottom', labels:{ color:'#9ca3af', font:{size:11}, boxWidth:12 } }, tooltip:{ callbacks:{ label:ctx=>' R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})+' ('+((ctx.raw/vals.reduce((a,b)=>a+b,0))*100).toFixed(1)+'%)' } } } }
+            });
+        }
+
+        function _execRenderTopProc(m) {
+            const el = document.getElementById('execChartProc'); if (!el) return;
+            if (_execCharts.proc) { try{_execCharts.proc.destroy();}catch(e){} }
+            const entries = Object.entries(m.procSums).sort((a,b)=>b[1]-a[1]).slice(0,10);
+            if (!entries.length) return;
+            const colors = ['#6366f1','#10b981','#f59e0b','#ec4899','#3b82f6','#14b8a6','#8b5cf6','#ef4444','#06b6d4','#84cc16'];
+            _execCharts.proc = new Chart(el.getContext('2d'), {
+                type:'bar',
+                data:{ labels:entries.map(([k])=>k.length>30?k.slice(0,30)+'…':k), datasets:[{ data:entries.map(([,v])=>v/100), backgroundColor:colors.map(c=>c+'cc'), borderColor:colors, borderWidth:1.5, borderRadius:5 }] },
+                options:{ indexAxis:'y', responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>' R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}} }, scales:{ x:{ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},grid:{color:'rgba(255,255,255,0.04)'}}, y:{ticks:{color:'#e2e8f4',font:{size:10,weight:'600'}},grid:{display:false}} } }
+            });
+        }
+
+        function _execRenderMedico(m) {
+            const el = document.getElementById('execChartMedico'); if (!el) return;
+            if (_execCharts.med) { try{_execCharts.med.destroy();}catch(e){} }
+            const entries = Object.entries(m.servSums).sort((a,b)=>b[1]-a[1]);
+            if (!entries.length) return;
+            const colors = ['#10b981','#6366f1','#f59e0b','#ec4899','#3b82f6','#14b8a6','#8b5cf6','#ef4444','#06b6d4','#84cc16'];
+            _execCharts.med = new Chart(el.getContext('2d'), {
+                type:'bar',
+                data:{ labels:entries.map(([k])=>k), datasets:[{ data:entries.map(([,v])=>v/100), backgroundColor:colors.map((c,i)=>colors[i%colors.length]+'cc'), borderColor:colors, borderWidth:1.5, borderRadius:5 }] },
+                options:{ indexAxis:'y', responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>' R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}} }, scales:{ x:{ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},grid:{color:'rgba(255,255,255,0.04)'}}, y:{ticks:{color:'#e2e8f4',font:{size:11,weight:'600'}},grid:{display:false}} } }
+            });
+        }
+
+        function _execRenderComp(m, mp) {
+            const el = document.getElementById('execChartComp'); if (!el) return;
+            if (_execCharts.compbar) { try{_execCharts.compbar.destroy();}catch(e){} }
+            const prev = new Date(_execDate.getFullYear(), _execDate.getMonth()-1, 1);
+            const lbl1 = _MONTHS_PT[prev.getMonth()].slice(0,3);
+            const lbl2 = _MONTHS_PT[_execDate.getMonth()].slice(0,3);
+            const lbl = document.getElementById('execCompLabel');
+            if (lbl) lbl.textContent = `${lbl1} vs ${lbl2}`;
+            _execCharts.compbar = new Chart(el.getContext('2d'), {
+                type:'bar',
+                data:{ labels:['Faturado','Recebido','Pendente'], datasets:[
+                    { label:lbl1, data:[mp.fat,mp.pago,mp.pend].map(v=>v/100), backgroundColor:'rgba(99,102,241,0.5)', borderColor:'#6366f1', borderWidth:1.5, borderRadius:5 },
+                    { label:lbl2, data:[m.fat,m.pago,m.pend].map(v=>v/100),   backgroundColor:'rgba(16,185,129,0.5)', borderColor:'#10b981', borderWidth:1.5, borderRadius:5 }
+                ] },
+                options:{ responsive:true, plugins:{ legend:{ labels:{color:'#9ca3af',font:{size:11}} }, tooltip:{callbacks:{label:ctx=>' R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}} }, scales:{ x:{ticks:{color:'#9ca3af',font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'}}, y:{ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},grid:{color:'rgba(255,255,255,0.04)'}} } }
+            });
+        }
+
+        function _execRenderMix(m) {
+            const el = document.getElementById('execChartMix'); if (!el) return;
+            if (_execCharts.mix) { try{_execCharts.mix.destroy();}catch(e){} }
+            const medPct  = m.fat>0 ? m.totalMed/m.fat*100 : 0;
+            const servPct = m.fat>0 ? m.totalServ/m.fat*100 : 0;
+            const outPct  = m.fat>0 ? m.totalOutros/m.fat*100 : 0;
+            _execCharts.mix = new Chart(el.getContext('2d'), {
+                type:'bar',
+                data:{ labels:['Share do Faturamento'], datasets:[
+                    { label:'Procedimentos', data:[servPct], backgroundColor:'rgba(99,102,241,0.7)', borderRadius:5 },
+                    { label:'Medicamentos',  data:[medPct],  backgroundColor:'rgba(16,185,129,0.7)', borderRadius:5 },
+                    { label:'Outros',        data:[outPct],  backgroundColor:'rgba(245,158,11,0.7)', borderRadius:5 }
+                ] },
+                options:{ responsive:true, indexAxis:'y', scales:{ x:{ stacked:true, max:100, ticks:{color:'#6b7a99',callback:v=>v+'%'}, grid:{color:'rgba(255,255,255,0.04)'} }, y:{ stacked:true, ticks:{color:'#9ca3af'}, grid:{display:false} } }, plugins:{ legend:{labels:{color:'#9ca3af',font:{size:11}}}, tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`}} } }
+            });
+        }
+
+        function _execRenderInsights(m, mp) {
+            const R = v => 'R$ '+(v/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const pct = (a,b) => b>0?(a/b*100).toFixed(1):'0.0';
+            const insights = [];
+            const top1 = Object.entries(m.servSums).sort((a,b)=>b[1]-a[1])[0];
+            const totSrv = Object.values(m.servSums).reduce((s,v)=>s+v,0);
+            const concPct = top1&&totSrv>0?top1[1]/totSrv*100:0;
+            const medPct = m.fat>0?m.totalMed/m.fat*100:0;
+            const movFat = mp.fat>0?(m.fat-mp.fat)/mp.fat*100:null;
+
+            if (movFat!==null) {
+                const tag = movFat>=0?'ok':'alert';
+                insights.push({tag, text:`<b>Faturamento ${movFat>=0?'cresceu':'caiu'} ${Math.abs(movFat).toFixed(1)}% vs mês anterior</b> — de ${R(mp.fat)} para ${R(m.fat)}.`});
+            }
+            if (m.txReceb>=92) insights.push({tag:'ok', text:`<b>Recebimento saudável (${m.txReceb.toFixed(1)}%).</b> Gestão de cobrança eficiente.`});
+            else if (m.txReceb>=80) insights.push({tag:'alert', text:`<b>Recebimento abaixo do ideal (${m.txReceb.toFixed(1)}%).</b> ${R(m.pend)} pendentes — acionar cobrança ativa.`});
+            else insights.push({tag:'danger', text:`<b>Recebimento crítico (${m.txReceb.toFixed(1)}%).</b> ${R(m.pend)} não recebidos. Revisar política de cobrança pré-procedimento.`});
+
+            if (concPct>70) insights.push({tag:'danger', text:`<b>Alta concentração em ${top1?top1[0]:'1 médico'} (${concPct.toFixed(0)}%).</b> Risco operacional: saída desse profissional impacta diretamente o caixa.`});
+            else if (concPct>50) insights.push({tag:'alert', text:`<b>${top1?top1[0]:'Top médico'} responde por ${concPct.toFixed(0)}% da receita de serviços.</b> Concentração moderada — diversificar captação.`});
+            else insights.push({tag:'ok', text:`<b>Receita bem distribuída entre médicos (top: ${concPct.toFixed(0)}%).</b> Menor risco de dependência.`});
+
+            if (medPct>45) insights.push({tag:'alert', text:`<b>Medicamentos em ${medPct.toFixed(1)}% do faturamento.</b> Share alto reduz margem — avaliar markup e custo de estoque.`});
+            else insights.push({tag:'info', text:`<b>Mix medicamentos/serviços: ${medPct.toFixed(1)}% med.</b> Dentro do padrão para clínica de reprodução (20–35%).`});
+
+            if ((m.ticket/100)<2000) insights.push({tag:'alert', text:`<b>Ticket médio baixo (${R(m.ticket)}/paciente).</b> Muitas consultas avulsas — avaliar taxa de conversão para tratamentos completos.`});
+            else insights.push({tag:'ok', text:`<b>Ticket médio de ${R(m.ticket)}/paciente.</b> Indica boa conversão para procedimentos de maior valor.`});
+
+            const recs = [];
+            if (m.txInad>8) recs.push('Implementar adiantamento de 30–50% pré-procedimento — prática padrão em clínicas de FIV para reduzir inadimplência.');
+            if (concPct>60) recs.push(`Diversificar captação — ${top1?top1[0]:'médico líder'} concentra ${concPct.toFixed(0)}% da receita de serviços.`);
+            if ((m.ticket/100)<3000) recs.push('Criar pacotes fechados (FIV + medicamento + consultas) aumenta ticket e previsibilidade.');
+            if (medPct>40) recs.push('Revisar markup de medicamentos ou negociar com distribuidores — share acima de 40% comprime margem.');
+            recs.push('Monitorar mensalmente: taxa de conversão 1ª consulta → protocolo de tratamento é o principal driver de crescimento em fertilidade.');
+
+            document.getElementById('execInsights').innerHTML = `
+                <div class="exec-insights">
+                    <h4>💡 Insights do Mês</h4>
+                    ${insights.map(i=>`<div class="exec-insight-row">
+                        <span class="exec-tag ${i.tag}">${i.tag==='ok'?'✓ BOM':i.tag==='alert'?'⚠ ATENÇÃO':i.tag==='danger'?'✕ CRÍTICO':'ℹ INFO'}</span>
+                        <span>${i.text}</span>
+                    </div>`).join('')}
+                </div>
+                <div class="exec-rec">
+                    <h4>→ Recomendações</h4>
+                    <ul>${recs.map(r=>`<li>${r}</li>`).join('')}</ul>
+                </div>`;
+        }
+
         // ===================== ANÁLISE EXECUTIVA CR =====================
         function renderCRExecAnalysis() {
             const wrap = document.getElementById('crExecWrap');
@@ -11216,7 +11564,6 @@
             renderCRMedicos();
             renderCRProjetoAna();
             renderCRMedicamentos();
-            renderCRExecAnalysis();
 
             if (!filtered.length) {
                 document.getElementById('crTableContent').innerHTML =
