@@ -43,6 +43,7 @@ const CRM_HEADERS = [
   'parc_pago','quitado','projeto_ana','observacoes','classificacao',
   'engravidou','desistiu','ultima_atualizacao'
 ];
+
 const LOG_HEADERS = [
   'timestamp','acao','paciente_key','usuario',
   'dados_anteriores','coluna_origem','coluna_destino'
@@ -158,6 +159,9 @@ function doGet(e) {
       return jsonOk({ backup: bData, timestamp: meta || '' });
     }
 
+    if (action === 'get_estoque') return handleGetEstoque();
+    if (action === 'parse_nfs')   return handleParseNFs();
+
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
     const data  = sheet.getDataRange().getValues();
@@ -183,6 +187,8 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
+      if (action === 'ajuste_estoque') return handleAjusteEstoque(body);
+
       if (action === 'save_caixa') {
         return handleSaveCaixa(body);
       }
@@ -1066,6 +1072,207 @@ function handleGetFormResponses(params) {
                     debug_last_names: lastNames });
   } catch(err) {
     return jsonErr('Erro ao ler formulário: ' + err.message);
+  }
+}
+
+// =========================================================
+// ESTOQUE DE MEDICAMENTOS
+// =========================================================
+const PASTA_NFS_XML_ID      = '1hxONrvuoUVCmwlwcSswWB90bcaXf0EmH';
+const ESTOQUE_NF_SHEET      = 'Entradas_NF';
+const ESTOQUE_AJUSTES_SHEET = 'Ajustes_Estoque';
+const ESTOQUE_NF_HEADERS    = ['nf_numero','data_nf','fornecedor','cnpj_fornecedor','produto','quantidade','unidade','valor_unit','valor_total','arquivo_xml','importado_em'];
+const ESTOQUE_AJUSTES_HEADERS = ['data','produto','quantidade','tipo','motivo','usuario','observacoes'];
+
+function getOrCreateEstoqueNFSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(ESTOQUE_NF_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(ESTOQUE_NF_SHEET);
+    sh.getRange(1, 1, 1, ESTOQUE_NF_HEADERS.length).setValues([ESTOQUE_NF_HEADERS]);
+    sh.getRange(1, 1, 1, ESTOQUE_NF_HEADERS.length).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function getOrCreateAjustesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(ESTOQUE_AJUSTES_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(ESTOQUE_AJUSTES_SHEET);
+    sh.getRange(1, 1, 1, ESTOQUE_AJUSTES_HEADERS.length).setValues([ESTOQUE_AJUSTES_HEADERS]);
+    sh.getRange(1, 1, 1, ESTOQUE_AJUSTES_HEADERS.length).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function parseNFeXML(content, filename) {
+  try {
+    const doc  = XmlService.parse(content);
+    const root = doc.getRootElement();
+    const ns   = XmlService.getNamespace('http://www.portalfiscal.inf.br/nfe');
+
+    // Suporta procNFe (wrapped) e NFe (direto)
+    let infNFe = root.getChild('infNFe', ns);
+    if (!infNFe) {
+      const nfe = root.getChild('NFe', ns);
+      if (nfe) infNFe = nfe.getChild('infNFe', ns);
+    }
+    if (!infNFe) return null;
+
+    const ide  = infNFe.getChild('ide', ns);
+    const emit = infNFe.getChild('emit', ns);
+    if (!ide || !emit) return null;
+
+    const nNF        = ide.getChildText('nNF', ns) || '';
+    const dhEmi      = ide.getChildText('dhEmi', ns) || ide.getChildText('dEmi', ns) || '';
+    const data_nf    = dhEmi ? dhEmi.substring(0, 10) : '';
+    const fornecedor = emit.getChildText('xNome', ns) || '';
+    const cnpj       = emit.getChildText('CNPJ', ns) || emit.getChildText('CPF', ns) || '';
+
+    const dets = infNFe.getChildren('det', ns);
+    const itens = [];
+    dets.forEach(function(det) {
+      const prod = det.getChild('prod', ns);
+      if (!prod) return;
+      const xProd  = prod.getChildText('xProd', ns) || '';
+      const qCom   = parseFloat(prod.getChildText('qCom', ns)   || '0');
+      const uCom   = prod.getChildText('uCom', ns) || '';
+      const vUnCom = parseFloat(prod.getChildText('vUnCom', ns) || '0');
+      const vProd  = parseFloat(prod.getChildText('vProd', ns)  || '0');
+      if (xProd && qCom > 0) {
+        itens.push({ produto: xProd, quantidade: qCom, unidade: uCom, valor_unit: vUnCom, valor_total: vProd });
+      }
+    });
+
+    return { nNF, data_nf, fornecedor, cnpj, itens };
+  } catch(e) {
+    Logger.log('Erro ao parsear ' + filename + ': ' + e.message);
+    return null;
+  }
+}
+
+function handleParseNFs() {
+  try {
+    const pasta   = DriveApp.getFolderById(PASTA_NFS_XML_ID);
+    const nfSheet = getOrCreateEstoqueNFSheet();
+
+    // Coleta chaves já importadas (nf_numero + arquivo_xml) para evitar duplicatas
+    const existData = nfSheet.getDataRange().getValues();
+    const existKeys = new Set();
+    for (var i = 1; i < existData.length; i++) {
+      existKeys.add(String(existData[i][0]) + '|' + String(existData[i][9]));
+    }
+
+    const arquivos = pasta.getFilesByType('application/xml');
+    const novas = [];
+    var processados = 0, erros = 0, ignorados = 0;
+
+    while (arquivos.hasNext()) {
+      const arq  = arquivos.next();
+      const nome = arq.getName();
+      // Ignora NFS-e (serviços), CC-e e DF-e — só NF-e de mercadorias
+      if (/nfse|NFSE|-CCe|^DFE/i.test(nome)) { ignorados++; continue; }
+
+      const content = arq.getBlob().getDataAsString('UTF-8');
+      const parsed  = parseNFeXML(content, nome);
+      if (!parsed || !parsed.itens.length) { erros++; continue; }
+
+      const agora = new Date().toISOString();
+      parsed.itens.forEach(function(it) {
+        const key = parsed.nNF + '|' + nome;
+        if (existKeys.has(key)) return;
+        novas.push([parsed.nNF, parsed.data_nf, parsed.fornecedor, parsed.cnpj,
+                    it.produto, it.quantidade, it.unidade, it.valor_unit, it.valor_total,
+                    nome, agora]);
+        existKeys.add(key);
+      });
+      processados++;
+    }
+
+    if (novas.length > 0) {
+      nfSheet.getRange(nfSheet.getLastRow() + 1, 1, novas.length, ESTOQUE_NF_HEADERS.length).setValues(novas);
+    }
+
+    return jsonOk({ success: true, processados, novas_linhas: novas.length, ignorados, erros });
+  } catch(e) {
+    return jsonErr('Erro ao processar NFs: ' + e.message);
+  }
+}
+
+function handleGetEstoque() {
+  try {
+    const nfData = getOrCreateEstoqueNFSheet().getDataRange().getValues();
+    const ajData = getOrCreateAjustesSheet().getDataRange().getValues();
+
+    const estoque = {};
+
+    // Soma entradas das NFs
+    for (var i = 1; i < nfData.length; i++) {
+      const row     = nfData[i];
+      const produto = String(row[4] || '').trim();
+      if (!produto) continue;
+      if (!estoque[produto]) {
+        estoque[produto] = { produto, unidade: String(row[6] || ''), qtd_nf: 0, qtd_ajuste: 0, valor_unit: 0, ultima_entrada: '', fornecedor: '' };
+      }
+      estoque[produto].qtd_nf    += parseFloat(row[5] || 0);
+      estoque[produto].valor_unit = parseFloat(row[7] || 0);
+      const d = String(row[1] || '');
+      if (d > estoque[produto].ultima_entrada) {
+        estoque[produto].ultima_entrada = d;
+        estoque[produto].fornecedor     = String(row[2] || '');
+      }
+    }
+
+    // Aplica ajustes manuais
+    for (var j = 1; j < ajData.length; j++) {
+      const row     = ajData[j];
+      const produto = String(row[1] || '').trim();
+      if (!produto) continue;
+      if (!estoque[produto]) {
+        estoque[produto] = { produto, unidade: '', qtd_nf: 0, qtd_ajuste: 0, valor_unit: 0, ultima_entrada: '', fornecedor: '' };
+      }
+      estoque[produto].qtd_ajuste += parseFloat(row[2] || 0);
+    }
+
+    const lista = Object.values(estoque).map(function(e) {
+      return Object.assign({}, e, { saldo: e.qtd_nf + e.qtd_ajuste });
+    }).sort(function(a, b) { return a.produto.localeCompare(b.produto); });
+
+    const resumo = {
+      total_itens:   lista.length,
+      estoque_baixo: lista.filter(function(e) { return e.saldo > 0 && e.saldo <= 2; }).length,
+      sem_estoque:   lista.filter(function(e) { return e.saldo <= 0; }).length,
+      valor_total:   lista.reduce(function(s, e) { return s + (e.saldo > 0 ? e.saldo * e.valor_unit : 0); }, 0)
+    };
+
+    return jsonOk({ success: true, estoque: lista, resumo });
+  } catch(e) {
+    return jsonErr('Erro ao calcular estoque: ' + e.message);
+  }
+}
+
+function handleAjusteEstoque(body) {
+  try {
+    const produto = (body.produto || '').trim();
+    const qtd     = parseFloat(body.quantidade || 0);
+    if (!produto)  return jsonErr('produto obrigatório');
+    if (qtd === 0) return jsonErr('quantidade não pode ser zero');
+
+    getOrCreateAjustesSheet().appendRow([
+      body.data || new Date().toISOString().substring(0, 10),
+      produto, qtd,
+      body.tipo || 'ajuste_manual',
+      body.motivo   || '',
+      body.usuario  || '',
+      body.observacoes || ''
+    ]);
+
+    return jsonOk({ success: true, message: 'Ajuste registrado: ' + produto + ' (' + (qtd > 0 ? '+' : '') + qtd + ')' });
+  } catch(e) {
+    return jsonErr('Erro ao registrar ajuste: ' + e.message);
   }
 }
 

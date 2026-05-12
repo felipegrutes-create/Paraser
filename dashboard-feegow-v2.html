@@ -2475,6 +2475,7 @@
                 <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-exec',null)">🧠 Análise Executiva</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-estoque',null)">💊 Estoque Medicamentos</button>
             </div>
         </div>
     </div>
@@ -3582,6 +3583,86 @@
             <!-- Insights -->
             <div id="execInsights"></div>
         </section>
+
+        <!-- ESTOQUE MEDICAMENTOS -->
+        <section id="sec-estoque" class="section">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+                <p class="section-title" style="margin:0">💊 Estoque de Medicamentos</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="cr-reload-btn" id="estoqueImportBtn" onclick="estoqueImportarNFs()">📥 Importar NFs do Drive</button>
+                    <button class="cr-reload-btn" onclick="estoqueAbrirAjuste()">✏️ Ajuste Manual</button>
+                    <button class="cr-reload-btn" onclick="loadAndRenderEstoque()">↺ Recarregar</button>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div id="estoqueKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px"></div>
+
+            <!-- Busca -->
+            <input id="estoqueBusca" type="text" placeholder="Buscar medicamento..." oninput="estoqueRenderTabela()"
+                style="width:100%;max-width:400px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;margin-bottom:16px">
+
+            <!-- Tabela -->
+            <div id="estoqueTabelaWrap" style="overflow-x:auto">
+                <table id="estoqueTabela" style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border);text-align:left">
+                            <th style="padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px">Medicamento</th>
+                            <th style="padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px">Saldo</th>
+                            <th style="padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px">Unid.</th>
+                            <th style="padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px">Últ. Preço</th>
+                            <th style="padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px">Fornecedor</th>
+                            <th style="padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px">Últ. Entrada</th>
+                            <th style="padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="estoqueTbody">
+                        <tr><td colspan="7" style="padding:20px;color:var(--muted);text-align:center">Clique em "Recarregar" para carregar o estoque.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Modal Ajuste Estoque -->
+        <div id="estoqueAjusteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+            <div style="background:var(--card);border-radius:16px;padding:28px;width:100%;max-width:440px;margin:20px">
+                <h3 style="margin:0 0 20px;font-size:16px">✏️ Ajuste Manual de Estoque</h3>
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Medicamento *</label>
+                        <input id="ajProduto" list="ajProdutoList" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;box-sizing:border-box" placeholder="Nome do medicamento">
+                        <datalist id="ajProdutoList"></datalist>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                        <div>
+                            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Quantidade *</label>
+                            <input id="ajQtd" type="number" step="0.01" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;box-sizing:border-box" placeholder="Ex: -5 (saída) ou +10 (entrada)">
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Data</label>
+                            <input id="ajData" type="date" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;box-sizing:border-box">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
+                        <select id="ajTipo" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+                            <option value="ajuste_inicial">Ajuste inicial (acerto de inventário)</option>
+                            <option value="saida_uso">Saída — uso clínico</option>
+                            <option value="saida_vencimento">Saída — vencimento/descarte</option>
+                            <option value="entrada_manual">Entrada manual</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Motivo / Observação</label>
+                        <input id="ajMotivo" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;box-sizing:border-box" placeholder="Opcional">
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:8px">
+                        <button onclick="estoqueSalvarAjuste()" style="flex:1;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Salvar</button>
+                        <button onclick="document.getElementById('estoqueAjusteModal').style.display='none'" style="flex:1;padding:10px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:14px;cursor:pointer">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- CAIXA RECEPÇÃO -->
         <section id="sec-caixa" class="section">
@@ -4880,6 +4961,7 @@
             'sec-cr':            'group-fin',
             'sec-caixa':         'group-fin',
             'sec-exec':          'group-fin',
+            'sec-estoque':       'group-fin',
         };
 
         function toggleTabGroup(groupId, event) {
@@ -4916,7 +4998,8 @@
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             if (id === 'sec-caixa') loadAndRenderMedicos();
-            if (id === 'sec-exec') loadAndRenderExec();
+            if (id === 'sec-exec')    loadAndRenderExec();
+            if (id === 'sec-estoque') loadAndRenderEstoque();
             if (id === 'sec-cr') loadAndRenderCR();
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
@@ -10939,6 +11022,116 @@
                     <h4>→ Recomendações</h4>
                     <ul>${recs.map(r=>`<li>${r}</li>`).join('')}</ul>
                 </div>`;
+        }
+
+        // ===================== ESTOQUE MEDICAMENTOS =====================
+        let _estoqueData = null; // cache
+
+        async function loadAndRenderEstoque() {
+            document.getElementById('estoqueTbody').innerHTML =
+                '<tr><td colspan="7" style="padding:20px;color:var(--muted);text-align:center">Carregando…</td></tr>';
+            document.getElementById('estoqueKpis').innerHTML = '';
+            try {
+                const resp = await fetch(CRM_SCRIPT_URL + '?action=get_estoque');
+                const json = await resp.json();
+                if (json.error) throw new Error(json.error);
+                _estoqueData = json.estoque || [];
+                estoqueRenderKpis(json.resumo || {});
+                estoqueRenderTabela();
+                // Popula datalist do modal
+                const dl = document.getElementById('ajProdutoList');
+                if (dl) dl.innerHTML = _estoqueData.map(e => `<option value="${e.produto}">`).join('');
+            } catch(e) {
+                document.getElementById('estoqueTbody').innerHTML =
+                    `<tr><td colspan="7" style="padding:20px;color:#ef4444;text-align:center">⚠ Erro: ${e.message}</td></tr>`;
+            }
+        }
+
+        function estoqueRenderKpis(r) {
+            const fmtR = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const cards = [
+                { label:'Total de itens',     val: r.total_itens || 0,    color:'blue',   icon:'📦' },
+                { label:'Estoque baixo (≤2)', val: r.estoque_baixo || 0,  color: r.estoque_baixo > 0 ? 'yellow':'green', icon:'⚠️' },
+                { label:'Sem estoque',         val: r.sem_estoque || 0,    color: r.sem_estoque > 0 ? 'red':'green', icon:'🚫' },
+                { label:'Valor em estoque',    val: fmtR(r.valor_total),   color:'blue',   icon:'💰' },
+            ];
+            document.getElementById('estoqueKpis').innerHTML = cards.map(c => `
+                <div class="exec-kpi ${c.color}">
+                    <div class="exec-kpi-val">${c.icon} ${c.val}</div>
+                    <div class="exec-kpi-label">${c.label}</div>
+                </div>`).join('');
+        }
+
+        function estoqueRenderTabela() {
+            const busca = (document.getElementById('estoqueBusca')?.value || '').toLowerCase();
+            const dados = (_estoqueData || []).filter(e => !busca || e.produto.toLowerCase().includes(busca));
+            if (!dados.length) {
+                document.getElementById('estoqueTbody').innerHTML =
+                    '<tr><td colspan="7" style="padding:20px;color:var(--muted);text-align:center">Nenhum item encontrado.</td></tr>';
+                return;
+            }
+            const fmtR = v => v > 0 ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+            document.getElementById('estoqueTbody').innerHTML = dados.map(e => {
+                const saldo = e.saldo || 0;
+                const badge = saldo <= 0 ? '<span style="background:#ef4444;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">SEM ESTOQUE</span>'
+                            : saldo <= 2 ? '<span style="background:#f59e0b;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">BAIXO</span>'
+                            : '<span style="background:#10b981;color:#fff;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">OK</span>';
+                return `<tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:9px 12px;font-weight:500">${e.produto}</td>
+                    <td style="padding:9px 12px;font-variant-numeric:tabular-nums;font-weight:600">${saldo}</td>
+                    <td style="padding:9px 12px;color:var(--muted)">${e.unidade||'—'}</td>
+                    <td style="padding:9px 12px;font-variant-numeric:tabular-nums">${fmtR(e.valor_unit)}</td>
+                    <td style="padding:9px 12px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.fornecedor||''}">${e.fornecedor||'—'}</td>
+                    <td style="padding:9px 12px;color:var(--muted)">${e.ultima_entrada||'—'}</td>
+                    <td style="padding:9px 12px">${badge}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function estoqueImportarNFs() {
+            const btn = document.getElementById('estoqueImportBtn');
+            if (btn) btn.textContent = '⏳ Importando…';
+            try {
+                const resp = await fetch(CRM_SCRIPT_URL + '?action=parse_nfs');
+                const json = await resp.json();
+                if (json.error) throw new Error(json.error);
+                alert(`✅ Importação concluída!\n\nNFs processadas: ${json.processados}\nItens novos: ${json.novas_linhas}\nIgnorados (NFS-e/CCe): ${json.ignorados}\nErros: ${json.erros}`);
+                await loadAndRenderEstoque();
+            } catch(e) {
+                alert('⚠ Erro: ' + e.message);
+            } finally {
+                if (btn) btn.textContent = '📥 Importar NFs do Drive';
+            }
+        }
+
+        function estoqueAbrirAjuste() {
+            document.getElementById('ajData').value = new Date().toISOString().substring(0,10);
+            document.getElementById('ajProduto').value = '';
+            document.getElementById('ajQtd').value = '';
+            document.getElementById('ajMotivo').value = '';
+            document.getElementById('estoqueAjusteModal').style.display = 'flex';
+        }
+
+        async function estoqueSalvarAjuste() {
+            const produto = document.getElementById('ajProduto').value.trim();
+            const qtd     = parseFloat(document.getElementById('ajQtd').value);
+            const data    = document.getElementById('ajData').value;
+            const tipo    = document.getElementById('ajTipo').value;
+            const motivo  = document.getElementById('ajMotivo').value.trim();
+            if (!produto) { alert('Informe o medicamento.'); return; }
+            if (!qtd || isNaN(qtd)) { alert('Informe a quantidade.'); return; }
+            try {
+                const resp = await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action:'ajuste_estoque', produto, quantidade:qtd, data, tipo, motivo })
+                });
+                const json = await resp.json();
+                if (json.error) throw new Error(json.error);
+                document.getElementById('estoqueAjusteModal').style.display = 'none';
+                await loadAndRenderEstoque();
+            } catch(e) {
+                alert('⚠ Erro: ' + e.message);
+            }
         }
 
         // ===================== ANÁLISE EXECUTIVA CR =====================
