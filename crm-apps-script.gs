@@ -187,7 +187,8 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
-      if (action === 'ajuste_estoque') return handleAjusteEstoque(body);
+      if (action === 'ajuste_estoque')       return handleAjusteEstoque(body);
+      if (action === 'enviar_pipeline_slack') return handleEnviarPipelineSlack(body);
 
       if (action === 'save_caixa') {
         return handleSaveCaixa(body);
@@ -1281,6 +1282,43 @@ function handleAjusteEstoque(body) {
     return jsonOk({ success: true, message: 'Ajuste registrado: ' + produto + ' (' + (qtd > 0 ? '+' : '') + qtd + ')' });
   } catch(e) {
     return jsonErr('Erro ao registrar ajuste: ' + e.message);
+  }
+}
+
+function handleEnviarPipelineSlack(body) {
+  try {
+    const webhookUrl = PropertiesService.getScriptProperties().getProperty('SLACK_COMERCIAL_WEBHOOK');
+    if (!webhookUrl) return jsonErr('SLACK_COMERCIAL_WEBHOOK não configurado. Adicione nas propriedades do script.');
+
+    const periodo    = body.periodo || '';
+    const itens      = body.itens   || [];
+    const total      = body.total   || 0;
+
+    const fmtR = function(cents) {
+      return 'R$ ' + (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const linhas = itens.slice(0, 50).map(function(it) {
+      var data = (it.data || '').replace(/-/g, '/');
+      var proc = (it.procedimento || '').substring(0, 35);
+      return '\u{1F538} *' + it.paciente + '* — ' + proc + ' — ' + fmtR(it.valor) + ' — ' + data;
+    }).join('\n');
+
+    var extra = itens.length > 50 ? '\n_...e mais ' + (itens.length - 50) + ' orçamentos_' : '';
+
+    var mensagem = {
+      text: '📊 *Pipeline Comercial — ' + periodo + '*\n*' + itens.length + ' orçamentos · ' + fmtR(total) + '*\n\n' + linhas + extra
+    };
+
+    UrlFetchApp.fetch(webhookUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(mensagem)
+    });
+
+    return jsonOk({ success: true, enviados: itens.length });
+  } catch(e) {
+    return jsonErr('Erro ao enviar para Slack: ' + e.message);
   }
 }
 

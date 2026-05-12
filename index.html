@@ -3436,6 +3436,7 @@
                     <span id="crMonthLabel" style="font-size:15px;font-weight:600;min-width:130px;text-align:center">—</span>
                     <button class="cr-nav-btn" onclick="crNavMonth(1)">›</button>
                     <button class="cr-reload-btn" onclick="crReload()">↺ Recarregar</button>
+                    <button class="cr-reload-btn" id="crSlackPipelineBtn" onclick="crEnviarPipelineSlack()" style="background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.3);color:#c084fc">📤 Pipeline → Slack</button>
                 </div>
             </div>
 
@@ -11694,6 +11695,41 @@
             loadAndRenderCR();
         }
         function crReload() { crDataLoaded = false; loadAndRenderCR(); }
+
+        async function crEnviarPipelineSlack() {
+            const pipeline = crData.filter(inv => crInvoiceStatus(inv) === 'pipeline');
+            if (!pipeline.length) { alert('Nenhum orçamento em pipeline para este mês.'); return; }
+            const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            const periodo = months[crCurrentDate.getMonth()] + '/' + crCurrentDate.getFullYear();
+            const itens = pipeline.map(inv => {
+                const det = inv.detalhes && inv.detalhes[0];
+                const fatVal = det ? (det.valor || 0) : 0;
+                const data = (det && det.data) || '';
+                const proc = (inv.itens||[]).filter(it=>it.tipo==='S')[0];
+                return {
+                    paciente: inv.nomePaciente || '—',
+                    valor: fatVal,
+                    data: data,
+                    procedimento: proc ? (proc.nomeResolvido || proc.descricao || '') : ''
+                };
+            }).sort((a,b) => b.valor - a.valor);
+            const total = itens.reduce((s,i) => s + i.valor, 0);
+            const btn = document.getElementById('crSlackPipelineBtn');
+            if (btn) btn.textContent = '⏳ Enviando…';
+            try {
+                const resp = await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'enviar_pipeline_slack', periodo, itens, total })
+                });
+                const json = await resp.json();
+                if (json.error) throw new Error(json.error);
+                alert(`✅ Pipeline enviado para o Slack!\n${json.enviados} orçamentos notificados.`);
+            } catch(e) {
+                alert('⚠ Erro: ' + e.message);
+            } finally {
+                if (btn) btn.textContent = '📤 Pipeline → Slack';
+            }
+        }
         function crInvoiceStatus(inv) {
             const det = inv.detalhes && inv.detalhes[0];
             const total = det ? (det.valor || 0) : 0;
