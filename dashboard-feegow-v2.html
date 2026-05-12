@@ -10348,10 +10348,14 @@
                 const propPago = fatVal > 0 ? Math.min(pagSum/fatVal, 1) : 0;
                 const status   = crInvoiceStatus(inv);
                 const dataFat  = (det && det.data) || '';
-                // dataFat é DD/MM/YYYY — filtrar pelo mês/ano selecionado
-                const parts = dataFat.split('/');
-                if (parts.length < 3) return;
-                if (parseInt(parts[1]) !== mes || parseInt(parts[2]) !== ano) return;
+                // dataFat pode ser YYYY-MM-DD (Feegow) ou DD/MM/YYYY
+                let anoItem, mesItem;
+                if (dataFat.includes('-')) {
+                    const p = dataFat.split('-'); anoItem = parseInt(p[0]); mesItem = parseInt(p[1]);
+                } else {
+                    const p = dataFat.split('/'); anoItem = parseInt(p[2]); mesItem = parseInt(p[1]);
+                }
+                if (mesItem !== mes || anoItem !== ano) return;
                 (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
                     if (!med) return;
