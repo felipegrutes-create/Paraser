@@ -1,0 +1,7 @@
+# Configuração local do Claude Code (não faz parte do sistema)
+.claude/
+
+# Lixo do SO
+Thumbs.db
+.DS_Store
+desktop.ini
