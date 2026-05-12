@@ -1112,6 +1112,11 @@ function parseNFeXML(content, filename) {
   try {
     const doc  = XmlService.parse(content);
     const root = doc.getRootElement();
+
+    // NFS-e (serviços municipais) — ignora, não é NF-e de produto
+    const rootName = root.getName();
+    if (/CompNfse|ConsultarNfseResposta|GerarNfseResposta|nfse/i.test(rootName)) return { isNfse: true };
+
     const ns   = XmlService.getNamespace('http://www.portalfiscal.inf.br/nfe');
 
     // Suporta procNFe (wrapped) e NFe (direto)
@@ -1166,19 +1171,22 @@ function handleParseNFs() {
       existKeys.add(String(existData[i][0]) + '|' + String(existData[i][9]));
     }
 
-    const arquivos = pasta.getFilesByType('application/xml');
+    const arquivos = pasta.getFiles(); // getFiles() pega todos os MIMEs (xml pode ser application/xml ou text/xml)
     const novas = [];
     var processados = 0, erros = 0, ignorados = 0;
 
     while (arquivos.hasNext()) {
       const arq  = arquivos.next();
       const nome = arq.getName();
-      // Ignora NFS-e (serviços), CC-e e DF-e — só NF-e de mercadorias
-      if (/nfse|NFSE|-CCe|^DFE/i.test(nome)) { ignorados++; continue; }
+      if (!nome.toLowerCase().endsWith('.xml')) continue;
+      // Ignora CC-e e DF-e pelo nome; NFS-e é detectada pelo parser (sem infNFe)
+      if (/-CCe|^DFE/i.test(nome)) { ignorados++; continue; }
 
       const content = arq.getBlob().getDataAsString('UTF-8');
       const parsed  = parseNFeXML(content, nome);
-      if (!parsed || !parsed.itens.length) { erros++; continue; }
+      if (!parsed) { erros++; continue; }
+      if (parsed.isNfse) { ignorados++; continue; }
+      if (!parsed.itens.length) { erros++; continue; }
 
       const agora = new Date().toISOString();
       parsed.itens.forEach(function(it) {
