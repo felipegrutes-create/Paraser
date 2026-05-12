@@ -10408,7 +10408,7 @@
                 const propPago = fatVal > 0 ? Math.min(pagSum/fatVal, 1) : 0;
                 const status   = crInvoiceStatus(inv);
                 const dataFat  = (det && det.data) || '';
-                (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
+                (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
                     if (!med) return;
                     const val = (it.valor||0)/100;
@@ -10500,7 +10500,7 @@
                 const p = dataFat.split(sep);
                 anoItem = parseInt(p[2]); mesItem = parseInt(p[1]);
                 if (mesItem !== mes || anoItem !== ano) return;
-                (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
+                (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
                     if (!med) return;
                     const val = (it.valor||0)/100;
@@ -10688,7 +10688,7 @@
                 const f = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0;
                 const p = (inv.pagamentos||[]).reduce((s,pg)=>s+(pg.valor||0),0);
                 const prop = f>0 ? Math.min(p/f,1) : 0;
-                (inv.itens||[]).forEach(it => {
+                (inv.itens||[]).filter(it=>!it.is_cancelado).forEach(it => {
                     const val = it.valor||0;
                     const nome = it.nomeResolvido||it.descricao||'';
                     if (it.tipo==='M') { totalMed+=val; }
@@ -10975,7 +10975,7 @@
                 const fat = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0;
                 const pag = (inv.pagamentos||[]).reduce((s,p)=>s+(p.valor||0),0);
                 const prop = fat > 0 ? Math.min(pag/fat,1) : 0;
-                (inv.itens||[]).forEach(it => {
+                (inv.itens||[]).filter(it=>!it.is_cancelado).forEach(it => {
                     const val = (it.valor||0);
                     if (it.tipo === 'M') { totalMed += val; const n=it.nomeResolvido||it.descricao||'Medicamento'; medSums[n]=(medSums[n]||0)+val; }
                     else if (it.tipo === 'S') { totalServ += val; const n=_resolveMedico(it.nomeResolvido||it.descricao||''); if(n) servSums[n]=(servSums[n]||0)+(val*prop); }
@@ -11592,7 +11592,7 @@
                 const total = det.valor || 0;
                 const pago  = (inv.pagamentos||[]).reduce((s,p)=>s+(p.valor||0),0);
                 const status = crInvoiceStatus(inv);
-                const itens = inv.itens || [];
+                const itens = (inv.itens || []).filter(it=>!it.is_cancelado);
                 const procs = itens.filter(it=>it.tipo==='S').map(it=>it.nomeResolvido||it.descricao||`ID${it.procedimento_id}`).filter(Boolean);
                 const meds  = itens.filter(it=>it.tipo==='M').map(it=>it.nomeResolvido||it.descricao||`ID${it.procedimento_id}`).filter(Boolean);
                 const rowId = `crr${i}`;
@@ -11730,7 +11730,7 @@
 
             const procRev = {};
             const procItems = {};
-            crData.forEach(inv => (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
+            crData.forEach(inv => (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
                 const n = (it.nomeResolvido||it.descricao||`ID${it.procedimento_id}`).slice(0,28);
                 const nFull = it.nomeResolvido||it.descricao||'';
                 procRev[n] = (procRev[n]||0) + (it.valor||0);
@@ -11747,7 +11747,7 @@
                 const fatVal = ((inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].valor)||0);
                 const pagSum = (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0);
                 const propPago = fatVal > 0 ? Math.min(pagSum / fatVal, 1) : 0;
-                (inv.itens||[]).forEach(it => {
+                (inv.itens||[]).filter(it=>!it.is_cancelado).forEach(it => {
                     const val = ((it.valor||0) / 100) * propPago;
                     if (val <= 0) return;
                     let cat = 'Outros';
@@ -11781,7 +11781,7 @@
                     const pagSum = (inv.pagamentos||[]).reduce((sp,p) => sp+(p.valor||0), 0);
                     const propPago = fatVal > 0 ? Math.min(pagSum / fatVal, 1) : 0;
                     const dataFat = (inv.detalhes&&inv.detalhes[0]&&inv.detalhes[0].data)||'';
-                    (inv.itens||[]).forEach(it => {
+                    (inv.itens||[]).filter(it=>!it.is_cancelado).forEach(it => {
                         const val = ((it.valor||0) / 100) * propPago;
                         if (val <= 0) return;
                         let cat = 'Outros';
@@ -11853,7 +11853,7 @@
                 const status   = crInvoiceStatus(inv);
                 const dataFat  = (det && det.data) || '';
 
-                (inv.itens||[]).filter(it=>it.tipo==='S').forEach(it => {
+                (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
                     if (!med) return;
                     const val      = (it.valor||0) / 100;
@@ -12077,7 +12077,7 @@
                 const pacAna   = isAnaPaciente(paciente);
 
                 const itensAna = (inv.itens||[]).filter(it =>
-                    isAnaItem(it) || (pacAna && it.tipo === 'S')
+                    !it.is_cancelado && (isAnaItem(it) || (pacAna && it.tipo === 'S'))
                 );
                 if (!itensAna.length && !pacAna) return;
                 if (!itensAna.length) return;
@@ -12098,7 +12098,7 @@
                 });
 
                 // Medicamentos da fatura ANA
-                (inv.itens||[]).filter(it => isCrMedItem(it)).forEach(it => {
+                (inv.itens||[]).filter(it => !it.is_cancelado && isCrMedItem(it)).forEach(it => {
                     const v = (it.valor||0) / 100;
                     totalFatMed  += v;
                     totalPagoMed += v * propPago;
@@ -12318,7 +12318,7 @@
                 const pagTotal = (inv.pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
                 const fatTotal = (inv.detalhes && inv.detalhes[0] && inv.detalhes[0].valor) || 0;
 
-                const itens = (inv.itens || []).filter(it => isCrMedItem(it));
+                const itens = (inv.itens || []).filter(it => !it.is_cancelado && isCrMedItem(it));
                 if (!itens.length) return;
 
                 // Proporção paga desta fatura
