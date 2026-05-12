@@ -11028,7 +11028,8 @@
         let _estoqueData = null; // cache
 
         // Blocklist de itens que não são medicamentos/insumos clínicos
-        const _ESTOQUE_BLOCKLIST = /^(BALA[S]?|ÁGUA|AGUA|CUBA[S]?|LUVA[S]?|SERINGA[S]?|AGULHA[S]?|ALGODÃO|ALGODAO|CANETA[S]?|PAPEL|COPO[S]?|EMBALAGEM|SACO[S]?\s|FITA[S]?\s|ETIQUETA|PROMOCION|PERSONALI|BRINDE|PRESENTE)\b/i;
+        // ^(...) = basta começar assim | \b...\b = basta conter a palavra em qualquer posição
+        const _ESTOQUE_BLOCKLIST = /^(BALA[S]?|ÁGUA|AGUA|LUVA[S]?|AGULHA[S]?|ALGODÃO|ALGODAO|CANETA[S]?|PAPEL|COPO[S]?|EMBALAGEM|FITA\s|ETIQUETA|BRINDE|PRESENTE|CONDUTOR\s|CRYSTAL\s*PET|FRUTBALL|FRUTDROPS|MICROCOMPUTADOR|MOCHILA|TRAM\s+CUBA|PRES\.\s*N[ÃA]O)|\bCUBA[S]?\b|\bPROMOCIONAL\s+PERSONALIZADO\b|\b(COMPUTADOR|NOTEBOOK|LAPTOP)\b/i;
 
         function isMedicamento(nome) {
             return !_ESTOQUE_BLOCKLIST.test((nome || '').trim());
