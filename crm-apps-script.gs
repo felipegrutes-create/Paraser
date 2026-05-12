@@ -1298,25 +1298,40 @@ function handleEnviarPipelineSlack(body) {
       return 'R$ ' + (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
-    const linhas = itens.slice(0, 50).map(function(it) {
+    // Filtra R$ 0,00 (lançamentos sem valor definido)
+    var itensFiltrados = itens.filter(function(it) { return it.valor > 0; });
+
+    var linhasTodas = itensFiltrados.map(function(it) {
       var data = (it.data || '').replace(/-/g, '/');
-      var proc = (it.procedimento || '').substring(0, 35);
-      return '\u{1F538} *' + it.paciente + '* — ' + proc + ' — ' + fmtR(it.valor) + ' — ' + data;
-    }).join('\n');
+      var proc = (it.procedimento || '—').substring(0, 40);
+      return '🔸 *' + it.paciente + '* — ' + proc + ' — ' + fmtR(it.valor) + ' — ' + data;
+    });
 
-    var extra = itens.length > 50 ? '\n_...e mais ' + (itens.length - 50) + ' orçamentos_' : '';
+    // Envia cabeçalho + itens em blocos de 30 (limite seguro do Slack)
+    var cabecalho = '📊 *Pipeline Comercial — ' + periodo + '*\n*' + itensFiltrados.length + ' orçamentos · ' + fmtR(total) + '*';
+    var blocos = [];
+    for (var i = 0; i < linhasTodas.length; i += 30) {
+      blocos.push(linhasTodas.slice(i, i + 30).join('\n'));
+    }
 
-    var mensagem = {
-      text: '📊 *Pipeline Comercial — ' + periodo + '*\n*' + itens.length + ' orçamentos · ' + fmtR(total) + '*\n\n' + linhas + extra
-    };
-
+    // Primeira mensagem: cabeçalho + bloco 1
     UrlFetchApp.fetch(webhookUrl, {
       method: 'post',
       contentType: 'application/json',
-      payload: JSON.stringify(mensagem)
+      payload: JSON.stringify({ text: cabecalho + '\n\n' + (blocos[0] || '') })
     });
 
-    return jsonOk({ success: true, enviados: itens.length });
+    // Demais blocos como mensagens separadas
+    for (var j = 1; j < blocos.length; j++) {
+      Utilities.sleep(500);
+      UrlFetchApp.fetch(webhookUrl, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({ text: blocos[j] })
+      });
+    }
+
+    return jsonOk({ success: true, enviados: itensFiltrados.length, ignorados_zero: itens.length - itensFiltrados.length });
   } catch(e) {
     return jsonErr('Erro ao enviar para Slack: ' + e.message);
   }
