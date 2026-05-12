@@ -11713,7 +11713,7 @@
                     data: data,
                     procedimento: proc ? (proc.nomeResolvido || proc.descricao || '') : ''
                 };
-            }).filter(it => !PIPELINE_EXCLUIR.test(it.procedimento))
+            }).filter(it => it.valor > 0 && !PIPELINE_EXCLUIR.test(it.procedimento))
               .sort((a,b) => b.valor - a.valor);
             const total = itens.reduce((s,i) => s + i.valor, 0);
             const btn = document.getElementById('crSlackPipelineBtn');
