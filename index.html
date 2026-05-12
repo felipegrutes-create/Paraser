@@ -3593,6 +3593,7 @@
                 <p class="section-title" style="margin:0">💊 Estoque de Medicamentos</p>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <button class="cr-reload-btn" id="estoqueImportBtn" onclick="estoqueImportarNFs()">📥 Importar NFs do Drive</button>
+                    <button class="cr-reload-btn" id="estoqueBaixaBtn" onclick="estoqueBaixaHoje()" style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#f87171">📉 Baixa de Hoje</button>
                     <button class="cr-reload-btn" onclick="estoqueAbrirInventario()" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#a5b4fc">📋 Inventário</button>
                     <button class="cr-reload-btn" onclick="estoqueAbrirAjuste()">✏️ Ajuste Manual</button>
                     <button class="cr-reload-btn" onclick="loadAndRenderEstoque()">↺ Recarregar</button>
@@ -11172,6 +11173,77 @@
                 alert('⚠ Erro: ' + e.message);
             } finally {
                 if (btn) btn.textContent = '📥 Importar NFs do Drive';
+            }
+        }
+
+        async function estoqueBaixaHoje() {
+            const btn = document.getElementById('estoqueBaixaBtn');
+            if (btn) btn.textContent = '⏳ Buscando…';
+            try {
+                const hoje = new Date();
+                const dd   = String(hoje.getDate()).padStart(2,'0');
+                const mm   = String(hoje.getMonth()+1).padStart(2,'0');
+                const yyyy = hoje.getFullYear();
+                const dtFmt = `${dd}/${mm}/${yyyy}`;
+
+                const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(dtFmt)}&data_end=${encodeURIComponent(dtFmt)}`;
+                const resp = await fetch(url);
+                const json = await resp.json();
+                if (json.error) throw new Error(json.error);
+
+                const faturas = json.data || [];
+                // Agrupa medicamentos (tipo='M') por nome, somando quantidades
+                const medMap = {};
+                faturas.forEach(inv => {
+                    (inv.itens||[]).filter(it => it.tipo === 'M' && !it.is_cancelado).forEach(it => {
+                        const nome = (it.nomeResolvido || it.descricao || '').trim();
+                        const qtd  = Number(it.quantidade) || 1;
+                        if (!nome) return;
+                        if (!medMap[nome]) medMap[nome] = { qtd: 0, pacientes: [] };
+                        medMap[nome].qtd += qtd;
+                        if (inv.nomePaciente) medMap[nome].pacientes.push(inv.nomePaciente);
+                    });
+                });
+
+                const itens = Object.entries(medMap).map(([nome, v]) => ({
+                    nome, qtd: v.qtd, pacientes: [...new Set(v.pacientes)]
+                })).sort((a,b) => a.nome.localeCompare(b.nome));
+
+                if (!itens.length) {
+                    alert(`Nenhum medicamento encontrado nas faturas de hoje (${dtFmt}) no Feegow.`);
+                    return;
+                }
+
+                const preview = itens.map(i =>
+                    `• ${normalizarNomeMed(i.nome)} — ${i.qtd} un. (${i.pacientes.slice(0,2).join(', ')}${i.pacientes.length>2?' +'+( i.pacientes.length-2):''})`
+                ).join('\n');
+
+                if (!confirm(`📉 Dar baixa no estoque de hoje (${dtFmt})?\n\n${preview}\n\nTotal: ${itens.length} medicamentos`)) return;
+
+                if (btn) btn.textContent = '⏳ Aplicando…';
+                const data = `${yyyy}-${mm}-${dd}`;
+                for (const it of itens) {
+                    const r = await fetch(CRM_SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'ajuste_estoque',
+                            produto: it.nome,
+                            quantidade: -it.qtd,
+                            data,
+                            tipo: 'saida_feegow',
+                            motivo: `Baixa automática Feegow ${dtFmt}`
+                        })
+                    });
+                    const rj = await r.json();
+                    if (rj.error) throw new Error(rj.error + ' (' + it.nome + ')');
+                }
+
+                alert(`✅ Baixa de hoje aplicada!\n${itens.length} medicamentos deduzidos do estoque.`);
+                await loadAndRenderEstoque();
+            } catch(e) {
+                alert('⚠ Erro: ' + e.message);
+            } finally {
+                if (btn) btn.textContent = '📉 Baixa de Hoje';
             }
         }
 
