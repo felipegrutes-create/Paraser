@@ -10382,6 +10382,14 @@
             const statusEl = document.getElementById('medMesStatus');
             if (!data) { if (statusEl) statusEl.textContent = 'Aguardando carregamento...'; return; }
 
+            // DEBUG temporário — abra F12 > Console para ver
+            if (data.length > 0) {
+                const d0 = data[0]; const det0 = d0.detalhes && d0.detalhes[0];
+                console.log('[MedMes] campos det:', det0 ? Object.keys(det0) : 'sem detalhes');
+                console.log('[MedMes] det.data:', det0 && det0.data, '| data_vencimento:', det0 && det0.data_vencimento);
+                console.log('[MedMes] itens[0]:', d0.itens && JSON.stringify(d0.itens[0]));
+            }
+
             const agg = _aggregateMedicosMes(data, _medMesAno, _medMes);
             const { entries, itemsMap } = agg;
             const total = entries.reduce((s,[,v])=>s+v,0);
