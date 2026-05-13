@@ -10990,26 +10990,28 @@
         }
 
         function _medExecCompute(data, med) {
-            const empty = { total: 0, procs: 0, byMonth: new Array(12).fill(0), topProcs: {} };
+            const empty = { total: 0, procs: 0, byMonth: new Array(12).fill(0), byMonthProcs: new Array(12).fill(0), topProcs: {} };
             if (!data || !med) return empty;
             const agg = _aggregateMedicos(data);
             const items = (agg.itemsMap[med] || []);
             if (!items.length) return empty;
             let total = 0, procs = 0;
             const byMonth = new Array(12).fill(0);
+            const byMonthProcs = new Array(12).fill(0);
             const topProcs = {};
             items.forEach(it => {
                 total += it.valorPago;
-                procs += (it.qtd || 1);
+                const q = (it.qtd || 1);
+                procs += q;
                 const dStr = it.data || '';
                 const sep = dStr.includes('-') ? '-' : '/';
                 const p = dStr.split(sep);
                 const mes = parseInt(p[1])-1;
-                if (mes >= 0 && mes < 12) byMonth[mes] += it.valorPago;
+                if (mes >= 0 && mes < 12) { byMonth[mes] += it.valorPago; byMonthProcs[mes] += q; }
                 const pk = it.proc || '(sem nome)';
                 topProcs[pk] = (topProcs[pk]||0) + it.valorPago;
             });
-            return { total, procs, byMonth, topProcs };
+            return { total, procs, byMonth, byMonthProcs, topProcs };
         }
 
         function _renderMedExec() {
@@ -11054,6 +11056,34 @@
             const el = document.getElementById('medExecChartMes');
             if (el) {
                 if (_medExecChart) { try{_medExecChart.destroy();}catch(e){} _medExecChart = null; }
+                // Plugin inline pra desenhar valor + nº de procedimentos acima de cada barra
+                const labelsPlugin = {
+                    id: 'medExecBarLabels',
+                    afterDatasetsDraw(chart) {
+                        const ctx = chart.ctx;
+                        const meta = chart.getDatasetMeta(0);
+                        if (!meta || !meta.data) return;
+                        ctx.save();
+                        ctx.textAlign = 'center';
+                        meta.data.forEach((bar, i) => {
+                            const val = rAno.byMonth[i] || 0;
+                            const nProcs = rAno.byMonthProcs[i] || 0;
+                            if (val <= 0 && nProcs === 0) return;
+                            const txt1 = val >= 1000 ? 'R$ ' + (val/1000).toFixed(1).replace('.0','') + 'k' : 'R$ ' + Math.round(val);
+                            const txt2 = nProcs + ' proc';
+                            // valor (acima)
+                            ctx.font = 'bold 11px Outfit, sans-serif';
+                            ctx.fillStyle = '#e2e8f4';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText(txt1, bar.x, bar.y - 14);
+                            // nº de procedimentos (logo abaixo do valor, ainda acima da barra)
+                            ctx.font = '10px Outfit, sans-serif';
+                            ctx.fillStyle = '#94a3b8';
+                            ctx.fillText(txt2, bar.x, bar.y - 2);
+                        });
+                        ctx.restore();
+                    }
+                };
                 _medExecChart = new Chart(el.getContext('2d'), {
                     type: 'bar',
                     data: {
@@ -11067,15 +11097,22 @@
                     },
                     options: {
                         responsive: true,
+                        layout: { padding: { top: 30 } },   // espaço pros labels acima das barras
                         plugins: {
                             legend: { display: false },
-                            tooltip: { callbacks: { label: ctx => ' R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) } }
+                            tooltip: { callbacks: { label: ctx => {
+                                const i = ctx.dataIndex;
+                                const v = rAno.byMonth[i] || 0;
+                                const n = rAno.byMonthProcs[i] || 0;
+                                return ' R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' · ' + n + ' procedimento' + (n===1?'':'s');
+                            } } }
                         },
                         scales: {
                             x: { ticks: { color:'#6b7a99', font:{size:11} }, grid:{display:false} },
                             y: { ticks: { color:'#6b7a99', font:{size:10}, callback: v => 'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, grid:{color:'rgba(255,255,255,0.04)'} }
                         }
-                    }
+                    },
+                    plugins: [labelsPlugin]
                 });
             }
 
