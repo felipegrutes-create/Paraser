@@ -10576,14 +10576,59 @@
             return null;
         }
 
-        // Tabela de "valor cheio" — procedimentos cujo valor não vem nas faturas do Feegow
-        // (ex: cirurgias, alguns pacotes). O dashboard busca esses procedimentos na AGENDA
-        // (Dados Diários) e usa o valor abaixo, atribuindo pelo Profissional do agendamento.
-        // Adicione novas linhas conforme a tabela de preços oficial da clínica.
+        // Tabela de "valor cheio" — procedimentos cuja receita o dashboard atribui pelo
+        // AGENDAMENTO (Profissional + valor da tabela), ignorando a fatura do Feegow pra
+        // esses procedimentos (evita dupla contagem).
+        //
+        // ⚠️ A ORDEM IMPORTA: variantes mais específicas (ex: GEMELAR) precisam vir ANTES
+        // das genéricas (ex: USG 1 PÓS BETA GEMELAR antes de USG 1 PÓS BETA).
+        // Procedimentos NÃO listados aqui continuam vindo da fatura, com a proporção paga.
         const PROC_VALOR_CHEIO = {
-            'PUNÇÃO DE ÓVULOS': 8000   // inclui "Punção de Óvulos - Doadora" (mesmo prefixo)
-            // Ex.: '1ª TEC': 0, 'PESA': 0, 'ASPIRAÇÃO DE CISTO': 0, ...
+            'HONORARIO FIV COM RECEPÇÃO DE ÓVULOS - DRA. PRISCILA LOYOLA': 9700,
+            'PUNÇÃO DE ÓVULOS':                              8000,
+            '2ª TEC EMBRION':                                4000,
+            'APLICAÇÃO DE FILGRASTIM':                       2060,
+            'INJÚRIA ENDOMETRIAL':                           2000,
+            // USG — gemelares ANTES das singulares
+            'USG 1 PÓS BETA GEMELAR':                         730,
+            'USG 2 PÓS BETA GEMELAR':                         730,
+            'USG TRANSLUCÊNCIA NUCAL GEMELAR':                910,
+            'USG OBSTÉTRICA COMUM GEMELAR':                   825,
+            'USG MORFOLÓGICA GEMELAR':                        910,
+            'USG OBSTÉTRICA COM DOPPLER GEMELAR':             990,
+            'PERFIL HEMODINAMICO (DOPPLER) GEMELAR':          550,
+            'PERFIL HEMODINAMICO (DOPPLER) FETO ÚNICO':       450,
+            'USG 1 PÓS BETA':                                 485,
+            'USG 2 PÓS BETA':                                 485,
+            'USG TRANSLUCÊNCIA NUCAL':                        605,
+            'USG OBSTÉTRICA COMUM':                           550,
+            'USG MORFOLÓGICA':                                605,
+            'USG OBSTÉTRICA COM DOPPLER':                     660,
+            'USG MAMAS':                                      430,
+            'USG TIREÓIDE':                                   430,
+            'USG ABDOME TOTAL':                               440,
+            'USG ABDOME SUPERIOR':                            330,
+            'USG VIAS URINÁRIAS':                             300,
+            'USG TRANSVAGINAL 3D COM DOPPLER':                590,
+            'USG TRANSVAGINAL 3D':                            550,
+            'USG TRANSVAGINAL':                               400,
+            'USG PÓS-BETA NEG/ABORTO':                        400,
+            'USG CONTAGEM FOLÍCULOS ANTRAIS':                 400,
+            'USG 3D PREP ENDOMETRIAL':                        400,
+            'USG INICIO PREPARO TEC':                         400,
+            'USG PREPARO TRANSFERÊNCIA 3':                    400
+            // Sem preço definido (não entram): "Usg Pélvica (Via Abdominal)", "Usg Transvaginal Pós Lectrum"
         };
+
+        // Procura o procedimento na tabela de valor cheio. Retorna {key, valor} ou null.
+        function _matchProcValorCheio(procName) {
+            const n = ((procName||'')+'').toUpperCase();
+            if (!n) return null;
+            for (const k of Object.keys(PROC_VALOR_CHEIO)) {
+                if (n.includes(k)) return { key: k, valor: PROC_VALOR_CHEIO[k] };
+            }
+            return null;
+        }
 
         // Procura na agenda (gRaw) procedimentos de PROC_VALOR_CHEIO no ano/mês informado,
         // soma usando o valor cheio da tabela e atribui pelo Profissional do agendamento.
@@ -10607,11 +10652,9 @@
                 const sta = ((r[gC.sta]||'')+'').toLowerCase().trim();
                 if (sta.includes('cancelado') || sta.includes('desmarcado')) return;
                 const procNome = ((r[gC.proc]||'')+'').toUpperCase().trim();
-                let valor = null, procKey = null;
-                for (const [k, v] of entries) {
-                    if (procNome.includes(k)) { valor = v; procKey = k; break; }
-                }
-                if (!valor) return;
+                const match = _matchProcValorCheio(procNome);
+                if (!match || !match.valor) return;
+                const valor = match.valor, procKey = match.key;
                 const prof = ((r[gC.prof]||'')+'').trim();
                 const med = _resolveMedico('', prof);
                 if (!med) return;
@@ -10649,6 +10692,8 @@
                     if (!med) return;
                     const val = (it.valor||0)/100;
                     if (val <= 0) return;
+                    // Se está na tabela de valor cheio, deixa a agenda contar (evita duplicar)
+                    if (_matchProcValorCheio(it.nomeResolvido||it.descricao||'')) return;
                     const valorPago = val * propPago;
                     sums[med] = (sums[med]||0) + valorPago;
                     if (!itemsMap[med]) itemsMap[med] = [];
@@ -10750,6 +10795,8 @@
                     if (!med) return;
                     const val = (it.valor||0)/100;
                     if (val <= 0) return;
+                    // Se está na tabela de valor cheio, deixa a agenda contar (evita duplicar)
+                    if (_matchProcValorCheio(it.nomeResolvido||it.descricao||'')) return;
                     const valorPago = val * propPago;
                     sums[med] = (sums[med]||0) + valorPago;
                     if (!itemsMap[med]) itemsMap[med] = [];
