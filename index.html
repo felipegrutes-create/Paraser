@@ -10576,8 +10576,66 @@
             return null;
         }
 
+        // Tabela de "valor cheio" — procedimentos cujo valor não vem nas faturas do Feegow
+        // (ex: cirurgias, alguns pacotes). O dashboard busca esses procedimentos na AGENDA
+        // (Dados Diários) e usa o valor abaixo, atribuindo pelo Profissional do agendamento.
+        // Adicione novas linhas conforme a tabela de preços oficial da clínica.
+        const PROC_VALOR_CHEIO = {
+            'PUNÇÃO DE ÓVULOS': 8000   // inclui "Punção de Óvulos - Doadora" (mesmo prefixo)
+            // Ex.: '1ª TEC': 0, 'PESA': 0, 'ASPIRAÇÃO DE CISTO': 0, ...
+        };
+
+        // Procura na agenda (gRaw) procedimentos de PROC_VALOR_CHEIO no ano/mês informado,
+        // soma usando o valor cheio da tabela e atribui pelo Profissional do agendamento.
+        // Retorna { sumsAdd: {med:val}, itemsAdd: {med:[items]} } pronto pra mergear nas
+        // agregações vindas das faturas.
+        function _augmentMedicosFromAgenda(year, month) {
+            const sumsAdd = {}, itemsAdd = {};
+            if (typeof gRaw === 'undefined' || !gRaw || !gRaw.length) return { sumsAdd, itemsAdd };
+            const entries = Object.entries(PROC_VALOR_CHEIO);
+            if (!entries.length) return { sumsAdd, itemsAdd };
+            // dedup: mesmo (data + hora + médico + procKey) conta 1 vez só
+            // (evita doadora + receptora do mesmo ciclo contarem em dobro)
+            const seen = new Set();
+            gRaw.forEach(r => {
+                const dStr = ((r[gC.data]||'')+'').trim();
+                const m = dStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (!m) return;
+                const yr = parseInt(m[3]), mo = parseInt(m[2]);
+                if (yr !== year) return;
+                if (month != null && mo !== month) return;
+                const sta = ((r[gC.sta]||'')+'').toLowerCase().trim();
+                if (sta.includes('cancelado') || sta.includes('desmarcado')) return;
+                const procNome = ((r[gC.proc]||'')+'').toUpperCase().trim();
+                let valor = null, procKey = null;
+                for (const [k, v] of entries) {
+                    if (procNome.includes(k)) { valor = v; procKey = k; break; }
+                }
+                if (!valor) return;
+                const prof = ((r[gC.prof]||'')+'').trim();
+                const med = _resolveMedico('', prof);
+                if (!med) return;
+                const hora = ((r[gC.hora]||'')+'').trim().slice(0,5);
+                const dedupKey = dStr + '|' + hora + '|' + med + '|' + procKey;
+                if (seen.has(dedupKey)) return;
+                seen.add(dedupKey);
+                sumsAdd[med] = (sumsAdd[med]||0) + valor;
+                if (!itemsAdd[med]) itemsAdd[med] = [];
+                itemsAdd[med].push({
+                    data: dStr.replace(/\//g,'-'),
+                    paciente: ((r[gC.pac]||'')+'').trim(),
+                    proc: ((r[gC.proc]||'')+'').trim() || procKey,
+                    qtd: 1, valor, valorPago: valor, valorPendente: 0,
+                    propPago: 1, status: 'agenda', fatTotal: valor, pagTotal: valor,
+                    pagamentos: [], _fromAgenda: true
+                });
+            });
+            return { sumsAdd, itemsAdd };
+        }
+
         function _aggregateMedicos(data) {
             const sums = {}, itemsMap = {};
+            let yearGuess = null;
             data.forEach(inv => {
                 const det    = inv.detalhes && inv.detalhes[0];
                 const fatVal = (det && det.valor) || 0;
@@ -10585,6 +10643,7 @@
                 const propPago = fatVal > 0 ? Math.min(pagSum/fatVal, 1) : 0;
                 const status   = crInvoiceStatus(inv);
                 const dataFat  = (det && det.data) || '';
+                if (!yearGuess && dataFat) { const ym = dataFat.match(/\d{4}/); if (ym) yearGuess = parseInt(ym[0]); }
                 (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
                     const med = _resolveMedico(it.nomeResolvido||it.descricao||'', it.executanteNome);
                     if (!med) return;
@@ -10602,6 +10661,15 @@
                     });
                 });
             });
+            // Augmenta com procedimentos de PROC_VALOR_CHEIO vindos da AGENDA
+            if (yearGuess) {
+                const aug = _augmentMedicosFromAgenda(yearGuess, null);
+                Object.entries(aug.sumsAdd).forEach(([m,v]) => sums[m] = (sums[m]||0) + v);
+                Object.entries(aug.itemsAdd).forEach(([m,arr]) => {
+                    if (!itemsMap[m]) itemsMap[m] = [];
+                    arr.forEach(it => itemsMap[m].push(it));
+                });
+            }
             return { entries: Object.entries(sums).sort((a,b)=>b[1]-a[1]), itemsMap };
         }
 
@@ -10693,6 +10761,13 @@
                         pagamentos: inv.pagamentos || []
                     });
                 });
+            });
+            // Augmenta com PROC_VALOR_CHEIO vindos da AGENDA (mesmo mês/ano)
+            const aug = _augmentMedicosFromAgenda(ano, mes);
+            Object.entries(aug.sumsAdd).forEach(([m,v]) => sums[m] = (sums[m]||0) + v);
+            Object.entries(aug.itemsAdd).forEach(([m,arr]) => {
+                if (!itemsMap[m]) itemsMap[m] = [];
+                arr.forEach(it => itemsMap[m].push(it));
             });
             return { entries: Object.entries(sums).sort((a,b)=>b[1]-a[1]), itemsMap };
         }
