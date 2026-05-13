@@ -10638,16 +10638,20 @@
             return null;
         }
 
-        // Taxa especial por médico (sócios). Retorna o % do faturamento que fica com a clínica.
-        // Ex: Dr. Joselmo é sócio → clínica fica com 15% das consultas gineco/1ª vez/retorno gineco.
-        // (Outros procedimentos dele — radiofrequência, DIU, biopsia, preventivo etc. — continuam 100%.)
-        function _taxaClinica(med, procName) {
+        // Fração da receita do procedimento que conta como receita DO MÉDICO.
+        // (Dashboard mostra "Receita Gerada por Médico" = o que o próprio médico recebe.)
+        // Default 1.0 = 100% pro médico.
+        // Sócios pagam taxa de sala → ficam com fração < 100% de algumas consultas:
+        //   Dr. Joselmo Salvato (sócio): paga 15% taxa de sala nas consultas
+        //   gineco/1ª vez/retorno gineco → recebe 85%. Demais procedimentos dele
+        //   (radiofrequência, DIU, biopsia, preventivo, retorno +/-30 dias): 100%.
+        function _pctReceitaMedico(med, procName) {
             if (med === 'Dr. Joselmo Salvato') {
                 const p = ((procName||'')+'').toUpperCase();
                 if (p.includes('CONSULTA GINECOLOGISTA') ||
                     p.includes('CONSULTA 1ª VEZ') || p.includes('CONSULTA 1A VEZ') ||
                     p.includes('CONSULTA RETORNO GINECOLOGISTA')) {
-                    return 0.15;
+                    return 0.85;
                 }
             }
             return 1.0;
@@ -10721,8 +10725,8 @@
                     if (valRaw <= 0) return;
                     // Se está na tabela de valor cheio, deixa a agenda contar (evita duplicar)
                     if (_matchProcValorCheio(procName)) return;
-                    // Taxa especial por médico (sócio): clínica fica com X% só
-                    const taxa = _taxaClinica(med, procName);
+                    // Fração do faturamento que conta como receita do médico (sócio paga taxa de sala)
+                    const taxa = _pctReceitaMedico(med, procName);
                     const val = valRaw * taxa;
                     const valorPago = val * propPago;
                     sums[med] = (sums[med]||0) + valorPago;
@@ -10829,8 +10833,8 @@
                     if (valRaw <= 0) return;
                     // Se está na tabela de valor cheio, deixa a agenda contar (evita duplicar)
                     if (_matchProcValorCheio(procName)) return;
-                    // Taxa especial por médico (sócio): clínica fica com X% só
-                    const taxa = _taxaClinica(med, procName);
+                    // Fração do faturamento que conta como receita do médico (sócio paga taxa de sala)
+                    const taxa = _pctReceitaMedico(med, procName);
                     const val = valRaw * taxa;
                     const valorPago = val * propPago;
                     sums[med] = (sums[med]||0) + valorPago;
