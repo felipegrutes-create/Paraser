@@ -799,6 +799,19 @@ function handleGetFinancial(params) {
     cacheSheet.getRange(lastRow + 1, 1, newCacheRows.length, 2).setValues(newCacheRows);
   }
 
+  // Carregar lista de profissionais p/ resolver item.executante_id → nome
+  var profNameMap = {};
+  try {
+    var rProf = UrlFetchApp.fetch(base + '/professional/list', { headers: reqHeaders, muteHttpExceptions: true });
+    if (rProf.getResponseCode() === 200) {
+      var pj = JSON.parse(rProf.getContentText());
+      (pj.content || []).forEach(function(p) {
+        var pid = p.profissional_id || p.id;
+        if (pid) profNameMap[pid] = p.nome || p.name || '';
+      });
+    }
+  } catch(e) { /* sem prof → cai no fallback de nome */ }
+
   // Montar nameMap (índice da fatura → nome paciente)
   var nameMap = {};
   invoices.forEach(function(invoice, idx) {
@@ -816,7 +829,7 @@ function handleGetFinancial(params) {
       if (invoice.hasOwnProperty(k)) out[k] = invoice[k];
     }
     out.nomePaciente = nameMap.hasOwnProperty(idx) ? nameMap[idx] : null;
-    // Enriquecer itens com categoria e nome resolvido
+    // Enriquecer itens com categoria, nome resolvido e nome do executante
     out.itens = (invoice.itens || []).map(function(item) {
       var enriched = {};
       for (var ki in item) { if (item.hasOwnProperty(ki)) enriched[ki] = item[ki]; }
@@ -833,6 +846,8 @@ function handleGetFinancial(params) {
         enriched.categoria = item.tipo || 'Outros';
         enriched.nomeResolvido = item.descricao || null;
       }
+      // executante (profissional que executou o procedimento) — usado p/ atribuir receita ao médico
+      enriched.executanteNome = (item.executante_id && profNameMap[item.executante_id]) || null;
       return enriched;
     });
     return out;

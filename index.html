@@ -10537,11 +10537,30 @@
         let _medMesAno = new Date().getFullYear(), _medMes = new Date().getMonth() + 1;
         let _medChartMes = null;
 
-        function _resolveMedico(nome) {
+        function _resolveMedico(nome, executanteNome) {
             const n = (nome||'').toUpperCase();
-            // USG FIV e Pacote USG → Érica Stein (checar ANTES de RODOLFO porque o
-            // PACOTE DE USG TV tem o nome do médico responsável mas é executado pela Érica)
+            // Override: USG FIV / Pacote USG vão sempre p/ Érica (mesmo que o procedimento cite outro
+            // médico ou o executante apareça diferente — regra de negócio definida pela clínica)
             if (n.includes('USG FIV') || (n.includes('PACOTE') && n.includes('USG'))) return 'Érica Stein';
+            // PRIORIDADE: nome do executante real do procedimento (Feegow item.executante_id → nome)
+            const e = (executanteNome||'').toUpperCase();
+            if (e) {
+                if (e.includes('STEIN'))                                   return 'Érica Stein';
+                if (e.includes('ÉRICA')||e.includes('ERICA'))              return 'Érica Stein';  // inclui Érica Freitas; consolida
+                if (e.includes('RODOLFO'))                                 return 'Dr. Rodolfo Salvato';
+                if (e.includes('PRISCILA')||e.includes('PRISCILLA'))       return 'Dra. Priscila Loyola';
+                if (e.includes('MARCELLE'))                                return 'Dra. Marcelle Moura';
+                if (e.includes('JOSELMO'))                                 return 'Dr. Joselmo Salvato';
+                if (e.includes('HELCE'))                                   return 'Dr. Helce Junior';
+                if (e.includes('MARIO')||e.includes('MÁRIO'))              return 'Dr. Mario Barroso';
+                if (e.includes('BRUNA ORTIZ')||e.includes('BRUNA O'))      return 'Dra. Bruna Ortiz';
+                if (e.includes('BIANCA'))                                  return 'Dra. Bianca Salvato';
+                if (e.includes('GRAZIELA'))                                return 'Nutricionista - Graziela Siqueira';
+                if (e.includes('MAGALI'))                                  return 'Dra. Magali';
+                if (e.includes('CRISTIANE')||e.includes('CHAGAS'))         return 'Acupuntura - Cris Chagas';
+                if (e.includes('SARA'))                                    return 'Psicóloga - Sara Estruc';
+            }
+            // FALLBACK: pelo nome do procedimento (quando executante_id veio 0)
             if (n.includes('STEIN'))                                   return 'Érica Stein';
             if (n.includes('RODOLFO'))                                 return 'Dr. Rodolfo Salvato';
             if (n.includes('PRISCILA')||n.includes('PRISCILLA'))      return 'Dra. Priscila Loyola';
@@ -10567,7 +10586,7 @@
                 const status   = crInvoiceStatus(inv);
                 const dataFat  = (det && det.data) || '';
                 (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
-                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
+                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'', it.executanteNome);
                     if (!med) return;
                     const val = (it.valor||0)/100;
                     if (val <= 0) return;
@@ -10659,7 +10678,7 @@
                 anoItem = parseInt(p[2]); mesItem = parseInt(p[1]);
                 if (mesItem !== mes || anoItem !== ano) return;
                 (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
-                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
+                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'', it.executanteNome);
                     if (!med) return;
                     const val = (it.valor||0)/100;
                     if (val <= 0) return;
@@ -11008,7 +11027,7 @@
                     if (it.tipo==='M') { totalMed+=val; }
                     else if (it.tipo==='S') {
                         totalServ+=val;
-                        const med = _resolveMedico(nome);
+                        const med = _resolveMedico(nome, it.executanteNome);
                         if (med) servSums[med] = (servSums[med]||0) + val*prop;
                         if (nome) procSums[nome] = (procSums[nome]||0) + val;
                     } else totalOutros+=val;
@@ -11573,7 +11592,7 @@ GONAPEPTYL,56`;
                 (inv.itens||[]).filter(it=>!it.is_cancelado).forEach(it => {
                     const val = (it.valor||0);
                     if (it.tipo === 'M') { totalMed += val; const n=it.nomeResolvido||it.descricao||'Medicamento'; medSums[n]=(medSums[n]||0)+val; }
-                    else if (it.tipo === 'S') { totalServ += val; const n=_resolveMedico(it.nomeResolvido||it.descricao||''); if(n) servSums[n]=(servSums[n]||0)+(val*prop); }
+                    else if (it.tipo === 'S') { totalServ += val; const n=_resolveMedico(it.nomeResolvido||it.descricao||'', it.executanteNome); if(n) servSums[n]=(servSums[n]||0)+(val*prop); }
                     else totalOutros += val;
                 });
             });
@@ -12507,7 +12526,7 @@ GONAPEPTYL,56`;
                 const dataFat  = (det && det.data) || '';
 
                 (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
-                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'');
+                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'', it.executanteNome);
                     if (!med) return;
                     const val      = (it.valor||0) / 100;
                     if (val <= 0) return;
