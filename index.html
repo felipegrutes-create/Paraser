@@ -10638,6 +10638,21 @@
             return null;
         }
 
+        // Taxa especial por médico (sócios). Retorna o % do faturamento que fica com a clínica.
+        // Ex: Dr. Joselmo é sócio → clínica fica com 15% das consultas gineco/1ª vez/retorno gineco.
+        // (Outros procedimentos dele — radiofrequência, DIU, biopsia, preventivo etc. — continuam 100%.)
+        function _taxaClinica(med, procName) {
+            if (med === 'Dr. Joselmo Salvato') {
+                const p = ((procName||'')+'').toUpperCase();
+                if (p.includes('CONSULTA GINECOLOGISTA') ||
+                    p.includes('CONSULTA 1ª VEZ') || p.includes('CONSULTA 1A VEZ') ||
+                    p.includes('CONSULTA RETORNO GINECOLOGISTA')) {
+                    return 0.15;
+                }
+            }
+            return 1.0;
+        }
+
         // Procura na agenda (gRaw) procedimentos de PROC_VALOR_CHEIO no ano/mês informado,
         // soma usando o valor cheio da tabela e atribui pelo Profissional do agendamento.
         // Retorna { sumsAdd: {med:val}, itemsAdd: {med:[items]} } pronto pra mergear nas
@@ -10699,20 +10714,25 @@
                 const dataFat  = (det && det.data) || '';
                 if (!yearGuess && dataFat) { const ym = dataFat.match(/\d{4}/); if (ym) yearGuess = parseInt(ym[0]); }
                 (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
-                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'', it.executanteNome);
+                    const procName = it.nomeResolvido||it.descricao||'';
+                    const med = _resolveMedico(procName, it.executanteNome);
                     if (!med) return;
-                    const val = (it.valor||0)/100;
-                    if (val <= 0) return;
+                    const valRaw = (it.valor||0)/100;
+                    if (valRaw <= 0) return;
                     // Se está na tabela de valor cheio, deixa a agenda contar (evita duplicar)
-                    if (_matchProcValorCheio(it.nomeResolvido||it.descricao||'')) return;
+                    if (_matchProcValorCheio(procName)) return;
+                    // Taxa especial por médico (sócio): clínica fica com X% só
+                    const taxa = _taxaClinica(med, procName);
+                    const val = valRaw * taxa;
                     const valorPago = val * propPago;
                     sums[med] = (sums[med]||0) + valorPago;
                     if (!itemsMap[med]) itemsMap[med] = [];
                     itemsMap[med].push({
                         data: dataFat, paciente: inv.nomePaciente||'—',
-                        proc: it.nomeResolvido||it.descricao||'', qtd: it.quantidade||1,
+                        proc: procName, qtd: it.quantidade||1,
                         valor: val, valorPago, valorPendente: Math.max(0, val - valorPago),
                         propPago, status, fatTotal: fatVal/100, pagTotal: pagSum/100,
+                        valorCheio: valRaw, taxa,   // referência: cheio antes da taxa + multiplicador aplicado
                         pagamentos: inv.pagamentos || []
                     });
                 });
@@ -10802,20 +10822,25 @@
                 anoItem = parseInt(p[2]); mesItem = parseInt(p[1]);
                 if (mesItem !== mes || anoItem !== ano) return;
                 (inv.itens||[]).filter(it=>!it.is_cancelado&&it.tipo==='S').forEach(it => {
-                    const med = _resolveMedico(it.nomeResolvido||it.descricao||'', it.executanteNome);
+                    const procName = it.nomeResolvido||it.descricao||'';
+                    const med = _resolveMedico(procName, it.executanteNome);
                     if (!med) return;
-                    const val = (it.valor||0)/100;
-                    if (val <= 0) return;
+                    const valRaw = (it.valor||0)/100;
+                    if (valRaw <= 0) return;
                     // Se está na tabela de valor cheio, deixa a agenda contar (evita duplicar)
-                    if (_matchProcValorCheio(it.nomeResolvido||it.descricao||'')) return;
+                    if (_matchProcValorCheio(procName)) return;
+                    // Taxa especial por médico (sócio): clínica fica com X% só
+                    const taxa = _taxaClinica(med, procName);
+                    const val = valRaw * taxa;
                     const valorPago = val * propPago;
                     sums[med] = (sums[med]||0) + valorPago;
                     if (!itemsMap[med]) itemsMap[med] = [];
                     itemsMap[med].push({
                         data: dataFat, paciente: inv.nomePaciente||'—',
-                        proc: it.nomeResolvido||it.descricao||'', qtd: it.quantidade||1,
+                        proc: procName, qtd: it.quantidade||1,
                         valor: val, valorPago, valorPendente: Math.max(0, val - valorPago),
                         propPago, status, fatTotal: fatVal/100, pagTotal: pagSum/100,
+                        valorCheio: valRaw, taxa,   // referência: cheio antes da taxa + multiplicador aplicado
                         pagamentos: inv.pagamentos || []
                     });
                 });
