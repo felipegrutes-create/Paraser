@@ -610,7 +610,8 @@ var IDS_ONLINE_PROCS = [
   280, 282, 283, 285,
   309, 310, 311, 318, 319,
   322, 323,
-  327, 331, 333, 334, 337, 338, 341, 342, 347, 349
+  327, 331, 333, 334, 337, 338, 341, 342, 347, 349,
+  353   // CONSULTA RETORNO ENDOCRINOLOGISTA - DRA. MAGALI (Online) — adicionado 2026-05-13
 ];
 
 // procIds de procedimentos que NÃO recebem confirmação por WhatsApp.
