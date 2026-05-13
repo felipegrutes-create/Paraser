@@ -11104,12 +11104,36 @@
                                 const i = ctx.dataIndex;
                                 const v = rAno.byMonth[i] || 0;
                                 const n = rAno.byMonthProcs[i] || 0;
-                                return ' R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' · ' + n + ' procedimento' + (n===1?'':'s');
+                                return ' R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' · ' + n + ' procedimento' + (n===1?'':'s') + ' · clique para detalhar';
                             } } }
                         },
                         scales: {
                             x: { ticks: { color:'#6b7a99', font:{size:11} }, grid:{display:false} },
                             y: { ticks: { color:'#6b7a99', font:{size:10}, callback: v => 'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, grid:{color:'rgba(255,255,255,0.04)'} }
+                        },
+                        onHover(evt, elements) {
+                            evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                        },
+                        onClick(evt, elements) {
+                            if (!elements.length) return;
+                            const idx = elements[0].index;
+                            if ((rAno.byMonthProcs[idx] || 0) === 0) return;
+                            const monthNum = idx + 1;
+                            const data = _medExecAno === 2025 ? _medData2025 : _medData2026;
+                            if (!data) return;
+                            const agg = _aggregateMedicos(data);
+                            const allItems = (agg.itemsMap[_medExecMedico] || []);
+                            const monthItems = allItems.filter(it => {
+                                const dStr = it.data || '';
+                                const sep = dStr.includes('-') ? '-' : '/';
+                                const p = dStr.split(sep);
+                                return parseInt(p[1]) === monthNum;
+                            });
+                            if (!monthItems.length) return;
+                            const key = _medExecMedico + ' — ' + _MESES_NOMES[idx] + '/' + _medExecAno;
+                            window._crMedicosItemsMap = window._crMedicosItemsMap || {};
+                            window._crMedicosItemsMap[key] = monthItems;
+                            openCrMedicoDetail(key);
                         }
                     },
                     plugins: [labelsPlugin]
