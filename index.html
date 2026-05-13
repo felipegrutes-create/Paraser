@@ -3704,11 +3704,11 @@
             <div class="kpi-grid" style="margin-bottom:20px">
                 <div class="kpi-card">
                     <div class="value" id="med-total-2025" style="color:#6366f1">—</div>
-                    <div class="label">Total Recebido 2025</div>
+                    <div class="label">Receita Gerada 2025</div>
                 </div>
                 <div class="kpi-card teal">
                     <div class="value" id="med-total-2026" style="color:#10b981">—</div>
-                    <div class="label">Total Recebido 2026</div>
+                    <div class="label">Receita Gerada 2026</div>
                 </div>
                 <div class="kpi-card">
                     <div class="value" id="med-crescimento">—</div>
@@ -3742,10 +3742,57 @@
                 </div>
             </div>
 
+            <!-- Sumário executivo por médico (seleção) -->
+            <div style="margin-top:36px;padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px">
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap">
+                    <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:0">👤 Sumário Executivo por Médico</p>
+                    <select id="medExecSelect" onchange="medExecSelect(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-family:inherit;font-size:13px;min-width:260px;cursor:pointer">
+                        <option value="">— Selecione um médico —</option>
+                    </select>
+                    <span id="medExecStatus" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
+                </div>
+                <div id="medExecEmpty" style="text-align:center;padding:28px;color:var(--muted);font-size:13px">
+                    Selecione um médico no menu acima para ver o sumário executivo (Receita Gerada anual + mensal + procedimentos).
+                </div>
+                <div id="medExecBody" style="display:none">
+                    <div class="kpi-grid" style="margin-bottom:20px">
+                        <div class="kpi-card">
+                            <div class="value" id="medExec-r2025" style="color:#6366f1">—</div>
+                            <div class="label">Receita Gerada 2025</div>
+                        </div>
+                        <div class="kpi-card teal">
+                            <div class="value" id="medExec-r2026" style="color:#10b981">—</div>
+                            <div class="label">Receita Gerada 2026</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="value" id="medExec-yoy">—</div>
+                            <div class="label">Crescimento YoY</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="value" id="medExec-procs" style="color:#f59e0b">—</div>
+                            <div class="label" id="medExec-procs-lab">Procedimentos no ano</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700">📅 Mensal</span>
+                        <button id="medExecY2025" class="fin-view-btn" onclick="medExecSetAno(2025)">2025</button>
+                        <button id="medExecY2026" class="fin-view-btn active" onclick="medExecSetAno(2026)">2026</button>
+                        <span id="medExec-monthTotal" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
+                    </div>
+                    <div class="chart-card" style="padding:14px">
+                        <canvas id="medExecChartMes" height="180"></canvas>
+                    </div>
+                    <div style="margin-top:20px">
+                        <p style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;font-weight:700">🏆 Procedimentos mais geradores de receita (ano selecionado)</p>
+                        <div id="medExecTopProcs"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Mensal -->
             <div style="margin-top:36px">
                 <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
-                    <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:0">📅 Receita por Médico — Mensal</p>
+                    <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:0">📅 Receita por Médico — Mensal (todos)</p>
                     <div style="display:flex;gap:6px">
                         <button id="medMesY2025" class="fin-view-btn" onclick="medMesSetAno(2025)">2025</button>
                         <button id="medMesY2026" class="fin-view-btn active" onclick="medMesSetAno(2026)">2026</button>
@@ -10751,6 +10798,162 @@
             _medMes    = new Date().getMonth() + 1;
             _medMesRenderBtns();
             renderMedMensal();
+
+            // Sumário executivo por médico
+            _medExecPopulateSelect();
+            if (_medExecMedico) _renderMedExec();
+        }
+
+        // ===================== SUMÁRIO EXECUTIVO POR MÉDICO =====================
+        let _medExecMedico = null;
+        let _medExecAno    = new Date().getFullYear();
+        let _medExecChart  = null;
+
+        function _medExecPopulateSelect() {
+            const sel = document.getElementById('medExecSelect');
+            if (!sel) return;
+            const setM = new Set();
+            if (_medData2025) _aggregateMedicos(_medData2025).entries.forEach(([m])=>setM.add(m));
+            if (_medData2026) _aggregateMedicos(_medData2026).entries.forEach(([m])=>setM.add(m));
+            const meds = [...setM].sort((a,b) => a.localeCompare(b, 'pt-BR'));
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">— Selecione um médico —</option>' +
+                meds.map(m => `<option value="${m}">${m}</option>`).join('');
+            if (cur && meds.includes(cur)) sel.value = cur;
+        }
+
+        function medExecSelect(medico) {
+            _medExecMedico = medico || null;
+            const body  = document.getElementById('medExecBody');
+            const empty = document.getElementById('medExecEmpty');
+            if (!_medExecMedico) {
+                if (body)  body.style.display  = 'none';
+                if (empty) empty.style.display = '';
+                if (_medExecChart) { try{_medExecChart.destroy();}catch(e){} _medExecChart = null; }
+                return;
+            }
+            if (empty) empty.style.display = 'none';
+            if (body)  body.style.display  = '';
+            _renderMedExec();
+        }
+
+        function medExecSetAno(ano) {
+            _medExecAno = ano;
+            document.getElementById('medExecY2025')?.classList.toggle('active', ano === 2025);
+            document.getElementById('medExecY2026')?.classList.toggle('active', ano === 2026);
+            if (_medExecMedico) _renderMedExec();
+        }
+
+        function _medExecCompute(data, med) {
+            const empty = { total: 0, procs: 0, byMonth: new Array(12).fill(0), topProcs: {} };
+            if (!data || !med) return empty;
+            const agg = _aggregateMedicos(data);
+            const items = (agg.itemsMap[med] || []);
+            if (!items.length) return empty;
+            let total = 0, procs = 0;
+            const byMonth = new Array(12).fill(0);
+            const topProcs = {};
+            items.forEach(it => {
+                total += it.valorPago;
+                procs += (it.qtd || 1);
+                const dStr = it.data || '';
+                const sep = dStr.includes('-') ? '-' : '/';
+                const p = dStr.split(sep);
+                const mes = parseInt(p[1])-1;
+                if (mes >= 0 && mes < 12) byMonth[mes] += it.valorPago;
+                const pk = it.proc || '(sem nome)';
+                topProcs[pk] = (topProcs[pk]||0) + it.valorPago;
+            });
+            return { total, procs, byMonth, topProcs };
+        }
+
+        function _renderMedExec() {
+            if (!_medExecMedico) return;
+            const crFmtL = v => 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            const r2025 = _medExecCompute(_medData2025, _medExecMedico);
+            const r2026 = _medExecCompute(_medData2026, _medExecMedico);
+
+            document.getElementById('medExec-r2025').textContent = crFmtL(r2025.total);
+            document.getElementById('medExec-r2026').textContent = crFmtL(r2026.total);
+
+            const yoyEl = document.getElementById('medExec-yoy');
+            if (r2025.total > 0 && r2026.total > 0) {
+                const pct = ((r2026.total - r2025.total) / r2025.total * 100);
+                yoyEl.textContent = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+                yoyEl.style.color = pct >= 0 ? '#34d399' : '#f87171';
+            } else if (r2026.total > 0 && r2025.total === 0) {
+                yoyEl.textContent = 'novo em 2026';
+                yoyEl.style.color = '#34d399';
+            } else {
+                yoyEl.textContent = '—';
+                yoyEl.style.color = '';
+            }
+
+            const rAno = _medExecAno === 2025 ? r2025 : r2026;
+            document.getElementById('medExec-procs').textContent = rAno.procs.toLocaleString('pt-BR');
+            document.getElementById('medExec-procs-lab').textContent = `Procedimentos em ${_medExecAno}`;
+
+            // Total do ano (label do "Mensal")
+            const totalEl = document.getElementById('medExec-monthTotal');
+            if (totalEl) totalEl.textContent = `${_medExecAno}: ${crFmtL(rAno.total)} · ${rAno.procs} procedimento${rAno.procs===1?'':'s'}`;
+
+            // Status
+            const stEl = document.getElementById('medExecStatus');
+            if (stEl) stEl.textContent = (r2025.total + r2026.total > 0) ? '' : 'Sem dados para este médico';
+
+            // Pills de ano sincronizadas
+            document.getElementById('medExecY2025')?.classList.toggle('active', _medExecAno === 2025);
+            document.getElementById('medExecY2026')?.classList.toggle('active', _medExecAno === 2026);
+
+            // Chart mensal
+            const el = document.getElementById('medExecChartMes');
+            if (el) {
+                if (_medExecChart) { try{_medExecChart.destroy();}catch(e){} _medExecChart = null; }
+                _medExecChart = new Chart(el.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: _MESES_NOMES,
+                        datasets: [{
+                            data: rAno.byMonth,
+                            backgroundColor: _MESES_NOMES.map((_,i) => (i === new Date().getMonth() && _medExecAno === new Date().getFullYear()) ? '#10b981ee' : '#10b98199'),
+                            borderColor: '#10b981',
+                            borderWidth: 1.5, borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => ' R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) } }
+                        },
+                        scales: {
+                            x: { ticks: { color:'#6b7a99', font:{size:11} }, grid:{display:false} },
+                            y: { ticks: { color:'#6b7a99', font:{size:10}, callback: v => 'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, grid:{color:'rgba(255,255,255,0.04)'} }
+                        }
+                    }
+                });
+            }
+
+            // Top procedimentos
+            const top = Object.entries(rAno.topProcs).sort((a,b)=>b[1]-a[1]).slice(0, 8);
+            const topEl = document.getElementById('medExecTopProcs');
+            if (topEl) {
+                if (!top.length) {
+                    topEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:10px">Sem procedimentos neste ano.</div>';
+                } else {
+                    const maxV = top[0][1] || 1;
+                    topEl.innerHTML = top.map(([proc, val]) => {
+                        const w = Math.round(val / maxV * 100);
+                        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:12px">
+                            <span style="flex:0 0 45%;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${proc.replace(/"/g,'&quot;')}">${proc}</span>
+                            <div style="flex:1;height:14px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden">
+                                <div style="height:100%;background:linear-gradient(90deg,#10b981,#34d399);width:${w}%"></div>
+                            </div>
+                            <span style="flex:0 0 110px;text-align:right;color:var(--text);font-weight:600">${crFmtL(val)}</span>
+                        </div>`;
+                    }).join('');
+                }
+            }
         }
 
         // ===================== ANÁLISE EXECUTIVA (aba própria) =====================
