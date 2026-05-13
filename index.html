@@ -10584,7 +10584,12 @@
         // TODO Felipe: reclassificar lançamentos no Feegow pra alinhar lançamento × execução
         // (idealmente lançar honorário no mês do procedimento, não no pagamento antecipado).
         // Quando isso for feito, re-ativar a tabela abaixo (mudar de {} pra _PROC_VALOR_CHEIO_FULL).
-        const PROC_VALOR_CHEIO = {};   // intencionalmente vazio — ver TODO acima
+        const PROC_VALOR_CHEIO = {
+            // Exceção: consulta psicóloga (Sara) nunca é faturada no Feegow → conta direto da agenda.
+            // Sem risco de duplicar (NÃO há fatura correspondente). Quando o Feegow estiver
+            // classificado certo, remover esta linha + ativar a tabela completa _PROC_VALOR_CHEIO_FULL.
+            'CONSULTA PSICÓLOGA': 300
+        };
 
         // Tabela completa preservada pra ativação futura (após reclassificação no Feegow).
         // ⚠️ A ORDEM IMPORTA: variantes específicas (GEMELAR) ANTES das genéricas.
@@ -10653,7 +10658,10 @@
                 if (yr !== year) return;
                 if (month != null && mo !== month) return;
                 const sta = ((r[gC.sta]||'')+'').toLowerCase().trim();
-                if (sta.includes('cancelado') || sta.includes('desmarcado')) return;
+                // exclui status que claramente não geram receita
+                if (sta.includes('cancelado') || sta.includes('desmarcado') ||
+                    sta.includes('não compareceu') || sta.includes('nao compareceu') ||
+                    sta.includes('remarcado')) return;
                 const procNome = ((r[gC.proc]||'')+'').toUpperCase().trim();
                 const match = _matchProcValorCheio(procNome);
                 if (!match || !match.valor) return;
