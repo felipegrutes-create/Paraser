@@ -978,7 +978,7 @@
       <div style="display:flex;flex-direction:column;gap:.4rem">
         <div style="text-align:center;padding:.45rem .8rem;border-radius:8px;background:rgba(82,196,138,.1);border:1px solid rgba(82,196,138,.4)">
           <span style="font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--green)">🚀 Projetado — 20% conversão</span>
-          <span style="font-size:13px;color:var(--muted);margin-left:.8rem">989 punções · 82/mês · Rodolfo: máx. 40/mês · Priscila: máx. 35/mês</span>
+          <span style="font-size:13px;color:var(--muted);margin-left:.8rem">988 punções · 82/mês · Rodolfo: máx. 40/mês · Priscila: máx. 25/mês</span>
         </div>
         <div style="flex:1;position:relative;min-height:0">
           <canvas id="chartProj"></canvas>
@@ -1279,9 +1279,11 @@
     // Excedente Rodolfo (262) redistribuído → Priscila chega a 434 → capped 420, overflow 14
     // Excedente Priscila (14) + Rodolfo restante → Marcelle 57, Bruna 25, Mario 7
     // Segmentos: base = projeção simples (sem redistribuição); adicionado = overflow recebido
-    const baseProj    = [480, 210, 23, 10, 3];   // base (Rodolfo já capado)
-    const adicionado  = [  0, 210, 34, 15, 4];   // redistribuído dos caps
-    // totais: [480, 420, 57, 25, 7]
+    // Rodolfo cap 40/mês=480 (overflow 262) → Priscila sobe p/ 434 → cap 25/mês=300 (overflow 134)
+    // 134 redistribuídos p/ Marcelle/Bruna/Mario proporcionalmente → 133, 58, 17
+    const baseProj    = [480, 210,  23, 10,  3];  // projeção simples (Rodolfo já capado)
+    const adicionado  = [  0,  90, 110, 48, 14];  // redistribuído dos caps
+    // totais:          [480, 300, 133, 58, 17]
 
     new Chart(document.getElementById('chartProj'), {
       type: 'bar',
@@ -1354,13 +1356,13 @@
             display: ctx => (ctx.datasetIndex === 0 && ctx.dataIndex === 0) ||
                             (ctx.datasetIndex === 1 && ctx.dataIndex !== 0),
             anchor: 'end', align: 'end',
-            color: ctx => ctx.dataIndex === 0 ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)',
+            color: ctx => (ctx.dataIndex === 0 || ctx.dataIndex === 1) ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)',
             font: { size: 14, weight: '700' },
             padding: { left: 8 },
             formatter: (val, ctx) => {
               const total = baseProj[ctx.dataIndex] + adicionado[ctx.dataIndex];
-              const suffix = ctx.dataIndex === 0 ? '  ·  ' + mês(total) + ' ⚠ cap' : '  ·  ' + mês(total);
-              return total + suffix;
+              const capped = ctx.dataIndex === 0 || ctx.dataIndex === 1;
+              return total + '  ·  ' + mês(total) + (capped ? ' ⚠ cap' : '');
             }
           }
         },
