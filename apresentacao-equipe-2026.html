@@ -655,6 +655,70 @@
     position:fixed; bottom:1.2rem; right:1.2rem; z-index:100;
     color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
   }
+
+  /* ── Mind map — Soluções para o Gargalo ── */
+  @keyframes rev-up {
+    from { opacity:0; transform:translateY(28px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes draw-h { from{stroke-dashoffset:600} to{stroke-dashoffset:0} }
+  @keyframes draw-v { from{stroke-dashoffset:80}  to{stroke-dashoffset:0} }
+
+  .mm-grid {
+    display:grid; grid-template-columns:repeat(3,1fr); gap:1.1rem;
+    height:calc(100% - 210px);
+  }
+  .mm-pillar {
+    border:1.5px solid var(--pc-border);
+    background:var(--pc-bg);
+    border-radius:16px; padding:1.1rem 1rem;
+    display:flex; flex-direction:column; gap:.6rem;
+    cursor:pointer; user-select:none;
+    transition:transform .28s ease, box-shadow .28s ease, border-color .28s ease, opacity .28s ease;
+  }
+  .mm-pillar:hover {
+    transform:translateY(-5px);
+    box-shadow:0 12px 40px rgba(0,0,0,.45), 0 0 50px var(--pc-glow);
+    border-color:var(--pc);
+  }
+  .mm-grid.has-focus .mm-pillar:not(.focused) { opacity:.32; }
+  .mm-grid.has-focus .mm-pillar.focused       { opacity:1; transform:translateY(-5px); }
+  .mm-pillar-icon { font-size:28px; line-height:1; }
+  .mm-pillar-hd {
+    font-size:15px; font-weight:800; color:var(--pc);
+    letter-spacing:.02em; line-height:1.25;
+  }
+  .mm-divider {
+    height:1.5px; background:var(--pc-border); border-radius:2px; margin:.1rem 0;
+    transform:scaleX(0); transform-origin:left;
+    transition:transform .4s cubic-bezier(0.22,1,0.36,1);
+  }
+  .mm-pillar:hover .mm-divider, .mm-pillar.focused .mm-divider { transform:scaleX(1); }
+  .mm-item {
+    font-size:13px; color:rgba(220,200,240,.88);
+    padding:.4rem .7rem; border-radius:8px;
+    background:rgba(255,255,255,.04);
+    border-left:3px solid var(--pc);
+    line-height:1.4;
+    transition:background .2s, transform .2s;
+  }
+  .mm-pillar:hover .mm-item { background:rgba(255,255,255,.07); }
+  .mm-item-sub {
+    font-size:11.5px; color:var(--muted); font-style:italic;
+    padding:.2rem .7rem .2rem 1rem;
+  }
+  /* stagger entry */
+  .slide.is-active .mm-pillar {
+    animation: rev-up .65s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .slide.is-active .mm-pillar:nth-child(1) { animation-delay:250ms }
+  .slide.is-active .mm-pillar:nth-child(2) { animation-delay:430ms }
+  .slide.is-active .mm-pillar:nth-child(3) { animation-delay:610ms }
+  /* SVG connector animations */
+  .slide.is-active .mm-svg-h { animation:draw-h .55s ease both; animation-delay:100ms; }
+  .slide.is-active .mm-svg-v1{ animation:draw-v .3s ease both;  animation-delay:150ms; }
+  .slide.is-active .mm-svg-v2{ animation:draw-v .3s ease both;  animation-delay:170ms; }
+  .slide.is-active .mm-svg-v3{ animation:draw-v .3s ease both;  animation-delay:190ms; }
 </style>
 </head>
 <body>
@@ -988,6 +1052,72 @@
     <p style="margin-top:.4rem;text-align:center;font-size:11px;color:var(--dim);letter-spacing:.04em">Dados reais Feegow mai/2025–mai/2026 · Excedente de Rodolfo redistribuído proporcionalmente aos demais · Meta: 20% conversão no funil</p>
   </section>
 
+  <!-- ========== SLIDE SOLUÇÕES — MAPA MENTAL ========== -->
+  <section class="slide" data-slide="solucoes" style="background:radial-gradient(ellipse at 50% 15%, #1c0835 0%, #0d0418 65%)">
+    <div class="kicker" style="color:var(--accent2)">Caminhos para resolver o gargalo</div>
+
+    <!-- Nó raiz do problema -->
+    <div style="text-align:center;margin-bottom:.5rem">
+      <div style="display:inline-flex;align-items:center;gap:.65rem;padding:.5rem 1.4rem;border-radius:40px;background:rgba(217,112,80,.1);border:1.5px solid rgba(217,112,80,.55);font-size:13px;font-weight:700;letter-spacing:.1em;color:rgba(230,130,100,.95)">
+        ⚠&nbsp;&nbsp;GARGALO ATUAL — 4,9% de conversão lead → consulta
+      </div>
+    </div>
+
+    <!-- Linhas conectoras SVG -->
+    <svg width="100%" height="36" style="display:block;overflow:visible" aria-hidden="true">
+      <line class="mm-svg-v1" x1="50%" y1="0" x2="50%" y2="16"
+            stroke="rgba(255,255,255,.18)" stroke-width="2" stroke-dasharray="80" stroke-dashoffset="80"/>
+      <line class="mm-svg-h"  x1="17%" y1="16" x2="83%" y2="16"
+            stroke="rgba(255,255,255,.18)" stroke-width="2" stroke-dasharray="600" stroke-dashoffset="600"/>
+      <line class="mm-svg-v1" x1="17%" y1="16" x2="17%" y2="36"
+            stroke="rgba(236,212,162,.6)"  stroke-width="2" stroke-dasharray="80" stroke-dashoffset="80"/>
+      <line class="mm-svg-v2" x1="50%" y1="16" x2="50%" y2="36"
+            stroke="rgba(82,196,138,.6)"   stroke-width="2" stroke-dasharray="80" stroke-dashoffset="80"/>
+      <line class="mm-svg-v3" x1="83%" y1="16" x2="83%" y2="36"
+            stroke="rgba(180,130,255,.6)"  stroke-width="2" stroke-dasharray="80" stroke-dashoffset="80"/>
+    </svg>
+
+    <!-- 3 Pilares -->
+    <div class="mm-grid" id="mmGrid">
+
+      <!-- Pilar 1 — Captação Inteligente -->
+      <div class="mm-pillar" style="--pc:var(--accent2);--pc-bg:rgba(236,212,162,.07);--pc-border:rgba(236,212,162,.3);--pc-glow:rgba(236,212,162,.12)">
+        <div class="mm-pillar-icon">🎯</div>
+        <div class="mm-pillar-hd">Captação Inteligente</div>
+        <div class="mm-divider"></div>
+        <div class="mm-item">Quiz no Meta em vez de formulário</div>
+        <div class="mm-item">LP específica por perfil de resposta</div>
+        <div class="mm-item">Menos fricção → mais engajamento</div>
+        <div class="mm-item">Convite para instalar o App Paraser</div>
+        <div class="mm-item-sub">↳ canal direto para comunicações futuras</div>
+      </div>
+
+      <!-- Pilar 2 — IA no Atendimento -->
+      <div class="mm-pillar" style="--pc:var(--green);--pc-bg:rgba(82,196,138,.07);--pc-border:rgba(82,196,138,.3);--pc-glow:rgba(82,196,138,.12)">
+        <div class="mm-pillar-icon">🤖</div>
+        <div class="mm-pillar-hd">IA no Atendimento</div>
+        <div class="mm-divider"></div>
+        <div class="mm-item">IA responde perguntas recorrentes</div>
+        <div class="mm-item">Equipe humana foca nos casos complexos</div>
+        <div class="mm-item">Mais capacidade sem mais contratações</div>
+        <div class="mm-item-sub">↳ reduz custo por atendimento</div>
+      </div>
+
+      <!-- Pilar 3 — Checklist da Fertilidade -->
+      <div class="mm-pillar" style="--pc:rgba(185,135,255,1);--pc-bg:rgba(165,110,255,.07);--pc-border:rgba(165,110,255,.3);--pc-glow:rgba(165,110,255,.12)">
+        <div class="mm-pillar-icon">📋</div>
+        <div class="mm-pillar-hd">Checklist da Fertilidade</div>
+        <div class="mm-divider"></div>
+        <div class="mm-item">Produto: consulta + exames em pacote</div>
+        <div class="mm-item">Vendido como jornada completa</div>
+        <div class="mm-item">Nova fonte de receita recorrente</div>
+        <div class="mm-item-sub">↳ reduz barreiras de entrada do paciente</div>
+      </div>
+
+    </div>
+    <p style="margin-top:.5rem;text-align:center;font-size:11px;color:var(--dim)">Clique em um pilar para destacar · As três frentes atuam em paralelo</p>
+  </section>
+
   <!-- ========== SLIDE 11 — O QUE JÁ CONSTRUÍMOS ========== -->
   <section class="slide" data-slide="11">
     <div class="kicker">o que já construímos pra fechar essa lacuna</div>
@@ -1179,6 +1309,18 @@
     else if (e.key === 'Home') show(0);
     else if (e.key === 'End') show(total-1);
   });
+  // Mind map: clique no pilar foca/desfoca (sem avançar o slide)
+  document.querySelectorAll('.mm-pillar').forEach(pillar => {
+    pillar.addEventListener('click', e => {
+      e.stopPropagation();
+      const grid = pillar.closest('.mm-grid');
+      const already = pillar.classList.contains('focused');
+      grid.querySelectorAll('.mm-pillar').forEach(p => p.classList.remove('focused'));
+      if (already) { grid.classList.remove('has-focus'); }
+      else { pillar.classList.add('focused'); grid.classList.add('has-focus'); }
+    });
+  });
+
   // Funil: clique no step foca/desfoca (sem avançar o slide)
   document.querySelectorAll('.funnel .step').forEach(step => {
     step.addEventListener('click', e => {
