@@ -1279,10 +1279,11 @@
     // Excedente Rodolfo (262) redistribuído → Priscila chega a 434 → capped 420, overflow 14
     // Excedente Priscila (14) + Rodolfo restante → Marcelle 57, Bruna 25, Mario 7
     // Segmentos: base = projeção simples (sem redistribuição); adicionado = overflow recebido
-    // Caps: Rodolfo 480 + Priscila 180 + Marcelle 84 (7/mês)
-    // Overflow total: 262+30+126 = 418 → Bruna e Mario absorvem: 188 e 56
-    const baseProj    = [480, 180, 23, 10,  3];  // projeção simples (capped onde aplicável)
-    const adicionado  = [  0,   0, 61,178, 53];  // redistribuído dos caps
+    // Segmento escuro = atual real (12 meses); segmento claro = crescimento projetado
+    // Projetados finais: Rodolfo 480 (cap 40/mês), Priscila 180 (cap 15/mês),
+    //   Marcelle 84 (cap 7/mês), Bruna 188, Mario 56
+    const baseProj    = [286,  81,  9,  4,  1];  // atual real (últimos 12 meses)
+    const adicionado  = [194,  99, 75,184, 55];  // crescimento até o projetado
     const capado      = [true, true, true, false, false];
     // totais:          [480, 180, 84, 188, 56]
 
@@ -1341,9 +1342,8 @@
             }
           },
           datalabels: {
-            // label no dataset 0 quando adicionado=0; dataset 1 nos demais (incluindo capados com adição)
-            display: ctx => (ctx.datasetIndex === 0 && adicionado[ctx.dataIndex] === 0) ||
-                            (ctx.datasetIndex === 1 && adicionado[ctx.dataIndex] > 0),
+            // label sempre no dataset 1 (segmento de crescimento, topo da barra)
+            display: ctx => ctx.datasetIndex === 1,
             anchor: 'end', align: 'end',
             color: ctx => capado[ctx.dataIndex] ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)',
             font: { size: 14, weight: '700' },
