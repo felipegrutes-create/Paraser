@@ -190,24 +190,27 @@
   .slide.is-active .roles-grid > :nth-child(5) { animation-delay: 1130ms }
   .slide.is-active .roles-grid > :nth-child(6) { animation-delay: 1250ms }
 
-  /* Funil — steps em cascata + connectors fade-in */
+  /* Funil — steps em cascata */
+  @keyframes draw-line { from{transform:scaleY(0)} to{transform:scaleY(1)} }
   .slide.is-active .funnel .step{
     animation: rev-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  .slide.is-active .step-wrap:nth-child(1)  .step { animation-delay: 480ms }
-  .slide.is-active .step-wrap:nth-child(3)  .step { animation-delay: 630ms }
-  .slide.is-active .step-wrap:nth-child(5)  .step { animation-delay: 780ms }
-  .slide.is-active .step-wrap:nth-child(7)  .step { animation-delay: 930ms }
-  .slide.is-active .step-wrap:nth-child(9)  .step { animation-delay: 1080ms }
-  .slide.is-active .step-wrap:nth-child(11) .step { animation-delay: 1230ms }
-  .slide.is-active .step-conn{
-    animation: rev-fade 0.35s ease both;
-  }
-  .slide.is-active .funnel > :nth-child(2)  { animation-delay: 555ms }
-  .slide.is-active .funnel > :nth-child(4)  { animation-delay: 705ms }
-  .slide.is-active .funnel > :nth-child(6)  { animation-delay: 855ms }
-  .slide.is-active .funnel > :nth-child(8)  { animation-delay: 1005ms }
-  .slide.is-active .funnel > :nth-child(10) { animation-delay: 1155ms }
+  .slide.is-active .step-wrap:nth-child(1) .step { animation-delay: 480ms }
+  .slide.is-active .step-wrap:nth-child(3) .step { animation-delay: 660ms }
+  .slide.is-active .step-wrap:nth-child(5) .step { animation-delay: 840ms }
+  .slide.is-active .step-wrap:nth-child(7) .step { animation-delay: 1020ms }
+  .slide.is-active .step-wrap:nth-child(9) .step { animation-delay: 1200ms }
+  /* Setas — linha desenha de cima pra baixo, cabeça surge depois */
+  .slide.is-active .arr-line { animation: draw-line 0.5s ease both; }
+  .slide.is-active .arr-head { animation: rev-fade 0.22s ease both; }
+  .slide.is-active .funnel > :nth-child(2) .arr-line { animation-delay: 570ms }
+  .slide.is-active .funnel > :nth-child(2) .arr-head { animation-delay: 1010ms }
+  .slide.is-active .funnel > :nth-child(4) .arr-line { animation-delay: 750ms }
+  .slide.is-active .funnel > :nth-child(4) .arr-head { animation-delay: 1190ms }
+  .slide.is-active .funnel > :nth-child(6) .arr-line { animation-delay: 930ms }
+  .slide.is-active .funnel > :nth-child(6) .arr-head { animation-delay: 1370ms }
+  .slide.is-active .funnel > :nth-child(8) .arr-line { animation-delay: 1110ms }
+  .slide.is-active .funnel > :nth-child(8) .arr-head { animation-delay: 1550ms }
 
   /* Insights do funil — entram pela direita após os steps */
   .slide.is-active .funnel-insights > *{
@@ -415,41 +418,38 @@
 
   /* === FUNIL === */
   .funnel-wrap{
-    display:flex; gap:3rem; align-items:flex-start; width:100%; max-width:1450px;
-    margin-top:.75rem;
+    display:flex; gap:2.5rem; align-items:flex-start; width:100%; max-width:1500px;
+    margin-top:.4rem;
   }
   .funnel{
     flex:1; display:flex; flex-direction:column; gap:0; align-items:center;
   }
-  /* step-wrap cria o efeito de afunilamento centrado */
   .step-wrap{ display:flex; flex-direction:column; align-items:stretch; }
   .step-wrap.s1{width:100%}
-  .step-wrap.s2{width:87%}
-  .step-wrap.s3{width:73%}
-  .step-wrap.s4{width:57%}
-  .step-wrap.s5{width:42%}
-  .step-wrap.s6{width:28%}
+  .step-wrap.s2{width:88%}
+  .step-wrap.s3{width:75%}
+  .step-wrap.s4{width:60%}
+  .step-wrap.s5{width:46%}
 
   .funnel .step{
     width:100%; position:relative;
     display:flex; align-items:center; justify-content:space-between;
-    padding:1.15rem 1.85rem; border-radius:12px;
+    padding:1.35rem 2rem; border-radius:14px;
     background:rgba(255,255,255,.03); border:1px solid var(--border);
-    font-size:20px; cursor:pointer;
+    cursor:pointer;
     transition: transform .22s ease, box-shadow .25s ease, border-color .2s, background .2s;
   }
   .funnel .step:hover{
     transform:scale(1.018);
-    box-shadow:0 0 32px rgba(212,184,136,.2), 0 6px 20px rgba(0,0,0,.35);
-    border-color:rgba(212,184,136,.6); background:rgba(255,255,255,.055);
+    box-shadow:0 0 36px rgba(212,184,136,.22), 0 6px 22px rgba(0,0,0,.35);
+    border-color:rgba(212,184,136,.65); background:rgba(255,255,255,.06);
   }
   .funnel .step.focused{
-    box-shadow:0 0 48px rgba(212,184,136,.38), 0 6px 22px rgba(0,0,0,.35);
-    border-color:rgba(212,184,136,.9); background:rgba(212,184,136,.09);
+    box-shadow:0 0 52px rgba(212,184,136,.42), 0 6px 22px rgba(0,0,0,.35);
+    border-color:rgba(212,184,136,.92); background:rgba(212,184,136,.1);
   }
-  .funnel .step .lbl{font-weight:600; color:var(--text); font-size:19px; flex:1; padding-right:1rem}
-  .funnel .step .num{font-weight:900; color:var(--accent2); font-size:36px; letter-spacing:-.02em; flex:0 0 auto; white-space:nowrap}
-  .funnel .step.pending .num{color:var(--muted); font-style:italic; font-weight:500; font-size:18px}
+  .funnel .step .lbl{font-weight:600; color:var(--text); font-size:21px; flex:1; padding-right:1rem}
+  .funnel .step .num{font-weight:900; color:var(--accent2); font-size:44px; letter-spacing:-.03em; flex:0 0 auto; white-space:nowrap}
 
   /* tooltip on hover */
   .funnel .step[data-tip]{position:relative}
@@ -469,11 +469,11 @@
   }
   .funnel .step.hot:hover{
     background:linear-gradient(90deg,rgba(217,112,80,.32),rgba(217,112,80,.08));
-    box-shadow:0 0 32px rgba(217,112,80,.28), 0 6px 20px rgba(0,0,0,.35);
-    border-color:rgba(217,112,80,.8);
+    box-shadow:0 0 36px rgba(217,112,80,.3), 0 6px 22px rgba(0,0,0,.35);
+    border-color:rgba(217,112,80,.82);
   }
   .funnel .step.hot.focused{
-    box-shadow:0 0 48px rgba(217,112,80,.42); border-color:rgba(217,112,80,.95);
+    box-shadow:0 0 52px rgba(217,112,80,.44); border-color:rgba(217,112,80,.96);
   }
   .funnel .step.hot .num{color:var(--red)}
 
@@ -483,34 +483,54 @@
   }
   .funnel .step.win:hover{
     background:linear-gradient(90deg,rgba(212,184,136,.32),rgba(212,184,136,.08));
-    box-shadow:0 0 32px rgba(212,184,136,.30), 0 6px 20px rgba(0,0,0,.35);
-    border-color:rgba(212,184,136,.9);
+    box-shadow:0 0 36px rgba(212,184,136,.32), 0 6px 22px rgba(0,0,0,.35);
+    border-color:rgba(212,184,136,.92);
   }
   .funnel .step.win.focused{
-    box-shadow:0 0 48px rgba(212,184,136,.42); border-color:rgba(212,184,136,.98);
+    box-shadow:0 0 52px rgba(212,184,136,.44); border-color:rgba(212,184,136,.98);
   }
   .funnel .step.win .num{color:var(--accent2)}
 
-  /* connectors between steps */
-  .step-conn{
+  /* === SETAS ANIMADAS === */
+  .funnel-arrow{
     display:flex; align-items:center; justify-content:center;
-    gap:.55rem; height:30px;
+    gap:1rem; height:54px; --ac: var(--border);
   }
-  .step-conn .arrow{font-size:15px; opacity:.4; line-height:1}
-  .step-conn .pct{
-    font-size:13px; font-weight:800; letter-spacing:.06em;
-    color:var(--accent3); background:var(--surface2);
-    border:1px solid var(--border); padding:.18rem .6rem; border-radius:6px;
+  .funnel-arrow.hot { --ac: var(--red) }
+  .funnel-arrow.win { --ac: var(--accent2) }
+  .arr-line-wrap{
+    display:flex; flex-direction:column; align-items:center;
+    height:100%; width:20px; flex:0 0 20px;
   }
-  .step-conn.hot .pct{color:var(--red); border-color:rgba(217,112,80,.5); background:rgba(217,112,80,.08)}
-  .step-conn.win .pct{color:var(--accent2); border-color:rgba(212,184,136,.5); background:rgba(212,184,136,.08)}
-  .step-conn .conn-lbl{font-size:11px; color:var(--dim); font-weight:600; letter-spacing:.1em; text-transform:uppercase}
+  .arr-line{
+    width:2px; flex:1;
+    background:var(--ac);
+    transform:scaleY(0); transform-origin:top;
+    transition: filter .2s;
+  }
+  .arr-head{
+    font-size:14px; line-height:1; color:var(--ac);
+    margin-top:-2px; opacity:0;
+  }
+  .arr-badge{ display:flex; flex-direction:column; align-items:flex-start; gap:.18rem; }
+  .arr-pct{
+    font-size:15px; font-weight:800; letter-spacing:.06em;
+    color:var(--ac); background:var(--surface2);
+    border:1px solid var(--ac); padding:.22rem .7rem; border-radius:7px;
+    display:block; transition:transform .2s ease, filter .2s ease;
+  }
+  .arr-lbl{
+    font-size:11px; color:var(--dim); font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; padding-left:.15rem;
+  }
+  .funnel-arrow:hover .arr-pct  { transform:scale(1.12); filter:brightness(1.4); }
+  .funnel-arrow:hover .arr-line  { filter:brightness(1.5); }
 
   .funnel-insights{
-    flex:0 0 380px; display:flex; flex-direction:column; gap:1.25rem;
+    flex:0 0 385px; display:flex; flex-direction:column; gap:1.25rem;
   }
   .insight{
-    padding:1.6rem 1.85rem; border-radius:14px;
+    padding:1.7rem 1.95rem; border-radius:14px;
     border:1px solid var(--border); background:rgba(255,255,255,.025);
   }
   .insight.win{border-color:rgba(212,184,136,.65); background:rgba(212,184,136,.09)}
@@ -518,7 +538,7 @@
   .insight .h{font-size:12px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; margin-bottom:.65rem}
   .insight.win .h{color:var(--accent2)}
   .insight.hot .h{color:var(--red)}
-  .insight .v{font-size:54px; font-weight:900; line-height:1; margin-bottom:.5rem; letter-spacing:-.03em}
+  .insight .v{font-size:60px; font-weight:900; line-height:1; margin-bottom:.5rem; letter-spacing:-.03em}
   .insight .t{font-size:14px; color:var(--muted); line-height:1.45}
 
   /* === INOVAÇÕES === */
@@ -745,42 +765,44 @@
             <span class="num" data-count="19000" data-prefix="~" data-thousands="1">~0</span>
           </div>
         </div>
-        <div class="step-conn"><span class="arrow">▼</span><span class="pct">63%</span><span class="conn-lbl">abordados</span></div>
+        <div class="funnel-arrow">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">63%</span><span class="arr-lbl">abordados</span></div>
+        </div>
         <div class="step-wrap s2">
           <div class="step" data-tip="Leads que iniciaram conversa via ManyChat no WhatsApp">
             <span class="lbl">2 · Contato WhatsApp (ManyChat)</span>
             <span class="num" data-count="12000" data-prefix="~" data-thousands="1">~0</span>
           </div>
         </div>
-        <div class="step-conn hot"><span class="arrow">▼</span><span class="pct">⚠ 4,9%</span><span class="conn-lbl">o gargalo</span></div>
+        <div class="funnel-arrow hot">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">⚠ 4,9%</span><span class="arr-lbl">o gargalo</span></div>
+        </div>
         <div class="step-wrap s3">
           <div class="step hot" data-tip="Pacientes únicos que realizaram a 1ª consulta na Paraser (Feegow, 2025–2026)">
             <span class="lbl">3 · 1ª Consulta REALIZADA</span>
             <span class="num" data-count="934">0</span>
           </div>
         </div>
-        <div class="step-conn"><span class="arrow">▼</span><span class="pct">48%</span><span class="conn-lbl">avançam</span></div>
+        <div class="funnel-arrow">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">48%</span><span class="arr-lbl">avançam</span></div>
+        </div>
         <div class="step-wrap s4">
           <div class="step win" data-tip="Pacientes que iniciaram ciclo de punção FIV ou coito programado">
             <span class="lbl">4 · Punção FIV / Coito Prog.</span>
             <span class="num" data-count="447">0</span>
           </div>
         </div>
-        <div class="step-conn win"><span class="arrow">▼</span><span class="pct">70%</span><span class="conn-lbl">das transf.</span></div>
+        <div class="funnel-arrow win">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">70%</span><span class="arr-lbl">das transf.</span></div>
+        </div>
         <div class="step-wrap s5">
           <div class="step win" data-tip="Taxa de beta positivo (inclui bioquímica). Média nacional FIV: 40–50%.">
             <span class="lbl">5 · Beta positivo (gravidez)</span>
             <span class="num" data-count="70" data-suffix="%">0%</span>
-          </div>
-        </div>
-        <div class="step-conn"><span class="arrow">▼</span></div>
-        <div class="step-wrap s6">
-          <div class="step" data-tip="Estimativa: ~30% das pacientes indicam a Paraser para amigas e familiares. Dado estimado — ainda sem medição formal.">
-            <span class="lbl">6 · Embaixadora</span>
-            <span style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem">
-              <span class="num" data-count="30" data-suffix="%">0%</span>
-              <span style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);opacity:.7">estimado</span>
-            </span>
           </div>
         </div>
       </div>
