@@ -6,12 +6,28 @@
 <title>Paraser 2026 — A Jornada</title>
 <style>
   :root{
-    --bg:#06090f; --bg2:#0a1018; --surface:#0f1924; --border:#1e2a3a;
-    --text:#e6edf6; --muted:#7b8aa1; --dim:#4a5a72;
-    --accent:#10b981; --accent2:#34d399; --accent3:#00d4aa;
-    --gold:#f59e0b; --rose:#f472b6; --purple:#a78bfa; --red:#ef4444;
-    --grad: linear-gradient(135deg,#10b981 0%, #00d4aa 50%, #34d399 100%);
-    --grad2: linear-gradient(135deg,#a78bfa 0%, #f472b6 100%);
+    /* Paleta Instituto Paraser */
+    --bg:#0d0418;              /* preto-roxo de fundo */
+    --bg2:#180828;             /* roxo um tom acima */
+    --brand-purple:#3d1652;    /* roxo principal da marca (fundo do logo) */
+    --brand-purple-deep:#2a0e3b;
+    --brand-purple-light:#5b2475;
+    --surface:#1c0c30;
+    --surface2:#260f3f;
+    --border:#3a1b54;
+    --text:#f3e9d5;            /* creme claro */
+    --muted:#a18d6e;           /* dourado opaco / cream */
+    --dim:#6b5946;
+    --accent:#d4b888;          /* dourado da marca */
+    --accent2:#ecd4a2;         /* dourado mais claro */
+    --accent3:#b89968;         /* dourado mais profundo */
+    --gold:#d4b888;
+    --rose:#c97a8c;
+    --purple:#7e3fa5;
+    --red:#d97050;             /* alerta mais quente */
+    --grad: linear-gradient(135deg,#d4b888 0%, #ecd4a2 50%, #b89968 100%);
+    --grad2: linear-gradient(135deg,#5b2475 0%, #d4b888 100%);
+    --grad-purple: linear-gradient(135deg,#3d1652 0%, #5b2475 100%);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;overflow:hidden}
@@ -21,19 +37,45 @@
     font-feature-settings:"ss01","cv11";
     -webkit-font-smoothing:antialiased;
   }
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800;900&family=Italiana&family=Cormorant:wght@300;400&display=swap');
+
+  /* === LOGO INSTITUTO PARASER === */
+  .brand-logo{
+    display:inline-flex; flex-direction:column; align-items:center; gap:.2rem;
+    color:var(--accent); line-height:1;
+  }
+  .brand-logo .inst{
+    font-family:'Cormorant',serif; font-weight:300;
+    letter-spacing:.55em; text-indent:.55em;
+    font-size:.7em; opacity:.92;
+  }
+  .brand-logo .name{
+    font-family:'Italiana','Cormorant',serif; font-weight:400;
+    font-size:1em; letter-spacing:-.01em;
+  }
+  .brand-logo .name .lig{font-style:italic;letter-spacing:-.03em}
+  .brand-logo.lg{font-size:clamp(48px,7vw,96px)}
+  .brand-logo.md{font-size:clamp(28px,3.4vw,46px)}
+  .brand-logo.sm{font-size:clamp(16px,1.6vw,22px)}
+  .brand-logo.mini{font-size:13px}
 
   /* === STAGE === */
   .stage{
     position:relative; width:100vw; height:100vh; overflow:hidden;
-    background:radial-gradient(ellipse at 20% 0%, #0d1825 0%, var(--bg) 60%);
+    background:
+      radial-gradient(ellipse at 20% 0%, #221038 0%, var(--bg) 55%),
+      var(--bg);
   }
   .stage::before{
     content:''; position:absolute; inset:0;
     background:
-      radial-gradient(circle at 85% 95%, rgba(16,185,129,0.08) 0%, transparent 40%),
-      radial-gradient(circle at 10% 80%, rgba(167,139,250,0.06) 0%, transparent 45%);
+      radial-gradient(circle at 85% 95%, rgba(212,184,136,0.08) 0%, transparent 40%),
+      radial-gradient(circle at 10% 80%, rgba(91,36,117,0.20) 0%, transparent 45%);
     pointer-events:none;
+  }
+  /* logo persistente no canto */
+  .stage::after{
+    content:''; pointer-events:none;
   }
 
   /* === SLIDE === */
@@ -81,8 +123,9 @@
   .badge{
     display:inline-flex; align-items:center; gap:.5rem;
     padding:.4rem 1rem; border-radius:99px;
-    background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.3);
-    color:var(--accent2); font-size:13px; font-weight:600;
+    background:rgba(212,184,136,.1); border:1px solid rgba(212,184,136,.4);
+    color:var(--accent); font-size:13px; font-weight:600;
+    letter-spacing:.15em;
   }
   .citacao{
     position:relative; padding-left:2rem; border-left:4px solid var(--accent);
@@ -95,14 +138,11 @@
 
   /* === SLIDE 1 — ABERTURA === */
   .open{justify-content:flex-end; padding-bottom:14vh}
-  .open .mark{
-    position:absolute; top:5vh; left:8vw;
-    font-size:clamp(14px,1.2vw,18px); font-weight:700; letter-spacing:.4em;
-    color:var(--muted); text-transform:uppercase;
+  .open .brand-logo{
+    position:absolute; top:9vh; left:50%; transform:translateX(-50%);
   }
-  .open .mark span{color:var(--accent2)}
   .open .heroline{
-    font-size:clamp(48px,8vw,128px); font-weight:900; line-height:.96;
+    font-size:clamp(44px,7.4vw,118px); font-weight:900; line-height:.98;
     letter-spacing:-.03em; text-align:center; max-width:24ch;
   }
   .open .heroline .a{color:var(--text)}
@@ -114,7 +154,7 @@
   .open .footer{
     position:absolute; bottom:5vh; left:8vw; right:8vw;
     display:flex; justify-content:space-between; align-items:center;
-    color:var(--muted); font-size:13px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); font-size:13px; letter-spacing:.2em; text-transform:uppercase;
   }
 
   /* === GENERIC STATS / NUMBERS === */
@@ -154,7 +194,7 @@
   .moment .icon{
     flex:0 0 auto;
     width:54px; height:54px; border-radius:14px;
-    background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.3);
+    background:rgba(212,184,136,.12); border:1px solid rgba(212,184,136,.4);
     display:flex; align-items:center; justify-content:center;
     font-size:26px;
   }
@@ -181,13 +221,13 @@
   .funnel .step .num{font-weight:800; color:var(--accent2); font-size:18px}
   .funnel .step.pending .num{color:var(--muted); font-style:italic; font-weight:500; font-size:13px}
   .funnel .step.hot{
-    background:linear-gradient(90deg, rgba(239,68,68,.12), rgba(245,158,11,.08));
-    border-color:rgba(245,158,11,.4);
+    background:linear-gradient(90deg, rgba(217,112,80,.16), rgba(217,112,80,.04));
+    border-color:rgba(217,112,80,.5);
   }
-  .funnel .step.hot .num{color:var(--gold)}
+  .funnel .step.hot .num{color:var(--red)}
   .funnel .step.win{
-    background:linear-gradient(90deg, rgba(16,185,129,.14), rgba(16,185,129,.04));
-    border-color:rgba(16,185,129,.5);
+    background:linear-gradient(90deg, rgba(212,184,136,.18), rgba(212,184,136,.04));
+    border-color:rgba(212,184,136,.55);
   }
   .funnel .step.win .num{color:var(--accent2)}
   .funnel .step .conv{
@@ -215,11 +255,11 @@
     padding:1.25rem 1.5rem; border-radius:12px;
     border:1px solid var(--border); background:rgba(255,255,255,.02);
   }
-  .insight.win{border-color:rgba(16,185,129,.5); background:rgba(16,185,129,.06)}
-  .insight.hot{border-color:rgba(245,158,11,.5); background:rgba(245,158,11,.05)}
+  .insight.win{border-color:rgba(212,184,136,.55); background:rgba(212,184,136,.08)}
+  .insight.hot{border-color:rgba(217,112,80,.5); background:rgba(217,112,80,.06)}
   .insight .h{font-size:13px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; margin-bottom:.5rem}
   .insight.win .h{color:var(--accent2)}
-  .insight.hot .h{color:var(--gold)}
+  .insight.hot .h{color:var(--red)}
   .insight .v{font-size:32px; font-weight:800; line-height:1.05; margin-bottom:.4rem}
   .insight .t{font-size:13px; color:var(--muted); line-height:1.4}
 
@@ -292,7 +332,10 @@
 
   <!-- ========== SLIDE 1 — ABERTURA ========== -->
   <section class="slide open is-active" data-slide="1">
-    <div class="mark">PARASER<span> · </span>2026</div>
+    <div class="brand-logo md">
+      <span class="inst">INSTITUTO</span>
+      <span class="name">Para<span class="lig">S</span>er</span>
+    </div>
     <div class="heroline">
       <span class="a">Estamos crescendo.</span><br>
       <span class="b">O melhor</span> <span class="a">ainda está por vir.</span><br>
@@ -527,14 +570,17 @@
 
   <!-- ========== SLIDE 12 — FECHAMENTO ========== -->
   <section class="slide close" data-slide="12">
-    <div class="badge" style="margin-bottom:2.5rem">PARASER · 2026</div>
+    <div class="brand-logo sm" style="margin-bottom:3rem">
+      <span class="inst">INSTITUTO</span>
+      <span class="name">Para<span class="lig">S</span>er</span>
+    </div>
     <div class="closing">
       Estamos crescendo.<br>
       <span class="grad-text">O melhor</span> ainda está por vir.<br>
       <span style="color:var(--muted);font-weight:300">E você faz parte disso.</span>
     </div>
     <p class="lead" style="text-align:center;margin-top:3rem;max-width:46ch">
-      Obrigado por construir a Paraser todos os dias. <br>Vamos pra cima. 💜
+      Obrigado por construir o <b style="color:var(--accent)">Instituto Paraser</b> todos os dias. <br>Vamos pra cima. ✨
     </p>
   </section>
 
