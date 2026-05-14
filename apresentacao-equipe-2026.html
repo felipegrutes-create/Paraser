@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paraser 2026 — A Jornada</title>
+<style>
+  :root{
+    --bg:#06090f; --bg2:#0a1018; --surface:#0f1924; --border:#1e2a3a;
+    --text:#e6edf6; --muted:#7b8aa1; --dim:#4a5a72;
+    --accent:#10b981; --accent2:#34d399; --accent3:#00d4aa;
+    --gold:#f59e0b; --rose:#f472b6; --purple:#a78bfa; --red:#ef4444;
+    --grad: linear-gradient(135deg,#10b981 0%, #00d4aa 50%, #34d399 100%);
+    --grad2: linear-gradient(135deg,#a78bfa 0%, #f472b6 100%);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:'Outfit',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg); color:var(--text);
+    font-feature-settings:"ss01","cv11";
+    -webkit-font-smoothing:antialiased;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800;900&display=swap');
+
+  /* === STAGE === */
+  .stage{
+    position:relative; width:100vw; height:100vh; overflow:hidden;
+    background:radial-gradient(ellipse at 20% 0%, #0d1825 0%, var(--bg) 60%);
+  }
+  .stage::before{
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 85% 95%, rgba(16,185,129,0.08) 0%, transparent 40%),
+      radial-gradient(circle at 10% 80%, rgba(167,139,250,0.06) 0%, transparent 45%);
+    pointer-events:none;
+  }
+
+  /* === SLIDE === */
+  .slide{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    padding:6vh 8vw;
+    opacity:0; pointer-events:none;
+    transition:opacity .55s ease, transform .55s ease;
+    transform:translateY(20px);
+  }
+  .slide.is-active{
+    opacity:1; pointer-events:auto; transform:translateY(0);
+  }
+
+  /* === LAYOUT HELPERS === */
+  .kicker{
+    font-size:clamp(11px,1vw,14px); font-weight:700; letter-spacing:.3em;
+    text-transform:uppercase; color:var(--accent3);
+    margin-bottom:1.5rem; display:inline-block;
+  }
+  .kicker.muted{color:var(--muted)}
+  h1, .h1{
+    font-size:clamp(38px,7vw,96px); font-weight:800; line-height:1.05;
+    letter-spacing:-.02em; max-width:18ch; text-align:center;
+  }
+  h2, .h2{
+    font-size:clamp(28px,5vw,68px); font-weight:800; line-height:1.08;
+    letter-spacing:-.02em; max-width:22ch;
+  }
+  h3, .h3{
+    font-size:clamp(20px,2.4vw,32px); font-weight:600; line-height:1.3;
+    color:var(--muted); max-width:32ch;
+  }
+  .lead{
+    font-size:clamp(16px,1.5vw,22px); color:var(--muted);
+    line-height:1.5; max-width:62ch; font-weight:300;
+  }
+  .grad-text{
+    background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .grad-text2{
+    background:var(--grad2); -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .badge{
+    display:inline-flex; align-items:center; gap:.5rem;
+    padding:.4rem 1rem; border-radius:99px;
+    background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.3);
+    color:var(--accent2); font-size:13px; font-weight:600;
+  }
+  .citacao{
+    position:relative; padding-left:2rem; border-left:4px solid var(--accent);
+    max-width:34ch;
+  }
+  .citacao .src{
+    display:block; font-size:14px; color:var(--muted); margin-top:1rem;
+    font-weight:400; letter-spacing:.04em;
+  }
+
+  /* === SLIDE 1 — ABERTURA === */
+  .open{justify-content:flex-end; padding-bottom:14vh}
+  .open .mark{
+    position:absolute; top:5vh; left:8vw;
+    font-size:clamp(14px,1.2vw,18px); font-weight:700; letter-spacing:.4em;
+    color:var(--muted); text-transform:uppercase;
+  }
+  .open .mark span{color:var(--accent2)}
+  .open .heroline{
+    font-size:clamp(48px,8vw,128px); font-weight:900; line-height:.96;
+    letter-spacing:-.03em; text-align:center; max-width:24ch;
+  }
+  .open .heroline .a{color:var(--text)}
+  .open .heroline .b{
+    background:var(--grad); -webkit-background-clip:text; background-clip:text;
+    color:transparent; display:inline-block;
+  }
+  .open .heroline .c{font-weight:300; color:var(--muted)}
+  .open .footer{
+    position:absolute; bottom:5vh; left:8vw; right:8vw;
+    display:flex; justify-content:space-between; align-items:center;
+    color:var(--muted); font-size:13px; letter-spacing:.1em; text-transform:uppercase;
+  }
+
+  /* === GENERIC STATS / NUMBERS === */
+  .bignumber{
+    font-size:clamp(80px,14vw,200px); font-weight:900;
+    line-height:1; letter-spacing:-.04em;
+    background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .bignumber.rose{background:var(--grad2); -webkit-background-clip:text;background-clip:text;color:transparent}
+  .bignumber.gold{color:var(--gold);background:none;-webkit-text-fill-color:var(--gold)}
+  .stat-row{display:grid; grid-template-columns:repeat(2,1fr); gap:3rem; max-width:1100px; margin-top:3rem; width:100%}
+  .stat-card{
+    background:rgba(255,255,255,.02); border:1px solid var(--border);
+    border-radius:16px; padding:2.5rem;
+  }
+  .stat-card .lbl{
+    font-size:12px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:1rem;
+  }
+  .stat-card .val{
+    font-size:clamp(40px,5vw,72px); font-weight:800; letter-spacing:-.02em;
+    background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent;
+    line-height:1; margin-bottom:.75rem;
+  }
+  .stat-card .desc{font-size:15px; color:var(--muted); line-height:1.4}
+
+  /* === MOMENTOS / CARDS === */
+  .moments-grid{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:1.5rem;
+    width:100%; max-width:1200px; margin-top:2rem;
+  }
+  .moment{
+    background:rgba(255,255,255,.025); border:1px solid var(--border);
+    border-radius:14px; padding:1.75rem 2rem;
+    display:flex; gap:1.5rem; align-items:flex-start;
+  }
+  .moment .icon{
+    flex:0 0 auto;
+    width:54px; height:54px; border-radius:14px;
+    background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.3);
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px;
+  }
+  .moment .title{font-size:18px; font-weight:700; margin-bottom:.4rem}
+  .moment .body{font-size:14px; color:var(--muted); line-height:1.5}
+  .moment .body b{color:var(--accent2)}
+
+  /* === FUNIL === */
+  .funnel-wrap{
+    display:flex; gap:5rem; align-items:center; width:100%; max-width:1300px;
+    margin-top:1.5rem;
+  }
+  .funnel{
+    flex:1; display:flex; flex-direction:column; gap:.45rem; align-items:center;
+  }
+  .funnel .step{
+    width:100%; position:relative;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.9rem 1.5rem; border-radius:10px;
+    background:rgba(255,255,255,.025); border:1px solid var(--border);
+    font-size:14px;
+  }
+  .funnel .step .lbl{font-weight:600; color:var(--text)}
+  .funnel .step .num{font-weight:800; color:var(--accent2); font-size:18px}
+  .funnel .step.pending .num{color:var(--muted); font-style:italic; font-weight:500; font-size:13px}
+  .funnel .step.hot{
+    background:linear-gradient(90deg, rgba(239,68,68,.12), rgba(245,158,11,.08));
+    border-color:rgba(245,158,11,.4);
+  }
+  .funnel .step.hot .num{color:var(--gold)}
+  .funnel .step.win{
+    background:linear-gradient(90deg, rgba(16,185,129,.14), rgba(16,185,129,.04));
+    border-color:rgba(16,185,129,.5);
+  }
+  .funnel .step.win .num{color:var(--accent2)}
+  .funnel .step .conv{
+    position:absolute; right:-65px; top:50%; transform:translateY(-50%);
+    font-size:11px; color:var(--muted); font-weight:700;
+    background:var(--surface); padding:.2rem .5rem; border-radius:4px;
+    border:1px solid var(--border);
+  }
+  /* tapered widths */
+  .funnel .step:nth-child(1){width:100%}
+  .funnel .step:nth-child(2){width:94%}
+  .funnel .step:nth-child(3){width:86%}
+  .funnel .step:nth-child(4){width:76%}
+  .funnel .step:nth-child(5){width:64%}
+  .funnel .step:nth-child(6){width:54%}
+  .funnel .step:nth-child(7){width:46%}
+  .funnel .step:nth-child(8){width:38%}
+  .funnel .step:nth-child(9){width:32%}
+  .funnel .step:nth-child(10){width:26%}
+
+  .funnel-insights{
+    flex:0 0 360px; display:flex; flex-direction:column; gap:1rem;
+  }
+  .insight{
+    padding:1.25rem 1.5rem; border-radius:12px;
+    border:1px solid var(--border); background:rgba(255,255,255,.02);
+  }
+  .insight.win{border-color:rgba(16,185,129,.5); background:rgba(16,185,129,.06)}
+  .insight.hot{border-color:rgba(245,158,11,.5); background:rgba(245,158,11,.05)}
+  .insight .h{font-size:13px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; margin-bottom:.5rem}
+  .insight.win .h{color:var(--accent2)}
+  .insight.hot .h{color:var(--gold)}
+  .insight .v{font-size:32px; font-weight:800; line-height:1.05; margin-bottom:.4rem}
+  .insight .t{font-size:13px; color:var(--muted); line-height:1.4}
+
+  /* === INOVAÇÕES === */
+  .inov-grid{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:1rem;
+    width:100%; max-width:1300px; margin-top:1.5rem;
+  }
+  .inov{
+    background:rgba(255,255,255,.025); border:1px solid var(--border);
+    border-radius:14px; padding:1.5rem; position:relative; overflow:hidden;
+  }
+  .inov::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:var(--grad);
+  }
+  .inov .icon{font-size:32px; margin-bottom:.75rem}
+  .inov h4{font-size:17px; font-weight:700; margin-bottom:.5rem}
+  .inov p{font-size:13px; color:var(--muted); line-height:1.45}
+
+  /* === EQUIPE / COMPROMISSO === */
+  .roles-grid{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:1.25rem;
+    width:100%; max-width:1100px; margin-top:1.5rem;
+  }
+  .role{display:flex; gap:1rem; align-items:flex-start; padding:1rem}
+  .role .emo{font-size:32px; flex:0 0 auto}
+  .role .who{font-size:15px; font-weight:700; margin-bottom:.25rem}
+  .role .what{font-size:14px; color:var(--muted); line-height:1.45}
+
+  /* === SLIDE 12 fechamento === */
+  .close .closing{
+    font-size:clamp(40px,6vw,86px); font-weight:800; line-height:1.05;
+    letter-spacing:-.02em; text-align:center; max-width:24ch;
+  }
+
+  /* === NAV === */
+  .nav{
+    position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:.75rem; z-index:100;
+    background:rgba(15,25,36,.85); backdrop-filter:blur(10px);
+    border:1px solid var(--border); border-radius:99px;
+    padding:.5rem .75rem; font-size:13px; color:var(--muted);
+  }
+  .nav button{
+    background:transparent; border:none; color:var(--muted);
+    cursor:pointer; padding:.5rem .75rem; font-size:18px;
+    border-radius:50%; transition:.15s;
+  }
+  .nav button:hover{background:rgba(255,255,255,.05); color:var(--text)}
+  .nav .indicator{font-weight:700; min-width:60px; text-align:center; color:var(--text)}
+  .nav .fullscreen{font-size:14px}
+  .progress{
+    position:fixed; top:0; left:0; right:0; height:3px;
+    background:rgba(255,255,255,.05); z-index:100;
+  }
+  .progress .bar{
+    height:100%; background:var(--grad); transition:width .35s;
+  }
+
+  /* hint */
+  .hint{
+    position:fixed; bottom:1.2rem; right:1.2rem; z-index:100;
+    color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <!-- ========== SLIDE 1 — ABERTURA ========== -->
+  <section class="slide open is-active" data-slide="1">
+    <div class="mark">PARASER<span> · </span>2026</div>
+    <div class="heroline">
+      <span class="a">Estamos crescendo.</span><br>
+      <span class="b">O melhor</span> <span class="a">ainda está por vir.</span><br>
+      <span class="c">E você faz parte disso.</span>
+    </div>
+    <div class="footer">
+      <span>Reunião de equipe</span>
+      <span>Maio · 2026</span>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 2 — TEMA: A JORNADA ========== -->
+  <section class="slide" data-slide="2">
+    <div class="kicker">o que vamos falar hoje</div>
+    <h1 class="h1">A nossa obsessão precisa ser <span class="grad-text">a jornada da paciente.</span></h1>
+    <p class="lead" style="margin-top:2rem;text-align:center">
+      Não a consulta. Não o procedimento. Não a venda.
+      <br><b style="color:var(--text)">A jornada inteira</b> — do primeiro Google que ela deu até o dia em que ela indica a Paraser pra uma amiga.
+    </p>
+  </section>
+
+  <!-- ========== SLIDE 3 — POR QUE JORNADA IMPORTA ========== -->
+  <section class="slide" data-slide="3">
+    <div class="kicker">por que jornada importa</div>
+    <h2 class="h2" style="text-align:center;margin-bottom:1rem">A paciente de fertilidade tem <span class="grad-text">50 a 100 pontos de contato</span> com a clínica.</h2>
+    <p class="lead" style="text-align:center">Do primeiro DM no Instagram até o nascimento. Cada um desses 100 momentos pode ser o que prende — ou o que afasta.</p>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="lbl">Não é por dinheiro</div>
+        <div class="val">66%</div>
+        <div class="desc">das pacientes que abandonam tratamento de fertilidade citam fatores <b style="color:var(--text)">emocionais</b>, não financeiros nem clínicos.<br><br><span style="color:var(--dim);font-size:12px">Boivin &amp; Domar, 2014 — Human Reproduction</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="lbl">A frase que importa</div>
+        <div class="val" style="font-size:clamp(24px,2.6vw,38px);line-height:1.2;background:none;-webkit-text-fill-color:var(--text)">"Não me senti vista como pessoa."</div>
+        <div class="desc">Motivo nº1 declarado por quem desistiu antes de iniciar tratamento.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 4 — A FRASE ========== -->
+  <section class="slide" data-slide="4">
+    <div class="citacao">
+      <div style="font-size:clamp(28px,4.2vw,58px);font-weight:700;line-height:1.15;letter-spacing:-.01em">
+        "A paciente não escolhe pelo <span class="grad-text">melhor médico</span>.<br>
+        Ela escolhe pelo médico em quem <span class="grad-text">confia</span>."
+      </div>
+      <span class="src">— consenso na literatura de centros de referência (CCRM, Boston IVF, Genesis)</span>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 5 — 4 MOMENTOS QUE CONVERTEM ========== -->
+  <section class="slide" data-slide="5">
+    <div class="kicker">os 4 momentos da verdade</div>
+    <h2 class="h2" style="text-align:center;margin-bottom:1.5rem">Onde a jornada <span class="grad-text">vira ou quebra</span></h2>
+
+    <div class="moments-grid">
+      <div class="moment">
+        <div class="icon">💬</div>
+        <div>
+          <div class="title">1. Primeiro contato (DM/WhatsApp)</div>
+          <div class="body">Resposta em <b>menos de 5 minutos</b> → taxa de marcação <b>dobra</b>. Mais que 24h → pacientes somem.</div>
+        </div>
+      </div>
+      <div class="moment">
+        <div class="icon">🤝</div>
+        <div>
+          <div class="title">2. A primeira consulta</div>
+          <div class="body"><b>78% das pacientes decidem se voltam</b> nos primeiros 15 minutos. É decisão emocional, não clínica.</div>
+        </div>
+      </div>
+      <div class="moment">
+        <div class="icon">📢</div>
+        <div>
+          <div class="title">3. A comunicação do resultado</div>
+          <div class="body">Beta, USG, biópsia. O <b>jeito como o resultado é dado</b> impacta mais a retenção do que o resultado em si.</div>
+        </div>
+      </div>
+      <div class="moment">
+        <div class="icon">🌟</div>
+        <div>
+          <div class="title">4. O pós-procedimento (48h)</div>
+          <div class="body">Clínicas que dão <b>follow-up nas 48h</b> têm <b>3× mais indicações orgânicas</b>. É o multiplicador da carteira.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 6 — O QUE A PACIENTE LEMBRA ========== -->
+  <section class="slide" data-slide="6">
+    <div class="kicker">o que fica na memória dela</div>
+    <div style="text-align:center;max-width:30ch">
+      <div style="font-size:clamp(32px,5vw,68px);font-weight:800;line-height:1.1;letter-spacing:-.02em">
+        Daqui a 5 anos, ela <span style="color:var(--dim)">não vai lembrar</span> do diagnóstico exato.
+      </div>
+      <div style="margin-top:2.5rem;font-size:clamp(28px,4.2vw,58px);font-weight:800;line-height:1.1;letter-spacing:-.02em">
+        Ela vai lembrar se foi <span class="grad-text">ouvida</span>, se foi <span class="grad-text">entendida</span>, e se sentiu que o time estava <span class="grad-text">com ela</span>.
+      </div>
+      <p class="lead" style="margin:2.5rem auto 0;text-align:center">— Resolve.org · associação americana de fertilidade</p>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 7 — CONVERSÃO É AMOR ========== -->
+  <section class="slide" data-slide="7">
+    <div class="kicker">A conta cruel</div>
+    <h2 class="h2" style="text-align:center;margin-bottom:.5rem">Conexão <span class="grad-text">não é fofo</span>. É economia.</h2>
+    <p class="lead" style="text-align:center;margin-bottom:2.5rem">Cada paciente perdida por "sentir-se número" custa o equivalente a 20–40 leads novos.</p>
+
+    <div class="stat-row" style="grid-template-columns:repeat(3,1fr);gap:1.5rem;max-width:1200px">
+      <div class="stat-card">
+        <div class="lbl">Custo do lead</div>
+        <div class="val">R$ 800–2,5k</div>
+        <div class="desc">Por paciente captada via Meta Ads. Trabalho duro pra trazer cada uma.</div>
+      </div>
+      <div class="stat-card">
+        <div class="lbl">Ticket anual médio</div>
+        <div class="val">R$ 25–40k</div>
+        <div class="desc">Quanto uma paciente em tratamento gera de receita em 12 meses.</div>
+      </div>
+      <div class="stat-card">
+        <div class="lbl">LTV (vida toda)</div>
+        <div class="val">R$ 40–80k</div>
+        <div class="desc">Inclui sucesso, indicação, retorno em ciclos futuros.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 8 — NOSSO FUNIL ========== -->
+  <section class="slide" data-slide="8">
+    <div class="kicker">o caminho da paciente até nós</div>
+    <h2 class="h2" style="margin-bottom:1.5rem;text-align:center">O Funil <span class="grad-text">Paraser</span></h2>
+
+    <div class="funnel-wrap">
+      <div class="funnel">
+        <div class="step"><span class="lbl">1 · Lead captado (Meta Ads)</span> <span class="num">~20.000</span></div>
+        <div class="step pending"><span class="lbl">2 · Lead qualificado</span> <span class="num">a integrar</span></div>
+        <div class="step pending"><span class="lbl">3 · Contato comercial feito</span> <span class="num">a integrar</span></div>
+        <div class="step pending"><span class="lbl">4 · 1ª consulta agendada</span> <span class="num">a integrar</span></div>
+        <div class="step hot"><span class="lbl">5 · 1ª consulta REALIZADA</span> <span class="num">520</span><span class="conv">2,6%</span></div>
+        <div class="step"><span class="lbl">6 · Retorno realizado</span> <span class="num">505</span></div>
+        <div class="step"><span class="lbl">7 · Proposta de tratamento</span> <span class="num">—</span></div>
+        <div class="step win"><span class="lbl">8 · Tratamento INICIADO</span> <span class="num">447</span><span class="conv">86%</span></div>
+        <div class="step pending"><span class="lbl">9 · Resultado positivo</span> <span class="num">a medir</span></div>
+        <div class="step pending"><span class="lbl">10 · Embaixadora (indica)</span> <span class="num">a medir</span></div>
+      </div>
+
+      <div class="funnel-insights">
+        <div class="insight hot">
+          <div class="h">🟡 O GARGALO</div>
+          <div class="v">97,4%</div>
+          <div class="t">dos leads <b>se perdem antes</b> de conhecer a Paraser.<br>É aqui que tem o maior potencial.</div>
+        </div>
+        <div class="insight win">
+          <div class="h">🟢 NOSSO SUPERPODER</div>
+          <div class="v">86%</div>
+          <div class="t">das pacientes que chegam <b>iniciam tratamento</b>.<br>Indústria está em 40–60%. Vocês são os melhores.</div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:1.5rem;text-align:center;font-size:12px;color:var(--dim);letter-spacing:.05em">Base 2025 · dados Feegow + Meta Ads</p>
+  </section>
+
+  <!-- ========== SLIDE 9 — A NARRATIVA ========== -->
+  <section class="slide" data-slide="9">
+    <div class="kicker">A história em 1 linha</div>
+    <div style="text-align:center;max-width:34ch">
+      <div style="font-size:clamp(28px,4.2vw,56px);font-weight:700;line-height:1.15;letter-spacing:-.01em">
+        O futuro da Paraser <span style="color:var(--dim)">não está no chão da clínica</span>.<br>
+        Está <span class="grad-text">no caminho que leva até ela</span>.
+      </div>
+      <p class="lead" style="margin-top:2.5rem">
+        Dentro daqui, a gente já é o melhor do mercado. <b style="color:var(--text)">8 em cada 10</b> que sentam na cadeira do médico viram paciente.
+        <br><br>
+        Lá fora, 97 em cada 100 leads se perdem porque <b style="color:var(--text)">a jornada antes da consulta</b> não está conectada.
+        Aí mora o crescimento.
+      </p>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 10 — O QUE JÁ CONSTRUÍMOS ========== -->
+  <section class="slide" data-slide="10">
+    <div class="kicker">o que já construímos pra fechar essa lacuna</div>
+    <h2 class="h2" style="text-align:center;margin-bottom:1rem">Inovações <span class="grad-text">2025-2026</span></h2>
+
+    <div class="inov-grid">
+      <div class="inov"><div class="icon">🧠</div><h4>Sistema Integrado Paraser</h4><p>Dashboard ao vivo: receita, agendamentos, financeiro, CRM, doadoras, estoque — tudo numa tela.</p></div>
+      <div class="inov"><div class="icon">📋</div><h4>CRM Comercial digital</h4><p>Cada paciente em uma jornada visual no Kanban (Fluxo → Proposta → Quitado → Tratamento).</p></div>
+      <div class="inov"><div class="icon">💬</div><h4>Confirmações WhatsApp automatizadas</h4><p>Toda agenda do dia seguinte é confirmada na hora certa, com o template certo (online vs presencial).</p></div>
+      <div class="inov"><div class="icon">🗺️</div><h4>Mapa de Salas em tempo real</h4><p>Quem está em qual sala, agora. Quanto cada sala gerou de produção no dia/mês.</p></div>
+      <div class="inov"><div class="icon">💰</div><h4>Caixa Recepção digital</h4><p>Fim do papel. Pagamentos lançados na hora, integrados com Financeiro e NF.</p></div>
+      <div class="inov"><div class="icon">📊</div><h4>Sumário Executivo por Médico</h4><p>Cada médico tem seu próprio painel: receita mensal/anual, top procedimentos, evolução.</p></div>
+      <div class="inov"><div class="icon">🎯</div><h4>Pipeline → Slack</h4><p>Orçamentos não fechados viram alerta no canal comercial. Ninguém cai no esquecimento.</p></div>
+      <div class="inov"><div class="icon">📦</div><h4>Controle de Estoque por NF-e</h4><p>Importa automaticamente as notas fiscais. Saldo real-time. Baixa automática via Feegow.</p></div>
+      <div class="inov"><div class="icon">👥</div><h4>Doadoras compartilhadas</h4><p>Sistema visual com perfis e matching multi-filtros (sangue, cabelo, olhos, pele).</p></div>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 11 — A EQUIPE ========== -->
+  <section class="slide" data-slide="11">
+    <div class="kicker">cada um faz parte da jornada</div>
+    <h2 class="h2" style="text-align:center;margin-bottom:.5rem">Você é <span class="grad-text">protagonista</span> em algum dos 100 pontos de contato.</h2>
+    <p class="lead" style="text-align:center;margin-bottom:1.5rem">A jornada da paciente <b style="color:var(--text)">não é responsabilidade de uma área</b>. É responsabilidade do time inteiro.</p>
+
+    <div class="roles-grid">
+      <div class="role">
+        <div class="emo">👩‍⚕️</div>
+        <div><div class="who">Médicas e médicos</div><div class="what">A consulta é o momento da verdade. 15 minutos definem se ela volta.</div></div>
+      </div>
+      <div class="role">
+        <div class="emo">📞</div>
+        <div><div class="who">Comercial / Atendimento</div><div class="what">O primeiro DM. Resposta em 5 min dobra a marcação.</div></div>
+      </div>
+      <div class="role">
+        <div class="emo">🏥</div>
+        <div><div class="who">Recepção</div><div class="what">A primeira cara que ela vê. O acolhimento é o sinal de tudo o que vem.</div></div>
+      </div>
+      <div class="role">
+        <div class="emo">💉</div>
+        <div><div class="who">Enfermagem</div><div class="what">É o time com mais contatos diretos durante o tratamento. Confiança se constrói aqui.</div></div>
+      </div>
+      <div class="role">
+        <div class="emo">💰</div>
+        <div><div class="who">Financeiro</div><div class="what">Transparência no orçamento e cobrança humana. Faz a diferença na hora de fechar.</div></div>
+      </div>
+      <div class="role">
+        <div class="emo">📋</div>
+        <div><div class="who">Coordenação</div><div class="what">A orquestra que faz tudo isso funcionar junto, sem ruído pra ela.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SLIDE 12 — FECHAMENTO ========== -->
+  <section class="slide close" data-slide="12">
+    <div class="badge" style="margin-bottom:2.5rem">PARASER · 2026</div>
+    <div class="closing">
+      Estamos crescendo.<br>
+      <span class="grad-text">O melhor</span> ainda está por vir.<br>
+      <span style="color:var(--muted);font-weight:300">E você faz parte disso.</span>
+    </div>
+    <p class="lead" style="text-align:center;margin-top:3rem;max-width:46ch">
+      Obrigado por construir a Paraser todos os dias. <br>Vamos pra cima. 💜
+    </p>
+  </section>
+
+</div>
+
+<div class="progress"><div class="bar" id="progressBar"></div></div>
+
+<div class="nav">
+  <button onclick="nav(-1)" title="Anterior (←)">‹</button>
+  <span class="indicator"><span id="cur">1</span> / <span id="tot">12</span></span>
+  <button onclick="nav(1)" title="Próximo (→)">›</button>
+  <button class="fullscreen" onclick="toggleFs()" title="Tela cheia (F)">⛶</button>
+</div>
+
+<div class="hint">setas ← → · espaço · F tela cheia</div>
+
+<script>
+(function(){
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  document.getElementById('tot').textContent = total;
+  let cur = 0;
+  function show(idx){
+    if (idx < 0) idx = 0;
+    if (idx > total-1) idx = total-1;
+    slides.forEach((s,i) => s.classList.toggle('is-active', i===idx));
+    cur = idx;
+    document.getElementById('cur').textContent = idx+1;
+    document.getElementById('progressBar').style.width = ((idx+1)/total*100)+'%';
+  }
+  window.nav = d => show(cur+d);
+  window.toggleFs = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  };
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); show(cur+1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(cur-1); }
+    else if (e.key.toLowerCase() === 'f') { toggleFs(); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(total-1);
+  });
+  // click anywhere except buttons to advance
+  document.getElementById('stage').addEventListener('click', e => {
+    if (e.target.closest('.nav') || e.target.closest('a, button')) return;
+    show(cur+1);
+  });
+  show(0);
+})();
+</script>
+
+</body>
+</html>
