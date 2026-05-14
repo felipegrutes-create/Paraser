@@ -25,6 +25,7 @@
     --rose:#c97a8c;
     --purple:#7e3fa5;
     --red:#d97050;             /* alerta mais quente */
+    --green:#52c48a;           /* verde projeção */
     --grad: linear-gradient(135deg,#d4b888 0%, #ecd4a2 50%, #b89968 100%);
     --grad2: linear-gradient(135deg,#5b2475 0%, #d4b888 100%);
     --grad-purple: linear-gradient(135deg,#3d1652 0%, #5b2475 100%);
@@ -544,6 +545,53 @@
   .insight .v{font-size:60px; font-weight:900; line-height:1; margin-bottom:.5rem; letter-spacing:-.03em}
   .insight .t{font-size:14px; color:var(--muted); line-height:1.45}
 
+  /* === SLIDE PROJEÇÃO === */
+  .slide.projection{
+    background:
+      radial-gradient(ellipse at 22% 0%, #050e08 0%, var(--bg) 52%),
+      radial-gradient(circle at 82% 92%, rgba(5,22,12,.8) 0%, transparent 44%),
+      var(--bg);
+  }
+  .slide.projection::before{
+    background:
+      radial-gradient(circle at 85% 95%, rgba(82,196,138,.1) 0%, transparent 44%),
+      radial-gradient(circle at 12% 80%, rgba(82,196,138,.14) 0%, transparent 46%);
+  }
+  /* Rótulo PROJEÇÃO no kicker */
+  .proj-kicker{ color: var(--green) }
+
+  /* Números lado-a-lado com riscado + verde */
+  .proj-nums{
+    display:flex; align-items:center; gap:.7rem; flex:0 0 auto; white-space:nowrap;
+  }
+  .pnum-old{
+    font-weight:900; font-size:26px; color:var(--dim);
+    text-decoration:line-through; text-decoration-thickness:3px;
+    text-decoration-color:rgba(217,112,80,.8); letter-spacing:-.02em; opacity:.5;
+  }
+  .pnum-arrow{ color:var(--green); font-size:20px; font-weight:700; opacity:.8 }
+  .pnum-new{
+    font-weight:900; font-size:44px; color:var(--green);
+    letter-spacing:-.03em; transition:text-shadow 1.8s cubic-bezier(0.22,1,0.36,1);
+  }
+  .pnum-same{
+    font-weight:900; font-size:44px; color:var(--accent2);
+    letter-spacing:-.03em; transition:text-shadow 1.8s cubic-bezier(0.22,1,0.36,1);
+  }
+  @keyframes green-pulse{
+    0%,100%{ text-shadow:0 0 40px rgba(82,196,138,.38),0 0 80px rgba(82,196,138,.16); }
+    50%    { text-shadow:0 0 70px rgba(82,196,138,.72),0 0 140px rgba(82,196,138,.3); }
+  }
+  .slide.projection.is-active .pnum-new{
+    text-shadow:0 0 40px rgba(82,196,138,.38),0 0 80px rgba(82,196,138,.16);
+    animation:green-pulse 3s ease-in-out infinite;
+    animation-delay:2s;
+  }
+  /* Seta da conversão 20% em verde */
+  .slide.projection .funnel-arrow.proj-win{
+    --ac:var(--green); --ac-bg:rgba(82,196,138,.13);
+  }
+
   /* === INOVAÇÕES === */
   .inov-grid{
     display:grid; grid-template-columns:repeat(3,1fr); gap:1rem;
@@ -824,6 +872,85 @@
       </div>
     </div>
     <p style="margin-top:.85rem;text-align:center;font-size:12px;color:var(--dim);letter-spacing:.05em">Base 2025–2026 · R$ 116k investidos em Meta Ads · ~R$ 6/lead · dados Feegow + planilha betas · bioquímica contada como positivo</p>
+  </section>
+
+  <!-- ========== SLIDE PROJEÇÃO — FUNIL 20% ========== -->
+  <section class="slide projection" data-slide="proj">
+    <div class="kicker">e se resolver o gargalo? · <span style="color:var(--green)">projeção 2026</span></div>
+    <h2 class="h2" style="margin-bottom:.65rem;text-align:center">Com <span style="color:var(--green);text-shadow:0 0 28px rgba(82,196,138,.4)">20%</span> de conversão</h2>
+
+    <div class="funnel-wrap">
+      <div class="funnel">
+        <div class="step-wrap s1">
+          <div class="step" data-tip="Mesmo investimento em anúncios — nenhum custo adicional de mídia.">
+            <span class="lbl">1 · Lead qualificado (Meta Ads)</span>
+            <span class="pnum-same" data-count="19000" data-prefix="~" data-thousands="1">~0</span>
+          </div>
+        </div>
+        <div class="funnel-arrow">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">63%</span><span class="arr-lbl">abordados</span></div>
+        </div>
+        <div class="step-wrap s2">
+          <div class="step" data-tip="Mesmo volume de contatos WhatsApp — nenhum custo adicional.">
+            <span class="lbl">2 · Contato WhatsApp (ManyChat)</span>
+            <span class="pnum-same" data-count="12000" data-prefix="~" data-thousands="1">~0</span>
+          </div>
+        </div>
+        <div class="funnel-arrow proj-win">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">20%</span><span class="arr-lbl">convertidos ↑</span></div>
+        </div>
+        <div class="step-wrap s3">
+          <div class="step win" data-tip="12.000 × 20% = 2.400 consultas. Era 934 — crescimento de +157%.">
+            <span class="lbl">3 · 1ª Consulta REALIZADA</span>
+            <div class="proj-nums">
+              <span class="pnum-old">934</span>
+              <span class="pnum-arrow">→</span>
+              <span class="pnum-new" data-count="2400" data-thousands="1" data-count-delay="900">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="funnel-arrow">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">48%</span><span class="arr-lbl">avançam</span></div>
+        </div>
+        <div class="step-wrap s4">
+          <div class="step win" data-tip="48% de 2.400 = 1.152 tratamentos. Era 447 — crescimento de +158%.">
+            <span class="lbl">4 · Punção FIV / Coito Prog.</span>
+            <div class="proj-nums">
+              <span class="pnum-old">447</span>
+              <span class="pnum-arrow">→</span>
+              <span class="pnum-new" data-count="1152" data-thousands="1" data-count-delay="1100">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="funnel-arrow win">
+          <div class="arr-line-wrap"><div class="arr-line"></div><div class="arr-head">▼</div></div>
+          <div class="arr-badge"><span class="arr-pct">70%</span><span class="arr-lbl">das transf.</span></div>
+        </div>
+        <div class="step-wrap s5">
+          <div class="step win" data-tip="Taxa de 70% se mantém — a excelência clínica não muda, só escala.">
+            <span class="lbl">5 · Beta positivo (gravidez)</span>
+            <span class="pnum-same" data-count="70" data-suffix="%">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="funnel-insights">
+        <div class="insight" style="border-color:rgba(82,196,138,.65);background:rgba(82,196,138,.08)">
+          <div class="h" style="color:var(--green);letter-spacing:.22em;font-size:12px;font-weight:700;text-transform:uppercase;margin-bottom:.65rem">🟢 CONSULTAS PROJETADAS</div>
+          <div class="v" style="color:var(--green)" data-count="2400" data-thousands="1" data-count-delay="1050">0</div>
+          <div class="t">vs <b style="color:var(--text)">934</b> atuais — <b style="color:var(--green)">+157%</b> sem gastar 1 real a mais em anúncios.</div>
+        </div>
+        <div class="insight" style="border-color:rgba(82,196,138,.65);background:rgba(82,196,138,.08)">
+          <div class="h" style="color:var(--green);letter-spacing:.22em;font-size:12px;font-weight:700;text-transform:uppercase;margin-bottom:.65rem">🟢 TRATAMENTOS PROJETADOS</div>
+          <div class="v" style="color:var(--green)" data-count="1152" data-thousands="1" data-count-delay="1250">0</div>
+          <div class="t">vs <b style="color:var(--text)">447</b> atuais — <b style="color:var(--green)">+158%</b> com o mesmo lead, só melhor atendido.</div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:.65rem;text-align:center;font-size:12px;color:var(--dim);letter-spacing:.05em">Projeção baseada no benchmark de top 25% clínicas de saúde · mesmo investimento em Meta Ads · base 2025–2026</p>
   </section>
 
   <!-- ========== SLIDE 10 — A NARRATIVA ========== -->
