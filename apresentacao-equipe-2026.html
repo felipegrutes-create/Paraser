@@ -978,7 +978,7 @@
       <div style="display:flex;flex-direction:column;gap:.4rem">
         <div style="text-align:center;padding:.45rem .8rem;border-radius:8px;background:rgba(82,196,138,.1);border:1px solid rgba(82,196,138,.4)">
           <span style="font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--green)">🚀 Projetado — 20% conversão</span>
-          <span style="font-size:13px;color:var(--muted);margin-left:.8rem">988 punções · 82/mês · Rodolfo: máx. 35/mês</span>
+          <span style="font-size:13px;color:var(--muted);margin-left:.8rem">989 punções · 82/mês · Rodolfo: máx. 40/mês · Priscila: máx. 35/mês</span>
         </div>
         <div style="flex:1;position:relative;min-height:0">
           <canvas id="chartProj"></canvas>
@@ -1222,53 +1222,16 @@
     Chart.register(ChartDataLabels);
 
     const labels = ['Rodolfo\nSalvato', 'Priscila\nLoyola', 'Marcelle\nMoura', 'Bruna\nOrtiz', 'Mario\nBarroso'];
-    const txtColor = 'rgba(210,190,235,.9)';
+    const txtColor  = 'rgba(215,195,240,.95)';
     const gridColor = 'rgba(255,255,255,.07)';
-    const anim = { duration: 1000, easing: 'easeOutQuart' };
+    const anim = { duration: 1050, easing: 'easeOutQuart' };
 
-    function monthlyLabel(val) {
+    function mês(val) {
       const m = val / 12;
       return (m < 1 ? m.toFixed(1) : Math.round(m)) + '/mês';
     }
 
-    function makeOpts(barColor, barBorder, maxX) {
-      return {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: anim,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: { label: c => ' ' + c.parsed.x + ' punções (' + monthlyLabel(c.parsed.x) + ')' }
-          },
-          datalabels: {
-            anchor: 'end',
-            align: 'end',
-            color: barColor,
-            font: { size: 12, weight: '700' },
-            padding: { left: 6 },
-            formatter: (val) => val + ' · ' + monthlyLabel(val)
-          }
-        },
-        layout: { padding: { right: 90 } },
-        scales: {
-          x: {
-            max: maxX,
-            ticks: { color: txtColor, font: { size: 11 } },
-            grid: { color: gridColor },
-            border: { color: gridColor }
-          },
-          y: {
-            ticks: { color: txtColor, font: { size: 12, weight: '600' } },
-            grid: { display: false },
-            border: { color: gridColor }
-          }
-        }
-      };
-    }
-
-    // Gráfico Atual
+    // ── Gráfico ATUAL ──────────────────────────────────────────
     new Chart(document.getElementById('chartAtual'), {
       type: 'bar',
       data: {
@@ -1281,46 +1244,141 @@
           borderRadius: 5
         }]
       },
-      options: makeOpts('rgba(236,212,162,1)', 'rgba(236,212,162,1)', 900)
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: anim,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ' ' + c.parsed.x + ' punções (' + mês(c.parsed.x) + ')' } },
+          datalabels: {
+            anchor: 'end', align: 'end',
+            color: 'rgba(236,212,162,1)',
+            font: { size: 14, weight: '700' },
+            padding: { left: 8 },
+            formatter: val => val + '  ·  ' + mês(val)
+          }
+        },
+        layout: { padding: { right: 110 } },
+        scales: {
+          x: {
+            max: 700,
+            ticks: { color: txtColor, font: { size: 13 } },
+            grid: { color: gridColor }, border: { color: gridColor }
+          },
+          y: {
+            ticks: { color: txtColor, font: { size: 14, weight: '700' } },
+            grid: { display: false }, border: { color: gridColor }
+          }
+        }
+      }
     });
 
-    // Gráfico Projetado (Rodolfo cap 35/mês = 420/ano; excedente redistribuído proporcionalmente)
+    // ── Gráfico PROJETADO — caps: Rodolfo 480/ano (40/mês), Priscila 420/ano (35/mês) ─
+    // Excedente Rodolfo (262) redistribuído → Priscila chega a 434 → capped 420, overflow 14
+    // Excedente Priscila (14) + Rodolfo restante → Marcelle 57, Bruna 25, Mario 7
+    // Segmentos: base = projeção simples (sem redistribuição); adicionado = overflow recebido
+    const baseProj    = [480, 210, 23, 10, 3];   // base (Rodolfo já capado)
+    const adicionado  = [  0, 210, 34, 15, 4];   // redistribuído dos caps
+    // totais: [480, 420, 57, 25, 7]
+
     new Chart(document.getElementById('chartProj'), {
       type: 'bar',
       data: {
         labels,
-        datasets: [{
-          data: [420, 485, 53, 23, 7],
-          backgroundColor: [
-            'rgba(236,212,162,.65)',   // Rodolfo — dourado mais fraco (cap)
-            'rgba(82,196,138,.82)',    // Priscila
-            'rgba(82,196,138,.82)',    // Marcelle
-            'rgba(82,196,138,.82)',    // Bruna
-            'rgba(82,196,138,.82)'    // Mario
-          ],
-          borderColor: [
-            'rgba(236,212,162,.9)',
-            'rgba(82,196,138,1)',
-            'rgba(82,196,138,1)',
-            'rgba(82,196,138,1)',
-            'rgba(82,196,138,1)'
-          ],
-          borderWidth: 1.5,
-          borderRadius: 5
-        }]
+        datasets: [
+          {
+            // segmento BASE
+            label: 'Projeção base',
+            data: baseProj,
+            backgroundColor: [
+              'rgba(236,212,162,.68)',   // Rodolfo — dourado (cap)
+              'rgba(82,196,138,.38)',
+              'rgba(82,196,138,.38)',
+              'rgba(82,196,138,.38)',
+              'rgba(82,196,138,.38)'
+            ],
+            borderColor: [
+              'rgba(236,212,162,.8)',
+              'rgba(82,196,138,.6)',
+              'rgba(82,196,138,.6)',
+              'rgba(82,196,138,.6)',
+              'rgba(82,196,138,.6)'
+            ],
+            borderWidth: 1.5,
+            borderRadius: 0,
+            stack: 'punc'
+          },
+          {
+            // segmento ADICIONADO (redistribuído)
+            label: 'Redistribuído',
+            data: adicionado,
+            backgroundColor: 'rgba(82,196,138,.92)',
+            borderColor: 'rgba(82,196,138,1)',
+            borderWidth: 1.5,
+            borderRadius: 5,
+            stack: 'punc'
+          }
+        ]
       },
-      options: (function() {
-        const opts = makeOpts('rgba(82,196,138,1)', 'rgba(82,196,138,1)', 900);
-        // Rodolfo usa cor dourada no label (cap)
-        opts.plugins.datalabels.color = (ctx) =>
-          ctx.dataIndex === 0 ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)';
-        // Nota de cap no Rodolfo
-        opts.plugins.datalabels.formatter = (val, ctx) => {
-          const s = val + ' · ' + monthlyLabel(val);
-          return ctx.dataIndex === 0 ? s + ' ⚠ cap' : s;
-        };
-        return opts;
-      })()
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: anim,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: txtColor,
+              font: { size: 12, weight: '600' },
+              boxWidth: 14, padding: 16,
+              generateLabels: () => [
+                { text: 'Projeção base', fillStyle: 'rgba(82,196,138,.38)', strokeStyle: 'rgba(82,196,138,.6)', lineWidth: 1 },
+                { text: '+ Redistribuído dos caps', fillStyle: 'rgba(82,196,138,.92)', strokeStyle: 'rgba(82,196,138,1)', lineWidth: 1 }
+              ]
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: c => {
+                const total = baseProj[c.dataIndex] + adicionado[c.dataIndex];
+                return ' Total: ' + total + ' punções (' + mês(total) + ')';
+              }
+            }
+          },
+          datalabels: {
+            // label no dataset 0 apenas p/ Rodolfo (adicionado=0); label no dataset 1 p/ demais
+            display: ctx => (ctx.datasetIndex === 0 && ctx.dataIndex === 0) ||
+                            (ctx.datasetIndex === 1 && ctx.dataIndex !== 0),
+            anchor: 'end', align: 'end',
+            color: ctx => ctx.dataIndex === 0 ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)',
+            font: { size: 14, weight: '700' },
+            padding: { left: 8 },
+            formatter: (val, ctx) => {
+              const total = baseProj[ctx.dataIndex] + adicionado[ctx.dataIndex];
+              const suffix = ctx.dataIndex === 0 ? '  ·  ' + mês(total) + ' ⚠ cap' : '  ·  ' + mês(total);
+              return total + suffix;
+            }
+          }
+        },
+        layout: { padding: { right: 130 } },
+        scales: {
+          x: {
+            max: 700,
+            stacked: true,
+            ticks: { color: txtColor, font: { size: 13 } },
+            grid: { color: gridColor }, border: { color: gridColor }
+          },
+          y: {
+            stacked: true,
+            ticks: { color: txtColor, font: { size: 14, weight: '700' } },
+            grid: { display: false }, border: { color: gridColor }
+          }
+        }
+      }
     });
   }
 
