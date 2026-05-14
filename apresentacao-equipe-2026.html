@@ -1280,12 +1280,12 @@
     // Excedente Priscila (14) + Rodolfo restante → Marcelle 57, Bruna 25, Mario 7
     // Segmentos: base = projeção simples (sem redistribuição); adicionado = overflow recebido
     // Segmento escuro = atual real (12 meses); segmento claro = crescimento projetado
-    // Projetados finais: Rodolfo 480 (cap 40/mês), Priscila 180 (cap 15/mês),
-    //   Marcelle 84 (cap 7/mês), Bruna 188, Mario 56
-    const baseProj    = [286,  81,  9,  4,  1];  // atual real (últimos 12 meses)
-    const adicionado  = [194,  99, 75,184, 55];  // crescimento até o projetado
-    const capado      = [true, true, true, false, false];
-    // totais:          [480, 180, 84, 188, 56]
+    // Caps: Rodolfo 35/mês=420, Priscila 15/mês=180; overflow 352 dividido igualmente
+    // entre Marcelle, Bruna e Mario (+~117 cada) → 141, 127, 120
+    const baseProj    = [286,  81,  9,  4,   1];  // atual real (últimos 12 meses)
+    const adicionado  = [134,  99,132,123, 119];  // crescimento até o projetado
+    const capado      = [true, true, false, false, false];
+    // totais:          [420, 180, 141, 127, 120]
 
     new Chart(document.getElementById('chartProj'), {
       type: 'bar',
