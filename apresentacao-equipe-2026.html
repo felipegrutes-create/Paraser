@@ -494,36 +494,39 @@
   /* === SETAS ANIMADAS === */
   .funnel-arrow{
     display:flex; align-items:center; justify-content:center;
-    gap:1rem; height:54px; --ac: var(--border);
+    gap:1.1rem; height:58px;
+    --ac: var(--accent3);   /* dourado visível por padrão */
+    --ac-bg: rgba(184,153,104,.12);
   }
-  .funnel-arrow.hot { --ac: var(--red) }
-  .funnel-arrow.win { --ac: var(--accent2) }
+  .funnel-arrow.hot { --ac: var(--red);    --ac-bg: rgba(217,112,80,.12) }
+  .funnel-arrow.win { --ac: var(--accent2); --ac-bg: rgba(236,212,162,.12) }
+
   .arr-line-wrap{
     display:flex; flex-direction:column; align-items:center;
-    height:100%; width:20px; flex:0 0 20px;
+    height:100%; width:24px; flex:0 0 24px;
   }
   .arr-line{
-    width:2px; flex:1;
+    width:3px; flex:1; border-radius:2px;
     background:var(--ac);
     transform:scaleY(0); transform-origin:top;
     transition: filter .2s;
   }
   .arr-head{
-    font-size:14px; line-height:1; color:var(--ac);
-    margin-top:-2px; opacity:0;
+    font-size:20px; line-height:1; color:var(--ac);
+    margin-top:-3px; opacity:0;
   }
-  .arr-badge{ display:flex; flex-direction:column; align-items:flex-start; gap:.18rem; }
+  .arr-badge{ display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
   .arr-pct{
-    font-size:15px; font-weight:800; letter-spacing:.06em;
-    color:var(--ac); background:var(--surface2);
-    border:1px solid var(--ac); padding:.22rem .7rem; border-radius:7px;
+    font-size:17px; font-weight:800; letter-spacing:.05em;
+    color:var(--ac); background:var(--ac-bg);
+    border:1.5px solid var(--ac); padding:.28rem .85rem; border-radius:8px;
     display:block; transition:transform .2s ease, filter .2s ease;
   }
   .arr-lbl{
-    font-size:11px; color:var(--dim); font-weight:600;
-    letter-spacing:.1em; text-transform:uppercase; padding-left:.15rem;
+    font-size:11px; color:var(--muted); font-weight:700;
+    letter-spacing:.12em; text-transform:uppercase; padding-left:.2rem;
   }
-  .funnel-arrow:hover .arr-pct  { transform:scale(1.12); filter:brightness(1.4); }
+  .funnel-arrow:hover .arr-pct  { transform:scale(1.1); filter:brightness(1.35); }
   .funnel-arrow:hover .arr-line  { filter:brightness(1.5); }
 
   .funnel-insights{
