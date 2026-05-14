@@ -219,6 +219,7 @@
   }
   .slide.is-active .funnel-insights > :nth-child(1) { animation-delay: 1400ms }
   .slide.is-active .funnel-insights > :nth-child(2) { animation-delay: 1560ms }
+  .slide.is-active .funnel-insights > :nth-child(3) { animation-delay: 1720ms }
 
   /* Slide abertura — logo zoom + heroline reveal lento */
   @keyframes logo-zoom {
@@ -958,6 +959,37 @@
     <p style="margin-top:.65rem;text-align:center;font-size:12px;color:var(--dim);letter-spacing:.05em">Projeção baseada no benchmark de top 25% clínicas de saúde · mesmo investimento em Meta Ads · base 2025–2026</p>
   </section>
 
+  <!-- ========== SLIDE MÉDICOS — POTENCIAL PUNÇÕES ========== -->
+  <section class="slide" data-slide="medicos" style="background:radial-gradient(ellipse at 65% 30%, #061820 0%, #020a14 50%, #050d1a 100%)">
+    <div class="kicker" style="color:var(--green)">Potencial por Médico</div>
+    <h2 style="margin-bottom:1.2rem">O que 20% de conversão representa<br><span style="color:var(--green)">para o volume de cada um</span></h2>
+    <div style="display:grid;grid-template-columns:220px 1fr;gap:2rem;height:calc(100% - 185px);align-items:stretch">
+      <!-- KPIs -->
+      <div style="display:flex;flex-direction:column;gap:.8rem">
+        <div class="insight" style="border-color:rgba(236,212,162,.5);background:rgba(236,212,162,.07);flex:1;padding:1rem 1.1rem">
+          <div class="h" style="color:var(--accent2)">HOJE — 12 MESES</div>
+          <div class="v" style="color:var(--accent2);font-size:50px" data-count="381" data-thousands="1" data-count-delay="200">0</div>
+          <div class="t">punções de óvulos realizadas</div>
+        </div>
+        <div class="insight" style="border-color:rgba(82,196,138,.65);background:rgba(82,196,138,.08);flex:1;padding:1rem 1.1rem">
+          <div class="h" style="color:var(--green)">PROJETADO (+20%)</div>
+          <div class="v" style="color:var(--green);font-size:50px" data-count="988" data-thousands="1" data-count-delay="500">0</div>
+          <div class="t">com o mesmo time</div>
+        </div>
+        <div class="insight" style="border-color:rgba(82,196,138,.75);background:rgba(82,196,138,.12);flex:1;padding:1rem 1.1rem">
+          <div class="h" style="color:var(--green)">CRESCIMENTO</div>
+          <div class="v" style="color:var(--green);font-size:46px;font-weight:900">+160%</div>
+          <div class="t">sem contratar ninguém novo</div>
+        </div>
+      </div>
+      <!-- Gráfico -->
+      <div style="position:relative;min-height:0">
+        <canvas id="chartPuncoes"></canvas>
+      </div>
+    </div>
+    <p style="margin-top:.5rem;text-align:center;font-size:11px;color:var(--dim);letter-spacing:.04em">Dados reais Feegow · mai/2025–mai/2026 · Projeção: ×2,6 alinhado à meta de 20% conversão no funil</p>
+  </section>
+
   <!-- ========== SLIDE 10 — A NARRATIVA ========== -->
   <section class="slide" data-slide="10">
     <div class="kicker">A história em 1 linha</div>
@@ -1054,6 +1086,7 @@
 
 <div class="hint">setas ← → · espaço · F tela cheia</div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 (function(){
   const slides = Array.from(document.querySelectorAll('.slide'));
@@ -1150,6 +1183,7 @@
     triggerCounters(active);
     document.getElementById('cur').textContent = idx+1;
     document.getElementById('progressBar').style.width = ((idx+1)/total*100)+'%';
+    if (active.dataset.slide === 'medicos') setTimeout(initPuncaoChart, 300);
   }
   window.nav = d => show(cur+d);
   window.toggleFs = () => {
@@ -1178,6 +1212,70 @@
     if (e.target.closest('.nav') || e.target.closest('a, button') || e.target.closest('.funnel .step')) return;
     show(cur+1);
   });
+
+  // Gráfico Punções por Médico — inicializa na primeira vez que o slide fica ativo
+  let _puncaoChart = null;
+  function initPuncaoChart() {
+    const ctx = document.getElementById('chartPuncoes');
+    if (!ctx || !window.Chart) return;
+    if (_puncaoChart) { _puncaoChart.update(); return; }
+    const textColor = 'rgba(200,180,230,.85)';
+    const gridColor = 'rgba(255,255,255,.07)';
+    _puncaoChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Rodolfo Salvato', 'Priscila Loyola', 'Marcelle Moura', 'Bruna Ortiz', 'Mario Barroso'],
+        datasets: [
+          {
+            label: 'Atual (12 meses)',
+            data: [286, 81, 9, 4, 1],
+            backgroundColor: 'rgba(236,212,162,.82)',
+            borderColor: 'rgba(236,212,162,1)',
+            borderWidth: 1.5,
+            borderRadius: 5
+          },
+          {
+            label: 'Projetado (20% conv.)',
+            data: [742, 210, 23, 10, 3],
+            backgroundColor: 'rgba(82,196,138,.82)',
+            borderColor: 'rgba(82,196,138,1)',
+            borderWidth: 1.5,
+            borderRadius: 5
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 1100, easing: 'easeOutQuart' },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: textColor, font: { size: 13, weight: '600' }, boxWidth: 14, padding: 18 }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.x + ' punções'
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: textColor, font: { size: 12 } },
+            grid: { color: gridColor },
+            border: { color: gridColor }
+          },
+          y: {
+            ticks: { color: textColor, font: { size: 13, weight: '600' } },
+            grid: { display: false },
+            border: { color: gridColor }
+          }
+        }
+      }
+    });
+  }
+
   show(0);
 })();
 </script>
