@@ -962,32 +962,30 @@
   <!-- ========== SLIDE MÉDICOS — POTENCIAL PUNÇÕES ========== -->
   <section class="slide" data-slide="medicos" style="background:radial-gradient(ellipse at 65% 30%, #061820 0%, #020a14 50%, #050d1a 100%)">
     <div class="kicker" style="color:var(--green)">Potencial por Médico</div>
-    <h2 style="margin-bottom:1.2rem">O que 20% de conversão representa<br><span style="color:var(--green)">para o volume de cada um</span></h2>
-    <div style="display:grid;grid-template-columns:220px 1fr;gap:2rem;height:calc(100% - 185px);align-items:stretch">
-      <!-- KPIs -->
-      <div style="display:flex;flex-direction:column;gap:.8rem">
-        <div class="insight" style="border-color:rgba(236,212,162,.5);background:rgba(236,212,162,.07);flex:1;padding:1rem 1.1rem">
-          <div class="h" style="color:var(--accent2)">HOJE — 12 MESES</div>
-          <div class="v" style="color:var(--accent2);font-size:50px" data-count="381" data-thousands="1" data-count-delay="200">0</div>
-          <div class="t">punções de óvulos realizadas</div>
+    <h2 style="margin-bottom:.8rem;font-size:clamp(22px,3vw,40px)">Punções de óvulos: hoje vs. projetado<br><span style="color:var(--green);font-size:.85em">com cap de capacidade do Dr. Rodolfo (35/mês)</span></h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;height:calc(100% - 165px)">
+      <!-- Gráfico ATUAL -->
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        <div style="text-align:center;padding:.45rem .8rem;border-radius:8px;background:rgba(236,212,162,.1);border:1px solid rgba(236,212,162,.3)">
+          <span style="font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--accent2)">📊 Cenário Atual</span>
+          <span style="font-size:13px;color:var(--muted);margin-left:1rem">381 punções · 32/mês no time</span>
         </div>
-        <div class="insight" style="border-color:rgba(82,196,138,.65);background:rgba(82,196,138,.08);flex:1;padding:1rem 1.1rem">
-          <div class="h" style="color:var(--green)">PROJETADO (+20%)</div>
-          <div class="v" style="color:var(--green);font-size:50px" data-count="988" data-thousands="1" data-count-delay="500">0</div>
-          <div class="t">com o mesmo time</div>
-        </div>
-        <div class="insight" style="border-color:rgba(82,196,138,.75);background:rgba(82,196,138,.12);flex:1;padding:1rem 1.1rem">
-          <div class="h" style="color:var(--green)">CRESCIMENTO</div>
-          <div class="v" style="color:var(--green);font-size:46px;font-weight:900">+160%</div>
-          <div class="t">sem contratar ninguém novo</div>
+        <div style="flex:1;position:relative;min-height:0">
+          <canvas id="chartAtual"></canvas>
         </div>
       </div>
-      <!-- Gráfico -->
-      <div style="position:relative;min-height:0">
-        <canvas id="chartPuncoes"></canvas>
+      <!-- Gráfico PROJETADO -->
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        <div style="text-align:center;padding:.45rem .8rem;border-radius:8px;background:rgba(82,196,138,.1);border:1px solid rgba(82,196,138,.4)">
+          <span style="font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--green)">🚀 Projetado — 20% conversão</span>
+          <span style="font-size:13px;color:var(--muted);margin-left:.8rem">988 punções · 82/mês · Rodolfo: máx. 35/mês</span>
+        </div>
+        <div style="flex:1;position:relative;min-height:0">
+          <canvas id="chartProj"></canvas>
+        </div>
       </div>
     </div>
-    <p style="margin-top:.5rem;text-align:center;font-size:11px;color:var(--dim);letter-spacing:.04em">Dados reais Feegow · mai/2025–mai/2026 · Projeção: ×2,6 alinhado à meta de 20% conversão no funil</p>
+    <p style="margin-top:.4rem;text-align:center;font-size:11px;color:var(--dim);letter-spacing:.04em">Dados reais Feegow mai/2025–mai/2026 · Excedente de Rodolfo redistribuído proporcionalmente aos demais · Meta: 20% conversão no funil</p>
   </section>
 
   <!-- ========== SLIDE 10 — A NARRATIVA ========== -->
@@ -1087,6 +1085,7 @@
 <div class="hint">setas ← → · espaço · F tela cheia</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 (function(){
   const slides = Array.from(document.querySelectorAll('.slide'));
@@ -1213,66 +1212,115 @@
     show(cur+1);
   });
 
-  // Gráfico Punções por Médico — inicializa na primeira vez que o slide fica ativo
-  let _puncaoChart = null;
+  // Gráficos Punções — inicializa na primeira vez que o slide fica ativo
+  let _chartsInited = false;
   function initPuncaoChart() {
-    const ctx = document.getElementById('chartPuncoes');
-    if (!ctx || !window.Chart) return;
-    if (_puncaoChart) { _puncaoChart.update(); return; }
-    const textColor = 'rgba(200,180,230,.85)';
+    if (!window.Chart || !window.ChartDataLabels) return;
+    if (_chartsInited) return;
+    _chartsInited = true;
+
+    Chart.register(ChartDataLabels);
+
+    const labels = ['Rodolfo\nSalvato', 'Priscila\nLoyola', 'Marcelle\nMoura', 'Bruna\nOrtiz', 'Mario\nBarroso'];
+    const txtColor = 'rgba(210,190,235,.9)';
     const gridColor = 'rgba(255,255,255,.07)';
-    _puncaoChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['Rodolfo Salvato', 'Priscila Loyola', 'Marcelle Moura', 'Bruna Ortiz', 'Mario Barroso'],
-        datasets: [
-          {
-            label: 'Atual (12 meses)',
-            data: [286, 81, 9, 4, 1],
-            backgroundColor: 'rgba(236,212,162,.82)',
-            borderColor: 'rgba(236,212,162,1)',
-            borderWidth: 1.5,
-            borderRadius: 5
-          },
-          {
-            label: 'Projetado (20% conv.)',
-            data: [742, 210, 23, 10, 3],
-            backgroundColor: 'rgba(82,196,138,.82)',
-            borderColor: 'rgba(82,196,138,1)',
-            borderWidth: 1.5,
-            borderRadius: 5
-          }
-        ]
-      },
-      options: {
+    const anim = { duration: 1000, easing: 'easeOutQuart' };
+
+    function monthlyLabel(val) {
+      const m = val / 12;
+      return (m < 1 ? m.toFixed(1) : Math.round(m)) + '/mês';
+    }
+
+    function makeOpts(barColor, barBorder, maxX) {
+      return {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 1100, easing: 'easeOutQuart' },
+        animation: anim,
         plugins: {
-          legend: {
-            position: 'top',
-            labels: { color: textColor, font: { size: 13, weight: '600' }, boxWidth: 14, padding: 18 }
-          },
+          legend: { display: false },
           tooltip: {
-            callbacks: {
-              label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.x + ' punções'
-            }
+            callbacks: { label: c => ' ' + c.parsed.x + ' punções (' + monthlyLabel(c.parsed.x) + ')' }
+          },
+          datalabels: {
+            anchor: 'end',
+            align: 'end',
+            color: barColor,
+            font: { size: 12, weight: '700' },
+            padding: { left: 6 },
+            formatter: (val) => val + ' · ' + monthlyLabel(val)
           }
         },
+        layout: { padding: { right: 90 } },
         scales: {
           x: {
-            ticks: { color: textColor, font: { size: 12 } },
+            max: maxX,
+            ticks: { color: txtColor, font: { size: 11 } },
             grid: { color: gridColor },
             border: { color: gridColor }
           },
           y: {
-            ticks: { color: textColor, font: { size: 13, weight: '600' } },
+            ticks: { color: txtColor, font: { size: 12, weight: '600' } },
             grid: { display: false },
             border: { color: gridColor }
           }
         }
-      }
+      };
+    }
+
+    // Gráfico Atual
+    new Chart(document.getElementById('chartAtual'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: [286, 81, 9, 4, 1],
+          backgroundColor: 'rgba(236,212,162,.78)',
+          borderColor: 'rgba(236,212,162,1)',
+          borderWidth: 1.5,
+          borderRadius: 5
+        }]
+      },
+      options: makeOpts('rgba(236,212,162,1)', 'rgba(236,212,162,1)', 900)
+    });
+
+    // Gráfico Projetado (Rodolfo cap 35/mês = 420/ano; excedente redistribuído proporcionalmente)
+    new Chart(document.getElementById('chartProj'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: [420, 485, 53, 23, 7],
+          backgroundColor: [
+            'rgba(236,212,162,.65)',   // Rodolfo — dourado mais fraco (cap)
+            'rgba(82,196,138,.82)',    // Priscila
+            'rgba(82,196,138,.82)',    // Marcelle
+            'rgba(82,196,138,.82)',    // Bruna
+            'rgba(82,196,138,.82)'    // Mario
+          ],
+          borderColor: [
+            'rgba(236,212,162,.9)',
+            'rgba(82,196,138,1)',
+            'rgba(82,196,138,1)',
+            'rgba(82,196,138,1)',
+            'rgba(82,196,138,1)'
+          ],
+          borderWidth: 1.5,
+          borderRadius: 5
+        }]
+      },
+      options: (function() {
+        const opts = makeOpts('rgba(82,196,138,1)', 'rgba(82,196,138,1)', 900);
+        // Rodolfo usa cor dourada no label (cap)
+        opts.plugins.datalabels.color = (ctx) =>
+          ctx.dataIndex === 0 ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)';
+        // Nota de cap no Rodolfo
+        opts.plugins.datalabels.formatter = (val, ctx) => {
+          const s = val + ' · ' + monthlyLabel(val);
+          return ctx.dataIndex === 0 ? s + ' ⚠ cap' : s;
+        };
+        return opts;
+      })()
     });
   }
 
