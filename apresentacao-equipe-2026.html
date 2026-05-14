@@ -190,16 +190,24 @@
   .slide.is-active .roles-grid > :nth-child(5) { animation-delay: 1130ms }
   .slide.is-active .roles-grid > :nth-child(6) { animation-delay: 1250ms }
 
-  /* Funil — desce em cascata da esquerda */
+  /* Funil — steps em cascata + connectors fade-in */
   .slide.is-active .funnel .step{
     animation: rev-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  .slide.is-active .funnel .step:nth-child(1) { animation-delay: 480ms }
-  .slide.is-active .funnel .step:nth-child(2) { animation-delay: 610ms }
-  .slide.is-active .funnel .step:nth-child(3) { animation-delay: 740ms }
-  .slide.is-active .funnel .step:nth-child(4) { animation-delay: 870ms }
-  .slide.is-active .funnel .step:nth-child(5) { animation-delay: 1000ms }
-  .slide.is-active .funnel .step:nth-child(6) { animation-delay: 1130ms }
+  .slide.is-active .step-wrap:nth-child(1)  .step { animation-delay: 480ms }
+  .slide.is-active .step-wrap:nth-child(3)  .step { animation-delay: 630ms }
+  .slide.is-active .step-wrap:nth-child(5)  .step { animation-delay: 780ms }
+  .slide.is-active .step-wrap:nth-child(7)  .step { animation-delay: 930ms }
+  .slide.is-active .step-wrap:nth-child(9)  .step { animation-delay: 1080ms }
+  .slide.is-active .step-wrap:nth-child(11) .step { animation-delay: 1230ms }
+  .slide.is-active .step-conn{
+    animation: rev-fade 0.35s ease both;
+  }
+  .slide.is-active .funnel > :nth-child(2)  { animation-delay: 555ms }
+  .slide.is-active .funnel > :nth-child(4)  { animation-delay: 705ms }
+  .slide.is-active .funnel > :nth-child(6)  { animation-delay: 855ms }
+  .slide.is-active .funnel > :nth-child(8)  { animation-delay: 1005ms }
+  .slide.is-active .funnel > :nth-child(10) { animation-delay: 1155ms }
 
   /* Insights do funil — entram pela direita após os steps */
   .slide.is-active .funnel-insights > *{
@@ -251,7 +259,8 @@
   }
   .slide.is-active .bignumber,
   .slide.is-active .insight .v,
-  .slide.is-active .stat-card .val{
+  .slide.is-active .stat-card .val,
+  .slide.is-active .funnel .step .num{
     text-shadow:
       0 0 40px rgba(212,184,136,.32),
       0 0 80px rgba(212,184,136,.15);
@@ -406,60 +415,111 @@
 
   /* === FUNIL === */
   .funnel-wrap{
-    display:flex; gap:5rem; align-items:center; width:100%; max-width:1300px;
-    margin-top:1.5rem;
+    display:flex; gap:3rem; align-items:flex-start; width:100%; max-width:1450px;
+    margin-top:.75rem;
   }
   .funnel{
-    flex:1; display:flex; flex-direction:column; gap:.45rem; align-items:center;
+    flex:1; display:flex; flex-direction:column; gap:0; align-items:center;
   }
+  /* step-wrap cria o efeito de afunilamento centrado */
+  .step-wrap{ display:flex; flex-direction:column; align-items:stretch; }
+  .step-wrap.s1{width:100%}
+  .step-wrap.s2{width:87%}
+  .step-wrap.s3{width:73%}
+  .step-wrap.s4{width:57%}
+  .step-wrap.s5{width:42%}
+  .step-wrap.s6{width:28%}
+
   .funnel .step{
     width:100%; position:relative;
     display:flex; align-items:center; justify-content:space-between;
-    padding:1rem 1.75rem; border-radius:10px;
-    background:rgba(255,255,255,.025); border:1px solid var(--border);
-    font-size:16px;
+    padding:1.15rem 1.85rem; border-radius:12px;
+    background:rgba(255,255,255,.03); border:1px solid var(--border);
+    font-size:20px; cursor:pointer;
+    transition: transform .22s ease, box-shadow .25s ease, border-color .2s, background .2s;
   }
-  .funnel .step .lbl{font-weight:600; color:var(--text)}
-  .funnel .step .num{font-weight:800; color:var(--accent2); font-size:22px}
-  .funnel .step.pending .num{color:var(--muted); font-style:italic; font-weight:500; font-size:15px}
+  .funnel .step:hover{
+    transform:scale(1.018);
+    box-shadow:0 0 32px rgba(212,184,136,.2), 0 6px 20px rgba(0,0,0,.35);
+    border-color:rgba(212,184,136,.6); background:rgba(255,255,255,.055);
+  }
+  .funnel .step.focused{
+    box-shadow:0 0 48px rgba(212,184,136,.38), 0 6px 22px rgba(0,0,0,.35);
+    border-color:rgba(212,184,136,.9); background:rgba(212,184,136,.09);
+  }
+  .funnel .step .lbl{font-weight:600; color:var(--text); font-size:19px; flex:1; padding-right:1rem}
+  .funnel .step .num{font-weight:900; color:var(--accent2); font-size:36px; letter-spacing:-.02em; flex:0 0 auto; white-space:nowrap}
+  .funnel .step.pending .num{color:var(--muted); font-style:italic; font-weight:500; font-size:18px}
+
+  /* tooltip on hover */
+  .funnel .step[data-tip]{position:relative}
+  .funnel .step[data-tip]::after{
+    content:attr(data-tip);
+    position:absolute; left:50%; top:calc(100% + 10px); transform:translateX(-50%);
+    background:rgba(22,8,40,.97); border:1px solid var(--border);
+    color:var(--muted); font-size:12px; font-weight:400; letter-spacing:0;
+    padding:.55rem .9rem; border-radius:8px; white-space:normal; max-width:300px; text-align:center;
+    opacity:0; pointer-events:none; transition:opacity .2s; z-index:60; line-height:1.4;
+  }
+  .funnel .step[data-tip]:hover::after{opacity:1}
+
   .funnel .step.hot{
-    background:linear-gradient(90deg, rgba(217,112,80,.16), rgba(217,112,80,.04));
-    border-color:rgba(217,112,80,.5);
+    background:linear-gradient(90deg,rgba(217,112,80,.22),rgba(217,112,80,.05));
+    border-color:rgba(217,112,80,.55);
+  }
+  .funnel .step.hot:hover{
+    background:linear-gradient(90deg,rgba(217,112,80,.32),rgba(217,112,80,.08));
+    box-shadow:0 0 32px rgba(217,112,80,.28), 0 6px 20px rgba(0,0,0,.35);
+    border-color:rgba(217,112,80,.8);
+  }
+  .funnel .step.hot.focused{
+    box-shadow:0 0 48px rgba(217,112,80,.42); border-color:rgba(217,112,80,.95);
   }
   .funnel .step.hot .num{color:var(--red)}
+
   .funnel .step.win{
-    background:linear-gradient(90deg, rgba(212,184,136,.18), rgba(212,184,136,.04));
-    border-color:rgba(212,184,136,.55);
+    background:linear-gradient(90deg,rgba(212,184,136,.22),rgba(212,184,136,.05));
+    border-color:rgba(212,184,136,.65);
+  }
+  .funnel .step.win:hover{
+    background:linear-gradient(90deg,rgba(212,184,136,.32),rgba(212,184,136,.08));
+    box-shadow:0 0 32px rgba(212,184,136,.30), 0 6px 20px rgba(0,0,0,.35);
+    border-color:rgba(212,184,136,.9);
+  }
+  .funnel .step.win.focused{
+    box-shadow:0 0 48px rgba(212,184,136,.42); border-color:rgba(212,184,136,.98);
   }
   .funnel .step.win .num{color:var(--accent2)}
-  .funnel .step .conv{
-    position:absolute; right:-65px; top:50%; transform:translateY(-50%);
-    font-size:11px; color:var(--muted); font-weight:700;
-    background:var(--surface); padding:.2rem .5rem; border-radius:4px;
-    border:1px solid var(--border);
+
+  /* connectors between steps */
+  .step-conn{
+    display:flex; align-items:center; justify-content:center;
+    gap:.55rem; height:30px;
   }
-  /* tapered widths */
-  .funnel .step:nth-child(1){width:100%}
-  .funnel .step:nth-child(2){width:90%}
-  .funnel .step:nth-child(3){width:76%}
-  .funnel .step:nth-child(4){width:58%}
-  .funnel .step:nth-child(5){width:40%}
-  .funnel .step:nth-child(6){width:24%}
+  .step-conn .arrow{font-size:15px; opacity:.4; line-height:1}
+  .step-conn .pct{
+    font-size:13px; font-weight:800; letter-spacing:.06em;
+    color:var(--accent3); background:var(--surface2);
+    border:1px solid var(--border); padding:.18rem .6rem; border-radius:6px;
+  }
+  .step-conn.hot .pct{color:var(--red); border-color:rgba(217,112,80,.5); background:rgba(217,112,80,.08)}
+  .step-conn.win .pct{color:var(--accent2); border-color:rgba(212,184,136,.5); background:rgba(212,184,136,.08)}
+  .step-conn .conn-lbl{font-size:11px; color:var(--dim); font-weight:600; letter-spacing:.1em; text-transform:uppercase}
 
   .funnel-insights{
-    flex:0 0 360px; display:flex; flex-direction:column; gap:1rem;
+    flex:0 0 380px; display:flex; flex-direction:column; gap:1.25rem;
   }
   .insight{
-    padding:1.25rem 1.5rem; border-radius:12px;
-    border:1px solid var(--border); background:rgba(255,255,255,.02);
+    padding:1.6rem 1.85rem; border-radius:14px;
+    border:1px solid var(--border); background:rgba(255,255,255,.025);
   }
-  .insight.win{border-color:rgba(212,184,136,.55); background:rgba(212,184,136,.08)}
-  .insight.hot{border-color:rgba(217,112,80,.5); background:rgba(217,112,80,.06)}
-  .insight .h{font-size:13px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; margin-bottom:.5rem}
+  .insight.win{border-color:rgba(212,184,136,.65); background:rgba(212,184,136,.09)}
+  .insight.hot{border-color:rgba(217,112,80,.55); background:rgba(217,112,80,.08)}
+  .insight .h{font-size:12px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; margin-bottom:.65rem}
   .insight.win .h{color:var(--accent2)}
   .insight.hot .h{color:var(--red)}
-  .insight .v{font-size:32px; font-weight:800; line-height:1.05; margin-bottom:.4rem}
-  .insight .t{font-size:13px; color:var(--muted); line-height:1.4}
+  .insight .v{font-size:54px; font-weight:900; line-height:1; margin-bottom:.5rem; letter-spacing:-.03em}
+  .insight .t{font-size:14px; color:var(--muted); line-height:1.45}
 
   /* === INOVAÇÕES === */
   .inov-grid{
@@ -705,16 +765,51 @@
   <!-- ========== SLIDE 9 — NOSSO FUNIL ========== -->
   <section class="slide" data-slide="9">
     <div class="kicker">o caminho da paciente até nós · <span style="color:var(--accent)">2025–2026</span></div>
-    <h2 class="h2" style="margin-bottom:1.5rem;text-align:center">O Funil <span class="grad-text">Paraser</span></h2>
+    <h2 class="h2" style="margin-bottom:.85rem;text-align:center">O Funil <span class="grad-text">Paraser</span></h2>
 
     <div class="funnel-wrap">
       <div class="funnel">
-        <div class="step"><span class="lbl">1 · Lead qualificado (Meta Ads)</span> <span class="num" data-count="19000" data-prefix="~" data-thousands="1">~0</span></div>
-        <div class="step"><span class="lbl">2 · Contato WhatsApp (ManyChat)</span> <span class="num" data-count="12000" data-prefix="~" data-thousands="1">~0</span><span class="conv">63%</span></div>
-        <div class="step hot"><span class="lbl">3 · 1ª consulta REALIZADA</span> <span class="num" data-count="934">0</span><span class="conv">4,9%</span></div>
-        <div class="step win"><span class="lbl">4 · Punção FIV / Coito Programado</span> <span class="num" data-count="447">0</span><span class="conv">48%</span></div>
-        <div class="step win"><span class="lbl">5 · Beta positivo (gravidez)</span> <span class="num" data-count="70" data-suffix="%">0%</span><span class="conv">das transf.</span></div>
-        <div class="step pending"><span class="lbl">6 · Embaixadora (indica)</span> <span class="num">a medir</span></div>
+        <div class="step-wrap s1">
+          <div class="step" data-tip="Leads que preencheram o formulário completo no Instagram / Facebook">
+            <span class="lbl">1 · Lead qualificado (Meta Ads)</span>
+            <span class="num" data-count="19000" data-prefix="~" data-thousands="1">~0</span>
+          </div>
+        </div>
+        <div class="step-conn"><span class="arrow">▼</span><span class="pct">63%</span><span class="conn-lbl">abordados</span></div>
+        <div class="step-wrap s2">
+          <div class="step" data-tip="Leads que iniciaram conversa via ManyChat no WhatsApp">
+            <span class="lbl">2 · Contato WhatsApp (ManyChat)</span>
+            <span class="num" data-count="12000" data-prefix="~" data-thousands="1">~0</span>
+          </div>
+        </div>
+        <div class="step-conn hot"><span class="arrow">▼</span><span class="pct">⚠ 4,9%</span><span class="conn-lbl">o gargalo</span></div>
+        <div class="step-wrap s3">
+          <div class="step hot" data-tip="Pacientes únicos que realizaram a 1ª consulta na Paraser (Feegow, 2025–2026)">
+            <span class="lbl">3 · 1ª Consulta REALIZADA</span>
+            <span class="num" data-count="934">0</span>
+          </div>
+        </div>
+        <div class="step-conn"><span class="arrow">▼</span><span class="pct">48%</span><span class="conn-lbl">avançam</span></div>
+        <div class="step-wrap s4">
+          <div class="step win" data-tip="Pacientes que iniciaram ciclo de punção FIV ou coito programado">
+            <span class="lbl">4 · Punção FIV / Coito Prog.</span>
+            <span class="num" data-count="447">0</span>
+          </div>
+        </div>
+        <div class="step-conn win"><span class="arrow">▼</span><span class="pct">70%</span><span class="conn-lbl">das transf.</span></div>
+        <div class="step-wrap s5">
+          <div class="step win" data-tip="Taxa de beta positivo (inclui bioquímica). Média nacional FIV: 40–50%.">
+            <span class="lbl">5 · Beta positivo (gravidez)</span>
+            <span class="num" data-count="70" data-suffix="%">0%</span>
+          </div>
+        </div>
+        <div class="step-conn"><span class="arrow">▼</span></div>
+        <div class="step-wrap s6">
+          <div class="step pending" data-tip="Pacientes que indicam a Paraser para amigas e familiares">
+            <span class="lbl">6 · Embaixadora</span>
+            <span class="num">a medir</span>
+          </div>
+        </div>
       </div>
 
       <div class="funnel-insights">
@@ -730,7 +825,7 @@
         </div>
       </div>
     </div>
-    <p style="margin-top:1.5rem;text-align:center;font-size:12px;color:var(--dim);letter-spacing:.05em">Base 2023–2026 · R$ 116k investidos em Meta Ads · ~R$ 6/lead · dados Feegow + planilha betas · bioquímica contada como positivo</p>
+    <p style="margin-top:.85rem;text-align:center;font-size:12px;color:var(--dim);letter-spacing:.05em">Base 2025–2026 · R$ 116k investidos em Meta Ads · ~R$ 6/lead · dados Feegow + planilha betas · bioquímica contada como positivo</p>
   </section>
 
   <!-- ========== SLIDE 10 — A NARRATIVA ========== -->
@@ -938,9 +1033,19 @@
     else if (e.key === 'Home') show(0);
     else if (e.key === 'End') show(total-1);
   });
-  // click anywhere except buttons to advance
+  // Funil: clique no step foca/desfoca (sem avançar o slide)
+  document.querySelectorAll('.funnel .step').forEach(step => {
+    step.addEventListener('click', e => {
+      e.stopPropagation();
+      const already = step.classList.contains('focused');
+      document.querySelectorAll('.funnel .step.focused').forEach(s => s.classList.remove('focused'));
+      if (!already) step.classList.add('focused');
+    });
+  });
+
+  // click anywhere except buttons/funil to advance
   document.getElementById('stage').addEventListener('click', e => {
-    if (e.target.closest('.nav') || e.target.closest('a, button')) return;
+    if (e.target.closest('.nav') || e.target.closest('a, button') || e.target.closest('.funnel .step')) return;
     show(cur+1);
   });
   show(0);
