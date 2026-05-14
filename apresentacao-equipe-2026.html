@@ -40,24 +40,20 @@
   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800;900&family=Italiana&family=Cormorant:wght@300;400&display=swap');
 
   /* === LOGO INSTITUTO PARASER === */
-  .brand-logo{
-    display:inline-flex; flex-direction:column; align-items:center; gap:.2rem;
-    color:var(--accent); line-height:1;
+  .brand-logo-img{
+    display:block; height:auto; user-select:none; pointer-events:none;
   }
-  .brand-logo .inst{
-    font-family:'Cormorant',serif; font-weight:300;
-    letter-spacing:.55em; text-indent:.55em;
-    font-size:.7em; opacity:.92;
+  .brand-logo-img.lg{ width:clamp(360px,42vw,640px) }
+  .brand-logo-img.md{ width:clamp(260px,28vw,420px) }
+  .brand-logo-img.sm{ width:clamp(180px,18vw,260px) }
+  .brand-icone{
+    position:absolute; top:3vh; right:3vw;
+    width:clamp(46px,4vw,68px); height:auto;
+    opacity:.42; pointer-events:none; user-select:none;
+    transition:opacity .35s;
+    border-radius:50%;
   }
-  .brand-logo .name{
-    font-family:'Italiana','Cormorant',serif; font-weight:400;
-    font-size:1em; letter-spacing:-.01em;
-  }
-  .brand-logo .name .lig{font-style:italic;letter-spacing:-.03em}
-  .brand-logo.lg{font-size:clamp(48px,7vw,96px)}
-  .brand-logo.md{font-size:clamp(28px,3.4vw,46px)}
-  .brand-logo.sm{font-size:clamp(16px,1.6vw,22px)}
-  .brand-logo.mini{font-size:13px}
+  .stage .slide:hover .brand-icone{opacity:.55}
 
   /* === STAGE === */
   .stage{
@@ -73,9 +69,16 @@
       radial-gradient(circle at 10% 80%, rgba(91,36,117,0.20) 0%, transparent 45%);
     pointer-events:none;
   }
-  /* logo persistente no canto */
-  .stage::after{
-    content:''; pointer-events:none;
+  /* slides abertura/fechamento usam fundo na cor exata da marca (combina c/ logo PNG) */
+  .slide.brand-bg{
+    background:var(--brand-purple);
+  }
+  .slide.brand-bg::before{
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 80% 110%, rgba(212,184,136,0.15) 0%, transparent 50%),
+      radial-gradient(circle at 15% -10%, rgba(255,255,255,0.04) 0%, transparent 40%);
+    pointer-events:none;
   }
 
   /* === SLIDE === */
@@ -331,11 +334,9 @@
 <div class="stage" id="stage">
 
   <!-- ========== SLIDE 1 — ABERTURA ========== -->
-  <section class="slide open is-active" data-slide="1">
-    <div class="brand-logo md">
-      <span class="inst">INSTITUTO</span>
-      <span class="name">Para<span class="lig">S</span>er</span>
-    </div>
+  <section class="slide open brand-bg is-active" data-slide="1">
+    <img class="brand-logo-img md" src="logo/paraser-logo.png" alt="Instituto Paraser"
+         style="position:absolute;top:7vh;left:50%;transform:translateX(-50%)">
     <div class="heroline">
       <span class="a">Estamos crescendo.</span><br>
       <span class="b">O melhor</span> <span class="a">ainda está por vir.</span><br>
@@ -569,11 +570,9 @@
   </section>
 
   <!-- ========== SLIDE 12 — FECHAMENTO ========== -->
-  <section class="slide close" data-slide="12">
-    <div class="brand-logo sm" style="margin-bottom:3rem">
-      <span class="inst">INSTITUTO</span>
-      <span class="name">Para<span class="lig">S</span>er</span>
-    </div>
+  <section class="slide close brand-bg" data-slide="12">
+    <img class="brand-logo-img sm" src="logo/paraser-logo.png" alt="Instituto Paraser"
+         style="margin-bottom:2rem">
     <div class="closing">
       Estamos crescendo.<br>
       <span class="grad-text">O melhor</span> ainda está por vir.<br>
@@ -603,6 +602,15 @@
   const total = slides.length;
   document.getElementById('tot').textContent = total;
   let cur = 0;
+  // Adiciona o ícone da marca como watermark nos slides intermediários
+  slides.forEach(s => {
+    if (s.classList.contains('brand-bg')) return; // open/close já tem logo grande
+    const img = document.createElement('img');
+    img.src = 'logo/paraser-icone.png';
+    img.className = 'brand-icone';
+    img.alt = '';
+    s.appendChild(img);
+  });
   function show(idx){
     if (idx < 0) idx = 0;
     if (idx > total-1) idx = total-1;
