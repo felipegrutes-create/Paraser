@@ -1279,11 +1279,12 @@
     // Excedente Rodolfo (262) redistribuído → Priscila chega a 434 → capped 420, overflow 14
     // Excedente Priscila (14) + Rodolfo restante → Marcelle 57, Bruna 25, Mario 7
     // Segmentos: base = projeção simples (sem redistribuição); adicionado = overflow recebido
-    // Caps: Rodolfo 40/mês=480 (overflow 262) + Priscila 15/mês=180 (próprio overflow 30) = 292 total
-    // 292 redistribuídos p/ Marcelle/Bruna/Mario proporcionalmente (23:10:3) → 210, 91, 27
-    const baseProj    = [480, 180,  23, 10,  3];  // projeção base capada
-    const adicionado  = [  0,   0, 187, 81, 24];  // redistribuído dos dois caps
-    // totais:          [480, 180, 210, 91, 27]
+    // Caps: Rodolfo 480 + Priscila 180 + Marcelle 84 (7/mês)
+    // Overflow total: 262+30+126 = 418 → Bruna e Mario absorvem: 188 e 56
+    const baseProj    = [480, 180, 23, 10,  3];  // projeção simples (capped onde aplicável)
+    const adicionado  = [  0,   0, 61,178, 53];  // redistribuído dos caps
+    const capado      = [true, true, true, false, false];
+    // totais:          [480, 180, 84, 188, 56]
 
     new Chart(document.getElementById('chartProj'), {
       type: 'bar',
@@ -1340,17 +1341,16 @@
             }
           },
           datalabels: {
-            // label no dataset 0 quando adicionado=0 (Rodolfo e Priscila); dataset 1 nos demais
+            // label no dataset 0 quando adicionado=0; dataset 1 nos demais (incluindo capados com adição)
             display: ctx => (ctx.datasetIndex === 0 && adicionado[ctx.dataIndex] === 0) ||
                             (ctx.datasetIndex === 1 && adicionado[ctx.dataIndex] > 0),
             anchor: 'end', align: 'end',
-            color: ctx => adicionado[ctx.dataIndex] === 0 ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)',
+            color: ctx => capado[ctx.dataIndex] ? 'rgba(236,212,162,1)' : 'rgba(82,196,138,1)',
             font: { size: 14, weight: '700' },
             padding: { left: 8 },
             formatter: (val, ctx) => {
               const total = baseProj[ctx.dataIndex] + adicionado[ctx.dataIndex];
-              const cap = adicionado[ctx.dataIndex] === 0;
-              return total + '  ·  ' + mês(total) + (cap ? ' ⚠ cap' : '');
+              return total + '  ·  ' + mês(total) + (capado[ctx.dataIndex] ? ' ⚠ cap' : '');
             }
           }
         },
