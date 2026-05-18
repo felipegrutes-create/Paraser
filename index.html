@@ -266,11 +266,20 @@
             margin-bottom: 18px;
         }
 
-        /* Visão Geral — barra de filtros */
+        /* Visão Geral — barra de filtros (sticky) */
         .vg-filtros {
             display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
             background: var(--surface); border: 1px solid var(--border);
             border-radius: 12px; padding: 12px 16px; margin-bottom: 14px;
+            position: sticky; top: 108px; z-index: 50;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+        /* KPIs da Visão Geral acompanham a barra de filtros (sticky logo abaixo) */
+        #sec-vg > .kpi-grid {
+            position: sticky; top: 178px; z-index: 49;
+            background: var(--bg); padding: 8px 0;
+            margin-top: -8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.20);
         }
         .vg-filtros .vg-fl {
             font-size: 13px; font-weight: 700; color: var(--text);
