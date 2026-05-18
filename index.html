@@ -12427,6 +12427,22 @@ GONAPEPTYL,56`;
 
                 loadDonorProfiles();
                 document.getElementById('loadingOverlay').style.display = 'none';
+
+                // === PREFETCH em background ===
+                // Carrega dados das tabs pesadas (Financeiro, Médicos, Contas a Receber)
+                // em paralelo após a UI principal já estar visível. Quando o usuário
+                // clicar nessas tabs, abre instantâneo (cache hit via flags *DataLoaded).
+                // setTimeout 1500ms = dá respiro pro browser pintar a tela principal antes.
+                setTimeout(() => {
+                    Promise.allSettled([
+                        loadAndRenderFinanceiro().catch(e => { console.warn('prefetch Financeiro:', e.message); throw e; }),
+                        loadAndRenderMedicos().catch(e => { console.warn('prefetch Médicos:', e.message); throw e; }),
+                        loadAndRenderCR().catch(e => { console.warn('prefetch CR:', e.message); throw e; })
+                    ]).then(results => {
+                        const ok = results.filter(r => r.status === 'fulfilled').length;
+                        console.log(`✓ Prefetch ${ok}/${results.length} tabs prontas em background`);
+                    });
+                }, 1500);
             } catch(e) {
                 document.getElementById('loadingOverlay').style.display = 'none';
                 const eb = document.getElementById('errorBanner');
