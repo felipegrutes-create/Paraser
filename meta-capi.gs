@@ -328,8 +328,7 @@ function dispatchMetaCapi() {
 // SETUP — rodar 1× pra configurar
 // ================================================================
 function setupMetaCapi() {
-  var ui = SpreadsheetApp.getUi();  // só funciona se rodar da planilha
-  // Como esse script é standalone, prefere abrir prompt via Browser
+  // Standalone script — usa Browser.inputBox (não SpreadsheetApp.getUi)
   var token = Browser.inputBox(
     'Cole o Access Token gerado em Business Manager → Conjuntos de Dados → Leads Paraser → Configurações → Tokens de acesso',
     Browser.Buttons.OK_CANCEL
