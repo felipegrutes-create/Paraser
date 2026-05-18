@@ -5863,9 +5863,11 @@
         // e retorna, por sala, o conjunto de faixas de 30 min ocupadas + a janela do dia + totais.
         function salasComputeDia(rows) {
             const clinicalAreas = SALAS_LAYOUT.filter(s => s.clinical).map(s => s.area);
-            const roomSlots = {}, roomCount = {}; clinicalAreas.forEach(a => { roomSlots[a] = new Set(); roomCount[a] = 0; });
+            const roomSlots = {}, roomCount = {}, roomAppts = {};
+            clinicalAreas.forEach(a => { roomSlots[a] = new Set(); roomCount[a] = 0; roomAppts[a] = []; });
             const daySlots = new Set();
-            const rr = {};
+            const rr = {};       // round-robin por grupo de salas (só dispara na 1ª vez de cada médico no grupo)
+            const medArea = {};  // 'grupo||medico' → area atribuída no dia (médico fica fixo na sala)
             let total = 0;
             rows.map(r => ({ r, hm: (r[gC.hora] || '').trim().slice(0, 5) }))
                 .filter(o => {
@@ -5880,15 +5882,38 @@
                     total++;
                     daySlots.add(o.slot);
                     const t = salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
+                    const med = (o.r[gC.prof] || '').trim();
                     let area;
-                    if (t.length === 1) area = t[0];
-                    else { const k = t.join('|'); const i = (rr[k]||0) % t.length; rr[k] = (rr[k]||0)+1; area = t[i]; }
-                    if (roomSlots[area]) { roomSlots[area].add(o.slot); roomCount[area]++; }
+                    if (t.length === 1) {
+                        area = t[0];
+                    } else {
+                        const k = t.join('|');
+                        const memo = k + '||' + med;
+                        if (medArea[memo]) {
+                            area = medArea[memo];                 // mesma médica já tem sala fixa no dia
+                        } else {
+                            const i = (rr[k]||0) % t.length;       // 1ª vez dessa médica nesse grupo → round-robin
+                            rr[k] = (rr[k]||0) + 1;
+                            area = t[i];
+                            medArea[memo] = area;
+                        }
+                    }
+                    if (roomSlots[area]) {
+                        roomSlots[area].add(o.slot);
+                        roomCount[area]++;
+                        roomAppts[area].push({
+                            pac:  (o.r[gC.pac]  || '').trim(),
+                            prof: med,
+                            proc: (o.r[gC.proc] || '').trim(),
+                            hora: o.hm,
+                            slot: o.slot
+                        });
+                    }
                 });
             const slotsArr = [...daySlots].sort((a,b)=>a-b);
             const win = slotsArr.length ? (slotsArr[slotsArr.length-1] - slotsArr[0]) / 30 + 1 : 0;
             let occ = 0; clinicalAreas.forEach(a => occ += roomSlots[a].size);
-            return { roomSlots, roomCount, slotsArr, win, total, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
+            return { roomSlots, roomCount, roomAppts, slotsArr, win, total, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
         }
 
         // Ocupação média por mês (a partir de TODO o gRaw). Cacheado — gRaw não muda após carregar.
@@ -5948,35 +5973,21 @@
             const dateFmt = dy + '/' + mo + '/' + yr; // DD/MM/YYYY
             const dayRows = gRaw.filter(r => (r[gC.data] || '').trim() === dateFmt);
 
-            // aloca agendamentos do SLOT selecionado nas salas
+            // ===== ALOCAÇÃO ÚNICA DO DIA (médico fixa numa sala o dia inteiro) =====
+            // Usa salasComputeDia que já garante: 1ª vez do médico no grupo → round-robin;
+            // próximas vezes do MESMO médico → mesma sala.
+            const dayComp = salasComputeDia(dayRows);
+            const totalDia = dayComp.total;
+            // Filtra agendamentos do slot selecionado a partir da alocação do dia
             const roomAppts = {}; SALAS_LAYOUT.forEach(s => roomAppts[s.area] = []);
-            const rr = {};   // contadores round-robin (chave = grupo de salas)
-            let totalDia = 0, totalSlot = 0;
-            dayRows.forEach(r => {
-                const hm = (r[gC.hora] || '').trim().slice(0, 5); // HH:MM
-                if (!/^\d{1,2}:\d{2}/.test(hm)) return;
-                const sta = (r[gC.sta] || '').toLowerCase().trim();
-                if (sta.includes('cancelado') || sta.includes('desmarcado')) return; // cancelado não ocupa sala
-                const [hh, mm] = hm.split(':').map(Number);
-                const apptSlot = Math.floor((hh*60 + mm) / 30) * 30;
-                const targets = salasRotaAgendamento(r[gC.prof], r[gC.proc]);
-                if (targets) {
-                    totalDia++;
-                    if (apptSlot === slotMin) {
-                        let area;
-                        if (targets.length === 1) area = targets[0];
-                        else { const k = targets.join('|'); const i = (rr[k]||0) % targets.length; rr[k] = (rr[k]||0)+1; area = targets[i]; }
-                        if (roomAppts[area]) {
-                            roomAppts[area].push({
-                                pac:  (r[gC.pac]  || '').trim(),
-                                prof: (r[gC.prof] || '').trim(),
-                                proc: (r[gC.proc] || '').trim(),
-                                hora: hm
-                            });
-                            totalSlot++;
-                        }
+            let totalSlot = 0;
+            Object.keys(dayComp.roomAppts || {}).forEach(area => {
+                (dayComp.roomAppts[area] || []).forEach(a => {
+                    if (a.slot === slotMin) {
+                        roomAppts[area].push({ pac: a.pac, prof: a.prof, proc: a.proc, hora: a.hora });
+                        totalSlot++;
                     }
-                }
+                });
             });
 
             const escAttr = s => (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -6004,42 +6015,11 @@
                 return `<div class="${cls}" style="grid-area:${s.area}" title="${escAttr(tip)}">${inner}</div>`;
             }).join('');
 
-            // ===== OCUPAÇÃO DO DIA INTEIRO (mesmo cálculo da planta) =====
-            const dayComp  = salasComputeDia(dayRows);
+            // ===== OCUPAÇÃO DO DIA INTEIRO (usa a mesma alocação coerente da planta) =====
             const roomSlots = dayComp.roomSlots, slotsArr = dayComp.slotsArr;
             const dayWindow = dayComp.win || 1;
             const dayPct   = dayComp.cap ? Math.round(dayComp.occ / dayComp.cap * 100) : 0;
-
-            // === Alocação completa do DIA por sala (pra modal de drilldown) ===
-            // Replica o round-robin de salasComputeDia, mas guarda a lista de agendamentos
-            const dayRoomAppts = {}; SALAS_LAYOUT.forEach(s => dayRoomAppts[s.area] = []);
-            {
-                const rr2 = {};
-                dayRows.map(r => ({ r, hm: (r[gC.hora] || '').trim().slice(0, 5) }))
-                    .filter(o => {
-                        if (!/^\d{1,2}:\d{2}/.test(o.hm)) return false;
-                        const sta = (o.r[gC.sta] || '').toLowerCase().trim();
-                        if (sta.includes('cancelado') || sta.includes('desmarcado')) return false;
-                        return !!salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
-                    })
-                    .map(o => { const [hh, mm] = o.hm.split(':').map(Number); o.slot = Math.floor((hh*60+mm)/30)*30; return o; })
-                    .sort((a, b) => a.slot - b.slot || a.hm.localeCompare(b.hm))
-                    .forEach(o => {
-                        const t = salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
-                        let area;
-                        if (t.length === 1) area = t[0];
-                        else { const k = t.join('|'); const i = (rr2[k]||0) % t.length; rr2[k] = (rr2[k]||0)+1; area = t[i]; }
-                        if (dayRoomAppts[area]) {
-                            dayRoomAppts[area].push({
-                                pac:  (o.r[gC.pac]  || '').trim(),
-                                prof: (o.r[gC.prof] || '').trim(),
-                                proc: (o.r[gC.proc] || '').trim(),
-                                hora: o.hm,
-                                slot: o.slot
-                            });
-                        }
-                    });
-            }
+            const dayRoomAppts = dayComp.roomAppts;   // já tem médico fixo por sala no dia
 
             let topRoom = null, topPct = -1, topRoomArea = null;
             const heatCells = SALAS_LAYOUT.map(s => {
