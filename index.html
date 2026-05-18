@@ -266,6 +266,27 @@
             margin-bottom: 18px;
         }
 
+        /* Visão Geral — barra de filtros */
+        .vg-filtros {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px 16px; margin-bottom: 14px;
+        }
+        .vg-filtros .vg-fl {
+            font-size: 13px; font-weight: 700; color: var(--text);
+            letter-spacing: 0.02em;
+        }
+        .vg-filtros select {
+            background: var(--bg); border: 1px solid var(--border); color: var(--text);
+            padding: 7px 10px; border-radius: 8px; font-size: 13px;
+            min-width: 130px; cursor: pointer;
+        }
+        .vg-filtros select:hover { border-color: var(--accent); }
+        .vg-filtros .vg-fl-resumo {
+            margin-left: auto; font-size: 12px; color: var(--muted);
+            font-style: italic;
+        }
+
         .kpi-card {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -2558,6 +2579,20 @@
 
         <!-- VISÃO GERAL -->
         <section id="sec-vg" class="section active">
+            <!-- Barra de filtros -->
+            <div class="vg-filtros">
+                <label class="vg-fl">📅 Período:</label>
+                <select id="vgFiltroModo" onchange="_vgSetModo()">
+                    <option value="todos">Todos os meses</option>
+                    <option value="mes">Mês específico</option>
+                    <option value="periodo">Intervalo (de → até)</option>
+                </select>
+                <select id="vgMesUnico" onchange="_vgRender()" style="display:none"></select>
+                <select id="vgPeriodoIni" onchange="_vgRender()" style="display:none"></select>
+                <span id="vgPeriodoSep" style="display:none;color:var(--muted);font-weight:600">→</span>
+                <select id="vgPeriodoFim" onchange="_vgRender()" style="display:none"></select>
+                <span id="vgFiltroResumo" class="vg-fl-resumo"></span>
+            </div>
             <div class="kpi-grid">
                 <div class="kpi-card">
                     <div class="value" id="vg-total">—</div>
@@ -5070,8 +5105,237 @@
             const mesLabel = mesNomes[nowDate.getMonth()] + '/' + nowDate.getFullYear();
             set("headerSubtitle", `${mesLabel} · ${fmt(mesAgend)} agendamentos · ${fmt(mesVez)} consultas 1ª vez`);
             set("footerInfo",     `Sistema Integrado Paraser · Dados em ${todayStr} · Fonte: Google Sheets`);
+
+            // Inicializa filtros da Visão Geral (popula dropdowns + resumo)
+            _vgInit();
+            _vgUpdateResumo(gRaw);
         }
 
+
+        // ===================== VISÃO GERAL — FILTROS =====================
+        let _vgAllMonths = [];   // ['2025-01', '2025-02', ...] em ordem crescente
+
+        function _vgMonthLabelFull(mk) {
+            const [yr, mo] = mk.split('-');
+            const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            return nomes[parseInt(mo)-1] + '/' + yr;
+        }
+
+        function _vgInit() {
+            if (!gRaw || !gRaw.length || !gC) return;
+            // Coletar meses existentes a partir de gRaw
+            const set = new Set();
+            gRaw.forEach(r => { const mk = monthKey(r[gC.data]); if (mk) set.add(mk); });
+            _vgAllMonths = [...set].sort();
+            const opts = _vgAllMonths.map(mk => `<option value="${mk}">${_vgMonthLabelFull(mk)}</option>`).join('');
+            const lastMk = _vgAllMonths[_vgAllMonths.length - 1] || '';
+            const firstMk = _vgAllMonths[0] || '';
+            const elMes = document.getElementById('vgMesUnico');
+            const elIni = document.getElementById('vgPeriodoIni');
+            const elFim = document.getElementById('vgPeriodoFim');
+            if (elMes) { elMes.innerHTML = opts; elMes.value = lastMk; }
+            if (elIni) { elIni.innerHTML = opts; elIni.value = firstMk; }
+            if (elFim) { elFim.innerHTML = opts; elFim.value = lastMk; }
+        }
+
+        function _vgSetModo() {
+            const modo = document.getElementById('vgFiltroModo').value;
+            const elMes = document.getElementById('vgMesUnico');
+            const elIni = document.getElementById('vgPeriodoIni');
+            const elSep = document.getElementById('vgPeriodoSep');
+            const elFim = document.getElementById('vgPeriodoFim');
+            elMes.style.display = modo === 'mes' ? '' : 'none';
+            elIni.style.display = modo === 'periodo' ? '' : 'none';
+            elSep.style.display = modo === 'periodo' ? '' : 'none';
+            elFim.style.display = modo === 'periodo' ? '' : 'none';
+            _vgRender();
+        }
+
+        function _vgFiltrarRaw() {
+            if (!gRaw || !gC) return [];
+            const modo = document.getElementById('vgFiltroModo').value;
+            if (modo === 'todos') return gRaw;
+            if (modo === 'mes') {
+                const mk = document.getElementById('vgMesUnico').value;
+                return gRaw.filter(r => monthKey(r[gC.data]) === mk);
+            }
+            if (modo === 'periodo') {
+                let ini = document.getElementById('vgPeriodoIni').value;
+                let fim = document.getElementById('vgPeriodoFim').value;
+                if (ini > fim) { const tmp = ini; ini = fim; fim = tmp; }
+                return gRaw.filter(r => {
+                    const mk = monthKey(r[gC.data]);
+                    return mk && mk >= ini && mk <= fim;
+                });
+            }
+            return gRaw;
+        }
+
+        function _vgStatusLabel(r) {
+            const s = (r[gC.sta] || '').toLowerCase().trim();
+            if (s === 'atendido') return 'atendido';
+            if (s.includes('não compareceu') || s.includes('nao compareceu')) return 'nao_compareceu';
+            if (s.includes('desmarcado') || s.includes('cancelado')) return 'cancelado';
+            if (s.includes('aguardando') || s.includes('marcado') || s.includes('confirmado') || s.includes('em atend')) return 'aguardando';
+            return 'outros';
+        }
+
+        function _vgUpdateResumo(raw) {
+            const el = document.getElementById('vgFiltroResumo');
+            if (!el) return;
+            const modo = document.getElementById('vgFiltroModo').value;
+            let txt = '';
+            if (modo === 'todos')      txt = `${raw.length.toLocaleString('pt-BR')} agendamentos (todos os meses)`;
+            else if (modo === 'mes')   txt = `${raw.length.toLocaleString('pt-BR')} agendamentos em ${_vgMonthLabelFull(document.getElementById('vgMesUnico').value)}`;
+            else if (modo === 'periodo') {
+                let ini = document.getElementById('vgPeriodoIni').value;
+                let fim = document.getElementById('vgPeriodoFim').value;
+                if (ini > fim) { const tmp = ini; ini = fim; fim = tmp; }
+                txt = `${raw.length.toLocaleString('pt-BR')} agendamentos · ${_vgMonthLabelFull(ini)} → ${_vgMonthLabelFull(fim)}`;
+            }
+            el.textContent = txt;
+        }
+
+        function _vgRender() {
+            if (!gRaw || !gC) return;
+            const raw = _vgFiltrarRaw();
+            _vgUpdateResumo(raw);
+
+            // Recalcula agregações sobre o subset
+            const allByMonth = {};
+            const allByProf  = {};
+            const allStatus  = { atendido:0, nao_compareceu:0, cancelado:0, aguardando:0, outros:0 };
+            raw.forEach(r => {
+                const mk = monthKey(r[gC.data]);
+                const pr = r[gC.prof] || 'Outros';
+                const s  = _vgStatusLabel(r);
+                if (mk) {
+                    if (!allByMonth[mk]) allByMonth[mk] = { total:0, atendido:0, cancelado:0, nao_comp:0, aguardando:0 };
+                    allByMonth[mk].total++;
+                    if (s==='atendido')        allByMonth[mk].atendido++;
+                    if (s==='cancelado')       allByMonth[mk].cancelado++;
+                    if (s==='nao_compareceu')  allByMonth[mk].nao_comp++;
+                    if (s==='aguardando')      allByMonth[mk].aguardando++;
+                }
+                allByProf[pr] = (allByProf[pr] || 0) + 1;
+                allStatus[s]++;
+            });
+
+            // 1ª vez no subset
+            const vezRows = raw.filter(r => {
+                if (!r[gC.proc]) return false;
+                const proc = r[gC.proc].trim().toLowerCase().replace(/\s+/g, ' ');
+                if (proc.includes('vez')) return true;
+                const prof = (r[gC.prof] || '').trim().toLowerCase();
+                if (proc === 'consulta - presencial') return (typeof CONSULTA_PRESENCIAL_PROFS !== 'undefined') && CONSULTA_PRESENCIAL_PROFS.some(p => prof.includes(p));
+                return false;
+            });
+
+            const vgTotal   = raw.length;
+            const vgAtend   = allStatus.atendido;
+            const vgNaocomp = allStatus.nao_compareceu;
+            const vgCancel  = allStatus.cancelado;
+            const vgAguard  = allStatus.aguardando + allStatus.outros;
+
+            set('vg-total',   fmt(vgTotal));
+            set('vg-atend',   `${fmt(vgAtend)} (${pct(vgAtend, vgTotal)})`);
+            set('vg-naocomp', `${fmt(vgNaocomp)} (${pct(vgNaocomp, vgTotal)})`);
+            set('vg-cancel',  `${fmt(vgCancel)} (${pct(vgCancel, vgTotal)})`);
+            set('vg-aguard',  fmt(vgAguard));
+            set('vg-vez',     fmt(vezRows.length));
+
+            // Evolução mensal (barras empilhadas)
+            const allMonthsSorted = Object.keys(allByMonth).sort();
+            mkChart('monthAll', {
+                type: 'bar',
+                data: {
+                    labels: allMonthsSorted.map(monthLabel),
+                    datasets: [
+                        { label:'Atendidos',      data: allMonthsSorted.map(m=>allByMonth[m].atendido),  backgroundColor: C_TEAL,  stack:'s' },
+                        { label:'Cancelados',     data: allMonthsSorted.map(m=>allByMonth[m].cancelado), backgroundColor: C_RED,   stack:'s' },
+                        { label:'Não compareceu', data: allMonthsSorted.map(m=>allByMonth[m].nao_comp),  backgroundColor: C_AMBER, stack:'s' },
+                        { label:'Aguardando',     data: allMonthsSorted.map(m=>allByMonth[m].aguardando),backgroundColor: C_SLATE, stack:'s' }
+                    ]
+                },
+                options: { responsive:true, plugins:{ legend:{ position:'top' } }, scales:{ x:{ stacked:true }, y:{ stacked:true } } }
+            });
+
+            // Por profissional
+            const profEntries = Object.entries(allByProf).sort((a,b)=>b[1]-a[1]).slice(0,8);
+            mkChart('profAll', barHoriz(profEntries.map(e=>e[0]), profEntries.map(e=>e[1]), 'Agendamentos'));
+
+            // Donut status
+            mkChart('statusAll', {
+                type: 'doughnut',
+                data: {
+                    labels:   ['Atendido','Cancelado','Não Compareceu','Aguardando'],
+                    datasets: [{ data:[vgAtend,vgCancel,vgNaocomp,vgAguard], backgroundColor:[C_TEAL,C_RED,C_AMBER,C_SLATE], borderWidth:0 }]
+                },
+                options: { responsive:true, plugins:{ legend:{ position:'right' } }, cutout:'65%' }
+            });
+
+            // Procedimentos por profissional
+            const profProcMap = {};
+            raw.forEach(r => {
+                const pr = r[gC.prof] || 'Outros';
+                const pc = (r[gC.proc] || 'Não informado').trim();
+                if (!profProcMap[pr]) profProcMap[pr] = {};
+                profProcMap[pr][pc] = (profProcMap[pr][pc] || 0) + 1;
+            });
+            const profProcGrid = document.getElementById('profProcGrid');
+            if (profProcGrid) {
+                const profsOrd = Object.keys(profProcMap).sort((a,b) =>
+                    Object.values(profProcMap[b]).reduce((s,v)=>s+v,0) -
+                    Object.values(profProcMap[a]).reduce((s,v)=>s+v,0)
+                );
+                profProcGrid.innerHTML = profsOrd.map(prof => {
+                    const procs = Object.entries(profProcMap[prof]).sort((a,b)=>b[1]-a[1]);
+                    const total = procs.reduce((s,[,v])=>s+v, 0);
+                    const rows  = procs.slice(0, 8).map(([name, cnt]) => {
+                        const p = ((cnt/total)*100).toFixed(0);
+                        return `<div class="proc-row">
+                            <span class="proc-name" title="${name}">${name}</span>
+                            <div class="proc-bar-wrap"><div class="proc-bar" style="width:${p}%"></div></div>
+                            <span class="proc-count">${fmt(cnt)}</span>
+                        </div>`;
+                    }).join('');
+                    return `<div class="prof-proc-card">
+                        <div class="prof-proc-header">
+                            <span>${prof}</span>
+                            <span class="prof-proc-total">${fmt(total)}</span>
+                        </div>
+                        ${rows}
+                    </div>`;
+                }).join('');
+            }
+
+            // Receita por profissional
+            const receitaProf = {};
+            raw.forEach(r => {
+                if ((r[gC.sta]||'').toLowerCase().trim() !== 'atendido') return;
+                const pr  = r[gC.prof] || 'Outros';
+                const vs  = String(r[gC.val] || '').replace(/[^\d,\.]/g,'').replace(',','.');
+                const val = parseFloat(vs) || 0;
+                if (!receitaProf[pr]) receitaProf[pr] = { atend:0, total:0 };
+                receitaProf[pr].atend++;
+                receitaProf[pr].total += val;
+            });
+            const recTbl = document.getElementById('receitaProfTable');
+            if (recTbl) {
+                const fmtR = v => v > 0 ? 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 }) : '—';
+                recTbl.innerHTML = Object.entries(receitaProf)
+                    .sort((a,b) => b[1].total - a[1].total)
+                    .map(([prof, { atend, total }]) => {
+                        const ticket = atend > 0 ? total / atend : 0;
+                        return `<tr>
+                            <td><strong>${prof}</strong></td>
+                            <td>${fmt(atend)}</td>
+                            <td style="color:var(--success);font-weight:600">${fmtR(total)}</td>
+                            <td style="color:var(--muted)">${fmtR(ticket)}</td>
+                        </tr>`;
+                    }).join('');
+            }
+        }
 
         // ===================== UTILS =====================
         function set(id, val) { const el=document.getElementById(id); if (el) el.textContent=val; }
