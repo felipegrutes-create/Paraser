@@ -2373,12 +2373,83 @@
             margin: 26px 0 10px;
         }
         .salas-room-heat {
-            cursor: help; position: relative;
+            cursor: pointer; position: relative;
         }
-        .salas-room-heat:hover { transform: scale(1.02); }
+        .salas-room-heat:hover { transform: scale(1.02); filter: brightness(1.15); }
         .salas-room-heat .salas-room-name { color: #fda4af; }
-        .salas-room-heat-empty { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.30); cursor: help; }
-        .salas-room-heat-empty:hover { transform: scale(1.02); }
+        .salas-room-heat-empty { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.30); cursor: pointer; }
+        .salas-room-heat-empty:hover { transform: scale(1.02); filter: brightness(1.15); }
+
+        /* Modal de detalhe por médico — Mapa de Salas */
+        .salas-detail-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px); z-index: 9998;
+            display: flex; align-items: center; justify-content: center;
+            animation: salas-fade-in .18s ease-out;
+        }
+        @keyframes salas-fade-in { from { opacity:0 } to { opacity:1 } }
+        .salas-detail-modal {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+            width: min(820px, 92vw); max-height: 86vh; overflow: hidden;
+            display: flex; flex-direction: column;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.55);
+        }
+        .salas-detail-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            background: linear-gradient(90deg, rgba(239,68,68,0.08), rgba(239,68,68,0.02));
+        }
+        .salas-detail-head.empty { background: linear-gradient(90deg, rgba(16,185,129,0.08), rgba(16,185,129,0.02)); }
+        .salas-detail-title { font-size: 17px; font-weight: 800; color: var(--text); }
+        .salas-detail-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+        .salas-detail-close {
+            background: transparent; border: 1px solid var(--border); color: var(--text);
+            cursor: pointer; padding: 6px 12px; border-radius: 8px; font-size: 14px; font-weight: 700;
+        }
+        .salas-detail-close:hover { background: rgba(255,255,255,0.06); }
+        .salas-detail-body {
+            padding: 16px 20px; overflow-y: auto;
+        }
+        .salas-detail-kpis {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px; margin-bottom: 16px;
+        }
+        .salas-detail-kpi {
+            background: rgba(255,255,255,0.025); border: 1px solid var(--border);
+            border-radius: 10px; padding: 10px 12px;
+        }
+        .salas-detail-kpi-num { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1; }
+        .salas-detail-kpi-lab { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .salas-detail-medico {
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+        }
+        .salas-detail-medico-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            margin-bottom: 8px;
+        }
+        .salas-detail-medico-nome { font-size: 14px; font-weight: 700; color: var(--text); }
+        .salas-detail-medico-meta { font-size: 11px; color: var(--muted); }
+        .salas-detail-medico-bar {
+            height: 6px; background: rgba(255,255,255,0.05); border-radius: 999px; overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .salas-detail-medico-bar-fill {
+            height: 100%; background: linear-gradient(90deg, #f59e0b, #ef4444);
+            border-radius: 999px;
+        }
+        .salas-detail-appt {
+            display: grid; grid-template-columns: 60px 1fr 1fr;
+            gap: 8px; padding: 6px 0; border-top: 1px dashed rgba(255,255,255,0.05);
+            font-size: 12px;
+        }
+        .salas-detail-appt:first-child { border-top: 0; }
+        .salas-detail-appt-hora { font-weight: 700; color: var(--text); }
+        .salas-detail-appt-pac { color: var(--text); }
+        .salas-detail-appt-proc { color: var(--muted); }
+        .salas-detail-empty {
+            text-align: center; padding: 30px 10px; color: var(--muted); font-size: 13px;
+        }
         .salas-room-heat-empty .salas-room-name { color: #10b981; }
         .salas-room-heat-val { font-size: 14px; font-weight: 800; color: #fecaca; }
         .salas-room-heat-empty .salas-room-heat-val { color: #10b981; font-weight: 600; font-size: 11px; }
@@ -5938,6 +6009,38 @@
             const roomSlots = dayComp.roomSlots, slotsArr = dayComp.slotsArr;
             const dayWindow = dayComp.win || 1;
             const dayPct   = dayComp.cap ? Math.round(dayComp.occ / dayComp.cap * 100) : 0;
+
+            // === Alocação completa do DIA por sala (pra modal de drilldown) ===
+            // Replica o round-robin de salasComputeDia, mas guarda a lista de agendamentos
+            const dayRoomAppts = {}; SALAS_LAYOUT.forEach(s => dayRoomAppts[s.area] = []);
+            {
+                const rr2 = {};
+                dayRows.map(r => ({ r, hm: (r[gC.hora] || '').trim().slice(0, 5) }))
+                    .filter(o => {
+                        if (!/^\d{1,2}:\d{2}/.test(o.hm)) return false;
+                        const sta = (o.r[gC.sta] || '').toLowerCase().trim();
+                        if (sta.includes('cancelado') || sta.includes('desmarcado')) return false;
+                        return !!salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
+                    })
+                    .map(o => { const [hh, mm] = o.hm.split(':').map(Number); o.slot = Math.floor((hh*60+mm)/30)*30; return o; })
+                    .sort((a, b) => a.slot - b.slot || a.hm.localeCompare(b.hm))
+                    .forEach(o => {
+                        const t = salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
+                        let area;
+                        if (t.length === 1) area = t[0];
+                        else { const k = t.join('|'); const i = (rr2[k]||0) % t.length; rr2[k] = (rr2[k]||0)+1; area = t[i]; }
+                        if (dayRoomAppts[area]) {
+                            dayRoomAppts[area].push({
+                                pac:  (o.r[gC.pac]  || '').trim(),
+                                prof: (o.r[gC.prof] || '').trim(),
+                                proc: (o.r[gC.proc] || '').trim(),
+                                hora: o.hm,
+                                slot: o.slot
+                            });
+                        }
+                    });
+            }
+
             let topRoom = null, topPct = -1, topRoomArea = null;
             const heatCells = SALAS_LAYOUT.map(s => {
                 if (!s.clinical) {
@@ -5947,15 +6050,15 @@
                 const pct = Math.round(occ / dayWindow * 100);
                 if (pct > topPct) { topPct = pct; topRoom = s.nome; topRoomArea = s.area; }
                 if (occ === 0) {
-                    return `<div class="salas-room salas-room-heat-empty" style="grid-area:${s.area}" title="${escAttr(s.nome+'\nSem uso neste dia')}">
+                    return `<div class="salas-room salas-room-heat-empty" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}" title="${escAttr(s.nome+'\nSem uso neste dia · clique para ver detalhe')}">
                         <div class="salas-room-name">${s.nome}</div><div class="salas-room-heat-val">livre o dia</div></div>`;
                 }
                 const ratio = Math.min(1, occ / dayWindow);
                 const alpha = (0.16 + 0.64 * ratio).toFixed(3);   // mais ocupado = vermelho mais vivo
                 const bg = `linear-gradient(to top, rgba(239,68,68,${alpha}) ${pct}%, rgba(255,255,255,0.025) ${pct}%)`;
                 const bc = pct >= 60 ? 'rgba(239,68,68,0.65)' : pct >= 30 ? 'rgba(239,68,68,0.45)' : 'rgba(239,68,68,0.28)';
-                const tip = `${s.nome}\n${occ} de ${dayWindow} faixas de 30 min ocupadas (${pct}% do dia)`;
-                return `<div class="salas-room salas-room-heat" style="grid-area:${s.area}; background:${bg}; border-color:${bc};" title="${escAttr(tip)}">
+                const tip = `${s.nome}\n${occ} de ${dayWindow} faixas de 30 min ocupadas (${pct}% do dia)\nClique para ver detalhe por médico`;
+                return `<div class="salas-room salas-room-heat" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}; background:${bg}; border-color:${bc};" title="${escAttr(tip)}">
                     <div class="salas-room-name">${s.nome}</div>
                     <div class="salas-room-heat-val">${pct}%<span class="salas-room-prof"> · ${occ} faixa${occ===1?'':'s'}</span></div>
                 </div>`;
@@ -6042,12 +6145,122 @@
                     <span>Salas clínicas agora: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
                 </div>
                 ${execHTML}
-                <div class="salas-heat-title">📊 Mapa de ocupação do dia inteiro — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(quanto mais cheia/viva a sala, mais tempo ficou ocupada)</span></div>
-                <div class="salas-fp-wrap"><div class="salas-floorplan">${heatCells}</div></div>
+                <div class="salas-heat-title">📊 Mapa de ocupação do dia inteiro — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(quanto mais cheia/viva a sala, mais tempo ficou ocupada · <b>clique numa sala para ver detalhe por médico</b>)</span></div>
+                <div class="salas-fp-wrap" id="salas-heat-wrap"><div class="salas-floorplan">${heatCells}</div></div>
                 <div class="salas-summary">
                     <span>Janela do dia: <b>${dayWindow} faixas de 30 min</b>${slotsArr.length?` (${janelaTxt})`:''}</span>
                     ${slotsArr.length ? `<span>Sala mais ocupada: <b style="color:#ef4444">${topRoom} (${topPct}%)</b></span>` : ''}
                 </div>`;
+
+            // === handler de click no mapa de ocupação → abre modal de detalhe por médico ===
+            const heatWrap = document.getElementById('salas-heat-wrap');
+            if (heatWrap) {
+                heatWrap.addEventListener('click', e => {
+                    const cell = e.target.closest('[data-heat-area]');
+                    if (!cell) return;
+                    const area = cell.getAttribute('data-heat-area');
+                    const sala = SALAS_LAYOUT.find(s => s.area === area);
+                    if (!sala || !sala.clinical) return;
+                    openSalaDayDetail(sala, dayRoomAppts[area] || [], dayWindow, roomSlots[area] || new Set(), dayLabel);
+                });
+            }
+        }
+
+        // === Modal: detalhe por médico de uma sala no dia inteiro ===
+        function openSalaDayDetail(sala, appts, dayWindow, slotsSet, dayLabel) {
+            // fecha modal antigo se houver
+            const old = document.getElementById('salas-detail-backdrop');
+            if (old) old.remove();
+
+            const occ = slotsSet.size;
+            const pct = dayWindow ? Math.round(occ / dayWindow * 100) : 0;
+
+            // agrupa por médico
+            const byMed = {};   // nome → { appts:[], slots:Set }
+            appts.forEach(a => {
+                const med = a.prof || '(sem médico)';
+                if (!byMed[med]) byMed[med] = { appts: [], slots: new Set() };
+                byMed[med].appts.push(a);
+                byMed[med].slots.add(a.slot);
+            });
+            const medList = Object.keys(byMed).map(med => ({
+                nome: med,
+                appts: byMed[med].appts.sort((a,b)=>a.hora.localeCompare(b.hora)),
+                qtd:  byMed[med].appts.length,
+                faixas: byMed[med].slots.size
+            })).sort((a,b) => b.qtd - a.qtd || b.faixas - a.faixas);
+
+            const escAttr2 = s => (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+            const isEmpty = appts.length === 0;
+
+            const medicosHTML = isEmpty
+                ? `<div class="salas-detail-empty">Sala sem atendimentos neste dia.</div>`
+                : medList.map(m => {
+                    const pctMed = dayWindow ? Math.round(m.faixas / dayWindow * 100) : 0;
+                    const apptsHTML = m.appts.map(a => `
+                        <div class="salas-detail-appt">
+                            <div class="salas-detail-appt-hora">${a.hora}</div>
+                            <div class="salas-detail-appt-pac">${escAttr2(a.pac)}</div>
+                            <div class="salas-detail-appt-proc">${escAttr2(a.proc)}</div>
+                        </div>`).join('');
+                    return `<div class="salas-detail-medico">
+                        <div class="salas-detail-medico-head">
+                            <div class="salas-detail-medico-nome">${escAttr2(m.nome)}</div>
+                            <div class="salas-detail-medico-meta">${m.qtd} atend. · ${m.faixas} faixa${m.faixas===1?'':'s'} (${pctMed}% do dia)</div>
+                        </div>
+                        <div class="salas-detail-medico-bar"><div class="salas-detail-medico-bar-fill" style="width:${pctMed}%"></div></div>
+                        ${apptsHTML}
+                    </div>`;
+                }).join('');
+
+            const html = `
+                <div class="salas-detail-backdrop" id="salas-detail-backdrop">
+                    <div class="salas-detail-modal" role="dialog" aria-modal="true">
+                        <div class="salas-detail-head ${isEmpty?'empty':''}">
+                            <div>
+                                <div class="salas-detail-title">${escAttr2(sala.nome)}</div>
+                                <div class="salas-detail-sub">${dayLabel} · ${occ} de ${dayWindow} faixas ocupadas (${pct}% do dia)</div>
+                            </div>
+                            <button class="salas-detail-close" id="salas-detail-close" title="Fechar (Esc)">✕ Fechar</button>
+                        </div>
+                        <div class="salas-detail-body">
+                            <div class="salas-detail-kpis">
+                                <div class="salas-detail-kpi">
+                                    <div class="salas-detail-kpi-num">${appts.length}</div>
+                                    <div class="salas-detail-kpi-lab">Atendimentos</div>
+                                </div>
+                                <div class="salas-detail-kpi">
+                                    <div class="salas-detail-kpi-num">${medList.length}</div>
+                                    <div class="salas-detail-kpi-lab">Médico${medList.length===1?'':'s'}</div>
+                                </div>
+                                <div class="salas-detail-kpi">
+                                    <div class="salas-detail-kpi-num">${occ}</div>
+                                    <div class="salas-detail-kpi-lab">Faixas ocupadas</div>
+                                </div>
+                                <div class="salas-detail-kpi">
+                                    <div class="salas-detail-kpi-num" style="color:${pct>=60?'#ef4444':pct>=30?'#f59e0b':'#10b981'}">${pct}%</div>
+                                    <div class="salas-detail-kpi-lab">Ocupação do dia</div>
+                                </div>
+                            </div>
+                            ${medicosHTML}
+                        </div>
+                    </div>
+                </div>`;
+            const wrap = document.createElement('div');
+            wrap.innerHTML = html;
+            document.body.appendChild(wrap.firstElementChild);
+
+            const close = () => {
+                const el = document.getElementById('salas-detail-backdrop');
+                if (el) el.remove();
+                document.removeEventListener('keydown', onKey);
+            };
+            const onKey = e => { if (e.key === 'Escape') close(); };
+            document.getElementById('salas-detail-close').addEventListener('click', close);
+            document.getElementById('salas-detail-backdrop').addEventListener('click', e => {
+                if (e.target.id === 'salas-detail-backdrop') close();
+            });
+            document.addEventListener('keydown', onKey);
         }
 
         // ===================== DOADORAS/RECEPTORAS =====================
