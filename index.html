@@ -2750,7 +2750,7 @@
             <!-- MAPA DE PROFISSIONAIS -->
             <div class="table-card" style="margin-top:20px">
                 <h3 style="display:flex;justify-content:space-between;align-items:center">
-                    👨‍⚕️ Mapa de Profissionais — Mês Atual
+                    👨‍⚕️ Mapa de Profissionais — <span id="profMapTitleSuffix">Mês Atual</span>
                     <span id="profMapMonth" style="font-size:12px;font-weight:600;color:var(--muted)"></span>
                 </h3>
                 <div id="profMapGrid" class="prof-map-grid"></div>
@@ -5115,9 +5115,9 @@
             set("headerSubtitle", `${mesLabel} · ${fmt(mesAgend)} agendamentos · ${fmt(mesVez)} consultas 1ª vez`);
             set("footerInfo",     `Sistema Integrado Paraser · Dados em ${todayStr} · Fonte: Google Sheets`);
 
-            // Inicializa filtros da Visão Geral (popula dropdowns + resumo)
+            // Inicializa filtros da Visão Geral (popula dropdowns + render inicial)
             _vgInit();
-            _vgUpdateResumo(gRaw);
+            _vgRender();
         }
 
 
@@ -5343,6 +5343,111 @@
                             <td style="color:var(--muted)">${fmtR(ticket)}</td>
                         </tr>`;
                     }).join('');
+            }
+
+            // === MAPA DE PROFISSIONAIS (acompanha o filtro) ===
+            const profMapMonthEl = document.getElementById('profMapMonth');
+            const profMapTitleSuffix = document.getElementById('profMapTitleSuffix');
+            const mNamesShort = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            const modoFiltro = document.getElementById('vgFiltroModo').value;
+            let labelMapa = '', titleSuffix = '';
+            if (modoFiltro === 'todos') {
+                labelMapa = `${_vgAllMonths.length} meses`;
+                titleSuffix = 'Todos os meses';
+            } else if (modoFiltro === 'mes') {
+                const mk = document.getElementById('vgMesUnico').value;
+                const [yr, mo] = mk.split('-');
+                labelMapa = mNamesShort[parseInt(mo)-1] + '/' + yr;
+                titleSuffix = _vgMonthLabelFull(mk);
+            } else if (modoFiltro === 'periodo') {
+                let ini = document.getElementById('vgPeriodoIni').value;
+                let fim = document.getElementById('vgPeriodoFim').value;
+                if (ini > fim) { const tmp = ini; ini = fim; fim = tmp; }
+                const [yi, mi] = ini.split('-'), [yf, mf] = fim.split('-');
+                labelMapa = `${mNamesShort[parseInt(mi)-1]}/${yi} → ${mNamesShort[parseInt(mf)-1]}/${yf}`;
+                titleSuffix = labelMapa;
+            }
+            if (profMapMonthEl) profMapMonthEl.textContent = labelMapa;
+            if (profMapTitleSuffix) profMapTitleSuffix.textContent = titleSuffix;
+
+            const profMap = {};
+            raw.forEach(r => {
+                const pr = (r[gC.prof] || 'Outros').trim();
+                const s = (r[gC.sta]||'').toLowerCase().trim();
+                if (!profMap[pr]) profMap[pr] = { total:0, atendido:0, pv:0, retorno:0, receita:0, naoComp:0, cancel:0 };
+                profMap[pr].total++;
+                if (s === 'atendido') profMap[pr].atendido++;
+                if (s.includes('não compareceu') || s.includes('nao compareceu')) profMap[pr].naoComp++;
+                if (s.includes('cancelado') || s.includes('desmarcado')) profMap[pr].cancel++;
+            });
+            // 1ª vez por profissional (no subset filtrado)
+            const doaExcludeMap = ['cancelado','desmarcado','remarcado'];
+            vezRows.forEach(r => {
+                const s = (r[gC.sta]||'').toLowerCase().trim();
+                if (doaExcludeMap.includes(s)) return;
+                const proc = (r[gC.proc]||'').toLowerCase().trim();
+                if (!proc.includes('vez')) return;
+                const pr = (r[gC.prof] || 'Outros').trim();
+                if (!profMap[pr]) profMap[pr] = { total:0, atendido:0, pv:0, retorno:0, receita:0, naoComp:0, cancel:0 };
+                profMap[pr].pv++;
+            });
+            // Receita por profissional (atendidos)
+            raw.forEach(r => {
+                if ((r[gC.sta]||'').toLowerCase().trim() !== 'atendido') return;
+                const pr = (r[gC.prof] || 'Outros').trim();
+                const vs = String(r[gC.val]||'').replace(/[^\d,\.]/g,'');
+                let v = vs; if (v.includes(',')) v = v.replace(/\./g,'').replace(',','.');
+                const val = parseFloat(v) || 0;
+                if (!profMap[pr]) profMap[pr] = { total:0, atendido:0, pv:0, retorno:0, receita:0, naoComp:0, cancel:0 };
+                profMap[pr].receita += val;
+            });
+            Object.values(profMap).forEach(p => { p.retorno = Math.max(0, p.atendido - p.pv); });
+
+            const profMapEl = document.getElementById('profMapGrid');
+            if (profMapEl) {
+                const entries = Object.entries(profMap).sort((a,b) => b[1].total - a[1].total);
+                const fmtRMap = v => v > 0 ? 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+                const receitaLabel = modoFiltro === 'todos' ? 'Receita Total'
+                                   : modoFiltro === 'mes'   ? 'Receita Mês'
+                                                            : 'Receita Período';
+                profMapEl.innerHTML = entries.map(([name, p]) => {
+                    const taxaAtend = p.total > 0 ? ((p.atendido / p.total) * 100).toFixed(1) : 0;
+                    const barColor = taxaAtend >= 70 ? '#10b981' : taxaAtend >= 40 ? '#f59e0b' : '#ef4444';
+                    return `<div class="prof-map-card">
+                        <div class="prof-map-name">${name}</div>
+                        <div class="prof-map-row">
+                            <span class="pm-label">📋 Agendamentos</span>
+                            <span class="pm-value">${fmt(p.total)}</span>
+                        </div>
+                        <div class="prof-map-row">
+                            <span class="pm-label">⭐ 1ª Vez</span>
+                            <span class="pm-value pm-purple">${fmt(p.pv)}</span>
+                        </div>
+                        <div class="prof-map-row">
+                            <span class="pm-label">🔄 Retornos</span>
+                            <span class="pm-value">${fmt(p.retorno)}</span>
+                        </div>
+                        <div class="prof-map-row">
+                            <span class="pm-label">✅ Atendidos</span>
+                            <span class="pm-value pm-green">${fmt(p.atendido)} <span style="font-weight:400;color:var(--muted)">(${taxaAtend}%)</span></span>
+                        </div>
+                        <div class="prof-map-bar">
+                            <div class="prof-map-bar-fill" style="width:${taxaAtend}%;background:${barColor}"></div>
+                        </div>
+                        <div class="prof-map-row">
+                            <span class="pm-label">❌ Não compareceu</span>
+                            <span class="pm-value" style="color:#ef4444">${fmt(p.naoComp)}</span>
+                        </div>
+                        <div class="prof-map-row">
+                            <span class="pm-label">🚫 Cancelados</span>
+                            <span class="pm-value" style="color:var(--muted)">${fmt(p.cancel)}</span>
+                        </div>
+                        <div class="prof-map-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+                            <span class="pm-label">💰 ${receitaLabel}</span>
+                            <span class="pm-value pm-green">${fmtRMap(p.receita)}</span>
+                        </div>
+                    </div>`;
+                }).join('');
             }
         }
 
