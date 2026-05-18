@@ -16,12 +16,18 @@
 //
 // SETUP (Felipe — só uma vez):
 //   1. Business Manager → Conjuntos de dados → "Leads Paraser" → Configurações
-//      → Tokens de acesso → Gerar Token (com permissões: ads_management,
-//      business_management). Copia o token.
-//   2. Execute setupMetaCapi() no editor, cole o token quando pedir.
-//   3. Execute enviarEventoTeste() pra mandar 1 evento de teste.
-//   4. Confere no Meta → Eventos de Teste se chegou.
-//   5. Execute criarTriggerDiarioMetaCapi() pra ativar o cron 2x ao dia.
+//      → Tokens de acesso → Gerar Token. Copia o token (EAA...).
+//   2. No Apps Script: ícone ⚙ Configurações do projeto (menu lateral esquerdo)
+//      → Propriedades do script → Adicionar propriedade. Cria estas 4:
+//         META_CAPI_TOKEN       = (cole o token do passo 1)
+//         FEEGOW_TOKEN          = (copia do script Confirmações Agenda)
+//         SPREADSHEET_ID        = 1uthRnuWMk2A26dZ8GaMXinuvPyxY50EH8RX85NemXwg
+//         META_CAPI_TEST_CODE   = (opcional: TEST_xxx do BM Eventos de Teste)
+//      Salvar.
+//   3. Execute verificarConfig() pra confirmar que tudo está setado.
+//   4. Execute enviarEventoTeste() pra mandar 1 evento.
+//   5. Confere no Meta → Eventos de Teste se chegou.
+//   6. Execute criarTriggerDiarioMetaCapi() pra ativar o cron 2x ao dia.
 // ================================================================
 
 // ---- CONFIG via Script Properties ----
@@ -325,50 +331,44 @@ function dispatchMetaCapi() {
 
 
 // ================================================================
-// SETUP — rodar 1× pra configurar
+// SETUP — verificar se as Script Properties estão configuradas
+// (As propriedades devem ser adicionadas via UI:
+//  ⚙ Configurações do projeto → Propriedades do script → Adicionar propriedade)
 // ================================================================
-function setupMetaCapi() {
-  // Standalone script — usa Browser.inputBox (não SpreadsheetApp.getUi)
-  var token = Browser.inputBox(
-    'Cole o Access Token gerado em Business Manager → Conjuntos de Dados → Leads Paraser → Configurações → Tokens de acesso',
-    Browser.Buttons.OK_CANCEL
-  );
-  if (!token || token === 'cancel') { Logger.log('Setup cancelado'); return; }
-  _MCP.setProperty('META_CAPI_TOKEN', token.trim());
-  Logger.log('META_CAPI_TOKEN salvo (len=' + token.length + ').');
-
-  if (!_MCP.getProperty('FEEGOW_TOKEN')) {
-    Logger.log('⚠️ FEEGOW_TOKEN ainda não está nas Properties — copie do script "Confirmações Agenda".');
+function verificarConfig() {
+  var props = {
+    META_CAPI_TOKEN:     _MCP.getProperty('META_CAPI_TOKEN'),
+    FEEGOW_TOKEN:        _MCP.getProperty('FEEGOW_TOKEN'),
+    SPREADSHEET_ID:      _MCP.getProperty('SPREADSHEET_ID'),
+    META_CAPI_TEST_CODE: _MCP.getProperty('META_CAPI_TEST_CODE')
+  };
+  var ok = true;
+  Logger.log('=== Script Properties ===');
+  if (props.META_CAPI_TOKEN) {
+    Logger.log('✅ META_CAPI_TOKEN: setado (len=' + props.META_CAPI_TOKEN.length + ', começa com "' + props.META_CAPI_TOKEN.slice(0, 6) + '...")');
+  } else {
+    Logger.log('❌ META_CAPI_TOKEN: FALTA — adicione em ⚙ Configurações do projeto → Propriedades do script');
+    ok = false;
   }
-  if (!_MCP.getProperty('SPREADSHEET_ID')) {
-    Logger.log('⚠️ SPREADSHEET_ID ainda não está nas Properties — copie do script "Confirmações Agenda".');
+  if (props.FEEGOW_TOKEN) {
+    Logger.log('✅ FEEGOW_TOKEN: setado (len=' + props.FEEGOW_TOKEN.length + ')');
+  } else {
+    Logger.log('❌ FEEGOW_TOKEN: FALTA — copie do script "Confirmações Agenda"');
+    ok = false;
   }
-  Logger.log('✅ Setup concluído. Próximo passo: enviarEventoTeste()');
-}
-
-function setarFeegowToken() {
-  var t = Browser.inputBox('FEEGOW_TOKEN (copia do script Confirmações Agenda)', Browser.Buttons.OK_CANCEL);
-  if (!t || t === 'cancel') return;
-  _MCP.setProperty('FEEGOW_TOKEN', t.trim());
-  Logger.log('FEEGOW_TOKEN salvo.');
-}
-
-function setarSpreadsheetId() {
-  var t = Browser.inputBox('SPREADSHEET_ID (copia do script Confirmações Agenda)', Browser.Buttons.OK_CANCEL);
-  if (!t || t === 'cancel') return;
-  _MCP.setProperty('SPREADSHEET_ID', t.trim());
-  Logger.log('SPREADSHEET_ID salvo.');
-}
-
-function setarTestEventCode() {
-  var t = Browser.inputBox(
-    'Test Event Code (Meta → Conjuntos de Dados → Eventos de Teste → Test ID).\n' +
-    'Deixe em branco pra desligar modo teste.',
-    Browser.Buttons.OK_CANCEL
-  );
-  if (t === 'cancel') return;
-  _MCP.setProperty('META_CAPI_TEST_CODE', (t || '').trim());
-  Logger.log('META_CAPI_TEST_CODE = "' + (t || '') + '"');
+  if (props.SPREADSHEET_ID) {
+    Logger.log('✅ SPREADSHEET_ID: ' + props.SPREADSHEET_ID);
+  } else {
+    Logger.log('❌ SPREADSHEET_ID: FALTA — use 1uthRnuWMk2A26dZ8GaMXinuvPyxY50EH8RX85NemXwg');
+    ok = false;
+  }
+  if (props.META_CAPI_TEST_CODE) {
+    Logger.log('🧪 META_CAPI_TEST_CODE: "' + props.META_CAPI_TEST_CODE + '" (modo teste ATIVO — eventos vão pra "Eventos de Teste", não pra produção)');
+  } else {
+    Logger.log('ℹ️ META_CAPI_TEST_CODE: vazio (modo PRODUÇÃO — eventos contam pra otimização)');
+  }
+  Logger.log(ok ? '\n✅ Tudo configurado. Próximo passo: enviarEventoTeste()' : '\n❌ Faltam propriedades. Configure e rode esta função novamente.');
+  return ok;
 }
 
 
