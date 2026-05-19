@@ -3226,7 +3226,7 @@
                     <div style="position:relative;flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">
                         <span style="font-size:18px;text-align:center">🔎</span>
                         <div style="position:relative">
-                            <input type="text" id="dnFilterNome" placeholder="Nome ou código da doadora..." oninput="renderDonorCards()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
+                            <input type="text" id="dnFilterNome" placeholder="Nome ou código da doadora..." oninput="_debouncedRenderDonorCards()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
                             <button onclick="document.getElementById('dnFilterNome').value='';renderDonorCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
                         </div>
                     </div>
@@ -3295,7 +3295,7 @@
                     <div style="position:relative;flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">
                         <span style="font-size:18px;text-align:center">🔎</span>
                         <div style="position:relative">
-                            <input type="text" id="dvFilterNome" placeholder="Nome ou código da doadora..." oninput="dvTab.renderCards()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
+                            <input type="text" id="dvFilterNome" placeholder="Nome ou código da doadora..." oninput="_debouncedDvRender()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
                             <button onclick="document.getElementById('dvFilterNome').value='';dvTab.renderCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
                         </div>
                     </div>
@@ -3364,7 +3364,7 @@
                     <div style="position:relative;flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">
                         <span style="font-size:18px;text-align:center">🔎</span>
                         <div style="position:relative">
-                            <input type="text" id="rcFilterNome" placeholder="Nome ou código da receptora..." oninput="rcTab.renderCards()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
+                            <input type="text" id="rcFilterNome" placeholder="Nome ou código da receptora..." oninput="_debouncedRcRender()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
                             <button onclick="document.getElementById('rcFilterNome').value='';rcTab.renderCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
                         </div>
                     </div>
@@ -3433,7 +3433,7 @@
                     <div style="position:relative;flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">
                         <span style="font-size:18px;text-align:center">🔎</span>
                         <div style="position:relative">
-                            <input type="text" id="ebFilterNome" placeholder="Nome ou código da paciente..." oninput="ebTab.renderCards()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
+                            <input type="text" id="ebFilterNome" placeholder="Nome ou código da paciente..." oninput="_debouncedEbRender()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
                             <button onclick="document.getElementById('ebFilterNome').value='';ebTab.renderCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
                         </div>
                     </div>
@@ -5501,10 +5501,22 @@
             }
         });
 
+        function _debounce(fn, ms) { var t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
+        var _debouncedRenderDonorCards = _debounce(function(){ renderDonorCards(); }, 250);
+        var _debouncedDvRender  = _debounce(function(){ dvTab.renderCards(); }, 250);
+        var _debouncedRcRender  = _debounce(function(){ rcTab.renderCards(); }, 250);
+        var _debouncedEbRender  = _debounce(function(){ ebTab.renderCards(); }, 250);
+
+        var _cachedSections = null, _cachedTabs = null, _cachedTabGroups = null;
         function showSection(id, el) {
-            document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
-            document.querySelectorAll(".tab, .tab-group-trigger, .tab-dropdown-item").forEach(t => t.classList.remove("active"));
-            document.querySelectorAll(".tab-group").forEach(g => g.classList.remove("open"));
+            if (!_cachedSections) {
+                _cachedSections   = document.querySelectorAll(".section");
+                _cachedTabs       = document.querySelectorAll(".tab, .tab-group-trigger, .tab-dropdown-item");
+                _cachedTabGroups  = document.querySelectorAll(".tab-group");
+            }
+            _cachedSections.forEach(s => s.classList.remove("active"));
+            _cachedTabs.forEach(t => t.classList.remove("active"));
+            _cachedTabGroups.forEach(g => g.classList.remove("open"));
             document.getElementById(id)?.classList.add("active");
 
             const groupId = SECTION_GROUP[id];
