@@ -5,3 +5,8 @@
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# CSVs com PII de pacientes (LGPD — NUNCA commitar)
+leads-meta.csv
+leads-meta-brevo.csv
+leads-*.csv
