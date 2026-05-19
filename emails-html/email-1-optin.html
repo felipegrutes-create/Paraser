@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podemos continuar conversando?</title>
+</head>
+<body style="margin:0;padding:0;background:#f5efe5;font-family:Helvetica,Arial,sans-serif;color:#2a1838;-webkit-text-size-adjust:100%;">
+
+<!-- preview text (oculto, aparece no inbox) -->
+<div style="display:none;font-size:1px;color:#f5efe5;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+Você se cadastrou conosco. Antes de mais nada, queremos sua confirmação.
+</div>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" width="100%" style="background:#f5efe5;">
+<tr><td align="center" style="padding:32px 12px;">
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:600px;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 4px 24px rgba(61,22,82,0.10);">
+
+<!-- HEADER -->
+<tr><td style="background:#3d1652;padding:32px 28px;text-align:center;">
+<div style="color:#d4b888;font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:6px;font-weight:normal;">INSTITUTO</div>
+<div style="color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:30px;letter-spacing:8px;margin-top:4px;font-weight:300;">PARASER</div>
+</td></tr>
+
+<!-- BODY -->
+<tr><td style="padding:40px 32px 24px 32px;">
+
+<p style="font-size:17px;line-height:1.6;color:#2a1838;margin:0 0 20px;">Oi, {{contact.NOME}}.</p>
+<p style="font-size:17px;line-height:1.6;color:#2a1838;margin:0 0 20px;">Tudo bem?</p>
+<p style="font-size:17px;line-height:1.6;color:#2a1838;margin:0 0 24px;">Você se cadastrou em uma das nossas campanhas para receber informações sobre fertilidade. A gente quer ter certeza de que você quer continuar recebendo conteúdo nosso por aqui.</p>
+
+<p style="font-size:16px;line-height:1.6;color:#5a4868;margin:0 0 16px;font-style:italic;">Se sim, é só ignorar este email — você continua na lista.</p>
+<p style="font-size:16px;line-height:1.6;color:#5a4868;margin:0 0 32px;font-style:italic;">Se você prefere não receber mais, basta clicar em "Cancelar inscrição" no rodapé desta mensagem. Tudo bem por nós.</p>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-top:1px solid #e8d8c0;margin:8px 0 24px;"><tr><td height="1"></td></tr></table>
+
+<p style="font-size:17px;line-height:1.6;color:#2a1838;margin:0 0 24px;">Vou aproveitar que estamos aqui e te contar uma coisa que descobri lendo um estudo da <em>Human Reproduction</em> (Boivin & Domar, 2014):</p>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#faf4ea;border-left:3px solid #d4b888;margin:0 0 28px;">
+<tr><td style="padding:24px 24px;">
+<p style="font-size:22px;line-height:1.35;color:#3d1652;margin:0 0 8px;font-weight:700;">66% das mulheres que abandonam tratamentos de fertilidade não abandonam por dinheiro.</p>
+<p style="font-size:15px;line-height:1.5;color:#5a4868;margin:8px 0 0;">Não abandonam por falta de chance médica. Abandonam por <strong style="color:#3d1652;">desgaste emocional</strong>.</p>
+<p style="font-size:15px;line-height:1.5;color:#5a4868;margin:14px 0 0;">A frase mais comum delas é <em>"não me senti vista como pessoa"</em>.</p>
+</td></tr>
+</table>
+
+<p style="font-size:17px;line-height:1.6;color:#2a1838;margin:0 0 20px;">Esse dado mudou a forma como construímos o Instituto Paraser. <strong>Não somos uma clínica de procedimentos. Somos uma clínica de jornada.</strong></p>
+
+<p style="font-size:17px;line-height:1.6;color:#2a1838;margin:0 0 20px;">Nos próximos dias vou te mandar 4 emails sobre como a gente pensa esse cuidado. Você vai entender por que <strong>oito em cada dez</strong> mulheres que sentam na cadeira do nosso médico iniciam tratamento — quase o dobro da média do mercado.</p>
+
+<p style="font-size:18px;line-height:1.6;color:#3d1652;margin:32px 0 16px;font-weight:600;">Mas antes de tudo: como você está, {{contact.NOME}}?</p>
+
+<p style="font-size:16px;line-height:1.6;color:#2a1838;margin:0 0 8px;">Se quiser conversar com alguém da equipe agora, é só responder a este email. <strong>Lemos todas as respostas.</strong></p>
+
+<p style="font-size:17px;line-height:1.6;color:#2a1838;margin:32px 0 4px;">Com carinho,</p>
+<p style="font-size:17px;line-height:1.6;color:#3d1652;margin:0;font-weight:700;">Equipe Instituto ParaSer</p>
+
+</td></tr>
+
+<!-- FOOTER -->
+<tr><td style="padding:28px 32px;background:#faf4ea;border-top:1px solid #e8d8c0;font-size:13px;color:#7a6a55;line-height:1.7;text-align:center;">
+<strong style="color:#3d1652;">Instituto ParaSer</strong><br>
+Rua Prof. Álvaro Rodrigues, 352 · 10º andar · Botafogo · Rio de Janeiro<br>
+<a href="mailto:contato@paraser.com.br" style="color:#7a6a55;text-decoration:none;">contato@paraser.com.br</a> ·
+<a href="https://www.paraser.com.br" style="color:#7a6a55;text-decoration:none;">paraser.com.br</a>
+<br><br>
+<a href="{{ unsubscribe }}" style="color:#9a8a75;text-decoration:underline;font-size:12px;">Cancelar inscrição</a>
+</td></tr>
+
+</table>
+
+</td></tr>
+</table>
+
+</body>
+</html>
