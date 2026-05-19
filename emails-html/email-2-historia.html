@@ -40,12 +40,12 @@ Reprodução Humana &middot; Rio de Janeiro
 
 <tr><td style="padding:56px 56px 36px 56px;">
 
-<p style="margin:0 0 28px 0; font-family:'Playfair Display', Georgia, serif; font-size:14px; line-height:1.4; color:#a08660; font-weight:400; letter-spacing:4px; text-transform:uppercase;">
-{% if contact.NOME %}{{ contact.NOME }},{% else %}Hoje,{% endif %}
-</p>
+{% if contact.NOME %}<p style="margin:0 0 28px 0; font-family:'Playfair Display', Georgia, serif; font-size:14px; line-height:1.4; color:#a08660; font-weight:400; letter-spacing:4px; text-transform:uppercase;">
+{{ contact.NOME }},
+</p>{% endif %}
 
 <p style="margin:0 0 28px 0; font-family:'Playfair Display', Georgia, serif; font-size:32px; line-height:1.25; color:#1a0626; font-weight:400; letter-spacing:-0.01em;">
-quero te contar a história da Camila.
+{% if contact.NOME %}quero te contar a história da Camila.{% else %}Quero te contar a história da Camila.{% endif %}
 </p>
 
 <p style="margin:0 0 22px 0; font-family:'Lora', Georgia, serif; font-size:17px; line-height:1.72; color:#1a0a26;">
