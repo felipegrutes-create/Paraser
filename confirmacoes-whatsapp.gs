@@ -344,6 +344,8 @@ function enviarConfirmacoes() {
     ' | Sem telefone: ' + semTelefone +
     ' | Erros: ' + erros
   );
+
+  notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone, erros, agendamentos.length);
 }
 
 // ================================================================
@@ -888,6 +890,40 @@ function enviarKeyaccessSlack(nomes, dataStr) {
   DriveApp.getFileById(ssId).setTrashed(true);
 
   Logger.log('Slack: arquivo enviado para #' + CF_SLACK_CHANNEL);
+}
+
+// ================================================================
+// SLACK — notifica resultado do envio de confirmações
+// ================================================================
+function notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone, erros, total) {
+  try {
+    var channelId = slackGetChannelId(CF_SLACK_CHANNEL);
+    var texto;
+
+    if (erros > 0 && enviados === 0) {
+      texto = '🚨 *Confirmações NÃO enviadas para ' + dataStr + '*\n' +
+              'Todos os ' + total + ' pacientes falharam.\n' +
+              'Erros: ' + erros + ' | Sem template: ' + semTemplate + ' | Sem telefone: ' + semTelefone + '\n' +
+              '⚠️ Verifique o Z-API e reenvie manualmente.';
+    } else if (erros > 0) {
+      texto = '⚠️ *Confirmações enviadas com erros — ' + dataStr + '*\n' +
+              '✅ Enviados: ' + enviados + ' | ❌ Erros: ' + erros +
+              ' | Sem template: ' + semTemplate + ' | Sem telefone: ' + semTelefone;
+    } else {
+      texto = '✅ *Confirmações enviadas — ' + dataStr + '*\n' +
+              'Enviados: ' + enviados + ' de ' + total + ' pacientes.' +
+              (semTemplate > 0 ? ' (' + semTemplate + ' sem template)' : '');
+    }
+
+    UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+      method:      'post',
+      contentType: 'application/json; charset=utf-8',
+      headers:     { Authorization: 'Bearer ' + CF_SLACK_TOKEN },
+      payload:     JSON.stringify({ channel: channelId, text: texto })
+    });
+  } catch(e) {
+    Logger.log('notificarSlackConfirmacoes erro: ' + e.message);
+  }
 }
 
 // ================================================================
@@ -1527,6 +1563,7 @@ function debugMaps() {
   var profMap = carregarProfissionais();
   Logger.log('PROFISSIONAIS:\n' + JSON.stringify(profMap, null, 2));
 }
+
 
 // ================================================================
 // SETUP — execute UMA VEZ para salvar os tokens no PropertiesService.
