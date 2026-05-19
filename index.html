@@ -13900,5 +13900,51 @@ GONAPEPTYL,56`;
         <div class="dn-dd-title">Pacientes FIV Compartilhada:</div>
         <div id="dnPendingList"></div>
     </div>
+
+    <!-- Auto-update: detecta nova versão e recarrega automaticamente -->
+    <div id="update-toast" style="display:none;position:fixed;bottom:24px;right:24px;background:#1a1a2e;color:#fff;padding:14px 20px;border-radius:10px;font-size:14px;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,0.4);border-left:4px solid #4CAF50;">
+        🔄 Nova versão disponível — atualizando em <span id="update-countdown">5</span>s...
+    </div>
+    <script>
+        (function() {
+            var currentEtag = null;
+            var toastShown = false;
+
+            function checkForUpdate() {
+                fetch(location.href, { method: 'HEAD', cache: 'no-store' })
+                    .then(function(res) {
+                        var etag = res.headers.get('etag') || res.headers.get('last-modified');
+                        if (!etag) return;
+                        if (currentEtag === null) { currentEtag = etag; return; }
+                        if (etag !== currentEtag && !toastShown) {
+                            toastShown = true;
+                            showUpdateToast();
+                        }
+                    })
+                    .catch(function() {});
+            }
+
+            function showUpdateToast() {
+                var toast = document.getElementById('update-toast');
+                var countdown = document.getElementById('update-countdown');
+                toast.style.display = 'block';
+                var secs = 5;
+                var interval = setInterval(function() {
+                    secs--;
+                    countdown.textContent = secs;
+                    if (secs <= 0) {
+                        clearInterval(interval);
+                        location.reload(true);
+                    }
+                }, 1000);
+            }
+
+            // Primeira checagem após 30s (deixa a página carregar), depois a cada 5min
+            setTimeout(function() {
+                checkForUpdate();
+                setInterval(checkForUpdate, 5 * 60 * 1000);
+            }, 30000);
+        })();
+    </script>
 </body>
 </html>
