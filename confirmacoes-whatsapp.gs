@@ -1004,7 +1004,7 @@ var FERIADOS = [
   '03/04', // Paixão de Cristo 2026
   '21/04', // Tiradentes
   '01/05', // Dia do Trabalho
-  '11/06', // Corpus Christi 2026
+  '04/06', // Corpus Christi 2026
   '23/04', // São Jorge (municipal RJ)
   '07/09', // Independência
   '12/10', // Nossa Senhora Aparecida
