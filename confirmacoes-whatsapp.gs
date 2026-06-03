@@ -255,12 +255,11 @@ const TMPL = {
 // FUNÇÃO PRINCIPAL — configurar trigger diário entre 17h-18h
 // ================================================================
 function enviarConfirmacoes() {
-  // NÃO envia confirmações aos sábados, domingos e feriados
+  // NÃO envia confirmações aos sábados e domingos
+  // (feriados são permitidos para enviar confirmações do próximo dia útil)
   var hoje = new Date();
-  if (hoje.getDay() === 0 || hoje.getDay() === 6 || ehFeriado(hoje)) {
-    Logger.log('Hoje é ' + DIAS_SEMANA[hoje.getDay()] +
-               (ehFeriado(hoje) ? ' / feriado' : '') +
-               ' — nenhuma confirmação será enviada.');
+  if (hoje.getDay() === 0 || hoje.getDay() === 6) {
+    Logger.log('Hoje é ' + DIAS_SEMANA[hoje.getDay()] + ' — nenhuma confirmação será enviada.');
     return;
   }
 
