@@ -1,6 +1,9 @@
 # Configuração local do Claude Code (não faz parte do sistema)
 .claude/
 
+# Sessões locais de brainstorming visual (efêmeras)
+.superpowers/
+
 # Lixo do SO
 Thumbs.db
 .DS_Store
