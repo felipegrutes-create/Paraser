@@ -228,7 +228,46 @@ function sanitizarNome(nome) {
 }
 
 // =============================================================================
-// SETUP (rode 1x manualmente após colar este código)
+// SETUP — preencha as 2 linhas vazias abaixo e rode UMA VEZ
+// =============================================================================
+// Como rodar:
+//   1) No editor do Apps Script, com este arquivo aberto
+//   2) Selecione "setupTudo" no menu de funções (em cima, ao lado do botão ▶ Executar)
+//   3) Clique em ▶ Executar
+//   4) Autorize quando pedir
+//   5) Veja no Logs (Ctrl+Enter ou menu "Execuções") que aparece "✅ Tudo configurado"
+//
+// Depois disso, as Properties ficam salvas — você pode apagar essa função
+// ou deixar pra reusar se trocar algum valor.
+// =============================================================================
+function setupTudo() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperties({
+    // ✅ JÁ PREENCHIDOS (não precisa editar):
+    'SHEET_ID':          '1726GuLXhAHiQbauLaZBievZSRUleFp8_HJc', // ⚠️ se incompleto, pegue o ID completo da planilha
+    'NOTIFY_EMAIL':      'felipegrutes@paraser.com.br',
+
+    // ✏️ EDITAR essas 2 linhas antes de rodar:
+    'DRIVE_FOLDER_ID':   'COLE_AQUI_O_ID_DA_PASTA_CVS',
+    'SLACK_WEBHOOK_URL': 'COLE_AQUI_O_WEBHOOK_DO_SLACK'
+  });
+
+  Logger.log('✅ Tudo configurado!');
+  Logger.log('SHEET_ID: ' + props.getProperty('SHEET_ID'));
+  Logger.log('DRIVE_FOLDER_ID: ' + props.getProperty('DRIVE_FOLDER_ID'));
+  Logger.log('SLACK_WEBHOOK_URL: ' + (props.getProperty('SLACK_WEBHOOK_URL').substring(0, 40) + '...'));
+  Logger.log('NOTIFY_EMAIL: ' + props.getProperty('NOTIFY_EMAIL'));
+
+  if (props.getProperty('DRIVE_FOLDER_ID') === 'COLE_AQUI_O_ID_DA_PASTA_CVS') {
+    Logger.log('⚠️ ATENÇÃO: você ainda não preencheu DRIVE_FOLDER_ID na função setupTudo. Edite o código e rode de novo.');
+  }
+  if (props.getProperty('SLACK_WEBHOOK_URL') === 'COLE_AQUI_O_WEBHOOK_DO_SLACK') {
+    Logger.log('⚠️ ATENÇÃO: você ainda não preencheu SLACK_WEBHOOK_URL na função setupTudo. Edite o código e rode de novo.');
+  }
+}
+
+// =============================================================================
+// TESTE — rode pra confirmar que tudo está configurado
 // =============================================================================
 function testarSetup() {
   var props = PropertiesService.getScriptProperties();
