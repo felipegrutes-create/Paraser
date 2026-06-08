@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trabalhe na Paraser — Recepção</title>
+<meta name="description" content="Estamos buscando alguém que acolha antes de atender. Recepção do Instituto Paraser, Botafogo, RJ." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: 'Lora', Georgia, 'Times New Roman', serif;
+    color: #1a0a26;
+    background: #f0e8d8;
+    background-image: radial-gradient(ellipse at top, #faf4ea 0%, #f0e8d8 70%);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .container { max-width: 640px; margin: 0 auto; padding: 32px 16px 56px; }
+
+  /* HEADER */
+  .brand-tag {
+    text-align: center; margin-bottom: 20px;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 11px; letter-spacing: 5px; color: #a08660;
+    text-transform: uppercase; font-weight: 400;
+  }
+  .card { background: #fff; border: 1px solid #e8d8b8; }
+  .header {
+    background: #1a0626; padding: 36px 24px 30px;
+    text-align: center; border-bottom: 1px solid #3d1652;
+  }
+  .header-mark {
+    color: #c4a574; font-family: 'Playfair Display', Georgia, serif;
+    font-size: 10px; letter-spacing: 6px; text-transform: uppercase;
+  }
+  .header-brand {
+    color: #fff; font-family: 'Playfair Display', Georgia, serif;
+    font-size: 26px; letter-spacing: 6px; font-weight: 300;
+    margin-top: 8px;
+  }
+
+  /* INTRO */
+  .intro { padding: 48px 32px 36px; text-align: center; }
+  .intro-eyebrow {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 11px; letter-spacing: 4px; color: #a08660;
+    text-transform: uppercase; margin-bottom: 18px;
+  }
+  .intro-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; color: #3d1652; font-size: 34px;
+    line-height: 1.25; margin-bottom: 24px; font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .intro-body {
+    color: #5a4868; font-family: 'Lora', Georgia, serif;
+    font-size: 16px; line-height: 1.75; margin: 0 auto 14px;
+    max-width: 460px;
+  }
+  .intro-meta {
+    color: #a08660; font-size: 11px; letter-spacing: 2px;
+    text-transform: uppercase; margin: 24px 0 30px;
+  }
+
+  /* CTA */
+  .btn-primary {
+    background: #3d1652; color: #fff;
+    border: 1px solid #d4b888;
+    padding: 16px 36px; font-family: 'Playfair Display', Georgia, serif;
+    font-size: 14px; letter-spacing: 3px; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .btn-primary:hover { background: #4d1f65; }
+  .btn-primary:disabled { background: #5a4868; cursor: not-allowed; }
+  .btn-back {
+    background: transparent; border: 0; color: #a08660;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 13px; cursor: pointer; padding: 8px 4px;
+  }
+  .btn-back:hover { color: #3d1652; }
+
+  /* QUIZ */
+  .quiz { padding: 40px 32px; }
+  .quiz-card {
+    background: #fff; max-width: 520px; margin: 0 auto;
+    padding: 36px; border: 1px solid #e8d8b8;
+  }
+  .quiz-step {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 10px; letter-spacing: 4px; color: #a08660;
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .progress {
+    background: #f0e0c4; height: 4px; border-radius: 2px;
+    overflow: hidden; margin-bottom: 28px;
+  }
+  .progress-bar {
+    background: #3d1652; height: 100%; width: 0%;
+    transition: width 0.3s ease;
+  }
+  .quiz-eyebrow {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 11px; letter-spacing: 4px; color: #a08660;
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .quiz-question {
+    font-family: 'Playfair Display', Georgia, serif;
+    color: #1a0626; font-size: 22px; line-height: 1.4;
+    margin-bottom: 22px; font-weight: 400;
+  }
+  .quiz-subtitle {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; color: #5a4868; font-size: 17px;
+    line-height: 1.5; margin-bottom: 22px;
+  }
+
+  .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .option {
+    border: 1px solid #d4b888; padding: 14px 18px; border-radius: 4px;
+    font-family: 'Lora', Georgia, serif; cursor: pointer;
+    color: #3d1652; font-size: 15px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .option:hover { background: #faf4ea; }
+  .option.selected { background: #faf4ea; border-color: #3d1652; border-width: 2px; padding: 13px 17px; }
+
+  /* CHECKBOX (multi) */
+  .checkbox-option {
+    border: 1px solid #d4b888; padding: 14px 18px; border-radius: 4px;
+    font-family: 'Lora', Georgia, serif; cursor: pointer;
+    color: #3d1652; font-size: 15px; display: flex; align-items: center; gap: 12px;
+  }
+  .checkbox-option:hover { background: #faf4ea; }
+  .checkbox-option input { accent-color: #3d1652; width: 18px; height: 18px; cursor: pointer; }
+
+  textarea, input[type="text"], input[type="email"], input[type="tel"], input[type="url"] {
+    width: 100%; padding: 14px;
+    border: 1px solid #d4b888;
+    font-family: 'Lora', Georgia, serif;
+    font-size: 14px; color: #1a0a26;
+    background: #fff; resize: vertical;
+    margin-bottom: 24px;
+  }
+  textarea { min-height: 130px; }
+  input:focus, textarea:focus { outline: 2px solid #3d1652; outline-offset: -2px; }
+
+  .quiz-actions {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 20px;
+  }
+  .quiz-actions .btn-primary {
+    padding: 12px 28px; font-size: 13px; letter-spacing: 2px;
+  }
+
+  /* CONTATO + CV */
+  .final-card {
+    background: #fff; max-width: 480px; margin: 0 auto;
+    padding: 40px 32px; border: 2px solid #d4b888;
+  }
+  .final-eyebrow {
+    text-align: center;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 10px; letter-spacing: 5px; color: #a08660;
+    text-transform: uppercase; margin-bottom: 16px;
+  }
+  .final-title {
+    text-align: center;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; color: #3d1652; font-size: 26px;
+    line-height: 1.3; margin-bottom: 24px; font-weight: 400;
+  }
+  .field-stack { display: flex; flex-direction: column; gap: 0; }
+  .field-stack input { margin-bottom: 12px; }
+
+  .file-zone {
+    border: 2px dashed #d4b888; padding: 24px; text-align: center;
+    background: #faf4ea; margin-bottom: 20px;
+    cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  }
+  .file-zone:hover { border-color: #3d1652; }
+  .file-zone.has-file { border-style: solid; background: #f0e8d8; border-color: #3d1652; }
+  .file-zone-label {
+    color: #3d1652; font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; font-size: 16px; margin-bottom: 6px;
+  }
+  .file-zone-help { color: #a08660; font-size: 12px; }
+  .file-zone-filename {
+    color: #3d1652; font-family: 'Lora', Georgia, serif; font-size: 13px;
+    margin-top: 8px; font-weight: 500;
+  }
+  .file-input-hidden { display: none; }
+
+  .final-cta { text-align: center; }
+  .final-note {
+    color: #a08660; font-size: 12px; margin-top: 18px;
+    font-style: italic; text-align: center;
+  }
+
+  /* THANKYOU */
+  .thankyou-card {
+    background: #fff; max-width: 480px; margin: 0 auto;
+    padding: 56px 32px; border: 2px solid #d4b888; text-align: center;
+  }
+  .thankyou-mark {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: #faf4ea; border: 2px solid #3d1652;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', Georgia, serif; font-size: 28px;
+    color: #3d1652; margin-bottom: 24px;
+  }
+  .thankyou-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; color: #3d1652; font-size: 28px;
+    line-height: 1.3; margin-bottom: 18px;
+  }
+  .thankyou-body {
+    color: #5a4868; font-family: 'Lora', Georgia, serif;
+    font-size: 15px; line-height: 1.75;
+  }
+
+  /* HIDE/SHOW */
+  .step { display: none; }
+  .step.active { display: block; animation: fade 0.3s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .error { color: #c97a8c; font-size: 13px; margin-bottom: 14px; display: none; }
+  .error.show { display: block; }
+  .loading { display: none; color: #a08660; font-style: italic; margin-top: 14px; }
+  .loading.show { display: block; }
+
+  @media (max-width: 600px) {
+    .container { padding: 16px 8px 32px; }
+    .intro { padding: 32px 20px 24px; }
+    .intro-title { font-size: 26px; }
+    .quiz { padding: 24px 8px; }
+    .quiz-card, .final-card, .thankyou-card { padding: 24px 18px; }
+    .quiz-question { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="brand-tag">— vagas · paraser —</div>
+
+<div class="card">
+
+  <div class="header">
+    <div class="header-mark">— Instituto —</div>
+    <div class="header-brand">PARASER</div>
+  </div>
+
+  <!-- STEP 0: CHEGADA -->
+  <div class="step active" id="step-0">
+    <div class="intro">
+      <div class="intro-eyebrow">— Estamos buscando —</div>
+      <h1 class="intro-title">Alguém que acolha<br>antes de atender.</h1>
+      <p class="intro-body">Recepção do Instituto Paraser, em Botafogo. Aqui, a primeira voz que uma paciente escuta importa quase tanto quanto a do médico.</p>
+      <div class="intro-meta">— 6 perguntas · 3 minutos · sem compromisso —</div>
+      <button class="btn-primary" onclick="next()">Começar &nbsp;→</button>
+    </div>
+  </div>
+
+  <!-- STEP 1 - Experiência -->
+  <div class="step" id="step-1">
+    <div class="quiz"><div class="quiz-card">
+      <div class="quiz-step">Pergunta 1 de 6</div>
+      <div class="progress"><div class="progress-bar" style="width:16.6%"></div></div>
+      <h3 class="quiz-question">Quantos anos de experiência você tem em recepção ou atendimento?</h3>
+      <div class="options">
+        <div class="option" data-value="0" onclick="selectOption(this, 1)">Nenhuma — quero começar</div>
+        <div class="option" data-value="1" onclick="selectOption(this, 1)">Menos de 1 ano</div>
+        <div class="option" data-value="2" onclick="selectOption(this, 1)">1 a 3 anos</div>
+        <div class="option" data-value="3" onclick="selectOption(this, 1)">3 a 5 anos</div>
+        <div class="option" data-value="4" onclick="selectOption(this, 1)">Mais de 5 anos</div>
+      </div>
+      <div class="quiz-actions">
+        <button class="btn-back" onclick="prev()">← voltar</button>
+        <button class="btn-primary" onclick="next()" id="next-1" disabled>Continuar →</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- STEP 2 - Atendimento emocional -->
+  <div class="step" id="step-2">
+    <div class="quiz"><div class="quiz-card">
+      <div class="quiz-step">Pergunta 2 de 6</div>
+      <div class="progress"><div class="progress-bar" style="width:33.3%"></div></div>
+      <h3 class="quiz-question">Você já atendeu pacientes em situação emocional (clínica, hospital, consultório)?</h3>
+      <div class="options">
+        <div class="option" data-value="muito" onclick="selectOption(this, 2)">Sim, com frequência — faz parte do meu dia a dia</div>
+        <div class="option" data-value="algumas" onclick="selectOption(this, 2)">Sim, algumas vezes</div>
+        <div class="option" data-value="pouco" onclick="selectOption(this, 2)">Raramente</div>
+        <div class="option" data-value="nunca" onclick="selectOption(this, 2)">Ainda não, mas tenho sensibilidade pra isso</div>
+      </div>
+      <div class="quiz-actions">
+        <button class="btn-back" onclick="prev()">← voltar</button>
+        <button class="btn-primary" onclick="next()" id="next-2" disabled>Continuar →</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- STEP 3 - Cenário situacional (open) -->
+  <div class="step" id="step-3">
+    <div class="quiz"><div class="quiz-card">
+      <div class="quiz-step">Pergunta 3 de 6</div>
+      <div class="progress"><div class="progress-bar" style="width:50%"></div></div>
+      <div class="quiz-eyebrow">cenário</div>
+      <h3 class="quiz-question">Uma paciente chega chorando porque o exame deu negativo de novo.</h3>
+      <p class="quiz-subtitle">Como você a recebe?</p>
+      <textarea id="answer-3" placeholder="Escreva como você responderia..." oninput="checkText(3)"></textarea>
+      <div class="quiz-actions">
+        <button class="btn-back" onclick="prev()">← voltar</button>
+        <button class="btn-primary" onclick="next()" id="next-3" disabled>Continuar →</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- STEP 4 - Ferramentas -->
+  <div class="step" id="step-4">
+    <div class="quiz"><div class="quiz-card">
+      <div class="quiz-step">Pergunta 4 de 6</div>
+      <div class="progress"><div class="progress-bar" style="width:66.6%"></div></div>
+      <h3 class="quiz-question">Quais ferramentas você tem domínio?</h3>
+      <p class="quiz-subtitle" style="font-size:14px; margin-bottom:18px;">Selecione todas que se aplicam.</p>
+      <div class="options" id="opts-4">
+        <label class="checkbox-option"><input type="checkbox" value="google" onchange="checkMulti(4)"/> Google Workspace (Gmail, Sheets, Drive)</label>
+        <label class="checkbox-option"><input type="checkbox" value="whatsapp" onchange="checkMulti(4)"/> WhatsApp Business</label>
+        <label class="checkbox-option"><input type="checkbox" value="sistema_gestao" onchange="checkMulti(4)"/> Sistema de gestão de clínica (Feegow, iClinic, similar)</label>
+        <label class="checkbox-option"><input type="checkbox" value="excel" onchange="checkMulti(4)"/> Excel / planilhas avançadas</label>
+        <label class="checkbox-option"><input type="checkbox" value="redes_sociais" onchange="checkMulti(4)"/> Instagram / redes sociais (para negócio)</label>
+        <label class="checkbox-option"><input type="checkbox" value="nenhuma" onchange="checkMulti(4)"/> Nenhuma das anteriores — aprendo rápido</label>
+      </div>
+      <div class="quiz-actions">
+        <button class="btn-back" onclick="prev()">← voltar</button>
+        <button class="btn-primary" onclick="next()" id="next-4" disabled>Continuar →</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- STEP 5 - Disponibilidade -->
+  <div class="step" id="step-5">
+    <div class="quiz"><div class="quiz-card">
+      <div class="quiz-step">Pergunta 5 de 6</div>
+      <div class="progress"><div class="progress-bar" style="width:83.3%"></div></div>
+      <h3 class="quiz-question">Sua disponibilidade de horário?</h3>
+      <div class="options">
+        <div class="option" data-value="integral_5" onclick="selectOption(this, 5)">Integral, 5 dias por semana</div>
+        <div class="option" data-value="integral_6" onclick="selectOption(this, 5)">Integral, 6 dias por semana</div>
+        <div class="option" data-value="manha" onclick="selectOption(this, 5)">Só manhã</div>
+        <div class="option" data-value="tarde" onclick="selectOption(this, 5)">Só tarde</div>
+        <div class="option" data-value="flexivel" onclick="selectOption(this, 5)">Flexível, posso negociar</div>
+      </div>
+      <div class="quiz-actions">
+        <button class="btn-back" onclick="prev()">← voltar</button>
+        <button class="btn-primary" onclick="next()" id="next-5" disabled>Continuar →</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- STEP 6 - Motivação (open) -->
+  <div class="step" id="step-6">
+    <div class="quiz"><div class="quiz-card">
+      <div class="quiz-step">Pergunta 6 de 6</div>
+      <div class="progress"><div class="progress-bar" style="width:100%"></div></div>
+      <h3 class="quiz-question">Por que você quer trabalhar na Paraser?</h3>
+      <p class="quiz-subtitle" style="font-size:14px;">2-3 linhas, do seu jeito.</p>
+      <textarea id="answer-6" placeholder="Conta pra gente..." oninput="checkText(6)"></textarea>
+      <div class="quiz-actions">
+        <button class="btn-back" onclick="prev()">← voltar</button>
+        <button class="btn-primary" onclick="next()" id="next-6" disabled>Continuar →</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- STEP 7 - Contato + CV -->
+  <div class="step" id="step-7">
+    <div class="quiz"><div class="final-card">
+      <div class="final-eyebrow">— última etapa —</div>
+      <h3 class="final-title">Como podemos te chamar?</h3>
+      <div class="field-stack">
+        <input type="text" id="nome" placeholder="Nome completo" required oninput="checkFinal()" />
+        <input type="email" id="email" placeholder="Email" required oninput="checkFinal()" />
+        <input type="tel" id="whatsapp" placeholder="WhatsApp (com DDD)" required oninput="checkFinal()" />
+        <input type="url" id="linkedin" placeholder="LinkedIn (opcional)" oninput="checkFinal()" />
+      </div>
+      <label for="cv-input" class="file-zone" id="file-zone">
+        <div class="file-zone-label">📎 Anexar seu currículo</div>
+        <div class="file-zone-help">PDF ou Word · até 5MB · clique pra escolher</div>
+        <div class="file-zone-filename" id="filename" style="display:none;"></div>
+      </label>
+      <input type="file" id="cv-input" class="file-input-hidden" accept=".pdf,.doc,.docx" onchange="onFile()" />
+      <div class="error" id="form-error"></div>
+      <div class="final-cta">
+        <button class="btn-primary" id="submit-btn" onclick="submitForm()" disabled>Enviar candidatura</button>
+      </div>
+      <div class="loading" id="loading">enviando... aguarde um instante.</div>
+      <div class="final-note">Você recebe um email confirmando em segundos.</div>
+    </div></div>
+  </div>
+
+  <!-- STEP 8 - Thank you -->
+  <div class="step" id="step-8">
+    <div class="quiz"><div class="thankyou-card">
+      <div class="thankyou-mark">✓</div>
+      <h3 class="thankyou-title">Recebemos sua candidatura.</h3>
+      <p class="thankyou-body">A equipe da Paraser vai ler com calma e te responde nos próximos dias.<br><br>💜</p>
+    </div></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+  // ⚠️ Felipe: substituir pela URL do Apps Script Web App após o deploy
+  const WEBHOOK_URL = 'COLE_AQUI_A_URL_DO_APPS_SCRIPT';
+
+  let currentStep = 0;
+  const totalSteps = 8; // 0..8
+  const answers = {};
+  let cvFile = null;
+
+  function showStep(n) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    document.getElementById('step-' + n).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    currentStep = n;
+  }
+  function next() {
+    if (currentStep === 7) return; // submit handles
+    if (currentStep < totalSteps) showStep(currentStep + 1);
+  }
+  function prev() {
+    if (currentStep > 0) showStep(currentStep - 1);
+  }
+  function selectOption(el, step) {
+    el.parentElement.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    answers['q' + step] = el.dataset.value;
+    document.getElementById('next-' + step).disabled = false;
+  }
+  function checkText(step) {
+    const text = document.getElementById('answer-' + step).value.trim();
+    answers['q' + step] = text;
+    document.getElementById('next-' + step).disabled = text.length < 10;
+  }
+  function checkMulti(step) {
+    const checks = document.querySelectorAll('#opts-' + step + ' input:checked');
+    answers['q' + step] = Array.from(checks).map(c => c.value).join(',');
+    document.getElementById('next-' + step).disabled = checks.length === 0;
+  }
+  function onFile() {
+    const input = document.getElementById('cv-input');
+    const f = input.files[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) {
+      document.getElementById('form-error').textContent = 'arquivo maior que 5MB. tente comprimir o PDF.';
+      document.getElementById('form-error').classList.add('show');
+      input.value = '';
+      return;
+    }
+    cvFile = f;
+    document.getElementById('filename').textContent = '✓ ' + f.name;
+    document.getElementById('filename').style.display = 'block';
+    document.getElementById('file-zone').classList.add('has-file');
+    document.getElementById('form-error').classList.remove('show');
+    checkFinal();
+  }
+  function checkFinal() {
+    const nome = document.getElementById('nome').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const wpp = document.getElementById('whatsapp').value.trim();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const wppOk = wpp.replace(/\D/g, '').length >= 10;
+    document.getElementById('submit-btn').disabled = !(nome.length >= 3 && emailOk && wppOk && cvFile);
+  }
+  async function submitForm() {
+    const btn = document.getElementById('submit-btn');
+    const loading = document.getElementById('loading');
+    const err = document.getElementById('form-error');
+    btn.disabled = true;
+    loading.classList.add('show');
+    err.classList.remove('show');
+
+    try {
+      // Lê CV como base64 (Apps Script aceita melhor que multipart)
+      const cvBase64 = await fileToBase64(cvFile);
+      const payload = {
+        nome: document.getElementById('nome').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        whatsapp: document.getElementById('whatsapp').value.trim(),
+        linkedin: document.getElementById('linkedin').value.trim(),
+        respostas: answers,
+        cv: {
+          nome: cvFile.name,
+          tipo: cvFile.type,
+          base64: cvBase64
+        },
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent
+      };
+
+      const resp = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' } // evita preflight CORS
+      });
+
+      const result = await resp.json();
+      if (result.ok) {
+        showStep(8);
+      } else {
+        throw new Error(result.error || 'erro desconhecido');
+      }
+    } catch (e) {
+      err.textContent = 'não conseguimos enviar. tenta de novo? (' + e.message + ')';
+      err.classList.add('show');
+      btn.disabled = false;
+      loading.classList.remove('show');
+    }
+  }
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result.split(',')[1]);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+</script>
+</body>
+</html>
