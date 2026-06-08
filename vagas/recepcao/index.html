@@ -72,6 +72,63 @@
     color: #a08660; font-size: 11px; letter-spacing: 2px;
     text-transform: uppercase; margin: 24px 0 30px;
   }
+  .intro-tagline {
+    color: #a08660; font-family: 'Playfair Display', Georgia, serif;
+    font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+  .intro-warning {
+    background: #faf4ea; border-left: 3px solid #3d1652;
+    padding: 22px 24px; text-align: left; margin: 0 auto 28px;
+    max-width: 520px;
+  }
+  .intro-warning-label {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 11px; letter-spacing: 3px; color: #3d1652;
+    text-transform: uppercase; font-weight: 500; margin-bottom: 12px;
+  }
+  .intro-warning p {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 15px; line-height: 1.7; color: #1a0a26; margin: 0;
+  }
+  .intro-checklist {
+    text-align: left; max-width: 520px; margin: 0 auto 24px;
+    padding: 0 4px;
+  }
+  .intro-checklist-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; font-size: 20px; color: #3d1652;
+    margin-bottom: 14px;
+  }
+  .intro-checklist ul {
+    list-style: none; padding: 0; margin: 0;
+  }
+  .intro-checklist li {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 15px; line-height: 1.65; color: #1a0a26;
+    padding: 9px 0; border-bottom: 1px solid #f0e5d0;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .intro-checklist li:last-child { border-bottom: 0; }
+  .intro-checklist .check { flex-shrink: 0; }
+  .intro-not-for-you {
+    text-align: left; max-width: 520px; margin: 0 auto 28px;
+    padding: 16px 20px; background: #fff8f0;
+    border-left: 3px solid #c4a574; color: #5a4868;
+    font-family: 'Lora', Georgia, serif;
+    font-size: 14px; line-height: 1.6; font-style: italic;
+  }
+  .intro-not-for-you strong {
+    color: #3d1652; font-style: normal;
+  }
+  .intro-final {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic; color: #3d1652; font-size: 18px;
+    line-height: 1.5; margin: 0 auto 30px; max-width: 480px;
+  }
+  .intro-final strong {
+    font-style: normal; color: #1a0626;
+  }
 
   /* CTA */
   .btn-primary {
@@ -272,11 +329,31 @@
   <!-- STEP 0: CHEGADA -->
   <div class="step active" id="step-0">
     <div class="intro">
-      <div class="intro-eyebrow">Estamos buscando</div>
-      <h1 class="intro-title">Alguém que acolha<br>antes de atender.</h1>
-      <p class="intro-body">Cada mulher que entra aqui carrega meses ou anos tentando engravidar. A recepção do Instituto Paraser, em Botafogo, é onde ela decide se confia na clínica.</p>
-      <p class="intro-body" style="margin-top:14px;"><em>Por isso a gente é exigente. Quem só quer atender não fica. Quem se vê servindo essa causa, sim.</em></p>
-      <div class="intro-meta">6 perguntas · 3 minutos · só pra quem se vê aqui</div>
+      <div class="intro-eyebrow">Vaga aberta</div>
+      <h1 class="intro-title">Recepcionista</h1>
+      <p class="intro-tagline">Instituto ParaSer · Botafogo · presencial</p>
+
+      <div class="intro-warning">
+        <div class="intro-warning-label">Antes de se candidatar, leia com atenção</div>
+        <p>Este não é um trabalho de "atender telefone". É lidar, todos os dias, com pessoas em momentos delicados de uma jornada de fertilidade. Exige paciência, empatia real e zero pressa para acolher.</p>
+      </div>
+
+      <div class="intro-checklist">
+        <div class="intro-checklist-title">É pra você se:</div>
+        <ul>
+          <li><span class="check">✅</span> Mora ou consegue chegar fácil em Botafogo</li>
+          <li><span class="check">✅</span> Tem experiência com atendimento (clínica é um plus)</li>
+          <li><span class="check">✅</span> É organizada de verdade. Agenda, sistema, follow-up</li>
+          <li><span class="check">✅</span> Gosta de cuidar de gente, não só de processo</li>
+        </ul>
+      </div>
+
+      <p class="intro-not-for-you">
+        <strong>Não é pra você se:</strong> procura algo 100% remoto, sem contato humano ou de passagem.
+      </p>
+
+      <p class="intro-final">👉 Se leu até aqui e pensou <em>"é isso"</em>, responda o quiz. <strong>5 minutos.</strong></p>
+
       <button class="btn-primary" onclick="next()">Começar &nbsp;→</button>
     </div>
   </div>
