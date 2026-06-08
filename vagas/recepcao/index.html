@@ -193,7 +193,14 @@
     color: #3d1652; font-family: 'Lora', Georgia, serif; font-size: 13px;
     margin-top: 8px; font-weight: 500;
   }
-  .file-input-hidden { display: none; }
+  .file-input-hidden {
+    position: absolute; left: -9999px; width: 1px; height: 1px;
+    opacity: 0; overflow: hidden; pointer-events: none;
+  }
+  input[type="text"], input[type="email"], input[type="tel"], input[type="url"] {
+    margin-bottom: 0;
+  }
+  .field-stack input { width: 100%; box-sizing: border-box; }
 
   .final-cta { text-align: center; }
   .final-note {

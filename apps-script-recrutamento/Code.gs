@@ -166,7 +166,9 @@ function enviarEmailConfirmacao(nome, email) {
       '</p>' +
     '</div>';
 
-  GmailApp.sendEmail(email, 'Recebemos sua candidatura — Paraser', '', {
+  MailApp.sendEmail({
+    to: email,
+    subject: 'Recebemos sua candidatura — Paraser',
     htmlBody: html,
     name: 'Instituto Paraser'
   });
@@ -213,7 +215,7 @@ function enviarEmailFelipe(email, payload, score, cvUrl) {
     'Planilha: https://docs.google.com/spreadsheets/d/' +
       PropertiesService.getScriptProperties().getProperty('SHEET_ID');
 
-  GmailApp.sendEmail(email, '🎯 Candidata PRIORIDADE Paraser: ' + payload.nome + ' (' + score + ')', corpo);
+  MailApp.sendEmail(email, '🎯 Candidata PRIORIDADE Paraser: ' + payload.nome + ' (' + score + ')', corpo);
 }
 
 // =============================================================================
@@ -258,6 +260,41 @@ function sanitizarNome(nome) {
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .substring(0, 40);
+}
+
+// =============================================================================
+// AUTORIZA TODOS OS SCOPES — rode UMA VEZ
+// =============================================================================
+// Toca todos os serviços que doPost precisa, força autorização dos scopes,
+// e o Web App passa a aceitar requests anônimos depois disso.
+// =============================================================================
+function autorizarTudo() {
+  // 1) Drive
+  var root = DriveApp.getRootFolder();
+  Logger.log('✓ Drive autorizado: ' + root.getName());
+
+  // 2) Spreadsheet (cria se não tiver Sheet configurada ainda)
+  var sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  if (sheetId) {
+    try {
+      var ss = SpreadsheetApp.openById(sheetId);
+      Logger.log('✓ Sheets autorizado: ' + ss.getName());
+    } catch (e) {
+      Logger.log('⚠️ Sheets configurado mas não acessível: ' + e.message);
+    }
+  }
+
+  // 3) Gmail (sem precisar de userinfo scope)
+  var quota = MailApp.getRemainingDailyQuota();
+  Logger.log('✓ Gmail autorizado, quota diária restante: ' + quota);
+
+  // 4) UrlFetch (Slack) — faz uma chamada GET inócua pra forçar autorização
+  UrlFetchApp.fetch('https://www.google.com/generate_204', { muteHttpExceptions: true });
+  Logger.log('✓ UrlFetch autorizado');
+
+  Logger.log('---');
+  Logger.log('✅ TODOS OS SCOPES AUTORIZADOS');
+  Logger.log('Agora o Web App público vai funcionar.');
 }
 
 // =============================================================================
