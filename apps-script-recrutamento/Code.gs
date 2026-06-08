@@ -23,16 +23,15 @@ function doPost(e) {
     // 1) Score automático
     var score = calcularScore(payload.respostas);
 
-    // 2) Salvar CV no Drive
-    var folderId = props.getProperty('DRIVE_FOLDER_ID');
+    // 2) Salvar CV no Drive (auto-cria pasta se ID inválido/vazio)
     var cvUrl = '';
-    if (folderId && payload.cv && payload.cv.base64) {
+    if (payload.cv && payload.cv.base64) {
+      var folder = getOrCreateCVFolder_();
       var blob = Utilities.newBlob(
         Utilities.base64Decode(payload.cv.base64),
         payload.cv.tipo || 'application/pdf',
         sanitizarNome(payload.nome) + '_' + payload.cv.nome
       );
-      var folder = DriveApp.getFolderById(folderId);
       var file = folder.createFile(blob);
       cvUrl = file.getUrl();
     }
@@ -215,6 +214,40 @@ function enviarEmailFelipe(email, payload, score, cvUrl) {
       PropertiesService.getScriptProperties().getProperty('SHEET_ID');
 
   GmailApp.sendEmail(email, '🎯 Candidata PRIORIDADE Paraser: ' + payload.nome + ' (' + score + ')', corpo);
+}
+
+// =============================================================================
+// AUTO-CRIA pasta CVs no Drive se Property estiver vazia ou inválida
+// =============================================================================
+function getOrCreateCVFolder_() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty('DRIVE_FOLDER_ID');
+
+  // Tenta usar Property se ela parecer um ID válido (não URL)
+  if (folderId && folderId.indexOf('http') === -1 && folderId.length > 15) {
+    try {
+      return DriveApp.getFolderById(folderId);
+    } catch (e) {
+      Logger.log('DRIVE_FOLDER_ID inválido, criando pasta nova: ' + e.message);
+    }
+  }
+
+  // Cria estrutura Paraser/RH/Recepcao 2026/ no Drive root
+  var paraser  = _getOrCreateChild(DriveApp.getRootFolder(), 'Paraser');
+  var rh       = _getOrCreateChild(paraser, 'RH');
+  var recepcao = _getOrCreateChild(rh, 'Recepcao 2026 - CVs');
+
+  // Salva o ID da pasta criada na Property (próxima execução pula essa lógica)
+  props.setProperty('DRIVE_FOLDER_ID', recepcao.getId());
+  Logger.log('Pasta auto-criada: ' + recepcao.getUrl());
+
+  return recepcao;
+}
+
+function _getOrCreateChild(parent, name) {
+  var iter = parent.getFoldersByName(name);
+  if (iter.hasNext()) return iter.next();
+  return parent.createFolder(name);
 }
 
 // =============================================================================
