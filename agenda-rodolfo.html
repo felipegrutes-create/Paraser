@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda Dr. Rodolfo — Horários Livres</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --roxo:#5b2a86; --roxo2:#7c3aed; --dourado:#c2922f; --creme:#faf6ef;
+    --text:#2d2438; --muted:#8a7f95; --linha:#ece4f2;
+    --livre:#15803d; --livre-bg:#dcfce7; --livre-bd:#86efac;
+    --ocup:#9f1239;  --ocup-bg:#fbe9ee;  --ocup-bd:#f3c0cd;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--creme);color:var(--text);
+    font-family:'Inter',system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  header.top{background:linear-gradient(120deg,var(--roxo),var(--roxo2));color:#fff;
+    padding:22px 24px 18px}
+  header.top h1{font-family:'Playfair Display',serif;font-weight:700;margin:0;font-size:26px;letter-spacing:.2px}
+  header.top .sub{opacity:.9;margin-top:4px;font-size:14px}
+  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:12px 24px;background:#fff;border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:5}
+  .btn{border:none;background:var(--roxo2);color:#fff;font-weight:600;font-size:14px;
+    padding:9px 16px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.55;cursor:default}
+  .bar .meta{color:var(--muted);font-size:13px}
+  main{padding:22px 24px 60px;max-width:1180px;margin:0 auto}
+
+  /* HOJE — destaque */
+  .hoje{background:#fff;border:2px solid var(--roxo2);border-radius:16px;
+    box-shadow:0 12px 34px rgba(91,42,134,.12);overflow:hidden;margin-bottom:26px}
+  .hoje-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    padding:18px 22px;background:linear-gradient(90deg,rgba(124,58,237,.08),transparent)}
+  .hoje-head .dia{font-family:'Playfair Display',serif;font-size:22px;font-weight:700}
+  .hoje-head .dia small{display:block;font-family:'Inter';font-weight:500;font-size:13px;color:var(--muted);text-transform:capitalize}
+  .resumo{display:flex;gap:10px;flex-wrap:wrap}
+  .pill{font-weight:700;font-size:14px;padding:7px 14px;border-radius:999px}
+  .pill.livre{background:var(--livre-bg);color:var(--livre);border:1px solid var(--livre-bd)}
+  .pill.ocup{background:var(--ocup-bg);color:var(--ocup);border:1px solid var(--ocup-bd)}
+  .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;padding:18px 22px 24px}
+  .slot{border-radius:11px;padding:12px 10px;text-align:center;font-weight:600;font-size:15px;border:1px solid}
+  .slot .lab{display:block;font-size:11px;font-weight:600;letter-spacing:.4px;margin-top:3px;text-transform:uppercase}
+  .slot.livre{background:var(--livre-bg);border-color:var(--livre-bd);color:var(--livre)}
+  .slot.livre .lab{color:var(--livre)}
+  .slot.ocup{background:var(--ocup-bg);border-color:var(--ocup-bd);color:var(--ocup);opacity:.85}
+  .slot.ocup .lab{color:var(--ocup)}
+  .vazio{padding:22px;color:var(--muted);font-size:15px}
+
+  /* PRÓXIMOS DIAS — compacto */
+  h2.secn{font-family:'Playfair Display',serif;font-size:18px;margin:0 0 14px;color:var(--roxo)}
+  .futuros{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  .card{background:#fff;border:1px solid var(--linha);border-radius:13px;padding:14px 16px}
+  .card .ch{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  .card .ch .d{font-weight:700;font-size:15px;text-transform:capitalize}
+  .card .ch .d small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+  .badge{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--livre-bg);color:var(--livre);border:1px solid var(--livre-bd);white-space:nowrap}
+  .badge.zero{background:#f4f1f7;color:var(--muted);border-color:var(--linha)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:13px;font-weight:600;padding:5px 9px;border-radius:8px;background:var(--livre-bg);color:var(--livre);border:1px solid var(--livre-bd)}
+  .card .nota{color:var(--muted);font-size:13px}
+
+  footer{max-width:1180px;margin:0 auto;padding:0 24px 50px;color:var(--muted);font-size:12.5px;line-height:1.6}
+  .erro{background:var(--ocup-bg);color:var(--ocup);border:1px solid var(--ocup-bd);padding:14px 18px;border-radius:11px;margin-bottom:20px}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px}
+  @keyframes r{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Agenda · Dr. Rodolfo Salvato</h1>
+  <div class="sub">Horários livres para encaixe — uso da recepção</div>
+</header>
+
+<div class="bar">
+  <button class="btn" id="btnRefresh" onclick="carregar()">🔄 Atualizar</button>
+  <span class="meta" id="metaAtualizado">Carregando…</span>
+</div>
+
+<main>
+  <div id="erro"></div>
+  <section class="hoje" id="hoje"></section>
+  <h2 class="secn">Próximos dias</h2>
+  <div class="futuros" id="futuros"></div>
+</main>
+
+<footer>
+  Mostra a agenda do Dr. Rodolfo direto do Feegow (ao vivo). Os horários <b>verdes</b> estão livres dentro do dia de atendimento dele;
+  os <b>vermelhos</b> já estão ocupados. Horários cancelados/remarcados aparecem como livres automaticamente.
+  Atualiza sozinho a cada 5 minutos. Antes de confirmar um encaixe, vale conferir no Feegow.
+</footer>
+
+<script>
+  // ===== Config =====
+  const PROXY_URL  = "https://script.google.com/macros/s/AKfycbzVhtXPGjYwJmoKTj3sd9_EF86xcIyLuQMWWyMT33R59C-B4xVZMoD70qEn7pK6MF1ncA/exec";
+  const RODOLFO_ID = 3;
+  const SLOT       = 30;            // minutos por bloco
+  const DIAS_FRENTE= 6;            // hoje + 6 = 7 dias
+  const GONE       = [11,15,22];   // desmarcado / remarcado / cancelado → libera o horário
+  const REFRESH_MS = 5*60*1000;
+  const SEMANA = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+
+  // ===== Helpers =====
+  const pad = n => String(n).padStart(2,'0');
+  const fmtFeegow = d => pad(d.getDate())+'-'+pad(d.getMonth()+1)+'-'+d.getFullYear(); // DD-MM-YYYY
+  const hmToMin = hm => { const [a,b]=hm.split(':'); return (+a)*60+(+b); };
+  const minToHm = m => pad(Math.floor(m/60))+':'+pad(m%60);
+  const dateFromKey = k => { const [d,m,y]=k.split('-'); return new Date(+y,+m-1,+d); };
+  const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+
+  async function feegowFetch(endpoint, params={}) {
+    const qs = new URLSearchParams({ action:'feegow_proxy', endpoint });
+    Object.entries(params).forEach(([k,v]) => { if(v!==undefined&&v!==null&&v!=='') qs.set(k,v); });
+    const r = await fetch(PROXY_URL + '?' + qs.toString());
+    if(!r.ok) throw new Error('Proxy HTTP '+r.status);
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    return d;
+  }
+
+  // Para um dia, devolve { ocupados:Set(minInicioDosBlocos), inicio, fim } ou null se sem atendimento
+  function computaDia(appts) {
+    if(!appts || !appts.length) return null;
+    const ocup = new Set();
+    let min = 24*60, max = 0;
+    appts.forEach(a => {
+      const ini = Math.floor(a.start/SLOT)*SLOT;
+      const fim = a.start + a.dur;
+      for(let m=ini; m<fim; m+=SLOT) ocup.add(m);
+      if(ini<min) min=ini;
+      if(fim>max) max=fim;
+    });
+    const fimGrade = Math.ceil(max/SLOT)*SLOT;
+    return { ocup, inicio:min, fim:fimGrade };
+  }
+
+  function slotsLivres(dia) {
+    if(!dia) return [];
+    const livres=[];
+    for(let m=dia.inicio; m<dia.fim; m+=SLOT) if(!dia.ocup.has(m)) livres.push(m);
+    return livres;
+  }
+
+  // ===== Render =====
+  function renderHoje(key, appts) {
+    const el = document.getElementById('hoje');
+    const dt = dateFromKey(key);
+    const titulo = `<div class="dia">Hoje<small>${cap(SEMANA[dt.getDay()])}, ${key.slice(0,5)}</small></div>`;
+    const dia = computaDia(appts);
+
+    if(!dia) {
+      el.innerHTML = `<div class="hoje-head">${titulo}
+        <div class="resumo"><span class="pill ocup">Sem agendamentos hoje</span></div></div>
+        <div class="vazio">Nenhum agendamento do Dr. Rodolfo hoje. Confirme se ele atende neste dia.</div>`;
+      return;
+    }
+    const livres = slotsLivres(dia);
+    const totalBlocos = (dia.fim - dia.inicio)/SLOT;
+    let grade='';
+    for(let m=dia.inicio; m<dia.fim; m+=SLOT) {
+      const livre = !dia.ocup.has(m);
+      grade += `<div class="slot ${livre?'livre':'ocup'}">${minToHm(m)}<span class="lab">${livre?'livre':'ocupado'}</span></div>`;
+    }
+    el.innerHTML = `<div class="hoje-head">${titulo}
+      <div class="resumo">
+        <span class="pill livre">🟢 ${livres.length} livre${livres.length!==1?'s':''}</span>
+        <span class="pill ocup">🔴 ${totalBlocos-livres.length} ocupado${(totalBlocos-livres.length)!==1?'s':''}</span>
+      </div></div>
+      <div class="grade">${grade}</div>`;
+  }
+
+  function renderFuturos(keys, byDay) {
+    const wrap = document.getElementById('futuros');
+    wrap.innerHTML = keys.map(key => {
+      const dt = dateFromKey(key);
+      const cab = `<div class="ch"><div class="d">${cap(SEMANA[dt.getDay()])}<small>${key.slice(0,5)}</small></div>`;
+      const dia = computaDia(byDay[key]);
+      if(!dia) return `<div class="card">${cab}<span class="badge zero">—</span></div><div class="nota">Sem agendamentos</div></div>`;
+      const livres = slotsLivres(dia);
+      const badge = livres.length
+        ? `<span class="badge">${livres.length} livre${livres.length!==1?'s':''}</span></div>`
+        : `<span class="badge zero">cheia</span></div>`;
+      const chips = livres.length
+        ? `<div class="chips">${livres.map(m=>`<span class="chip">${minToHm(m)}</span>`).join('')}</div>`
+        : `<div class="nota">Agenda cheia 🔴</div>`;
+      return `<div class="card">${cab}${badge}${chips}</div>`;
+    }).join('');
+  }
+
+  // ===== Carga =====
+  let _carregando = false;
+  async function carregar() {
+    if(_carregando) return;
+    _carregando = true;
+    const btn = document.getElementById('btnRefresh');
+    const meta = document.getElementById('metaAtualizado');
+    const erro = document.getElementById('erro');
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Atualizando…';
+    erro.innerHTML = '';
+    try {
+      const hoje = new Date(); hoje.setHours(0,0,0,0);
+      const fim = new Date(hoje); fim.setDate(fim.getDate()+DIAS_FRENTE);
+      const data = await feegowFetch('/appoints/search', { data_start:fmtFeegow(hoje), data_end:fmtFeegow(fim) });
+      const todos = Array.isArray(data.content) ? data.content : [];
+
+      // filtra Rodolfo + agendamentos vivos (não cancelados/remarcados)
+      const byDay = {};
+      todos.filter(a => String(a.profissional_id)===String(RODOLFO_ID) && GONE.indexOf(Number(a.status_id))<0)
+        .forEach(a => {
+          const hm = (a.horario||'').slice(0,5);
+          if(!/^\d{2}:\d{2}$/.test(hm)) return;
+          const start = hmToMin(hm);
+          const dur = Math.max(SLOT, parseInt(a.duracao)||SLOT);
+          (byDay[a.data] = byDay[a.data]||[]).push({ start, dur });
+        });
+
+      // monta lista de dias hoje..+N
+      const keys = [];
+      for(let i=0;i<=DIAS_FRENTE;i++){ const d=new Date(hoje); d.setDate(d.getDate()+i); keys.push(fmtFeegow(d)); }
+
+      renderHoje(keys[0], byDay[keys[0]]);
+      renderFuturos(keys.slice(1), byDay);
+
+      const agora = new Date();
+      meta.textContent = `Atualizado às ${pad(agora.getHours())}:${pad(agora.getMinutes())} · dados ao vivo do Feegow`;
+    } catch(e) {
+      erro.innerHTML = `<div class="erro"><b>Não consegui carregar a agenda.</b> ${e.message}. Tente “Atualizar” de novo em instantes.</div>`;
+      meta.textContent = 'Falha ao atualizar';
+    } finally {
+      btn.disabled = false; btn.innerHTML = '🔄 Atualizar';
+      _carregando = false;
+    }
+  }
+
+  carregar();
+  setInterval(carregar, REFRESH_MS);
+</script>
+</body>
+</html>
