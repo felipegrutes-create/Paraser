@@ -70,11 +70,10 @@ Quando atendente humana **confirma o pré-agendamento** no Dashboard → contato
 ### Diagrama geral
 
 ```
-ENTRADAS
+ENTRADAS (MVP cobre 3 — Instagram DM fora de escopo)
 ├─ Meta Ad "Saiba mais"  → LP/Quiz (GitHub Pages)  ───┐
 ├─ Meta Ad "Enviar Msg"  → WhatsApp Z-API             ├─→
-├─ Site → botão WhatsApp → WhatsApp Z-API             │
-└─ Instagram DM (manual) → WhatsApp Z-API             ┘
+└─ Site → botão WhatsApp → WhatsApp Z-API             ┘
                                                        ▼
 APPS SCRIPTS (cérebro)
 ├─ ana-quiz       : recebe submissão LP, dispara mensagem WhatsApp inicial
@@ -235,8 +234,8 @@ Live em `app.paraser.com.br/ana/dashboard` — HTML single-page no estilo `index
 | **Config ANA** | Persona, regras, palavras-chave de red flag. Controle Felipe (mudanças críticas pedem confirmação). |
 
 ### Quem usa
-- **Pessoa dedicada** (a contratar — Roberta no mockup) opera diariamente
-- **Felipe** edita Config ANA e revisa amostras
+- **Pessoa dedicada** (Felipe já contratou — colabora no design do Dashboard na Fase 2) opera diariamente
+- **Felipe** edita Config ANA e revisa amostras semanalmente
 
 ---
 
