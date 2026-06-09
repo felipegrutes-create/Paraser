@@ -281,6 +281,15 @@ function enviarConfirmacoes() {
                   ? 'amanhã'
                   : DIAS_SEMANA[dia.getDay()];
 
+  // Antes de enviar: confirma que a instância Z-API (WhatsApp) está conectada.
+  // Sem isso, o Z-API aceita o envio (HTTP 200) mas não entrega — e o Slack
+  // reportaria "enviado" falsamente. Se estiver offline, aborta e avisa.
+  if (!zapiConectado()) {
+    Logger.log('🚨 Z-API DESCONECTADO — nenhuma confirmação enviada para ' + dataStr + '.');
+    notificarZapiDesconectado(dataStr, agendamentos.length);
+    return;
+  }
+
   var enviados = 0, semTemplate = 0, semTelefone = 0, erros = 0;
 
   agendamentos.forEach(function(ag) {
@@ -754,6 +763,29 @@ function sendWhatsApp(phone, message) {
 }
 
 // ================================================================
+// Z-API — verifica se a instância (WhatsApp do celular) está conectada.
+// Retorna true só se o WhatsApp está online e pronto pra enviar.
+// Qualquer falha na checagem retorna false (falha segura: não envia às cegas).
+// ================================================================
+function zapiConectado() {
+  var url = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID + '/token/' + CF_ZAPI_TOKEN + '/status';
+  var headers = {};
+  if (CF_ZAPI_CLIENT_TOKEN) headers['Client-Token'] = CF_ZAPI_CLIENT_TOKEN;
+  var resp = UrlFetchApp.fetch(url, {
+    method:      'GET',
+    headers:     headers,
+    muteHttpExceptions: true
+  });
+  var code = resp.getResponseCode();
+  if (code < 200 || code >= 300) {
+    Logger.log('zapiConectado: HTTP ' + code + ' ' + resp.getContentText().substring(0, 200));
+    return false;
+  }
+  var data = JSON.parse(resp.getContentText());
+  return data.connected === true;
+}
+
+// ================================================================
 // LISTA DE PACIENTES — configura trigger às 8h para esta função
 // Popula a aba "Pacientes_Amanha" com nomes formatados (≤40 chars)
 // para a recepção usar no Keyaccess antes das 10h30
@@ -922,6 +954,27 @@ function notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone,
     });
   } catch(e) {
     Logger.log('notificarSlackConfirmacoes erro: ' + e.message);
+  }
+}
+
+// ================================================================
+// SLACK — avisa que o Z-API está desconectado e NADA foi enviado
+// ================================================================
+function notificarZapiDesconectado(dataStr, total) {
+  try {
+    var channelId = slackGetChannelId(CF_SLACK_CHANNEL);
+    var texto = '🚨 *Z-API DESCONECTADO — confirmações de ' + dataStr + ' NÃO foram enviadas*\n' +
+                total + ' paciente(s) ficaram SEM confirmação.\n' +
+                'O WhatsApp da clínica está desconectado. Reconecte o QR Code em app.z-api.io ' +
+                'e rode as confirmações de novo.';
+    UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+      method:      'post',
+      contentType: 'application/json; charset=utf-8',
+      headers:     { Authorization: 'Bearer ' + CF_SLACK_TOKEN },
+      payload:     JSON.stringify({ channel: channelId, text: texto })
+    });
+  } catch(e) {
+    Logger.log('notificarZapiDesconectado erro: ' + e.message);
   }
 }
 

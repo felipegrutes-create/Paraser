@@ -13,3 +13,6 @@ desktop.ini
 leads-meta.csv
 leads-meta-brevo.csv
 leads-*.csv
+
+# Clone clasp local do "Confirmações Agenda" (fonte versionada é confirmacoes-whatsapp.gs)
+apps-script-confirmacoes/
