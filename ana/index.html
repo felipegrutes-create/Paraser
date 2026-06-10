@@ -153,11 +153,38 @@
       </div>
     </div>
 
-    <!-- Task 16 adiciona step 6 (contato + envio) e step 7 (transição WhatsApp) -->
+    <!-- Q6: Nome + Telefone -->
+    <div class="step" id="step-6">
+      <div class="quiz-card">
+        <div class="quiz-step">Última etapa</div>
+        <div class="progress"><div class="progress-bar" style="width:100%"></div></div>
+        <h3 class="quiz-question">Como podemos te chamar?</h3>
+        <input type="text" id="nome" placeholder="Seu primeiro nome" oninput="checkFinal()" style="width:100%;padding:14px;border:1px solid #d4b888;font-family:'Lora',serif;font-size:14px;margin-bottom:12px;box-sizing:border-box;" />
+        <input type="tel" id="telefone" placeholder="WhatsApp (com DDD)" oninput="checkFinal()" style="width:100%;padding:14px;border:1px solid #d4b888;font-family:'Lora',serif;font-size:14px;margin-bottom:24px;box-sizing:border-box;" />
+        <div class="quiz-actions">
+          <button class="btn-back" onclick="showStep(5)">← voltar</button>
+          <button class="btn-primary" id="submit-btn" disabled onclick="enviarQuiz()">Continuar no WhatsApp →</button>
+        </div>
+        <div id="erro-final" style="color:#c97a8c;font-size:13px;margin-top:14px;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Sucesso -->
+    <div class="step" id="step-7">
+      <div class="quiz-card" style="text-align:center;border:2px solid #d4b888;">
+        <div style="font-family:'Playfair Display',serif;font-style:italic;color:#3d1652;font-size:26px;margin-bottom:18px;">Tenho ideias pra você. 💜</div>
+        <p style="color:#5a4868;font-size:15px;line-height:1.7;margin-bottom:28px;">Vou te apresentar pessoalmente no WhatsApp. Toque no botão pra abrir nossa conversa.</p>
+        <a id="link-whatsapp" href="#" style="background:#25D366;color:#fff;border:0;padding:16px 32px;font-family:'Playfair Display',serif;font-size:14px;letter-spacing:2px;text-decoration:none;border-radius:8px;display:inline-block;">📱 Abrir WhatsApp →</a>
+        <p style="color:#a08660;font-size:11px;margin-top:18px;">Você vai conversar com a Ana, atendente da Paraser.</p>
+      </div>
+    </div>
 
   </div>
 </div>
 <script>
+  const QUIZ_WEBHOOK = 'COLE_AQUI_A_URL_DO_ANA_QUIZ'; // preenchido na Task 17
+  const WHATSAPP_NUMERO = '552130344130';
+
   let currentStep = 0;
   const respostas = {};
 
@@ -177,6 +204,49 @@
     const txt = document.getElementById('answer-' + step).value.trim();
     respostas['q' + step] = txt;
     document.getElementById('next-' + step).disabled = txt.length < 5;
+  }
+  function checkFinal() {
+    const nome = document.getElementById('nome').value.trim();
+    const tel = document.getElementById('telefone').value.replace(/\D/g, '');
+    document.getElementById('submit-btn').disabled = !(nome.length >= 2 && tel.length >= 10);
+  }
+
+  async function enviarQuiz() {
+    const btn = document.getElementById('submit-btn');
+    const erro = document.getElementById('erro-final');
+    btn.disabled = true;
+    erro.style.display = 'none';
+
+    const nome = document.getElementById('nome').value.trim();
+    let tel = document.getElementById('telefone').value.replace(/\D/g, '');
+    if (!tel.startsWith('55')) tel = '55' + tel;
+
+    const payload = {
+      nome: nome,
+      telefone: tel,
+      respostas: respostas,
+      timestamp: new Date().toISOString(),
+      origem: document.referrer || 'direto'
+    };
+
+    try {
+      const resp = await fetch(QUIZ_WEBHOOK, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+      });
+      const result = await resp.json();
+      if (!result.ok) throw new Error(result.error || 'erro desconhecido');
+
+      // Abre WhatsApp com mensagem inicial
+      const ref = encodeURIComponent('Oi! Vim do quiz da Paraser. Acabei de responder. Quero conversar 💜');
+      document.getElementById('link-whatsapp').href = `https://wa.me/${WHATSAPP_NUMERO}?text=${ref}`;
+      showStep(7);
+    } catch (e) {
+      erro.textContent = 'não consegui enviar. tenta de novo? (' + e.message + ')';
+      erro.style.display = 'block';
+      btn.disabled = false;
+    }
   }
 </script>
 </body>
