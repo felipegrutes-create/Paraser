@@ -101,11 +101,57 @@ function doPost(e) {
   }
 }
 
-// Permite chamadas OPTIONS preflight (CORS)
-function doGet() {
+// Permite chamadas OPTIONS preflight (CORS) + diagnóstico via ?action=diag&key=...
+function doGet(e) {
+  var params = (e && e.parameter) || {};
+  if (params.action === 'diag' && params.key === 'paraser2026') {
+    return ContentService
+      .createTextOutput(JSON.stringify(coletarDiagnostico_(), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, message: 'Recrutamento Paraser webhook ativo' }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function coletarDiagnostico_() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty('DRIVE_FOLDER_ID');
+  var out = { drive_folder_id_property: folderId, eh_url: false, pasta_property: null, pasta_auto_criada: null };
+
+  if (folderId && folderId.indexOf('http') !== -1) out.eh_url = true;
+  if (folderId && folderId.indexOf('http') === -1 && folderId.length > 15) {
+    try {
+      var f = DriveApp.getFolderById(folderId);
+      out.pasta_property = { nome: f.getName(), url: f.getUrl(), id: f.getId() };
+    } catch (e) { out.pasta_property = { erro: e.message }; }
+  }
+
+  var root = DriveApp.getRootFolder();
+  var p = root.getFoldersByName('Paraser');
+  if (p.hasNext()) {
+    var paraser = p.next();
+    var rh = paraser.getFoldersByName('RH');
+    if (rh.hasNext()) {
+      var rhF = rh.next();
+      var rec = rhF.getFoldersByName('Recepcao 2026 - CVs');
+      if (rec.hasNext()) {
+        var recF = rec.next();
+        var files = recF.getFiles();
+        var arr = [];
+        while (files.hasNext()) {
+          var ff = files.next();
+          arr.push({ nome: ff.getName(), url: ff.getUrl(), data: ff.getDateCreated().toISOString() });
+        }
+        out.pasta_auto_criada = {
+          nome: recF.getName(), url: recF.getUrl(), id: recF.getId(),
+          total_arquivos: arr.length, arquivos: arr
+        };
+      } else out.pasta_auto_criada = { erro: 'Pasta "Recepcao 2026 - CVs" não existe dentro de Paraser/RH' };
+    } else out.pasta_auto_criada = { erro: 'Pasta "RH" não existe dentro de Paraser' };
+  } else out.pasta_auto_criada = { erro: 'Pasta "Paraser" não existe no root' };
+
+  return out;
 }
 
 // =============================================================================
@@ -268,6 +314,90 @@ function sanitizarNome(nome) {
 // Toca todos os serviços que doPost precisa, força autorização dos scopes,
 // e o Web App passa a aceitar requests anônimos depois disso.
 // =============================================================================
+// =============================================================================
+// DIAGNÓSTICO — onde estão os CVs? Roda e me manda o log
+// =============================================================================
+function diagnosticarDrive() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty('DRIVE_FOLDER_ID');
+
+  Logger.log('========= DIAGNÓSTICO DRIVE_FOLDER_ID =========');
+  Logger.log('Valor atual da Property: ' + folderId);
+  Logger.log('É URL? ' + (folderId && folderId.indexOf('http') !== -1 ? 'SIM (inválido, vai auto-criar)' : 'NÃO'));
+  Logger.log('---');
+
+  var folderUsada = null;
+  if (folderId && folderId.indexOf('http') === -1 && folderId.length > 15) {
+    try {
+      folderUsada = DriveApp.getFolderById(folderId);
+      Logger.log('✓ Pasta da Property abre OK:');
+      Logger.log('  Nome: ' + folderUsada.getName());
+      Logger.log('  URL:  ' + folderUsada.getUrl());
+    } catch (e) {
+      Logger.log('✗ Pasta da Property NÃO ABRE: ' + e.message);
+    }
+  }
+
+  Logger.log('---');
+  Logger.log('Procurando pasta auto-criada "Paraser/RH/Recepcao 2026 - CVs"...');
+  var root2 = DriveApp.getRootFolder();
+  var paraserIter = root2.getFoldersByName('Paraser');
+  if (paraserIter.hasNext()) {
+    var paraser = paraserIter.next();
+    Logger.log('  ✓ Achei "Paraser" no root');
+    var rhIter = paraser.getFoldersByName('RH');
+    if (rhIter.hasNext()) {
+      var rh = rhIter.next();
+      Logger.log('  ✓ Achei "Paraser/RH"');
+      var recepIter = rh.getFoldersByName('Recepcao 2026 - CVs');
+      if (recepIter.hasNext()) {
+        var recep = recepIter.next();
+        Logger.log('  ✓ Achei "Paraser/RH/Recepcao 2026 - CVs"');
+        Logger.log('  URL: ' + recep.getUrl());
+        Logger.log('  ID:  ' + recep.getId());
+        var files = recep.getFiles();
+        var count = 0;
+        var samples = [];
+        while (files.hasNext()) {
+          var f = files.next();
+          count++;
+          if (samples.length < 10) samples.push(f.getName());
+        }
+        Logger.log('  Arquivos: ' + count);
+        samples.forEach(function(s, i) { Logger.log('   #' + (i+1) + ': ' + s); });
+      } else {
+        Logger.log('  ✗ Não tem "Recepcao 2026 - CVs" dentro de Paraser/RH');
+      }
+    } else {
+      Logger.log('  ✗ Não tem "RH" dentro de Paraser');
+    }
+  } else {
+    Logger.log('  ✗ Não tem pasta "Paraser" no root do Drive');
+  }
+  Logger.log('========= FIM =========');
+}
+
+// =============================================================================
+// MOVER PROPERTY — depois do diagnóstico, troca a Property pra pasta certa.
+// Edite NOVA_PASTA_ID com o ID da pasta que você quer e rode 1x.
+// =============================================================================
+function moverParaPasta() {
+  var NOVA_PASTA_ID = 'COLE_AQUI_O_ID_DA_PASTA_DESEJADA';
+  if (NOVA_PASTA_ID === 'COLE_AQUI_O_ID_DA_PASTA_DESEJADA') {
+    Logger.log('⚠️ Edite NOVA_PASTA_ID na função moverParaPasta antes de rodar.');
+    return;
+  }
+  try {
+    var folder = DriveApp.getFolderById(NOVA_PASTA_ID);
+    PropertiesService.getScriptProperties().setProperty('DRIVE_FOLDER_ID', NOVA_PASTA_ID);
+    Logger.log('✅ DRIVE_FOLDER_ID atualizado.');
+    Logger.log('Próximos CVs vão pra: ' + folder.getName());
+    Logger.log('URL: ' + folder.getUrl());
+  } catch (e) {
+    Logger.log('✗ Erro abrindo pasta: ' + e.message + '. Confira o ID.');
+  }
+}
+
 function autorizarTudo() {
   // 1) Drive
   var root = DriveApp.getRootFolder();
