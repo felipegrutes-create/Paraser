@@ -32,7 +32,18 @@
   .btn-primary:disabled { background: #5a4868; cursor: not-allowed; }
   .step { display: none; }
   .step.active { display: block; }
-  /* TODO Task 15: estilos do quiz */
+  .quiz-card { background: #fff; max-width: 520px; margin: 0 auto; padding: 32px; border: 1px solid #e8d8b8; }
+  .quiz-step { font-family: 'Playfair Display', serif; font-size: 10px; letter-spacing: 4px; color: #a08660; text-transform: uppercase; margin-bottom: 14px; }
+  .progress { background: #f0e0c4; height: 4px; margin-bottom: 28px; overflow: hidden; }
+  .progress-bar { background: #3d1652; height: 100%; transition: width .3s; }
+  .quiz-question { font-family: 'Playfair Display', serif; font-style: italic; color: #1a0626; font-size: 24px; line-height: 1.3; margin-bottom: 22px; font-weight: 400; }
+  .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .option { border: 1px solid #d4b888; padding: 14px 18px; border-radius: 4px; font-family: 'Lora', serif; color: #3d1652; cursor: pointer; }
+  .option:hover { background: #faf4ea; }
+  .option.selected { background: #faf4ea; border-color: #3d1652; border-width: 2px; padding: 13px 17px; }
+  .quiz-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+  .btn-back { background: transparent; border: 0; color: #a08660; font-family: 'Playfair Display', serif; font-size: 13px; cursor: pointer; }
+  textarea { width: 100%; padding: 14px; border: 1px solid #d4b888; font-family: 'Lora', serif; font-size: 14px; min-height: 100px; resize: vertical; margin-bottom: 24px; box-sizing: border-box; }
 </style>
 </head>
 <body>
@@ -53,18 +64,119 @@
       </div>
     </div>
 
-    <!-- Task 15 adiciona steps 1-5 do quiz -->
+    <!-- Q1: Tempo tentando -->
+    <div class="step" id="step-1">
+      <div class="quiz-card">
+        <div class="quiz-step">Pergunta 1 de 5</div>
+        <div class="progress"><div class="progress-bar" style="width:20%"></div></div>
+        <h3 class="quiz-question">Há quanto tempo você tenta engravidar?</h3>
+        <div class="options">
+          <div class="option" data-value="lt6m" onclick="selectOpt(this,1)">Menos de 6 meses</div>
+          <div class="option" data-value="6m-1y" onclick="selectOpt(this,1)">6 meses a 1 ano</div>
+          <div class="option" data-value="1-2y" onclick="selectOpt(this,1)">1 a 2 anos</div>
+          <div class="option" data-value="gt3y" onclick="selectOpt(this,1)">Mais de 3 anos</div>
+        </div>
+        <div class="quiz-actions">
+          <button class="btn-back" onclick="showStep(0)">← voltar</button>
+          <button class="btn-primary" id="next-1" disabled onclick="next()">Continuar →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Q2: Idade -->
+    <div class="step" id="step-2">
+      <div class="quiz-card">
+        <div class="quiz-step">Pergunta 2 de 5</div>
+        <div class="progress"><div class="progress-bar" style="width:40%"></div></div>
+        <h3 class="quiz-question">Sua idade?</h3>
+        <div class="options">
+          <div class="option" data-value="lt30" onclick="selectOpt(this,2)">Menos de 30 anos</div>
+          <div class="option" data-value="30-35" onclick="selectOpt(this,2)">30 a 35 anos</div>
+          <div class="option" data-value="36-40" onclick="selectOpt(this,2)">36 a 40 anos</div>
+          <div class="option" data-value="gt40" onclick="selectOpt(this,2)">Mais de 40 anos</div>
+        </div>
+        <div class="quiz-actions">
+          <button class="btn-back" onclick="showStep(1)">← voltar</button>
+          <button class="btn-primary" id="next-2" disabled onclick="next()">Continuar →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Q3: Especialista anterior -->
+    <div class="step" id="step-3">
+      <div class="quiz-card">
+        <div class="quiz-step">Pergunta 3 de 5</div>
+        <div class="progress"><div class="progress-bar" style="width:60%"></div></div>
+        <h3 class="quiz-question">Já consultou um especialista em fertilidade antes?</h3>
+        <div class="options">
+          <div class="option" data-value="nao" onclick="selectOpt(this,3)">Não, ainda não</div>
+          <div class="option" data-value="sim_sem_tratamento" onclick="selectOpt(this,3)">Sim, fiz consulta mas não iniciei tratamento</div>
+          <div class="option" data-value="sim_iiu" onclick="selectOpt(this,3)">Sim, fiz IIU (inseminação)</div>
+          <div class="option" data-value="sim_fiv" onclick="selectOpt(this,3)">Sim, fiz FIV (uma ou mais vezes)</div>
+        </div>
+        <div class="quiz-actions">
+          <button class="btn-back" onclick="showStep(2)">← voltar</button>
+          <button class="btn-primary" id="next-3" disabled onclick="next()">Continuar →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Q4: Plano vs particular -->
+    <div class="step" id="step-4">
+      <div class="quiz-card">
+        <div class="quiz-step">Pergunta 4 de 5</div>
+        <div class="progress"><div class="progress-bar" style="width:80%"></div></div>
+        <h3 class="quiz-question">Tem plano de saúde ou prefere particular?</h3>
+        <div class="options">
+          <div class="option" data-value="plano" onclick="selectOpt(this,4)">Tenho plano de saúde</div>
+          <div class="option" data-value="particular" onclick="selectOpt(this,4)">Vou pagar particular</div>
+          <div class="option" data-value="indeciso" onclick="selectOpt(this,4)">Ainda não sei</div>
+        </div>
+        <div class="quiz-actions">
+          <button class="btn-back" onclick="showStep(3)">← voltar</button>
+          <button class="btn-primary" id="next-4" disabled onclick="next()">Continuar →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Q5: Dúvida principal (aberta) -->
+    <div class="step" id="step-5">
+      <div class="quiz-card">
+        <div class="quiz-step">Pergunta 5 de 5</div>
+        <div class="progress"><div class="progress-bar" style="width:100%"></div></div>
+        <h3 class="quiz-question">Qual sua principal dúvida ou expectativa hoje?</h3>
+        <textarea id="answer-5" placeholder="Pode falar de qualquer coisa: medo, dúvida sobre custo, dúvida médica, motivação..." oninput="checkOpenAnswer(5)"></textarea>
+        <div class="quiz-actions">
+          <button class="btn-back" onclick="showStep(4)">← voltar</button>
+          <button class="btn-primary" id="next-5" disabled onclick="next()">Continuar →</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Task 16 adiciona step 6 (contato + envio) e step 7 (transição WhatsApp) -->
 
   </div>
 </div>
 <script>
   let currentStep = 0;
+  const respostas = {};
+
   function next() { showStep(currentStep + 1); }
   function showStep(n) {
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     const el = document.getElementById('step-' + n);
     if (el) { el.classList.add('active'); currentStep = n; window.scrollTo({top:0,behavior:'smooth'}); }
+  }
+  function selectOpt(el, step) {
+    el.parentElement.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    respostas['q' + step] = el.dataset.value;
+    document.getElementById('next-' + step).disabled = false;
+  }
+  function checkOpenAnswer(step) {
+    const txt = document.getElementById('answer-' + step).value.trim();
+    respostas['q' + step] = txt;
+    document.getElementById('next-' + step).disabled = txt.length < 5;
   }
 </script>
 </body>
