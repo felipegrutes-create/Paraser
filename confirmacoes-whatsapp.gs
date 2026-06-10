@@ -25,6 +25,7 @@ const CF_SPREADSHEET_ID    = _P.getProperty('SPREADSHEET_ID');
 const CF_CONFIG_SHEET      = 'Config';
 const CF_QR_LINK_CELL      = 'B1';
 const CF_LOG_SHEET         = 'Confirmacoes_Log';
+const CF_PENDENTES_SHEET   = 'Confirmacoes_Pendentes'; // fila de quem recebeu o botão Sim/Não
 
 // ================================================================
 // ENDEREÇO (bloco fixo inserido nos templates presenciais)
@@ -334,6 +335,19 @@ function enviarConfirmacoes() {
         Utilities.sleep(1500);
         sendWhatsApp(phone, TMPL.ACOMPANHANTES);
         Utilities.sleep(1500);
+      }
+
+      // Pergunta de confirmação com botão Sim/Não — só pra quem ainda NÃO confirmou (status != 7).
+      // Quando a paciente responde Sim, o webhook (doPost) muda o status no Feegow pra 7.
+      if (Number(ag.status_id) !== 7) {
+        var agId = ag.agendamento_id || ag.id || ag.agenda_id;
+        if (agId) {
+          sendBotaoConfirmacao(phone, agId);
+          registrarPendente(phone, ag.paciente_nome || '', agId, dataStr);
+          Utilities.sleep(1500);
+        } else {
+          Logger.log('Sem agendamento_id pro botão — campos: ' + Object.keys(ag).join(', '));
+        }
       }
 
       logRow(ag, 'ENVIADO', phone, tmplKey);
@@ -1668,4 +1682,373 @@ function testeEnvio() {
     Utilities.sleep(3000);
   });
   */
+}
+
+// ================================================================
+// ================================================================
+// CONFIRMAÇÃO INTERATIVA (Sim/Não) — botão WhatsApp + webhook + Feegow
+// ----------------------------------------------------------------
+// Fluxo:
+//  1) enviarConfirmacoes() chama sendBotaoConfirmacao() e registrarPendente()
+//  2) paciente clica Sim/Não (ou responde texto) -> Z-API chama doPost()
+//  3) Sim  -> confirmarFeegow() muda status 1->7  + avisa Slack
+//     Não  -> só avisa Slack (recepção reagenda manual)
+// ================================================================
+
+// ----------------------------------------------------------------
+// WEBHOOK — Z-API chama esta URL a cada mensagem recebida.
+// Ignora tudo que não for resposta a uma confirmação pendente.
+// ----------------------------------------------------------------
+function doPost(e) {
+  try {
+    var body = JSON.parse(e.postData.contents);
+    if (body.fromMe === true) return _okText();
+
+    var r = interpretarResposta(body);
+    if (!r.phone || !r.answer) return _okText(); // não é Sim/Não -> ignora
+
+    processarResposta(r.phone, r.answer);
+  } catch (err) {
+    Logger.log('doPost erro: ' + err.message);
+  }
+  return _okText(); // sempre 200 pro Z-API não reenviar em loop
+}
+
+function doGet(e) {
+  var params = (e && e.parameter) || {};
+  if (params.action === 'diag' && params.key === 'paraser2026') {
+    return ContentService
+      .createTextOutput(JSON.stringify(_diagConfirmacoes(), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'setup-webhook' && params.key === 'paraser2026') {
+    return ContentService
+      .createTextOutput(JSON.stringify(_configurarWebhookZapi(params.url || ''), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput('Confirmacoes online')
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+function _configurarWebhookZapi(webhookUrl) {
+  if (!webhookUrl) return { erro: 'Passe ?url=<URL do Web App>' };
+
+  // Configurar APENAS o webhook de mensagem recebida.
+  // Limpar os outros pra evitar bombardeio de eventos irrelevantes.
+  var config = [
+    { ep: 'update-webhook-received',       valor: webhookUrl }, // SET nosso
+    { ep: 'update-webhook-message-status', valor: '' }          // CLEAR (sem ruído)
+  ];
+
+  var results = {};
+  config.forEach(function(c) {
+    try {
+      var url = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID +
+                '/token/' + CF_ZAPI_TOKEN + '/' + c.ep;
+      var headers = { 'Content-Type': 'application/json' };
+      if (CF_ZAPI_CLIENT_TOKEN) headers['Client-Token'] = CF_ZAPI_CLIENT_TOKEN;
+      var resp = UrlFetchApp.fetch(url, {
+        method: 'put',
+        headers: headers,
+        payload: JSON.stringify({ value: c.valor }),
+        muteHttpExceptions: true
+      });
+      results[c.ep] = { http: resp.getResponseCode(), body: resp.getContentText().substring(0, 200) };
+    } catch (e) { results[c.ep] = { erro: e.message }; }
+  });
+
+  return { webhook_configurado: webhookUrl, resultados: results };
+}
+
+function _diagConfirmacoes() {
+  var out = {};
+
+  // 1) Status do Z-API + URL do webhook configurado
+  try {
+    var url = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID +
+              '/token/' + CF_ZAPI_TOKEN + '/webhook-receive-all-messages';
+    var headers = {};
+    if (CF_ZAPI_CLIENT_TOKEN) headers['Client-Token'] = CF_ZAPI_CLIENT_TOKEN;
+    var resp = UrlFetchApp.fetch(url, { method: 'get', headers: headers, muteHttpExceptions: true });
+    out.zapi_webhook_receive_all = { http: resp.getResponseCode(), body: resp.getContentText().substring(0, 500) };
+  } catch (e1) { out.zapi_webhook_receive_all = { erro: e1.message }; }
+
+  try {
+    var url2 = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID +
+               '/token/' + CF_ZAPI_TOKEN + '/status';
+    var headers2 = {};
+    if (CF_ZAPI_CLIENT_TOKEN) headers2['Client-Token'] = CF_ZAPI_CLIENT_TOKEN;
+    var resp2 = UrlFetchApp.fetch(url2, { method: 'get', headers: headers2, muteHttpExceptions: true });
+    out.zapi_status = { http: resp2.getResponseCode(), body: resp2.getContentText().substring(0, 300) };
+  } catch (e2) { out.zapi_status = { erro: e2.message }; }
+
+  // 2) Últimas 20 linhas da fila de pendentes
+  try {
+    var sh = pendentesSheet_();
+    var n  = sh.getLastRow();
+    var startRow = Math.max(2, n - 19);
+    if (n >= 2) {
+      var vals = sh.getRange(startRow, 1, n - startRow + 1, sh.getLastColumn()).getValues();
+      out.pendentes_ultimos = vals.map(function(r) {
+        return { timestamp: String(r[0]), telefone: r[1], paciente: r[2], agId: r[3], data: String(r[4]), status: r[5] };
+      });
+    } else {
+      out.pendentes_ultimos = [];
+    }
+
+    // 3) Contagem por status (últimos 30 dias)
+    var contagem = {};
+    if (n >= 2) {
+      var todasLinhas = sh.getRange(2, 1, n - 1, sh.getLastColumn()).getValues();
+      var trintaDias = new Date(Date.now() - 30*24*3600*1000);
+      todasLinhas.forEach(function(r) {
+        var ts = new Date(r[0]);
+        if (ts >= trintaDias) {
+          var s = r[5] || 'SEM_STATUS';
+          contagem[s] = (contagem[s] || 0) + 1;
+        }
+      });
+    }
+    out.contagem_30dias = contagem;
+  } catch (e3) { out.pendentes_erro = e3.message; }
+
+  // 4) Última execução de enviarConfirmacoes (vê logRow se houver)
+  out.timestamp_diag = new Date().toISOString();
+
+  return out;
+}
+
+// ----------------------------------------------------------------
+// Envia a pergunta de confirmação com botões Sim/Não.
+// Se o endpoint de botão falhar, cai pro texto (a pergunta sempre chega).
+// ----------------------------------------------------------------
+function sendBotaoConfirmacao(phone, agId) {
+  var texto = 'Posso confirmar seu agendamento? 💜\n\n' +
+              'Toque no botão abaixo ou responda *SIM* para confirmar, ' +
+              'ou *NÃO* se precisar reagendar.';
+
+  var url = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID +
+            '/token/' + CF_ZAPI_TOKEN + '/send-button-list';
+  var headers = {};
+  if (CF_ZAPI_CLIENT_TOKEN) headers['Client-Token'] = CF_ZAPI_CLIENT_TOKEN;
+
+  var payload = {
+    phone:   phone,
+    message: texto,
+    buttonList: {
+      buttons: [
+        { id: 'CONFIRMAR_SIM', label: 'Sim, confirmo' },
+        { id: 'CONFIRMAR_NAO', label: 'Não, reagendar' }
+      ]
+    }
+  };
+
+  var resp = UrlFetchApp.fetch(url, {
+    method:             'post',
+    contentType:        'application/json',
+    headers:            headers,
+    payload:            JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  var code = resp.getResponseCode();
+  if (code < 200 || code >= 300) {
+    Logger.log('send-button-list HTTP ' + code + ': ' +
+               resp.getContentText().substring(0, 200) + ' — fallback texto');
+    sendWhatsApp(phone, texto); // garante a entrega da pergunta
+  }
+}
+
+// ----------------------------------------------------------------
+// Lê o payload do Z-API e devolve {phone, answer:'SIM'|'NAO'|null}.
+// Cobre clique de botão, resposta de lista e texto livre.
+// ----------------------------------------------------------------
+function interpretarResposta(body) {
+  var phone = body.phone || '';
+  var partes = [];
+  if (body.text && body.text.message) partes.push(body.text.message);
+  if (body.buttonsResponseMessage) {
+    partes.push(body.buttonsResponseMessage.buttonId || '');
+    partes.push(body.buttonsResponseMessage.message || '');
+  }
+  if (body.listResponseMessage) {
+    partes.push(body.listResponseMessage.selectedRowId || '');
+    partes.push(body.listResponseMessage.title || '');
+    partes.push(body.listResponseMessage.message || '');
+  }
+  if (body.buttonReply) {
+    partes.push(body.buttonReply.id || '');
+    partes.push(body.buttonReply.message || '');
+  }
+
+  var t = partes.join(' ').toLowerCase();
+  var answer = null;
+  if (t.indexOf('nao') !== -1 || t.indexOf('não') !== -1 || t.indexOf('reagend') !== -1) {
+    answer = 'NAO';
+  } else if (t.indexOf('sim') !== -1 || t.indexOf('confirm') !== -1) {
+    answer = 'SIM';
+  }
+  return { phone: phone, answer: answer };
+}
+
+// ----------------------------------------------------------------
+// Processa a resposta da paciente.
+// ----------------------------------------------------------------
+function processarResposta(phone, answer) {
+  var pend = buscarPendente(phone);
+  if (!pend) return; // sem confirmação pendente pra esse número -> ignora
+
+  if (answer === 'SIM') {
+    try {
+      confirmarFeegow(pend.agId);
+      marcarPendente(pend.row, 'CONFIRMADO');
+      sendWhatsApp(phone, 'Perfeito! ✅ Seu agendamento está confirmado. Te esperamos! 💜');
+      slackPost('✅ *Confirmado pelo WhatsApp* — ' + (pend.nome || phone) +
+                ' (agendamento ' + pend.agId + '). Status mudado pra Confirmado no Feegow.');
+    } catch (err) {
+      marcarPendente(pend.row, 'ERRO_FEEGOW');
+      sendWhatsApp(phone, 'Recebi sua confirmação! ✅ Já avisei a equipe. 💜');
+      slackPost('⚠️ ' + (pend.nome || phone) + ' confirmou, mas FALHOU mudar no Feegow ' +
+                '(agendamento ' + pend.agId + '): ' + err.message + '. Confirmar manualmente.');
+    }
+  } else { // NAO
+    marcarPendente(pend.row, 'REAGENDAR');
+    sendWhatsApp(phone, 'Sem problema! 💜 A recepção vai te chamar pra encontrar um novo horário.');
+    slackPost('🔄 *Pediu pra reagendar* — ' + (pend.nome || phone) +
+              ' (agendamento ' + pend.agId + '). Recepção: entrar em contato.');
+  }
+}
+
+// ----------------------------------------------------------------
+// Feegow — muda o status do agendamento para 7 (Marcado-confirmado).
+// Params via query-string (compatível com a API PHP do Feegow).
+// ----------------------------------------------------------------
+function confirmarFeegow(agId) {
+  var url = CF_FEEGOW_BASE + '/appoints/statusUpdate' +
+            '?AgendamentoID=' + encodeURIComponent(agId) +
+            '&StatusID=7' +
+            '&Obs=' + encodeURIComponent('Confirmado pela paciente via WhatsApp');
+  var resp = UrlFetchApp.fetch(url, {
+    method:             'post',
+    headers:            { 'x-access-token': CF_FEEGOW_TOKEN },
+    muteHttpExceptions: true
+  });
+  var code = resp.getResponseCode();
+  var txt  = resp.getContentText();
+  if (code < 200 || code >= 300) {
+    throw new Error('Feegow HTTP ' + code + ': ' + txt.substring(0, 200));
+  }
+  // Feegow às vezes responde 200 com success:false — trata como erro.
+  try {
+    var j = JSON.parse(txt);
+    if (j && j.success === false) {
+      throw new Error('Feegow success:false — ' + (j.message || txt.substring(0, 150)));
+    }
+  } catch (e) { /* resposta não-JSON: confia no HTTP 2xx */ }
+}
+
+// ----------------------------------------------------------------
+// Fila de pendentes — aba Confirmacoes_Pendentes
+// Colunas: Timestamp | Telefone | Paciente | AgendamentoID | Data | Status
+// ----------------------------------------------------------------
+function pendentesSheet_() {
+  var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(CF_PENDENTES_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(CF_PENDENTES_SHEET);
+    sh.appendRow(['Timestamp', 'Telefone', 'Paciente', 'AgendamentoID', 'Data', 'Status']);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function registrarPendente(phone, nome, agId, dataStr) {
+  try {
+    pendentesSheet_().appendRow([new Date(), phone, nome, agId, dataStr, 'PENDENTE']);
+  } catch (err) {
+    Logger.log('registrarPendente erro: ' + err.message);
+  }
+}
+
+// Acha a confirmação PENDENTE mais recente desse telefone (compara só os dígitos).
+function buscarPendente(phone) {
+  var sh = pendentesSheet_();
+  if (sh.getLastRow() < 2) return null;
+  var dados = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+  var alvo = soDigitos(phone);
+  for (var i = dados.length - 1; i >= 0; i--) { // de baixo pra cima = mais recente
+    var tel = soDigitos(String(dados[i][1]));
+    var st  = String(dados[i][5]);
+    if (st === 'PENDENTE' && telBate(tel, alvo)) {
+      return { row: i + 2, agId: dados[i][3], nome: dados[i][2] };
+    }
+  }
+  return null;
+}
+
+function marcarPendente(row, novoStatus) {
+  try {
+    pendentesSheet_().getRange(row, 6).setValue(novoStatus);
+  } catch (err) {
+    Logger.log('marcarPendente erro: ' + err.message);
+  }
+}
+
+// ----------------------------------------------------------------
+// Slack — post simples no canal de atendimento
+// ----------------------------------------------------------------
+function slackPost(texto) {
+  try {
+    if (!CF_SLACK_TOKEN) return;
+    var channelId = slackGetChannelId(CF_SLACK_CHANNEL);
+    if (!channelId) return;
+    UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+      method:             'post',
+      contentType:        'application/json; charset=utf-8',
+      headers:            { Authorization: 'Bearer ' + CF_SLACK_TOKEN },
+      payload:            JSON.stringify({ channel: channelId, text: texto }),
+      muteHttpExceptions: true
+    });
+  } catch (err) {
+    Logger.log('slackPost erro: ' + err.message);
+  }
+}
+
+// ----------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------
+function soDigitos(s) { return String(s).replace(/\D/g, ''); }
+
+// Telefones batem se os últimos 8 dígitos coincidem (ignora 55/DDD/9 extra).
+function telBate(a, b) {
+  if (!a || !b) return false;
+  var n = 8;
+  return a.slice(-n) === b.slice(-n);
+}
+
+function _okText() {
+  return ContentService.createTextOutput('ok').setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ----------------------------------------------------------------
+// SETUP — rode UMA VEZ pra apontar o webhook "ao receber" do Z-API
+// pra este Web App. Depois disso, as respostas Sim/Não chegam aqui.
+// Se você reimplantar o Web App (nova URL), atualize WEBHOOK_URL e rode de novo.
+// ----------------------------------------------------------------
+function configurarWebhookZapi() {
+  var WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwCDFfEx0JEn0m9vwbaLEt6jqoYXR_Mjy4Z9Gu6i6srkozNQG_sJCbR9fON5aybvi-5dw/exec';
+
+  var url = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID +
+            '/token/' + CF_ZAPI_TOKEN + '/update-webhook-received';
+  var headers = {};
+  if (CF_ZAPI_CLIENT_TOKEN) headers['Client-Token'] = CF_ZAPI_CLIENT_TOKEN;
+
+  var resp = UrlFetchApp.fetch(url, {
+    method:             'put',
+    contentType:        'application/json',
+    headers:            headers,
+    payload:            JSON.stringify({ value: WEBHOOK_URL }),
+    muteHttpExceptions: true
+  });
+  Logger.log('Z-API update-webhook-received: HTTP ' + resp.getResponseCode() +
+             ' — ' + resp.getContentText().substring(0, 300));
 }
