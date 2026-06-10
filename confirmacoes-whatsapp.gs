@@ -548,17 +548,17 @@ var IDS_INJURIA = [69, 152, 153];
 // procId=42  confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
 // procId=40  confirmado: USG 1 PÓS BETA (Marcelle 05/05/2026 12:00)
 // procId=41  confirmado: USG 2 PÓS BETA (Priscila 28/04/2026 15:20)
-// procId=59  confirmado: USG CONTAGEM DE FOLÍCULOS ANTRAIS (Marcelle + Priscila)
-// procId=61  confirmado: USG TRANSVAGINAL (Érica 29/04/2026 14:20)
-// procId=58  confirmado: USG TRANSVAGINAL (Priscila 27/04/2026 14:00)
-// TODO: USG 2 Pós Beta, USG Morfológica, USG Obstétrica c/ Doppler, USG Transvaginal 3D
-//       → rode debugEncontrarProcId() para localizar os IDs e adicione aqui
 // procId=43  confirmado: USG OBSTÉTRICA COMUM (Érica 22/04/2026)
 // procId=44  confirmado: USG MORFOLÓGICA (Érica 27/04/2026)
 // procId=45  confirmado: USG OBSTÉTRICA COM DOPPLER (Érica 30/04/2026)
 // procId=51  confirmado: USG OBSTÉTRICA COM DOPPLER GEMELAR (Érica 26/02/2026)
 // procId=171 confirmado: USG PÓS BETA NEG/ABORTO (Rodolfo 28/04/2026)
-var IDS_OBSTETRICA = [40, 41, 42, 43, 44, 45, 51, 58, 59, 61, 171];
+//
+// REMOVIDOS DAQUI (2026-06-10, bug: estavam recebendo template "obstétrica" com pen drive):
+//   procId=58, 61 = USG TRANSVAGINAL (não é obstétrica)
+//   procId=59     = USG CONTAGEM DE FOLÍCULOS ANTRAIS (avaliação fertilidade, não obstétrica)
+// → movidos para IDS_ULTRAS_TRATAMENTO
+var IDS_OBSTETRICA = [40, 41, 42, 43, 44, 45, 51, 171];
 
 // procIds de exames de acompanhamento de tratamento (USG Preparo TEC, USG FIV)
 // procId=244 confirmado: USG PREPARO TEC 1 - Medicado (Marcelle 05/05/2026 10:00 / 11:00)
@@ -602,6 +602,7 @@ var IDS_ULTRAS_TRATAMENTO = [
   11, 12, 13, 14, 15, 16,
   17, 18, 19, 20, 21, 22, 23,
   24, 25, 26, 27, 28, 29, 30, 31,
+  58, 59, 61,   // ← USG TRANSVAGINAL (58, 61) e CONTAGEM FOLÍCULOS (59) — exames de avaliação/fertilidade, NÃO obstétrica
   65, 66, 67,
   73, 74, 75,
   100, 122, 167,
@@ -713,11 +714,12 @@ function resolveTemplateKey(ag) {
   if (proc.indexOf('TEC') >= 0 && proc.indexOf('PREPARO') < 0)                                    return null;
   if (proc.includes('EMBRIÃO') || proc.includes('EMBRIAO') || proc.includes('EMBRION'))           return null;
   if (proc.includes('PRIMÓRDIA') || proc.includes('PRIMORDIA') || proc.includes('ORIGEN'))        return null;
-  // USG obstétrica
+  // USG obstétrica (somente exames REALMENTE obstétricos: gestação acompanhada)
   if (proc.includes('OBSTET') || proc.includes('MORFOL') || proc.includes('TRANSLUC'))            return 'ULTRAS_OBSTETRICA';
   if (proc.includes('POS BETA') || proc.includes('PÓS BETA') || proc.includes('PÓS-BETA'))        return 'ULTRAS_OBSTETRICA';
-  if (proc.includes('FOLICULO') || proc.includes('FOLÍCULO'))                                     return 'ULTRAS_OBSTETRICA';
-  if (proc.includes('TRANSVAGINAL') || proc.includes('DOPPLER'))                                  return 'ULTRAS_OBSTETRICA';
+  // ⚠️ NÃO inclua TRANSVAGINAL, DOPPLER ou FOLÍCULO genéricos aqui — são exames de avaliação/fertilidade.
+  //    "USG OBSTÉTRICA COM DOPPLER" já é capturado pela regra OBSTET acima.
+  //    DOPPLER sozinho (transvaginal/folicular) cai em ULTRAS_TRATAMENTO via regra USG mais abaixo.
   // USG de tratamento (preparo TEC/ERA, FIV, coito programado, inseminação, monitorização...)
   if (proc.includes('PREPARO') || proc.includes('FIV'))                                           return 'ULTRAS_TRATAMENTO';
   if (proc.includes('COITO') || proc.includes('INSEMINA') || proc.includes('MONITORIZA'))         return 'ULTRAS_TRATAMENTO';
