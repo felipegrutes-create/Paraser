@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vamos descobrir juntas o seu próximo passo · Paraser</title>
+<meta name="description" content="5 perguntas rápidas pra montar seu plano de fertilidade personalizado." />
+<meta http-equiv="Cache-Control" content="no-cache" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400&family=Lora:wght@0,400;0,500;0,600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Lora', Georgia, serif;
+    color: #1a0a26;
+    background: #f0e8d8;
+    background-image: radial-gradient(ellipse at top, #faf4ea 0%, #f0e8d8 70%);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+  .container { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+  .header { background: #1a0626; padding: 36px 24px; text-align: center; }
+  .header-mark { color: #c4a574; font-family: 'Playfair Display', serif; font-size: 10px; letter-spacing: 6px; text-transform: uppercase; }
+  .header-brand { color: #fff; font-family: 'Playfair Display', serif; font-size: 26px; letter-spacing: 6px; margin-top: 8px; font-weight: 300; }
+  .card { background: #fff; border: 1px solid #e8d8b8; overflow: hidden; }
+  .intro { padding: 48px 32px; text-align: center; }
+  .intro-eyebrow { font-family: 'Playfair Display', serif; font-size: 11px; letter-spacing: 4px; color: #a08660; text-transform: uppercase; margin-bottom: 18px; }
+  .intro-title { font-family: 'Playfair Display', serif; font-style: italic; color: #3d1652; font-size: 34px; line-height: 1.25; margin-bottom: 24px; font-weight: 400; }
+  .intro-body { color: #5a4868; font-size: 16px; line-height: 1.75; margin: 0 auto 28px; max-width: 460px; }
+  .btn-primary { background: #3d1652; color: #fff; border: 1px solid #d4b888; padding: 16px 36px; font-family: 'Playfair Display', serif; font-size: 14px; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; }
+  .btn-primary:disabled { background: #5a4868; cursor: not-allowed; }
+  .step { display: none; }
+  .step.active { display: block; }
+  /* TODO Task 15: estilos do quiz */
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="header">
+      <div class="header-mark">Instituto</div>
+      <div class="header-brand">PARASER</div>
+    </div>
+
+    <div class="step active" id="step-0">
+      <div class="intro">
+        <div class="intro-eyebrow">Reprodução assistida em Botafogo</div>
+        <h1 class="intro-title">Vamos descobrir juntas<br>o seu próximo passo.</h1>
+        <p class="intro-body">5 perguntas, menos de 1 minuto. A gente personaliza um plano e te apresenta pelo WhatsApp.</p>
+        <button class="btn-primary" onclick="next()">Começar →</button>
+        <p style="color:#a08660;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:24px;">Ao continuar você concorda com nossa <a href="politica-privacidade.html" style="color:#3d1652;">Política de Privacidade</a></p>
+      </div>
+    </div>
+
+    <!-- Task 15 adiciona steps 1-5 do quiz -->
+    <!-- Task 16 adiciona step 6 (contato + envio) e step 7 (transição WhatsApp) -->
+
+  </div>
+</div>
+<script>
+  let currentStep = 0;
+  function next() { showStep(currentStep + 1); }
+  function showStep(n) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById('step-' + n);
+    if (el) { el.classList.add('active'); currentStep = n; window.scrollTo({top:0,behavior:'smooth'}); }
+  }
+</script>
+</body>
+</html>
