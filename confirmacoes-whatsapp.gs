@@ -1728,6 +1728,28 @@ function doGet(e) {
       .createTextOutput(JSON.stringify(_configurarWebhookZapi(params.url || ''), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'setup-medicos' && params.key === 'paraser2026') {
+    setupListaMedicos();
+    return ContentService.createTextOutput('{"ok":true,"msg":"aba Medicos_Agenda criada"}').setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'setup-trigger-agenda' && params.key === 'paraser2026') {
+    setupTriggerAgendaMedicos();
+    return ContentService.createTextOutput('{"ok":true,"msg":"trigger 18h criado"}').setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'preview-agenda' && params.key === 'paraser2026') {
+    return ContentService
+      .createTextOutput(JSON.stringify(_previewAgendaMedicos(params.para || '', params.dia || ''), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'enviar-agenda-todos' && params.key === 'paraser2026') {
+    enviarAgendaMedicos();
+    return ContentService.createTextOutput('{"ok":true,"msg":"dispatch iniciado, veja log + Slack"}').setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'debug-match' && params.key === 'paraser2026') {
+    return ContentService
+      .createTextOutput(JSON.stringify(_debugMatchAgenda(params.dia || ''), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   return ContentService.createTextOutput('Confirmacoes online')
     .setMimeType(ContentService.MimeType.TEXT);
 }
@@ -2053,4 +2075,397 @@ function configurarWebhookZapi() {
   });
   Logger.log('Z-API update-webhook-received: HTTP ' + resp.getResponseCode() +
              ' — ' + resp.getContentText().substring(0, 300));
+}
+
+// ================================================================
+// AGENDA DO MÉDICO — envia agenda do dia seguinte pra cada médico
+// configurado na aba "Medicos_Agenda" da planilha. Trigger Seg-Sex 18h.
+// ================================================================
+
+var CF_MEDICOS_SHEET = 'Medicos_Agenda';
+
+// Roda 1x pra criar a aba e popular com a lista inicial.
+function setupListaMedicos() {
+  var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(CF_MEDICOS_SHEET);
+  if (!sh) sh = ss.insertSheet(CF_MEDICOS_SHEET);
+  sh.clear();
+  sh.appendRow(['Nome', 'Telefone', 'Ativo']);
+  sh.setFrozenRows(1);
+
+  var lista = [
+    ['Dra. Bianca Salvato',    '5521966723841', 'SIM'],
+    ['Dra. Bruna Ortiz',       '5521967360998', 'SIM'],
+    ['Cristiane Chagas',       '5521983569930', 'SIM'],
+    ['Dra. Érica Stein',       '5521997876716', 'SIM'],
+    ['Graziela Siqueira',      '5521994550819', 'SIM'],
+    ['Dr. Helce Ribeiro',      '5521992436355', 'SIM'],
+    ['Dr. Joselmo Salvato',    '5521999899118', 'SIM'],
+    ['Dra. Kátia Chamorro',    '5521988277790', 'SIM'],
+    ['Dra. Mabel Iglesias',    '5521997424582', 'SIM'],
+    ['Dra. Magali Miranda',    '5532990210011', 'SIM'],
+    ['Dra. Marcelle Moura',    '5521997399888', 'SIM'],
+    ['Dr. Mario Barroso',      '5521983293133', 'SIM'],
+    ['Dra. Priscila Loyola',   '5521991510502', 'SIM'],
+    ['Dr. Rodolfo Salvato',    '5521993612289', 'SIM'],
+    ['Sara Salvato',           '5521996777207', 'SIM'],
+    ['Dra. Verônica Pintor',   '5521965206906', 'SIM']
+  ];
+  sh.getRange(2, 1, lista.length, 3).setValues(lista);
+  sh.setColumnWidths(1, 3, 220);
+  Logger.log('✅ Aba "' + CF_MEDICOS_SHEET + '" criada com ' + lista.length + ' médicos. Edite ativo/telefone direto na planilha.');
+}
+
+function lerListaMedicos_() {
+  var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(CF_MEDICOS_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
+  return vals
+    .map(function(r) { return { nome: String(r[0] || '').trim(), telefone: String(r[1] || '').replace(/\D/g, ''), ativo: String(r[2] || '').trim().toUpperCase() }; })
+    .filter(function(m) { return m.nome && m.telefone && m.ativo === 'SIM'; });
+}
+
+// Match: confronta um agendamento com a lista, retorna o telefone do médico
+// pelo primeiro nome único (Bianca, Bruna, Rodolfo, etc). Case-insensitive,
+// sem acentos.
+function _normalizarNome(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+    .toUpperCase()
+    .replace(/\bDRA?\.?\s*/g, '') // remove "Dr." / "Dra." + ponto + espaço
+    .replace(/[^A-Z0-9\s]/g, ' ') // qualquer não-alfanumérico vira espaço
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function _matchMedico(profNomeFeegow, listaMedicos) {
+  if (!profNomeFeegow) return null;
+  var alvo = _normalizarNome(profNomeFeegow);
+  if (!alvo) return null;
+  // tenta match por primeiro nome
+  var primeiroAlvo = alvo.split(' ')[0];
+  for (var i = 0; i < listaMedicos.length; i++) {
+    var nomeListado = _normalizarNome(listaMedicos[i].nome);
+    var primeiroListado = nomeListado.split(' ')[0];
+    if (primeiroAlvo && primeiroAlvo === primeiroListado) return listaMedicos[i];
+  }
+  return null;
+}
+
+// Formata um horário "HH:MM" a partir do campo Hora do Feegow ("14:30" ou "14:30:00")
+function _formatHora(h) {
+  var s = String(h || '');
+  var m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return s;
+  return (m[1].length === 1 ? '0' + m[1] : m[1]) + 'h' + m[2];
+}
+
+function _statusEmoji(statusId) {
+  // 7 = Marcado-Confirmado (já confirmou pelo WhatsApp ou manual)
+  // 1 = Marcado (não confirmado ainda)
+  // 3 = Atendido
+  if (Number(statusId) === 7 || Number(statusId) === 3) return '✅';
+  return '⏳';
+}
+
+function _statusTexto(statusId) {
+  if (Number(statusId) === 7) return 'Confirmado';
+  if (Number(statusId) === 3) return 'Atendido';
+  return 'Não confirmado';
+}
+
+function _diaSemanaPorExt(d) {
+  var dias = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+  return dias[d.getDay()];
+}
+
+function _titleCaseNome(s) {
+  var minus = ['da', 'de', 'do', 'das', 'dos', 'e', 'di', 'du'];
+  return String(s || '').toLowerCase().trim().split(/\s+/).map(function(w, i) {
+    if (i > 0 && minus.indexOf(w) >= 0) return w;
+    if (!w.length) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+
+// Preenche ag.paciente_nome em todos os agendamentos (faz 1 call por paciente único).
+function _carregarNomesPacientes(agendamentos) {
+  var cache = {};
+  agendamentos.forEach(function(ag) {
+    if (!ag.paciente_id) return;
+    if (cache[ag.paciente_id] === undefined) {
+      try {
+        var p = getPatientData(ag.paciente_id);
+        cache[ag.paciente_id] = (p && p.nome) || '';
+      } catch (e) {
+        cache[ag.paciente_id] = '';
+      }
+    }
+    ag.paciente_nome = cache[ag.paciente_id];
+  });
+}
+
+function _tituloMedico(nomeCompleto) {
+  // "Dra. Bianca Salvato" → "Dra. Bianca"
+  // "Sara Salvato" → "Sara"
+  // "Cristiane Chagas" → "Cristiane"
+  var m = String(nomeCompleto || '').match(/^(Dra?\.\s*)(\S+)/i);
+  if (m) return m[1] + m[2];
+  return String(nomeCompleto || '').split(' ')[0];
+}
+
+function _formatarMensagemAgenda(nomeMedico, dataAlvo, agendamentos) {
+  var titulo = _tituloMedico(nomeMedico);
+  var dataStr = Utilities.formatDate(dataAlvo, 'GMT-3', 'dd/MM');
+  var diaSem  = _diaSemanaPorExt(dataAlvo);
+
+  var saudacao = 'Oi, ' + titulo + '! 💜\n\n';
+  if (!agendamentos.length) {
+    return saudacao + 'Você não tem agendamentos pra amanhã (' + diaSem + ', ' + dataStr + ').\n\nBom descanso!\n\nEquipe Paraser';
+  }
+
+  agendamentos.sort(function(a, b) { return String(a.hora || '').localeCompare(String(b.hora || '')); });
+
+  // Detecta gaps maiores que 60min entre consultas e marca como "livre"
+  var linhas = [];
+  var prevFimMin = null;
+  agendamentos.forEach(function(ag) {
+    var horaIni = _formatHora(ag.hora);
+    var match = String(ag.hora || '').match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      var minIni = (+match[1]) * 60 + (+match[2]);
+      if (prevFimMin !== null && minIni - prevFimMin >= 60) {
+        var gapH = Math.floor(prevFimMin / 60), gapM = prevFimMin % 60;
+        var gapStr = (gapH < 10 ? '0' + gapH : gapH) + 'h' + (gapM < 10 ? '0' + gapM : gapM);
+        linhas.push('🕓 ' + gapStr + ' — _livre_');
+      }
+      var dur = Number(ag.tempo) || Number(ag.duracao) || 30;
+      prevFimMin = minIni + dur;
+    }
+    var emoji = _statusEmoji(ag.status_id);
+    var nomePac = _titleCaseNome(ag.paciente_nome || 'paciente');
+    var procName = _titleCaseNome((ag._procNome || 'procedimento').replace(/\s*-\s*/g, ' - '));
+    var statusTxt = _statusTexto(ag.status_id);
+    linhas.push(
+      emoji + ' *' + horaIni + '* · *' + nomePac + '*\n' +
+      '     ' + procName + ' · _' + statusTxt + '_'
+    );
+  });
+
+  var total = agendamentos.length;
+  var confirmados = agendamentos.filter(function(a) { return Number(a.status_id) === 7 || Number(a.status_id) === 3; }).length;
+  var rodape = '\n\nTotal: *' + total + ' paciente' + (total > 1 ? 's' : '') + '*';
+  if (confirmados) rodape += ' · ' + confirmados + ' confirmado' + (confirmados > 1 ? 's' : '') + ' ✅';
+  rodape += '.';
+
+  return saudacao +
+         'Sua agenda de amanhã (' + diaSem + ', ' + dataStr + '):\n\n' +
+         linhas.join('\n\n') +
+         rodape +
+         '\n\nEquipe Paraser';
+}
+
+// FUNÇÃO PRINCIPAL — chamada pelo trigger Seg-Sex 18h
+function enviarAgendaMedicos() {
+  var hoje = new Date();
+  var dow = hoje.getDay(); // 0=dom, 6=sáb
+  if (dow === 0 || dow === 6) {
+    Logger.log('Fim de semana — não envia agenda hoje.');
+    return;
+  }
+
+  // Z-API conectado?
+  if (typeof zapiConectado === 'function' && !zapiConectado()) {
+    Logger.log('🚨 Z-API desconectado — agendas NÃO enviadas.');
+    if (typeof slackPost === 'function') slackPost('🚨 *Agenda médicos* — Z-API desconectado, agendas de amanhã NÃO foram enviadas.');
+    return;
+  }
+
+  // Dia alvo = amanhã (se hoje é sexta, alvo é segunda)
+  var alvo = new Date(hoje);
+  alvo.setDate(alvo.getDate() + 1);
+  while (alvo.getDay() === 0 || alvo.getDay() === 6) alvo.setDate(alvo.getDate() + 1);
+
+  // Pega agenda + carrega nomes
+  var agendamentos = getAgendamentos(alvo);
+  var profMap = carregarProfissionais();
+  var procMap = (typeof carregarNomesProcedimentos === 'function') ? carregarNomesProcedimentos() : {};
+  agendamentos.forEach(function(ag) {
+    ag._profNome = profMap[ag.profissional_id] || '';
+    if (!ag._procNome && procMap[ag.procedimento_id]) ag._procNome = procMap[ag.procedimento_id];
+    if (!ag._procNome) ag._procNome = (typeof resolveNomeProc === 'function') ? resolveNomeProc(ag) : '';
+    if (!ag.hora && ag.horario) ag.hora = ag.horario;
+  });
+
+  var medicos = lerListaMedicos_();
+  if (!medicos.length) {
+    Logger.log('Sem médicos ativos na aba ' + CF_MEDICOS_SHEET);
+    return;
+  }
+
+  // Filtra só agendamentos de médicos da lista pra evitar chamar getPatientData de pacientes que ninguém vai ver
+  var idsMedicosLista = {};
+  medicos.forEach(function(med) {
+    agendamentos.forEach(function(ag) {
+      if (_matchMedico(ag._profNome, [med])) idsMedicosLista[ag.agendamento_id] = true;
+    });
+  });
+  var relevantes = agendamentos.filter(function(ag) { return idsMedicosLista[ag.agendamento_id]; });
+  _carregarNomesPacientes(relevantes);
+
+  var enviados = 0, falhas = 0, semAgenda = 0;
+  medicos.forEach(function(med) {
+    try {
+      var agDoMedico = agendamentos.filter(function(ag) { return _matchMedico(ag._profNome, [med]); });
+      if (!agDoMedico.length) { semAgenda++; }
+
+      var msg = _formatarMensagemAgenda(med.nome, alvo, agDoMedico);
+      sendWhatsApp(med.telefone, msg);
+      Utilities.sleep(1200);
+      enviados++;
+      logRowAgenda_(med, alvo, agDoMedico.length, 'ENVIADO');
+    } catch (err) {
+      falhas++;
+      Logger.log('Falha enviando agenda pra ' + med.nome + ': ' + err.message);
+      logRowAgenda_(med, alvo, 0, 'ERRO: ' + err.message);
+    }
+  });
+
+  var resumo = '📅 *Agenda médicos enviada* — ' +
+               Utilities.formatDate(alvo, 'GMT-3', 'dd/MM') +
+               ' · enviadas: ' + enviados + ' / falhas: ' + falhas + ' / sem agenda: ' + semAgenda;
+  Logger.log(resumo);
+  if (typeof slackPost === 'function') slackPost(resumo);
+}
+
+function logRowAgenda_(med, dataAlvo, totalAg, status) {
+  var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+  var sh = ss.getSheetByName('Agenda_Medicos_Log');
+  if (!sh) {
+    sh = ss.insertSheet('Agenda_Medicos_Log');
+    sh.appendRow(['Timestamp', 'Medico', 'Telefone', 'Data Alvo', 'Total Agend', 'Status']);
+    sh.setFrozenRows(1);
+  }
+  sh.appendRow([new Date(), med.nome, med.telefone, Utilities.formatDate(dataAlvo, 'GMT-3', 'dd/MM/yyyy'), totalAg, status]);
+}
+
+function _debugMatchAgenda(diaForcado) {
+  var alvo;
+  if (diaForcado) {
+    var p = diaForcado.split('/');
+    alvo = new Date(+p[2], +p[1] - 1, +p[0]);
+  } else {
+    alvo = new Date();
+    alvo.setDate(alvo.getDate() + 1);
+  }
+
+  var agendamentos = getAgendamentos(alvo);
+  var profMap = carregarProfissionais();
+  var amostras = agendamentos.slice(0, 10).map(function(ag) {
+    var nomeFromMap = profMap[ag.profissional_id] || '';
+    return {
+      paciente: ag.paciente_nome,
+      hora: ag.hora || ag.horario,
+      profissional_id: ag.profissional_id,
+      _profNome_do_map: nomeFromMap,
+      campos_disponiveis: Object.keys(ag).filter(function(k){ return !k.startsWith('_'); }).slice(0, 25)
+    };
+  });
+
+  var medicos = lerListaMedicos_();
+  agendamentos.forEach(function(ag) { ag._profNome = profMap[ag.profissional_id] || ''; });
+
+  var tentativas = medicos.map(function(med) {
+    var matchados = agendamentos.filter(function(ag) { return _matchMedico(ag._profNome, [med]); });
+    return {
+      medico_lista: med.nome,
+      primeiro_normalizado: _normalizarNome(med.nome).split(' ')[0],
+      qtd_matchados: matchados.length
+    };
+  });
+
+  return {
+    dia: Utilities.formatDate(alvo, 'GMT-3', 'dd/MM/yyyy'),
+    total_agendamentos: agendamentos.length,
+    prof_map_size: Object.keys(profMap).length,
+    amostras_brutas: amostras,
+    tentativas_match: tentativas
+  };
+}
+
+// PREVIEW — envia pro número do Felipe (ou outro) TODAS as mensagens
+// que sairiam pra cada médico, marcadas como "[PREVIEW Dr. X]" pra ele aprovar.
+// Não toca nos médicos reais.
+function _previewAgendaMedicos(paraNumero, diaForcado) {
+  if (!paraNumero) return { erro: 'passe ?para=<telefone com DDI>' };
+
+  var alvo;
+  if (diaForcado) {
+    var p = diaForcado.split('/');
+    if (p.length === 3) alvo = new Date(+p[2], +p[1] - 1, +p[0]);
+    else return { erro: 'dia inválido. Formato: dd/MM/yyyy' };
+  } else {
+    alvo = new Date();
+    alvo.setDate(alvo.getDate() + 1);
+    while (alvo.getDay() === 0 || alvo.getDay() === 6) alvo.setDate(alvo.getDate() + 1);
+  }
+
+  var agendamentos = getAgendamentos(alvo);
+  var profMap = carregarProfissionais();
+  var procMap = (typeof carregarNomesProcedimentos === 'function') ? carregarNomesProcedimentos() : {};
+  agendamentos.forEach(function(ag) {
+    ag._profNome = profMap[ag.profissional_id] || '';
+    if (!ag._procNome && procMap[ag.procedimento_id]) ag._procNome = procMap[ag.procedimento_id];
+    if (!ag._procNome) ag._procNome = (typeof resolveNomeProc === 'function') ? resolveNomeProc(ag) : '';
+    if (!ag.hora && ag.horario) ag.hora = ag.horario;
+  });
+
+  var medicos = lerListaMedicos_();
+
+  // Carrega nomes só dos pacientes que vão aparecer
+  var idsLista = {};
+  medicos.forEach(function(med) {
+    agendamentos.forEach(function(ag) {
+      if (_matchMedico(ag._profNome, [med])) idsLista[ag.agendamento_id] = true;
+    });
+  });
+  var relevantes = agendamentos.filter(function(ag) { return idsLista[ag.agendamento_id]; });
+  _carregarNomesPacientes(relevantes);
+
+  var enviados = 0, semAgenda = 0, resumo = [];
+
+  medicos.forEach(function(med) {
+    var agDoMedico = agendamentos.filter(function(ag) { return _matchMedico(ag._profNome, [med]); });
+    if (!agDoMedico.length) semAgenda++;
+    var msg = '[PREVIEW » ' + med.nome + ']\n\n' + _formatarMensagemAgenda(med.nome, alvo, agDoMedico);
+    sendWhatsApp(paraNumero, msg);
+    Utilities.sleep(1500);
+    enviados++;
+    resumo.push({ medico: med.nome, agendamentos: agDoMedico.length });
+  });
+
+  return {
+    ok: true,
+    para: paraNumero,
+    dia_alvo: Utilities.formatDate(alvo, 'GMT-3', 'dd/MM/yyyy'),
+    total_medicos: medicos.length,
+    sem_agenda: semAgenda,
+    enviados: enviados,
+    resumo: resumo
+  };
+}
+
+// Setup trigger Seg-Sex 18h (chamada manual 1x)
+function setupTriggerAgendaMedicos() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'enviarAgendaMedicos') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('enviarAgendaMedicos')
+    .timeBased()
+    .everyDays(1)
+    .atHour(18)
+    .inTimezone('America/Sao_Paulo')
+    .create();
+  Logger.log('✅ Trigger criado: enviarAgendaMedicos roda diário 18h (a função em si pula sáb/dom)');
 }
