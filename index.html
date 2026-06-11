@@ -11702,7 +11702,7 @@
             const topProcs = {};
             items.forEach(it => {
                 total += it.valorPago;
-                const q = (it.qtd || 1);
+                const q = (Number(it.qtd) || 1);  // força número: it.qtd vem como texto e concatenava
                 procs += q;
                 const dStr = it.data || '';
                 const sep = dStr.includes('-') ? '-' : '/';
@@ -13811,7 +13811,7 @@ GONAPEPTYL,56`;
                 anaMedItems.forEach(m => {
                     if (!medSums[m.nome]) medSums[m.nome] = { total:0, qtd:0, pago:0 };
                     medSums[m.nome].total += m.valor;
-                    medSums[m.nome].qtd   += m.quantidade;
+                    medSums[m.nome].qtd   += Number(m.quantidade) || 0;  // força número (mesmo bug do proc)
                     medSums[m.nome].pago  += m.valorPago;
                 });
                 const medEntries = Object.entries(medSums).sort((a,b)=>b[1].total-a[1].total);
@@ -13916,7 +13916,7 @@ GONAPEPTYL,56`;
             medItems.forEach(m => {
                 if (!medSums[m.nome]) medSums[m.nome] = { total: 0, qtd: 0, pago: 0 };
                 medSums[m.nome].total += m.valor;
-                medSums[m.nome].qtd += m.quantidade;
+                medSums[m.nome].qtd += Number(m.quantidade) || 0;  // força número (mesmo bug do proc)
                 medSums[m.nome].pago += m.valorPago;
             });
             const medEntries = Object.entries(medSums).sort((a, b) => b[1].total - a[1].total);
