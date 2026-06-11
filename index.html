@@ -12844,28 +12844,6 @@ GONAPEPTYL,56`;
 
         init();
 
-        // Auto-refresh: verifica a cada 2 min se a página foi atualizada
-        (function autoRefresh() {
-            const CHECK_INTERVAL = 30 * 1000; // 30 segundos
-            let currentHash = null;
-
-            async function checkForUpdates() {
-                try {
-                    const url = location.href.split('?')[0] + '?_t=' + Date.now();
-                    const resp = await fetch(url, { cache: 'no-store', method: 'HEAD' });
-                    const lastMod = resp.headers.get('last-modified') || resp.headers.get('etag') || resp.headers.get('content-length') || '';
-                    if (currentHash === null) {
-                        currentHash = lastMod;
-                    } else if (lastMod && lastMod !== currentHash) {
-                        location.reload(true);
-                    }
-                } catch(e) { /* silencioso */ }
-            }
-
-            checkForUpdates();
-            setInterval(checkForUpdates, CHECK_INTERVAL);
-        })();
-
         // ===== CONTAS A RECEBER =====
         // Critério unificado: medicamento por tipo OU por nome (usado no donut E no Controle)
         function isCrMedItem(it) {
