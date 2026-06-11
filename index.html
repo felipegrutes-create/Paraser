@@ -10608,7 +10608,8 @@
             const el = document.getElementById('finRecDespTotal');
             if (el) {
                 el.style.color = lucro >= 0 ? '#10b981' : '#ef4444';
-                el.textContent = `Resultado acumulado: ${fmtValor(lucro)}`;
+                // parseValorBR remove o "-", então o sinal de menos é montado aqui
+                el.textContent = `Resultado acumulado: ${lucro < 0 ? '-' : ''}${fmtValor(Math.abs(lucro))}`;
             }
 
             // Build datasets based on view mode
