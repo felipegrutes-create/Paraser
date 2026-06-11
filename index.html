@@ -3540,6 +3540,7 @@
                     <button class="fin-view-btn" onclick="setFinView('sede',this)">Visão Nova Sede</button>
                 </div>
                 <canvas id="finChartReceitaDespesa" height="120"></canvas>
+                <div id="finCaixaBox" style="margin-top:18px"></div>
             </div>
         </section>
 
@@ -10477,6 +10478,12 @@
 
         let finViewMode = 'geral';
 
+        // Participação societária (edite aqui se mudar): usada no quadro "De onde foi o caixa"
+        const SOCIOS_PARTICIP = [
+            { nome: 'Dr. Rodolfo', pct: 0.80 },
+            { nome: 'Dr. Joselmo', pct: 0.20 },
+        ];
+
         function setFinView(mode, btn) {
             finViewMode = mode;
             document.querySelectorAll('.fin-view-btn').forEach(b => b.classList.remove('active'));
@@ -10611,6 +10618,64 @@
                 // parseValorBR remove o "-", então o sinal de menos é montado aqui
                 el.textContent = `Resultado acumulado: ${lucro < 0 ? '-' : ''}${fmtValor(Math.abs(lucro))}`;
             }
+
+            // ===== Quadro "De onde foi o caixa" + aporte por sócio =====
+            (function renderCaixaBox() {
+                const box = document.getElementById('finCaixaBox');
+                if (!box) return;
+                if (totalRec <= 0 && totalDesp <= 0) { box.innerHTML = ''; return; }
+
+                const sumCF = rvdFixo.reduce((s,v) => s+v, 0);
+                const sumCV = rvdVar.reduce((s,v) => s+v, 0);
+                const sumSC = rvdSocio.reduce((s,v) => s+v, 0);
+                const sumNS = rvdSede.reduce((s,v) => s+v, 0);
+                const sumDespGeral = rvdDespesa.reduce((s,v) => s+v, 0);
+
+                // Linhas de despesa conforme a visão ativa
+                const linhas = [];
+                if (finViewMode === 'geral') {
+                    linhas.push(['Despesas totais', sumDespGeral]);
+                } else {
+                    linhas.push(['Custo Fixo', sumCF]);
+                    linhas.push(['Custo Variável', sumCV]);
+                    if (finViewMode === 'socios' || finViewMode === 'sede') linhas.push(['Retirada de Sócios', sumSC]);
+                    if (finViewMode === 'sede') linhas.push(['Investimento Nova Sede', sumNS]);
+                }
+
+                const neg = lucro < 0;
+                const cor = neg ? '#ef4444' : '#10b981';
+                const resStr = (neg ? '-' : '+') + fmtValor(Math.abs(lucro));
+
+                const linhasHtml = linhas.map(([lbl, val]) =>
+                    `<div style="display:flex;justify-content:space-between;padding:6px 0;color:#cdd6e8;font-size:13px">
+                        <span>(-) ${lbl}</span><span>${fmtValor(val)}</span>
+                    </div>`).join('');
+
+                const socioHtml = SOCIOS_PARTICIP.map(s =>
+                    `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px">
+                        <span style="color:#cdd6e8">${s.nome} (${(s.pct*100).toFixed(0)}%)</span>
+                        <span style="font-weight:700;color:${cor}">${fmtValor(Math.abs(lucro) * s.pct)}</span>
+                    </div>`).join('');
+
+                const tituloAporte = neg ? '💸 Quanto cada sócio precisa aportar' : '💰 Disponível para distribuição';
+
+                box.innerHTML = `
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:18px 20px;max-width:520px">
+                        <div style="font-weight:700;color:#e2e8f4;margin-bottom:12px;font-size:14px">💧 De onde foi o caixa (acumulado do período)</div>
+                        <div style="display:flex;justify-content:space-between;padding:6px 0;color:#34d399;font-weight:600;font-size:13px">
+                            <span>Receita do período</span><span>${fmtValor(totalRec)}</span>
+                        </div>
+                        ${linhasHtml}
+                        <div style="border-top:1px solid rgba(255,255,255,0.12);margin:8px 0"></div>
+                        <div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:800;font-size:15px">
+                            <span style="color:#e2e8f4">= Resultado de caixa</span>
+                            <span style="color:${cor}">${resStr}</span>
+                        </div>
+                        <div style="border-top:1px solid rgba(255,255,255,0.12);margin:10px 0 8px"></div>
+                        <div style="font-weight:700;color:#e2e8f4;margin-bottom:6px;font-size:13px">${tituloAporte}</div>
+                        ${socioHtml}
+                    </div>`;
+            })();
 
             // Build datasets based on view mode
             let datasets, chartPlugin;
