@@ -10641,19 +10641,34 @@
                                 + (finViewMode === 'sede' ? sd : 0);
                             const profit = rec - totalCost;
                             const xPos = x.getPixelForValue(i);
-                            const yMax = y.getPixelForValue(Math.max(rec, totalCost));
+                            const yRecTop = y.getPixelForValue(rec);
+                            const yDespTop = y.getPixelForValue(totalCost);
+
+                            // Total da barra de despesas (acima da pilha)
+                            if (totalCost > 0) {
+                                const topDespIdx = finViewMode === 'sede' ? 4 : (finViewMode === 'socios' ? 3 : 2);
+                                const topMeta = chart.getDatasetMeta(topDespIdx);
+                                const xDesp = (topMeta && topMeta.data[i]) ? topMeta.data[i].x : xPos;
+                                ctx.font = '700 11px Outfit, sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillStyle = '#fca5a5';
+                                ctx.fillText(fmtValor(totalCost), xDesp, yDespTop - 5);
+                            }
 
                             // Margem % e valor
                             if (rec > 0) {
                                 const margin = (((rec - totalCost) / rec) * 100).toFixed(1);
                                 const isPos = parseFloat(margin) >= 0;
+                                // se a despesa é a barra mais alta, sobe o % pra não colar no total
+                                const pctY = (yDespTop <= yRecTop) ? (yDespTop - 22) : (yRecTop - 8);
                                 ctx.font = '800 12px Outfit, sans-serif';
                                 ctx.textAlign = 'center';
                                 ctx.textBaseline = 'bottom';
                                 ctx.fillStyle = isPos ? '#10b981' : '#ef4444';
                                 const sign = isPos ? '+' : '';
                                 const valSign = profit >= 0 ? '' : '-';
-                                ctx.fillText(sign + margin + '% (' + valSign + 'R$ ' + Math.abs(profit/1000).toFixed(0) + 'k)', xPos, yMax - 8);
+                                ctx.fillText(sign + margin + '% (' + valSign + 'R$ ' + Math.abs(profit/1000).toFixed(0) + 'k)', xPos, pctY);
                             }
 
                             // Valor da receita dentro da barra
