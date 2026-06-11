@@ -1843,13 +1843,13 @@ function _diagConfirmacoes() {
 }
 
 // ----------------------------------------------------------------
-// Envia a pergunta de confirmação com botões Sim/Não.
-// Se o endpoint de botão falhar, cai pro texto (a pergunta sempre chega).
+// Envia a pergunta de confirmação com botões Sim/Não (clique-only).
+// Se o envio do botão falhar, avisa a recepção no Slack — sem fallback de
+// texto, já que agora só o CLIQUE no botão confirma.
 // ----------------------------------------------------------------
 function sendBotaoConfirmacao(phone, agId) {
   var texto = 'Posso confirmar seu agendamento? 💜\n\n' +
-              'Toque no botão abaixo ou responda *SIM* para confirmar, ' +
-              'ou *NÃO* se precisar reagendar.';
+              'É só tocar no botão aqui embaixo 👇';
 
   var url = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID +
             '/token/' + CF_ZAPI_TOKEN + '/send-button-list';
@@ -1877,38 +1877,45 @@ function sendBotaoConfirmacao(phone, agId) {
   var code = resp.getResponseCode();
   if (code < 200 || code >= 300) {
     Logger.log('send-button-list HTTP ' + code + ': ' +
-               resp.getContentText().substring(0, 200) + ' — fallback texto');
-    sendWhatsApp(phone, texto); // garante a entrega da pergunta
+               resp.getContentText().substring(0, 200));
+    // Sem fallback de texto (só o clique confirma). Se o botão não saiu,
+    // avisa a recepção pra tratar manualmente.
+    slackPost('⚠️ Não consegui enviar o botão de confirmação para ' + phone +
+              ' (agendamento ' + agId + '). Confirmar manualmente com a paciente.');
   }
 }
 
 // ----------------------------------------------------------------
 // Lê o payload do Z-API e devolve {phone, answer:'SIM'|'NAO'|null}.
-// Cobre clique de botão, resposta de lista e texto livre.
+// SÓ vale clique no botão (ou seleção de lista). Texto digitado é IGNORADO
+// de propósito — senão um "Sim" digitado numa conversa de reagendamento com
+// a recepção seria lido como confirmação (bug do print 11/06).
 // ----------------------------------------------------------------
 function interpretarResposta(body) {
   var phone = body.phone || '';
-  var partes = [];
-  if (body.text && body.text.message) partes.push(body.text.message);
+
+  // Monta o "sinal" APENAS a partir de campos de clique de botão/lista.
+  // Nunca lê body.text (mensagem digitada) — esse é o ponto do fix.
+  var sig = '';
   if (body.buttonsResponseMessage) {
-    partes.push(body.buttonsResponseMessage.buttonId || '');
-    partes.push(body.buttonsResponseMessage.message || '');
+    sig += ' ' + (body.buttonsResponseMessage.buttonId || '') +
+           ' ' + (body.buttonsResponseMessage.message || '');
   }
   if (body.listResponseMessage) {
-    partes.push(body.listResponseMessage.selectedRowId || '');
-    partes.push(body.listResponseMessage.title || '');
-    partes.push(body.listResponseMessage.message || '');
+    sig += ' ' + (body.listResponseMessage.selectedRowId || '') +
+           ' ' + (body.listResponseMessage.title || '') +
+           ' ' + (body.listResponseMessage.message || '');
   }
   if (body.buttonReply) {
-    partes.push(body.buttonReply.id || '');
-    partes.push(body.buttonReply.message || '');
+    sig += ' ' + (body.buttonReply.id || '') +
+           ' ' + (body.buttonReply.message || '');
   }
+  sig = sig.toUpperCase();
 
-  var t = partes.join(' ').toLowerCase();
   var answer = null;
-  if (t.indexOf('nao') !== -1 || t.indexOf('não') !== -1 || t.indexOf('reagend') !== -1) {
+  if (sig.indexOf('CONFIRMAR_NAO') !== -1 || sig.indexOf('REAGEND') !== -1) {
     answer = 'NAO';
-  } else if (t.indexOf('sim') !== -1 || t.indexOf('confirm') !== -1) {
+  } else if (sig.indexOf('CONFIRMAR_SIM') !== -1 || sig.indexOf('CONFIRMO') !== -1) {
     answer = 'SIM';
   }
   return { phone: phone, answer: answer };
@@ -2318,7 +2325,14 @@ function enviarAgendaMedicos() {
   medicos.forEach(function(med) {
     try {
       var agDoMedico = agendamentos.filter(function(ag) { return _matchMedico(ag._profNome, [med]); });
-      if (!agDoMedico.length) { semAgenda++; }
+
+      // Sem grade no dia seguinte -> NÃO envia (só registra). Médico sem
+      // agendamento amanhã não precisa receber a mensagem.
+      if (!agDoMedico.length) {
+        semAgenda++;
+        logRowAgenda_(med, alvo, 0, 'SEM_AGENDA (nao enviado)');
+        return;
+      }
 
       var msg = _formatarMensagemAgenda(med.nome, alvo, agDoMedico);
       sendWhatsApp(med.telefone, msg);
@@ -2437,12 +2451,17 @@ function _previewAgendaMedicos(paraNumero, diaForcado) {
 
   medicos.forEach(function(med) {
     var agDoMedico = agendamentos.filter(function(ag) { return _matchMedico(ag._profNome, [med]); });
-    if (!agDoMedico.length) semAgenda++;
+    // Espelha a produção: quem não tem grade no dia seguinte não recebe.
+    if (!agDoMedico.length) {
+      semAgenda++;
+      resumo.push({ medico: med.nome, agendamentos: 0, enviado: false });
+      return;
+    }
     var msg = '[PREVIEW » ' + med.nome + ']\n\n' + _formatarMensagemAgenda(med.nome, alvo, agDoMedico);
     sendWhatsApp(paraNumero, msg);
     Utilities.sleep(1500);
     enviados++;
-    resumo.push({ medico: med.nome, agendamentos: agDoMedico.length });
+    resumo.push({ medico: med.nome, agendamentos: agDoMedico.length, enviado: true });
   });
 
   return {
