@@ -337,16 +337,16 @@ function enviarConfirmacoes() {
         Utilities.sleep(1500);
       }
 
-      // Pergunta de confirmação com botão Sim/Não — só pra quem ainda NÃO confirmou (status != 7).
-      // Quando a paciente responde Sim, o webhook (doPost) muda o status no Feegow pra 7.
+      // Confirmação por LINK (os botões do WhatsApp foram bloqueados pela Meta).
+      // Só pra quem ainda NÃO confirmou (status != 7). Clicou no link → confirmarFeegow.
       if (Number(ag.status_id) !== 7) {
         var agId = ag.agendamento_id || ag.id || ag.agenda_id;
         if (agId) {
-          sendBotaoConfirmacao(phone, agId);
+          sendWhatsApp(phone, _msgConfirmacaoLink(agId));
           registrarPendente(phone, ag.paciente_nome || '', agId, dataStr);
           Utilities.sleep(1500);
         } else {
-          Logger.log('Sem agendamento_id pro botão — campos: ' + Object.keys(ag).join(', '));
+          Logger.log('Sem agendamento_id pro link — campos: ' + Object.keys(ag).join(', '));
         }
       }
 
@@ -1718,6 +1718,9 @@ function doPost(e) {
 
 function doGet(e) {
   var params = (e && e.parameter) || {};
+  // Confirmação por link (paciente clica — sem key; o token no link autentica)
+  if (params.a === 'c' && params.ag) return _confirmarViaLink(params.ag, params.t || '');
+  if (params.a === 'r' && params.ag) return _reagendarViaLink(params.ag, params.t || '');
   if (params.action === 'diag' && params.key === 'paraser2026') {
     return ContentService
       .createTextOutput(JSON.stringify(_diagConfirmacoes(), null, 2))
@@ -1734,7 +1737,7 @@ function doGet(e) {
   }
   if (params.action === 'setup-trigger-agenda' && params.key === 'paraser2026') {
     setupTriggerAgendaMedicos();
-    return ContentService.createTextOutput('{"ok":true,"msg":"trigger 18h criado"}').setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput('{"ok":true,"msg":"triggers sexta 17h + seg-qui 18h criados"}').setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'preview-agenda' && params.key === 'paraser2026') {
     return ContentService
@@ -1749,6 +1752,18 @@ function doGet(e) {
     return ContentService
       .createTextOutput(JSON.stringify(_debugMatchAgenda(params.dia || ''), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'set-webapp-url' && params.key === 'paraser2026') {
+    _P.setProperty('WEBAPP_URL', params.url || '');
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, url: params.url || '' })).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'test-link' && params.key === 'paraser2026') {
+    var agT = params.ag || '000000';
+    if (params.phone) sendWhatsApp(params.phone, _msgConfirmacaoLink(agT));
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, sent_to: params.phone || '(nao enviado)',
+      mensagem: _msgConfirmacaoLink(agT),
+      link_confirmar: linkConfirmacao(agT, 'c'),
+      link_reagendar: linkConfirmacao(agT, 'r') })).setMimeType(ContentService.MimeType.JSON);
   }
   return ContentService.createTextOutput('Confirmacoes online')
     .setMimeType(ContentService.MimeType.TEXT);
@@ -1975,6 +1990,97 @@ function confirmarFeegow(agId) {
       throw new Error('Feegow success:false — ' + (j.message || txt.substring(0, 150)));
     }
   } catch (e) { /* resposta não-JSON: confia no HTTP 2xx */ }
+}
+
+// ================================================================
+// CONFIRMAÇÃO POR LINK
+// Os botões interativos do WhatsApp foram bloqueados pela Meta para a
+// API não-oficial (Z-API) — passaram a não ser entregues. Em vez de botão,
+// a paciente recebe um LINK único por agendamento. Clicou → muda status no
+// Feegow (mesma confirmarFeegow do webhook). Token impede confirmar agenda alheia.
+// ================================================================
+function _linkSecret_() {
+  var s = _P.getProperty('LINK_SECRET');
+  if (!s) { s = Utilities.getUuid().replace(/-/g, ''); _P.setProperty('LINK_SECRET', s); }
+  return s;
+}
+function _tokenConf_(agId) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(agId) + '|' + _linkSecret_());
+  var hex = '';
+  for (var i = 0; i < 6; i++) hex += ('0' + (bytes[i] & 0xFF).toString(16)).slice(-2);
+  return hex; // 12 chars — inviável de adivinhar
+}
+function _webAppUrl_() {
+  return _P.getProperty('WEBAPP_URL') || ScriptApp.getService().getUrl();
+}
+function linkConfirmacao(agId, tipo) { // tipo: 'c' confirmar | 'r' reagendar
+  // Domínio da clínica (não parece golpe). A página confirmar.html encaminha pro web app.
+  var base = _P.getProperty('PUBLIC_LINK_BASE') || 'https://app.paraser.com.br/confirmar.html';
+  return base + '?a=' + tipo + '&ag=' + encodeURIComponent(agId) + '&t=' + _tokenConf_(agId);
+}
+function _msgConfirmacaoLink(agId) {
+  return 'É só tocar na opção abaixo 💜\n\n' +
+         '✅ *CONFIRMAR CONSULTA*\n' + linkConfirmacao(agId, 'c') + '\n\n' +
+         '❌ *PRECISO REMARCAR*\n' + linkConfirmacao(agId, 'r');
+}
+function _acharPendentePorAg_(agId) {
+  var sh = pendentesSheet_();
+  if (sh.getLastRow() < 2) return null;
+  var dados = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+  for (var i = dados.length - 1; i >= 0; i--) {
+    if (String(dados[i][3]) === String(agId) && String(dados[i][5]) === 'PENDENTE') {
+      return { row: i + 2, agId: dados[i][3], nome: dados[i][2] };
+    }
+  }
+  return null;
+}
+function _paginaConf_(emoji, titulo, msg) {
+  var html =
+    '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Paraser</title></head>' +
+    '<body style="margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f3f0f8">' +
+    '<div style="max-width:420px;margin:9vh auto;background:#fff;border-radius:18px;padding:38px 26px;' +
+    'text-align:center;box-shadow:0 10px 34px rgba(91,58,140,.14)">' +
+    '<div style="font-size:56px;line-height:1">' + emoji + '</div>' +
+    '<h1 style="color:#5b3a8c;font-size:22px;margin:16px 0 10px">' + titulo + '</h1>' +
+    '<p style="color:#555;font-size:16px;line-height:1.5;margin:0">' + msg + '</p>' +
+    '<p style="color:#b3a6c9;font-size:13px;margin-top:28px">Clínica Paraser 💜</p>' +
+    '</div></body></html>';
+  return HtmlService.createHtmlOutput(html)
+    .addMetaTag('viewport', 'width=device-width,initial-scale=1');
+}
+function _confirmarViaLink(agId, token) {
+  if (token !== _tokenConf_(agId)) {
+    return _paginaConf_('⚠️', 'Link inválido', 'Esse link de confirmação não é válido. Fale com a recepção pelo WhatsApp. 💜');
+  }
+  if (String(agId) === '000000') { // agendamento de teste — não toca no Feegow
+    return _paginaConf_('✅', 'Presença confirmada!', 'Tudo certo, te esperamos! 💜');
+  }
+  var pend = _acharPendentePorAg_(agId);
+  try {
+    confirmarFeegow(agId);
+    if (pend) marcarPendente(pend.row, 'CONFIRMADO');
+    slackPost('✅ *Confirmado via link* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
+              ' (agendamento ' + agId + '). Status → Confirmado no Feegow.');
+    return _paginaConf_('✅', 'Presença confirmada!', 'Tudo certo, te esperamos! 💜');
+  } catch (err) {
+    if (pend) marcarPendente(pend.row, 'ERRO_FEEGOW');
+    slackPost('⚠️ Clicou confirmar (ag ' + agId + ') mas FALHOU no Feegow: ' + err.message + '. Confirmar manual.');
+    return _paginaConf_('✅', 'Recebemos sua confirmação!', 'Já avisamos a equipe. 💜');
+  }
+}
+function _reagendarViaLink(agId, token) {
+  if (token !== _tokenConf_(agId)) {
+    return _paginaConf_('⚠️', 'Link inválido', 'Esse link não é válido. Fale com a recepção pelo WhatsApp. 💜');
+  }
+  if (String(agId) === '000000') { // agendamento de teste — não posta no Slack
+    return _paginaConf_('🔄', 'Pedido recebido', 'A recepção vai te chamar pra achar um novo horário. 💜');
+  }
+  var pend = _acharPendentePorAg_(agId);
+  if (pend) marcarPendente(pend.row, 'REAGENDAR');
+  slackPost('🔄 *Pediu reagendar (link)* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
+            ' (agendamento ' + agId + '). Recepção: contatar.');
+  return _paginaConf_('🔄', 'Pedido recebido', 'A recepção vai te chamar pra achar um novo horário. 💜');
 }
 
 // ----------------------------------------------------------------
@@ -2289,6 +2395,14 @@ function enviarAgendaMedicos() {
     return;
   }
 
+  // Trava anti-duplicação: se já enviou hoje (ex.: disparo manual + trigger no mesmo dia), não reenvia.
+  var _propsAg = PropertiesService.getScriptProperties();
+  var _hojeStr = Utilities.formatDate(hoje, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  if (_propsAg.getProperty('AGENDA_MED_ENVIADA_EM') === _hojeStr) {
+    Logger.log('Agenda médicos já enviada hoje (' + _hojeStr + ') — pulando pra não duplicar.');
+    return;
+  }
+
   // Dia alvo = amanhã (se hoje é sexta, alvo é segunda)
   var alvo = new Date(hoje);
   alvo.setDate(alvo.getDate() + 1);
@@ -2351,6 +2465,7 @@ function enviarAgendaMedicos() {
                ' · enviadas: ' + enviados + ' / falhas: ' + falhas + ' / sem agenda: ' + semAgenda;
   Logger.log(resumo);
   if (typeof slackPost === 'function') slackPost(resumo);
+  _propsAg.setProperty('AGENDA_MED_ENVIADA_EM', _hojeStr);
 }
 
 function logRowAgenda_(med, dataAlvo, totalAg, status) {
@@ -2476,15 +2591,28 @@ function _previewAgendaMedicos(paraNumero, diaForcado) {
 }
 
 // Setup trigger Seg-Sex 18h (chamada manual 1x)
+// Wrappers dos triggers: SEXTA envia às 17h (agenda de segunda); SEG–QUI às 18h.
+// Cada dia só UM wrapper dispara, então não há envio em duplicidade.
+function enviarAgendaMedicosSexta() {
+  if (new Date().getDay() === 5) enviarAgendaMedicos();
+}
+function enviarAgendaMedicosSemana() {
+  var d = new Date().getDay();
+  if (d >= 1 && d <= 4) enviarAgendaMedicos();
+}
+
 function setupTriggerAgendaMedicos() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'enviarAgendaMedicos') ScriptApp.deleteTrigger(t);
+    var fn = t.getHandlerFunction();
+    if (fn === 'enviarAgendaMedicos' || fn === 'enviarAgendaMedicosSexta' || fn === 'enviarAgendaMedicosSemana') {
+      ScriptApp.deleteTrigger(t);
+    }
   });
-  ScriptApp.newTrigger('enviarAgendaMedicos')
-    .timeBased()
-    .everyDays(1)
-    .atHour(18)
-    .inTimezone('America/Sao_Paulo')
-    .create();
-  Logger.log('✅ Trigger criado: enviarAgendaMedicos roda diário 18h (a função em si pula sáb/dom)');
+  // Sexta-feira: 17h
+  ScriptApp.newTrigger('enviarAgendaMedicosSexta')
+    .timeBased().everyDays(1).atHour(17).inTimezone('America/Sao_Paulo').create();
+  // Segunda a quinta: 18h
+  ScriptApp.newTrigger('enviarAgendaMedicosSemana')
+    .timeBased().everyDays(1).atHour(18).inTimezone('America/Sao_Paulo').create();
+  Logger.log('✅ Triggers: sexta 17h + seg-qui 18h (cada wrapper checa o dia; trava anti-duplo por dia)');
 }
