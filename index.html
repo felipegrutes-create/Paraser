@@ -11588,13 +11588,28 @@
             if (_medChart2025) { try{_medChart2025.destroy();}catch(e){} _medChart2025=null; }
             if (_medChart2026) { try{_medChart2026.destroy();}catch(e){} _medChart2026=null; }
 
-            const fetchYear = async (ds, de) => {
+            const fetchPart = async (ds, de) => {
                 const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
                 const resp = await fetch(url);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const json = await resp.json();
                 if (json.error) throw new Error(json.error);
                 return json.data || [];
+            };
+            // O ano inteiro vem em ~6MB (4000+ faturas) e o navegador derruba com "Failed to fetch".
+            // Quebra em janelas de 3 meses e concatena — cada pedaço ~1.5MB, transfere sem cair.
+            const fetchYear = async (ds, de) => {
+                const parse = s => { const [d,m,y] = s.split('/').map(Number); return new Date(y, m-1, d); };
+                const fmt   = dt => String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+dt.getFullYear();
+                const end = parse(de);
+                let all = [], cur = parse(ds);
+                while (cur <= end) {
+                    const win = new Date(cur.getFullYear(), cur.getMonth()+3, 0); // último dia do 3º mês da janela
+                    const sliceEnd = win < end ? win : end;
+                    all = all.concat(await fetchPart(fmt(cur), fmt(sliceEnd)));
+                    cur = new Date(sliceEnd.getFullYear(), sliceEnd.getMonth(), sliceEnd.getDate() + 1);
+                }
+                return all;
             };
 
             let entries2025 = [], entries2026 = [];
