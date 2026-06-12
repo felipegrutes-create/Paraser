@@ -11203,9 +11203,12 @@
 
         function _resolveMedico(nome, executanteNome) {
             const n = (nome||'').toUpperCase();
-            // Override: USG FIV / Pacote USG vão sempre p/ Érica (mesmo que o procedimento cite outro
-            // médico ou o executante apareça diferente — regra de negócio definida pela clínica)
-            if (n.includes('USG FIV') || (n.includes('PACOTE') && n.includes('USG'))) return 'Érica Stein';
+            // PACOTE DE USG (FIV/congelamento) = VENDA DE TRATAMENTO, não honorário de médico.
+            // Decisão Felipe 2026-06-12: não credita a nenhum médico (some da disputa por médico,
+            // vira receita da clínica). Antes ia tudo p/ Érica e inflava a barra dela (~R$ 31k em
+            // jun/26, incluindo 13 pacotes sem executante + 2 USG que a Bianca executou).
+            // USG FIV individual segue pelo executante real abaixo (Bianca pega os dela, etc).
+            if (n.includes('PACOTE') && n.includes('USG')) return null;
             // PRIORIDADE: nome do executante real do procedimento (Feegow item.executante_id → nome)
             const e = (executanteNome||'').toUpperCase();
             if (e) {
