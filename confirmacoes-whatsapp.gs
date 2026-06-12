@@ -1757,6 +1757,11 @@ function doGet(e) {
     _P.setProperty('WEBAPP_URL', params.url || '');
     return ContentService.createTextOutput(JSON.stringify({ ok: true, url: params.url || '' })).setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'test-slack' && params.key === 'paraser2026') {
+    var waT = formatPhone(params.phone || '5521984341020');
+    slackPost('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, wa: waT })).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'test-link' && params.key === 'paraser2026') {
     var agT = params.ag || '000000';
     if (params.phone) sendWhatsApp(params.phone, _msgConfirmacaoLink(agT));
@@ -2029,7 +2034,7 @@ function _acharPendentePorAg_(agId) {
   var dados = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
   for (var i = dados.length - 1; i >= 0; i--) {
     if (String(dados[i][3]) === String(agId) && String(dados[i][5]) === 'PENDENTE') {
-      return { row: i + 2, agId: dados[i][3], nome: dados[i][2] };
+      return { row: i + 2, agId: dados[i][3], nome: dados[i][2], tel: dados[i][1] };
     }
   }
   return null;
@@ -2086,8 +2091,11 @@ function _reagendarViaLink(agId, token) {
   }
   var pend = _acharPendentePorAg_(agId);
   if (pend) marcarPendente(pend.row, 'REAGENDAR');
+  var waReag = (pend && pend.tel) ? formatPhone(pend.tel) : null;
   slackPost('🔄 *Pediu reagendar (link)* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
-            ' (agendamento ' + agId + '). Recepção: contatar.');
+            ' (agendamento ' + agId + ').' +
+            (waReag ? '\n📲 <https://wa.me/' + waReag + '|Chamar a paciente no WhatsApp>'
+                    : ' Recepção: contatar.'));
   return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
 }
 
