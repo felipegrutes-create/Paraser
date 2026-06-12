@@ -2527,6 +2527,24 @@
     </style>
 </head>
 <body>
+    <!-- 🔒 Trava de acesso (afasta pacientes/curiosos). Guarda só o hash SHA-256 da senha, nunca a senha. Trocar senha: me peça. -->
+    <div id="pr-lock" style="position:fixed;inset:0;background:#f3f0f8;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#5b3a8c;font-size:17px;text-align:center;padding:20px">🔒 Verificando acesso…</div>
+    <script>
+    (function(){
+      var HASH = '3128ece6821fa44fb2defd2da4c90fe8d9d5cf5f5e5d0b126f8407bdcdef092a';
+      var lock = document.getElementById('pr-lock');
+      function unlock(){ if (lock) lock.remove(); }
+      function deny(t){ if (lock) lock.textContent = '🔒 ' + t; }
+      try { if (sessionStorage.getItem('pr_ok') === HASH) { unlock(); return; } } catch(e){}
+      var pwd = prompt('🔒 Senha do Sistema Paraser:');
+      if (pwd === null) { deny('Acesso restrito.'); return; }
+      crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd)).then(function(buf){
+        var hex = Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
+        if (hex === HASH) { try { sessionStorage.setItem('pr_ok', HASH); } catch(e){} unlock(); }
+        else { deny('Senha incorreta. Recarregue a página pra tentar de novo.'); }
+      }).catch(function(){ deny('Erro ao verificar. Recarregue a página.'); });
+    })();
+    </script>
     <div id="loadingOverlay">
         <div class="spinner-ring"></div>
         <h2>Sistema Integrado Paraser</h2>

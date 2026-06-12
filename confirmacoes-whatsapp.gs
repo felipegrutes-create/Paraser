@@ -1719,8 +1719,8 @@ function doPost(e) {
 function doGet(e) {
   var params = (e && e.parameter) || {};
   // Confirmação por link (paciente clica — sem key; o token no link autentica)
-  if (params.a === 'c' && params.ag) return _confirmarViaLink(params.ag, params.t || '');
-  if (params.a === 'r' && params.ag) return _reagendarViaLink(params.ag, params.t || '');
+  if (params.a === 'c' && params.ag) return _respConf(_confirmarViaLink(params.ag, params.t || ''), params.fmt);
+  if (params.a === 'r' && params.ag) return _respConf(_reagendarViaLink(params.ag, params.t || ''), params.fmt);
   if (params.action === 'diag' && params.key === 'paraser2026') {
     return ContentService
       .createTextOutput(JSON.stringify(_diagConfirmacoes(), null, 2))
@@ -2049,12 +2049,20 @@ function _paginaConf_(emoji, titulo, msg) {
   return HtmlService.createHtmlOutput(html)
     .addMetaTag('viewport', 'width=device-width,initial-scale=1');
 }
+// Retorna {emoji,titulo,msg}. _respConf decide se vira HTML (acesso direto) ou
+// JSON (chamado pela página app.paraser.com.br via fetch, com &fmt=json).
+function _respConf(res, fmt) {
+  if (fmt === 'json') {
+    return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+  }
+  return _paginaConf_(res.emoji, res.titulo, res.msg);
+}
 function _confirmarViaLink(agId, token) {
   if (token !== _tokenConf_(agId)) {
-    return _paginaConf_('⚠️', 'Link inválido', 'Esse link de confirmação não é válido. Fale com a recepção pelo WhatsApp. 💜');
+    return { emoji:'⚠️', titulo:'Link inválido', msg:'Esse link de confirmação não é válido. Fale com a recepção pelo WhatsApp. 💜' };
   }
   if (String(agId) === '000000') { // agendamento de teste — não toca no Feegow
-    return _paginaConf_('✅', 'Presença confirmada!', 'Tudo certo, te esperamos! 💜');
+    return { emoji:'✅', titulo:'Presença confirmada!', msg:'Tudo certo, te esperamos! 💜' };
   }
   var pend = _acharPendentePorAg_(agId);
   try {
@@ -2062,25 +2070,25 @@ function _confirmarViaLink(agId, token) {
     if (pend) marcarPendente(pend.row, 'CONFIRMADO');
     slackPost('✅ *Confirmado via link* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
               ' (agendamento ' + agId + '). Status → Confirmado no Feegow.');
-    return _paginaConf_('✅', 'Presença confirmada!', 'Tudo certo, te esperamos! 💜');
+    return { emoji:'✅', titulo:'Presença confirmada!', msg:'Tudo certo, te esperamos! 💜' };
   } catch (err) {
     if (pend) marcarPendente(pend.row, 'ERRO_FEEGOW');
     slackPost('⚠️ Clicou confirmar (ag ' + agId + ') mas FALHOU no Feegow: ' + err.message + '. Confirmar manual.');
-    return _paginaConf_('✅', 'Recebemos sua confirmação!', 'Já avisamos a equipe. 💜');
+    return { emoji:'✅', titulo:'Recebemos sua confirmação!', msg:'Já avisamos a equipe. 💜' };
   }
 }
 function _reagendarViaLink(agId, token) {
   if (token !== _tokenConf_(agId)) {
-    return _paginaConf_('⚠️', 'Link inválido', 'Esse link não é válido. Fale com a recepção pelo WhatsApp. 💜');
+    return { emoji:'⚠️', titulo:'Link inválido', msg:'Esse link não é válido. Fale com a recepção pelo WhatsApp. 💜' };
   }
   if (String(agId) === '000000') { // agendamento de teste — não posta no Slack
-    return _paginaConf_('🔄', 'Pedido recebido', 'A recepção vai te chamar pra achar um novo horário. 💜');
+    return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
   }
   var pend = _acharPendentePorAg_(agId);
   if (pend) marcarPendente(pend.row, 'REAGENDAR');
   slackPost('🔄 *Pediu reagendar (link)* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
             ' (agendamento ' + agId + '). Recepção: contatar.');
-  return _paginaConf_('🔄', 'Pedido recebido', 'A recepção vai te chamar pra achar um novo horário. 💜');
+  return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
 }
 
 // ----------------------------------------------------------------
