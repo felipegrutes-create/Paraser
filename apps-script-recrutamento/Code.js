@@ -109,9 +109,248 @@ function doGet(e) {
       .createTextOutput(JSON.stringify(coletarDiagnostico_(), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'stats-localidade' && params.key === 'paraser2026') {
+    return ContentService
+      .createTextOutput(JSON.stringify(statsLocalidade_(), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'perfil-experiente' && params.key === 'paraser2026') {
+    return ContentService
+      .createTextOutput(JSON.stringify(perfilExperiente_(), null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, message: 'Recrutamento Paraser webhook ativo' }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Filtro: experiência sólida em recepção (Q1 = 3-5 anos ou >5 anos) + DDD 21 (acesso Botafogo).
+// Retorna respostas completas pra Felipe avaliar carreira na recepção.
+function perfilExperiente_() {
+  var props = PropertiesService.getScriptProperties();
+  var sheetId = props.getProperty('SHEET_ID');
+  if (!sheetId) return { erro: 'SHEET_ID não configurado' };
+  var ss = SpreadsheetApp.openById(sheetId);
+  var sh = ss.getSheetByName('Candidaturas');
+  if (!sh || sh.getLastRow() < 2) return { erro: 'Sem candidaturas' };
+
+  // Mapeamento das respostas Q1 (experiência)
+  var MAPA_EXP = {
+    '0': 'Nenhuma. Quero começar agora',
+    '1': 'Menos de 1 ano',
+    '2': '1 a 3 anos',
+    '3': '3 a 5 anos',
+    '4': 'Mais de 5 anos'
+  };
+  var MAPA_Q2 = {
+    'muito':    'Sim, com frequência (dia a dia)',
+    'algumas':  'Sim, algumas vezes',
+    'pouco':    'Raramente',
+    'nunca':    'Ainda não, tenho sensibilidade'
+  };
+  var MAPA_Q5 = {
+    'integral_5': 'Integral 5 dias',
+    'integral_6': 'Integral 6 dias',
+    'manha':      'Só manhã',
+    'tarde':      'Só tarde',
+    'flexivel':   'Flexível'
+  };
+  var MAPA_Q4 = {
+    'google':         'Google Workspace',
+    'whatsapp':       'WhatsApp Business',
+    'sistema_gestao': 'Sistema gestão clínica',
+    'excel':          'Excel avançado',
+    'redes_sociais':  'Redes sociais',
+    'nenhuma':        'Nenhuma (aprende rápido)'
+  };
+
+  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 14).getValues();
+  var candidatas = [];
+
+  vals.forEach(function(r) {
+    var timestamp = r[0];
+    var nome = String(r[1] || '');
+    var email = String(r[2] || '');
+    var fone = String(r[3] || '').replace(/\D/g, '');
+    var linkedin = String(r[4] || '');
+    var q1 = String(r[5] || '');
+    var q2 = String(r[6] || '');
+    var q3 = String(r[7] || '');
+    var q4 = String(r[8] || '');
+    var q5 = String(r[9] || '');
+    var q6 = String(r[10] || '');
+    var score = Number(r[11]) || 0;
+    var classif = r[12] || '';
+    var cv = String(r[13] || '');
+
+    // Detecta DDD
+    var ddd = null;
+    if (fone.length === 13 && fone.startsWith('55')) ddd = fone.substring(2, 4);
+    else if (fone.length === 11 || fone.length === 10) ddd = fone.substring(0, 2);
+
+    // Filtros principais: experiência 3+ anos + DDD 21
+    var expNum = parseInt(q1, 10);
+    if (isNaN(expNum) || expNum < 3) return; // só 3-5 anos ou >5 anos
+    if (ddd !== '21') return;                 // só Rio metro
+
+    // Atendimento emocional traduzido
+    var q2Label = MAPA_Q2[q2] || q2;
+
+    // Ferramentas como lista (Q4 vem como CSV separado por vírgula)
+    var ferramentas = (q4 || '').split(',')
+      .filter(function(t) { return t && t !== 'nenhuma'; })
+      .map(function(t) { return MAPA_Q4[t] || t; });
+    var temSistemaGestao = (q4 || '').indexOf('sistema_gestao') !== -1;
+    var temWhatsBiz = (q4 || '').indexOf('whatsapp') !== -1;
+
+    candidatas.push({
+      nome: nome,
+      score: score,
+      classificacao: classif,
+      experiencia: MAPA_EXP[q1] || q1,
+      experiencia_anos: expNum,
+      atendimento_emocional: q2Label,
+      disponibilidade: MAPA_Q5[q5] || q5,
+      ferramentas: ferramentas,
+      tem_sistema_gestao: temSistemaGestao,
+      tem_whatsapp_business: temWhatsBiz,
+      cenario_resposta: q3,
+      motivacao: q6,
+      email: email,
+      telefone: fone,
+      linkedin: linkedin,
+      cv_url: cv,
+      timestamp: (timestamp instanceof Date)
+        ? Utilities.formatDate(timestamp, 'GMT-3', 'yyyy-MM-dd HH:mm')
+        : String(timestamp || '')
+    });
+  });
+
+  // Ordena: mais experientes primeiro, depois score
+  candidatas.sort(function(a, b) {
+    if (b.experiencia_anos !== a.experiencia_anos) return b.experiencia_anos - a.experiencia_anos;
+    return b.score - a.score;
+  });
+
+  // Quebra em buckets
+  var mais_5 = candidatas.filter(function(c) { return c.experiencia_anos === 4; });
+  var tres_a_5 = candidatas.filter(function(c) { return c.experiencia_anos === 3; });
+
+  return {
+    total_filtradas: candidatas.length,
+    mais_5_anos: mais_5.length,
+    tres_a_5_anos: tres_a_5.length,
+    com_sistema_gestao_clinica: candidatas.filter(function(c) { return c.tem_sistema_gestao; }).length,
+    com_whatsapp_business:      candidatas.filter(function(c) { return c.tem_whatsapp_business; }).length,
+    atendimento_diario:         candidatas.filter(function(c) { return c.atendimento_emocional.indexOf('frequência') !== -1; }).length,
+    candidatas: candidatas
+  };
+}
+
+// Análise das candidaturas agrupadas por DDD do WhatsApp.
+// Botafogo (zona sul Rio) → DDD 21 é fácil acesso (metrô/ônibus).
+// DDDs 22 e 24 são interior RJ (mais distante). Outros DDDs = fora do estado.
+function statsLocalidade_() {
+  var props = PropertiesService.getScriptProperties();
+  var sheetId = props.getProperty('SHEET_ID');
+  if (!sheetId) return { erro: 'SHEET_ID não configurado' };
+  var ss = SpreadsheetApp.openById(sheetId);
+  var sh = ss.getSheetByName('Candidaturas');
+  if (!sh || sh.getLastRow() < 2) return { erro: 'Sem candidaturas' };
+
+  // Colunas: Timestamp(1) Nome(2) Email(3) WhatsApp(4) LinkedIn(5)
+  // Q1_Experiencia(6) Q2(7) Q3(8) Q4(9) Q5(10) Q6(11)
+  // Score_Automatico(12) Classificacao(13) CV_URL(14) UserAgent(15)
+  var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 14).getValues();
+
+  // DDDs do RJ + classificação de proximidade a Botafogo
+  var DDD_PROXIMIDADE = {
+    '21': 'rio_metro',     // RJ capital + região metropolitana (perto Botafogo)
+    '22': 'rio_interior',  // norte fluminense, lagos, Macaé
+    '24': 'rio_interior'   // sul fluminense, Petrópolis, Volta Redonda
+  };
+
+  // DDDs de outros estados (pra rotulagem)
+  var DDD_ESTADO = {
+    '11':'SP','12':'SP','13':'SP','14':'SP','15':'SP','16':'SP','17':'SP','18':'SP','19':'SP',
+    '27':'ES','28':'ES',
+    '31':'MG','32':'MG','33':'MG','34':'MG','35':'MG','37':'MG','38':'MG',
+    '41':'PR','42':'PR','43':'PR','44':'PR','45':'PR','46':'PR',
+    '47':'SC','48':'SC','49':'SC',
+    '51':'RS','53':'RS','54':'RS','55':'RS',
+    '61':'DF','62':'GO','64':'GO','63':'TO','65':'MT','66':'MT','67':'MS',
+    '68':'AC','69':'RO',
+    '71':'BA','73':'BA','74':'BA','75':'BA','77':'BA',
+    '79':'SE','81':'PE','82':'AL','83':'PB','84':'RN','85':'CE','86':'PI','87':'PE','88':'CE','89':'PI',
+    '91':'PA','92':'AM','93':'PA','94':'PA','95':'RR','96':'AP','97':'AM','98':'MA','99':'MA'
+  };
+
+  var stats = {
+    total: vals.length,
+    rio_metro: 0,           // DDD 21
+    rio_interior: 0,        // DDDs 22, 24
+    outros_estados: 0,
+    sem_ddd_valido: 0,
+    por_ddd: {},
+    por_estado: {},
+    candidatas_rio_metro: [],
+    candidatas_priori_rio: []  // Score >=70 E DDD 21
+  };
+
+  vals.forEach(function(r) {
+    var nome = r[1] || '';
+    var fone = String(r[3] || '').replace(/\D/g, '');
+    var score = Number(r[11]) || 0;
+    var classif = r[12] || '';
+    var cvUrl = r[13] || '';
+
+    // Detecta DDD: telefone BR pode ser 55+DDD+numero (13 dig) ou DDD+numero (10-11 dig)
+    var ddd = null;
+    if (fone.length === 13 && fone.startsWith('55')) ddd = fone.substring(2, 4);
+    else if (fone.length === 12 && fone.startsWith('55')) ddd = fone.substring(2, 4);
+    else if (fone.length === 11 || fone.length === 10) ddd = fone.substring(0, 2);
+
+    if (!ddd) {
+      stats.sem_ddd_valido++;
+      return;
+    }
+
+    stats.por_ddd[ddd] = (stats.por_ddd[ddd] || 0) + 1;
+    var proximidade = DDD_PROXIMIDADE[ddd];
+
+    if (proximidade === 'rio_metro') {
+      stats.rio_metro++;
+      if (stats.candidatas_rio_metro.length < 30) {
+        stats.candidatas_rio_metro.push({
+          nome: nome,
+          score: score,
+          classif: classif,
+          telefone: fone,
+          cv: cvUrl
+        });
+      }
+      if (score >= 70) {
+        stats.candidatas_priori_rio.push({
+          nome: nome,
+          score: score,
+          telefone: fone,
+          cv: cvUrl
+        });
+      }
+    } else if (proximidade === 'rio_interior') {
+      stats.rio_interior++;
+    } else {
+      stats.outros_estados++;
+      var uf = DDD_ESTADO[ddd] || '?';
+      stats.por_estado[uf] = (stats.por_estado[uf] || 0) + 1;
+    }
+  });
+
+  // Ordena prioridades por score desc
+  stats.candidatas_priori_rio.sort(function(a, b) { return b.score - a.score; });
+  stats.candidatas_rio_metro.sort(function(a, b) { return b.score - a.score; });
+
+  return stats;
 }
 
 function coletarDiagnostico_() {
