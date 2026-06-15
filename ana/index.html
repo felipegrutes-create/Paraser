@@ -45,6 +45,21 @@
   .btn-back { background: transparent; border: 0; color: #a08660; font-family: 'Playfair Display', serif; font-size: 13px; cursor: pointer; }
   textarea { width: 100%; padding: 14px; border: 1px solid #d4b888; font-family: 'Lora', serif; font-size: 14px; min-height: 100px; resize: vertical; margin-bottom: 24px; box-sizing: border-box; }
 </style>
+
+<!-- Meta Pixel: Leads Paraser (920108941023871) -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '920108941023871');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none" alt=""
+src="https://www.facebook.com/tr?id=920108941023871&ev=PageView&noscript=1"/></noscript>
+<!-- /Meta Pixel -->
+
 </head>
 <body>
 <div class="container">
@@ -192,7 +207,13 @@
   function showStep(n) {
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     const el = document.getElementById('step-' + n);
-    if (el) { el.classList.add('active'); currentStep = n; window.scrollTo({top:0,behavior:'smooth'}); }
+    if (el) {
+      el.classList.add('active'); currentStep = n; window.scrollTo({top:0,behavior:'smooth'});
+      // Pixel: paciente iniciou o quiz (passa de hero pra primeira pergunta)
+      if (n === 1) {
+        try { fbq('track', 'InitiateCheckout', { content_name: 'quiz_ana_iniciado' }); } catch (_) {}
+      }
+    }
   }
   function selectOpt(el, step) {
     el.parentElement.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
@@ -237,6 +258,11 @@
       });
       const result = await resp.json();
       if (!result.ok) throw new Error(result.error || 'erro desconhecido');
+
+      // Pixel: lead qualificado pelo quiz
+      try {
+        fbq('track', 'Lead', { content_name: 'quiz_ana', content_category: 'fertilidade', value: 1, currency: 'BRL' });
+      } catch (_) { /* fbq pode estar bloqueado por adblocker — não falha o submit */ }
 
       // Abre WhatsApp com mensagem inicial
       const ref = encodeURIComponent('Oi! Vim do quiz da Paraser. Acabei de responder. Quero conversar 💜');
