@@ -2598,6 +2598,8 @@
                 <button class="tab-dropdown-item" onclick="showSection('sec-estoque',null)">💊 Estoque Medicamentos</button>
             </div>
         </div>
+
+        <button class="tab" onclick="showSection('sec-marketing',this)">📊 Marketing</button>
     </div>
 
     <div class="container">
@@ -3937,6 +3939,79 @@
                 </div>
                 <div class="chart-card">
                     <canvas id="medChartMes" height="220"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- MARKETING — Pixel + CAPI + Meta Ads + Clarity -->
+        <section id="sec-marketing" class="section">
+            <p class="section-title">📊 Marketing — Campanhas, Funil e Performance</p>
+            <p style="color:var(--muted);font-size:13px;margin:-8px 0 18px">
+                Dados ao vivo Meta Ads (atualiza a cada abertura) + funil completo agregado 2×/dia.
+                <span id="mktFetchedAt" style="color:var(--accent)"></span>
+                <button onclick="loadAndRenderMarketing(true)" style="margin-left:12px;background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);color:var(--accent);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px">🔄 Atualizar</button>
+            </p>
+
+            <div id="mktError" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;padding:14px 18px;border-radius:8px;margin-bottom:18px;font-size:13px"></div>
+
+            <!-- KPIs -->
+            <div class="kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px">
+                <div class="kpi-card"><div class="value" id="mktSpendToday">—</div><div class="label">Gasto hoje</div></div>
+                <div class="kpi-card"><div class="value" id="mktSpend7d">—</div><div class="label">Gasto 7 dias</div></div>
+                <div class="kpi-card"><div class="value" id="mktSpendMonth">—</div><div class="label">Gasto no mês</div></div>
+                <div class="kpi-card purple"><div class="value" id="mktCpl7d" style="color:#c084fc">—</div><div class="label">CPL 7d (Lead Form)</div></div>
+                <div class="kpi-card"><div class="value" id="mktLeads7d">—</div><div class="label">Leads 7d</div></div>
+                <div class="kpi-card"><div class="value" id="mktContacts7d">—</div><div class="label">Contacts 7d (WhatsApp)</div></div>
+            </div>
+
+            <!-- Campanhas -->
+            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:24px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                    <h3 style="margin:0;font-size:15px;color:var(--text)">Campanhas (últimos 7 dias)</h3>
+                    <span style="color:var(--muted);font-size:11px">🟢 ativa · ⚫ pausada · ordenadas por gasto</span>
+                </div>
+                <div style="overflow-x:auto">
+                    <table id="mktCampaignsTable" style="width:100%;border-collapse:collapse;font-size:13px">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--border);color:var(--muted);text-align:left">
+                                <th style="padding:10px 8px">Campanha</th>
+                                <th style="padding:10px 8px;text-align:right">Gasto</th>
+                                <th style="padding:10px 8px;text-align:right">Impressões</th>
+                                <th style="padding:10px 8px;text-align:right">Cliques</th>
+                                <th style="padding:10px 8px;text-align:right">CTR</th>
+                                <th style="padding:10px 8px;text-align:right">Leads</th>
+                                <th style="padding:10px 8px;text-align:right">Contacts</th>
+                                <th style="padding:10px 8px;text-align:right">CPL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mktCampaignsBody">
+                            <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--muted)">Carregando…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Funil -->
+            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:24px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                    <h3 style="margin:0;font-size:15px;color:var(--text)">Funil completo (snapshot 7 dias)</h3>
+                    <span id="mktFunnelTime" style="color:var(--muted);font-size:11px"></span>
+                </div>
+                <div id="mktFunnelBody" style="display:flex;flex-direction:column;gap:10px">
+                    <div style="color:var(--muted);text-align:center;padding:24px">Carregando…</div>
+                </div>
+            </div>
+
+            <!-- Clarity / Pixel quick links -->
+            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px">
+                <h3 style="margin:0 0 14px 0;font-size:15px;color:var(--text)">🔥 Comportamento do visitante (Clarity) + Eventos (Pixel)</h3>
+                <p style="color:var(--muted);font-size:13px;margin:0 0 14px 0">
+                    Heatmaps e gravações de sessão só dentro do painel da Microsoft. Use estes botões pra navegar rápido:
+                </p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <a href="https://clarity.microsoft.com/projects/view/x7kb96gx87" target="_blank" rel="noopener" style="background:#a855f7;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">🔥 Abrir Clarity (heatmap + sessões)</a>
+                    <a href="https://business.facebook.com/events_manager2/list/dataset/920108941023871/overview" target="_blank" rel="noopener" style="background:#3b82f6;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📊 Pixel "Leads Paraser" no BM</a>
+                    <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=849546694121439" target="_blank" rel="noopener" style="background:#1877f2;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📣 Ads Manager (campanhas)</a>
                 </div>
             </div>
         </section>
@@ -5555,6 +5630,7 @@
             if (id === 'sec-exec')    loadAndRenderExec();
             if (id === 'sec-estoque') loadAndRenderEstoque();
             if (id === 'sec-cr') loadAndRenderCR();
+            if (id === 'sec-marketing') loadAndRenderMarketing(false);
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
             if (id === 'sec-arquivo-morto') renderArquivoMorto();
@@ -13047,6 +13123,122 @@ GONAPEPTYL,56`;
                 const el = document.getElementById(id);
                 if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0,0,el.width,el.height); }
             });
+        }
+
+        // ===== Marketing dashboard (Meta Ads + CAPI + Pixel + Clarity) =====
+        const MKT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbz3_5tH7d3vJXGKNk1G_gGvS8bStTl36iEESQmvRvlmHu59L_2OPHgsNES3lEqBSAI/exec';
+        let _mktLoaded = false;
+        function _mktFmtBRL(v) {
+            if (v == null || isNaN(v)) return '—';
+            return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        function _mktFmtInt(v) {
+            if (v == null || isNaN(v)) return '—';
+            return Number(v).toLocaleString('pt-BR');
+        }
+        function _mktFmtPct(v) {
+            if (v == null || isNaN(v)) return '—';
+            return Number(v).toFixed(2) + '%';
+        }
+        async function loadAndRenderMarketing(forceRefresh) {
+            if (_mktLoaded && !forceRefresh) return;
+            const errEl = document.getElementById('mktError');
+            errEl.style.display = 'none';
+            try {
+                const [nowResp, funnelResp] = await Promise.all([
+                    fetch(MKT_WEBAPP_URL + '?action=marketing-now&key=paraser2026').then(r => r.json()),
+                    fetch(MKT_WEBAPP_URL + '?action=marketing-funnel&key=paraser2026').then(r => r.json())
+                ]);
+
+                if (!nowResp.ok) {
+                    const msg = nowResp.error || 'erro desconhecido';
+                    if (/ads_read|ads_management|#200/i.test(msg)) {
+                        errEl.innerHTML = '🔑 <b>Token Meta Ads sem permissão</b><br>O token CAPI atual não tem scope <code>ads_read</code>. Pra ativar dados reais, gere um System User Token no Business Manager com permissão <i>ads_read</i> e cole na Script Property <code>META_ADS_TOKEN</code> do Apps Script "Meta CAPI Paraser". <a href="https://business.facebook.com/settings/system-users" target="_blank" style="color:var(--accent)">Abrir Business Manager →</a>';
+                    } else {
+                        errEl.innerHTML = '❌ ' + msg;
+                    }
+                    errEl.style.display = 'block';
+                    _mktRenderEmpty();
+                    return;
+                }
+
+                _mktRenderNow(nowResp);
+                _mktRenderFunnel(funnelResp);
+                _mktLoaded = true;
+            } catch (e) {
+                errEl.innerHTML = '❌ Falha ao conectar: ' + (e.message || e);
+                errEl.style.display = 'block';
+            }
+        }
+        function _mktRenderEmpty() {
+            ['mktSpendToday','mktSpend7d','mktSpendMonth','mktCpl7d','mktLeads7d','mktContacts7d'].forEach(id => {
+                document.getElementById(id).textContent = '—';
+            });
+            document.getElementById('mktCampaignsBody').innerHTML =
+                '<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--muted)">Sem dados ainda.</td></tr>';
+            document.getElementById('mktFunnelBody').innerHTML =
+                '<div style="color:var(--muted);text-align:center;padding:24px">Sem snapshot ainda.</div>';
+        }
+        function _mktRenderNow(d) {
+            const k = d.kpis || {};
+            document.getElementById('mktSpendToday').textContent  = _mktFmtBRL(k.spendToday);
+            document.getElementById('mktSpend7d').textContent     = _mktFmtBRL(k.spend7d);
+            document.getElementById('mktSpendMonth').textContent  = _mktFmtBRL(k.spendMonth);
+            document.getElementById('mktCpl7d').textContent       = _mktFmtBRL(k.cpl7d);
+            document.getElementById('mktLeads7d').textContent     = _mktFmtInt(k.leads7d);
+            document.getElementById('mktContacts7d').textContent  = _mktFmtInt(k.contacts7d);
+            document.getElementById('mktFetchedAt').textContent   = 'Atualizado em ' + new Date(d.fetchedAt).toLocaleString('pt-BR');
+
+            const tbody = document.getElementById('mktCampaignsBody');
+            const camps = d.campaigns || [];
+            if (!camps.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--muted)">Nenhuma campanha encontrada.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = camps.map(c => {
+                const dot = c.effectiveStatus === 'ACTIVE' ? '🟢' :
+                            c.effectiveStatus === 'CAMPAIGN_PAUSED' || c.effectiveStatus === 'ADSET_PAUSED' || c.effectiveStatus === 'PAUSED' ? '⚫' : '🟡';
+                const cplColor = c.cpl == null ? 'color:var(--muted)' :
+                                 c.cpl < 10 ? 'color:#4ade80' :
+                                 c.cpl < 25 ? 'color:#fbbf24' : 'color:#f87171';
+                return `<tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:10px 8px"><span style="margin-right:6px">${dot}</span>${c.name}</td>
+                    <td style="padding:10px 8px;text-align:right">${_mktFmtBRL(c.spend)}</td>
+                    <td style="padding:10px 8px;text-align:right">${_mktFmtInt(c.impressions)}</td>
+                    <td style="padding:10px 8px;text-align:right">${_mktFmtInt(c.clicks)}</td>
+                    <td style="padding:10px 8px;text-align:right">${_mktFmtPct(c.ctr)}</td>
+                    <td style="padding:10px 8px;text-align:right">${_mktFmtInt(c.leads)}</td>
+                    <td style="padding:10px 8px;text-align:right">${_mktFmtInt(c.contacts)}</td>
+                    <td style="padding:10px 8px;text-align:right;${cplColor};font-weight:600">${_mktFmtBRL(c.cpl)}</td>
+                </tr>`;
+            }).join('');
+        }
+        function _mktRenderFunnel(d) {
+            const body = document.getElementById('mktFunnelBody');
+            const ts   = document.getElementById('mktFunnelTime');
+            if (!d.ok || !d.hasData) {
+                body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:24px">
+                    ${d.msg || 'Snapshot agendado pra 8h e 18h. Aguarde a primeira execução.'}
+                </div>`;
+                ts.textContent = '';
+                return;
+            }
+            ts.textContent = 'Snapshot ' + new Date(d.snapshot.snapshotAt).toLocaleString('pt-BR');
+            const steps = d.funnelSteps || [];
+            const max = Math.max(...steps.map(s => s.value || 0)) || 1;
+            body.innerHTML = steps.map((s, i) => {
+                const pct = (s.value || 0) / max * 100;
+                const conv = s.conv != null ? `<span style="color:#4ade80;font-size:11px;margin-left:8px">(${s.conv.toFixed(1)}% do anterior)</span>` : '';
+                return `<div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
+                        <span>${i+1}. ${s.label}${conv}</span>
+                        <span style="font-weight:600">${_mktFmtInt(s.value)}</span>
+                    </div>
+                    <div style="background:var(--bg);border-radius:6px;height:10px;overflow:hidden">
+                        <div style="background:linear-gradient(90deg,#00d4aa,#a855f7);height:100%;width:${pct}%;transition:width .4s"></div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         async function loadAndRenderCR() {
