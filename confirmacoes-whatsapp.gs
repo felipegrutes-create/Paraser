@@ -2073,6 +2073,10 @@ function _confirmarViaLink(agId, token) {
   try {
     confirmarFeegow(agId);
     if (pend) marcarPendente(pend.row, 'CONFIRMADO');
+    if (pend && pend.tel) {
+      try { sendWhatsApp(pend.tel, 'Perfeito! ✅ Seu agendamento está confirmado. Te esperamos! 💜'); }
+      catch (e) { slackPost('⚠️ Confirmou (ag ' + agId + ') mas falhou ao mandar WhatsApp de agradecimento: ' + e.message); }
+    }
     slackPost('✅ *Confirmado via link* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
               ' (agendamento ' + agId + '). Status → Confirmado no Feegow.');
     return { emoji:'✅', titulo:'Presença confirmada!', msg:'Tudo certo, te esperamos! 💜' };
@@ -2092,6 +2096,10 @@ function _reagendarViaLink(agId, token) {
   var pend = _acharPendentePorAg_(agId);
   if (pend) marcarPendente(pend.row, 'REAGENDAR');
   var waReag = (pend && pend.tel) ? formatPhone(pend.tel) : null;
+  if (pend && pend.tel) {
+    try { sendWhatsApp(pend.tel, 'Recebemos seu pedido de reagendamento. 💜 A recepção vai te chamar pra achar um novo horário.'); }
+    catch (e) { slackPost('⚠️ Pedido reagendar (ag ' + agId + ') mas falhou ao mandar WhatsApp de aviso: ' + e.message); }
+  }
   slackPost('🔄 *Pediu reagendar (link)* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
             ' (agendamento ' + agId + ').' +
             (waReag ? '\n📲 <https://wa.me/' + waReag + '|Chamar a paciente no WhatsApp>'
