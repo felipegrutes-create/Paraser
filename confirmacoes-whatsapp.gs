@@ -1795,6 +1795,15 @@ function doGet(e) {
     slackPost('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
     return ContentService.createTextOutput(JSON.stringify({ ok: true, wa: waT })).setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'dump-pendentes' && params.key === 'paraser2026') {
+    var ps = pendentesSheet_();
+    var pout = { total: 0, rows: [] };
+    if (ps.getLastRow() > 1) {
+      pout.rows = ps.getRange(2, 1, ps.getLastRow() - 1, 6).getValues();
+      pout.total = pout.rows.length;
+    }
+    return ContentService.createTextOutput(JSON.stringify(pout)).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'dump-msgs' && params.key === 'paraser2026') {
     var dss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
     var dsh = dss.getSheetByName('Msgs_Recebidas');
@@ -2114,12 +2123,15 @@ function _acharPendentePorAg_(agId) {
   var sh = pendentesSheet_();
   if (sh.getLastRow() < 2) return null;
   var dados = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+  var qualquer = null;
   for (var i = dados.length - 1; i >= 0; i--) {
-    if (String(dados[i][3]) === String(agId) && String(dados[i][5]) === 'PENDENTE') {
-      return { row: i + 2, agId: dados[i][3], nome: dados[i][2], tel: dados[i][1] };
+    if (String(dados[i][3]) === String(agId)) {
+      var p = { row: i + 2, agId: dados[i][3], nome: dados[i][2], tel: dados[i][1], status: String(dados[i][5]) };
+      if (p.status === 'PENDENTE') return p;   // prioriza pendente (1ª resposta)
+      if (!qualquer) qualquer = p;             // guarda o mais recente em qualquer status (p/ ter nome+telefone)
     }
   }
-  return null;
+  return qualquer;
 }
 function _paginaConf_(emoji, titulo, msg) {
   var html =
@@ -2152,6 +2164,9 @@ function _confirmarViaLink(agId, token) {
     return { emoji:'✅', titulo:'Presença confirmada!', msg:'Tudo certo, te esperamos! 💜' };
   }
   var pend = _acharPendentePorAg_(agId);
+  if (pend && pend.status === 'CONFIRMADO') { // já confirmado antes — não repete nada
+    return { emoji:'✅', titulo:'Presença confirmada!', msg:'Tudo certo, te esperamos! 💜' };
+  }
   try {
     confirmarFeegow(agId);
     if (pend) marcarPendente(pend.row, 'CONFIRMADO');
@@ -2176,6 +2191,9 @@ function _reagendarViaLink(agId, token) {
     return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
   }
   var pend = _acharPendentePorAg_(agId);
+  if (pend && pend.status === 'REAGENDAR') { // já pediu reagendar antes — não duplica o aviso no Slack
+    return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
+  }
   if (pend) marcarPendente(pend.row, 'REAGENDAR');
   var waReag = (pend && pend.tel) ? formatPhone(pend.tel) : null;
   if (pend && pend.tel) {
