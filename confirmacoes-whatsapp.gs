@@ -1798,9 +1798,9 @@ function doGet(e) {
   if (params.action === 'dump-msgs' && params.key === 'paraser2026') {
     var dss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
     var dsh = dss.getSheetByName('Msgs_Recebidas');
-    var out = { total: 0, msgs: [] };
+    var out = { total: 0, msgs: [], planilha: dss.getName(), planilha_url: dss.getUrl(), aba: 'Msgs_Recebidas' };
     if (dsh && dsh.getLastRow() > 1) {
-      out.msgs = dsh.getRange(2, 1, dsh.getLastRow() - 1, 4).getValues();
+      out.msgs = dsh.getRange(2, 1, dsh.getLastRow() - 1, 5).getValues();
       out.total = out.msgs.length;
     }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
@@ -2000,18 +2000,24 @@ function interpretarResposta(body) {
 // ----------------------------------------------------------------
 function _gravarMsgRecebida(body) {
   try {
-    if (!body || body.fromMe || body.isGroup) return;
+    if (!body || body.isGroup) return; // grava RECEBIDAS e ENVIADAS (p/ medir tempo de resposta); ignora só grupos
     var txt = (body.text && body.text.message) ? body.text.message
             : (typeof body.text === 'string' ? body.text : '');
-    if (!txt) return; // só mensagens de texto (ignora áudio/imagem/etc por ora)
+    if (!txt) return; // só mensagens de texto
     var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
     var sh = ss.getSheetByName('Msgs_Recebidas');
     if (!sh) {
       sh = ss.insertSheet('Msgs_Recebidas');
-      sh.appendRow(['Timestamp', 'Telefone', 'Nome', 'Texto']);
+      sh.appendRow(['Timestamp', 'Telefone', 'Nome', 'Direcao', 'Texto']);
+      sh.setFrozenRows(1);
+    } else if (sh.getRange(1, 4).getValue() !== 'Direcao') {
+      // formato antigo (4 col, só recebidas) — recria p/ medir demanda + tempo de resposta
+      sh.clear();
+      sh.appendRow(['Timestamp', 'Telefone', 'Nome', 'Direcao', 'Texto']);
       sh.setFrozenRows(1);
     }
-    sh.appendRow([new Date(), body.phone || '', body.senderName || body.chatName || '', txt]);
+    sh.appendRow([new Date(), body.phone || '', body.senderName || body.chatName || '',
+                  body.fromMe ? 'ENVIADA' : 'RECEBIDA', txt]);
   } catch (err) {
     Logger.log('gravarMsg erro: ' + err.message);
   }
