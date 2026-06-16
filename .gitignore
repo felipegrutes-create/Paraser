@@ -16,3 +16,6 @@ leads-*.csv
 
 # Clone clasp local do "Confirmações Agenda" (fonte versionada é confirmacoes-whatsapp.gs)
 apps-script-confirmacoes/
+
+# Clone clasp local do "Meta CAPI Paraser" (lida com tokens — não versionar em repo público)
+apps-script-metacapi/
