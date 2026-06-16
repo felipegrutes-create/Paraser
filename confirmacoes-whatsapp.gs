@@ -231,6 +231,13 @@ const TMPL = {
     '{ENDERECO}\n\n' +
     'Podemos confirmar? 💜',
 
+  KATIA_PRESENCIAL:
+    'Olá! Tudo bem?\n\n' +
+    'Passando para confirmar o seu exame de ultrassom com a Dra. Katia Chamorro, {DIA_SEMANA}, dia {DATA}, às {HORA}.\n\n' +
+    '{PREPARO}\n\n' +
+    '{ENDERECO}\n\n' +
+    'Podemos confirmar? 💜',
+
   INJURIA:
     'Olá! Tudo bem?\n' +
     'Passando para confirmar seu exame {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -323,7 +330,8 @@ function enviarConfirmacoes() {
         HORA:        hora,
         DIA_SEMANA:  diaSemana,
         LINK_QR:     qrLink,
-        DATA_VISITA: dataStr
+        DATA_VISITA: dataStr,
+        PREPARO:     (tmplKey === 'KATIA_PRESENCIAL') ? _preparoKatia(ag) : ''
       });
 
       sendWhatsApp(phone, msg);
@@ -696,6 +704,11 @@ function resolveTemplateKey(ag) {
   // --- 0. Procedimentos sem confirmação (cirurgias, PRP, EMBRION etc.) ---
   if (IDS_SEM_CONFIRMACAO.indexOf(procId) >= 0) return null;
 
+  // --- Dra. Katia Chamorro — USG geral/diagnóstica. Roteia pela MÉDICA antes das
+  // regras genéricas de USG (senão transvaginal/pélvica cairiam em tratamento/FIV).
+  // O preparo certo é montado por _preparoKatia (pelo nome do exame).
+  if (prof.includes('KATIA') || prof.includes('CHAMORRO')) return 'KATIA_PRESENCIAL';
+
   // --- 1. IDs especiais hardcoded (mais confiável) ---
   if (IDS_INJURIA.indexOf(procId)           >= 0) return 'INJURIA';
   if (IDS_OBSTETRICA.indexOf(procId)        >= 0) return 'ULTRAS_OBSTETRICA';
@@ -753,7 +766,26 @@ function fillTemplate(tmpl, vars) {
     .replace(/{DIA_SEMANA}/g,  vars.DIA_SEMANA  || 'amanhã')
     .replace(/{ENDERECO}/g,    ENDERECO_PARASER)
     .replace(/{LINK_QR}/g,     vars.LINK_QR     || '')
-    .replace(/{DATA_VISITA}/g, vars.DATA_VISITA || '');
+    .replace(/{DATA_VISITA}/g, vars.DATA_VISITA || '')
+    .replace(/{PREPARO}/g,     vars.PREPARO     || '');
+}
+
+// Preparo do exame de USG da Dra. Katia, escolhido pelo NOME do procedimento.
+function _preparoKatia(ag) {
+  var n = (ag._procNome || '').toUpperCase();
+  var EX = 'Trazer exames anteriores.';
+  var BEXIGA = 'Bexiga cheia no momento do exame: comece a beber 500 mL de água aos poucos, 30 minutos antes do horário.';
+  if (n.indexOf('ABDOME') >= 0 || n.indexOf('ABDÔME') >= 0)
+    return '📋 *Preparo do exame:*\n• Jejum de 8 horas\n• Pode beber água ou água de coco\n• Pode tomar seus medicamentos habituais\n• ' + BEXIGA + '\n• ' + EX;
+  if (n.indexOf('MAMA') >= 0)
+    return '📋 *Preparo do exame:*\n• ' + EX + '\n• Trazer laudos de biópsia, caso já tenha realizado';
+  if (n.indexOf('TIRE') >= 0 || n.indexOf('CERVICAL') >= 0)
+    return '📋 *Preparo do exame:*\n• ' + EX + '\n• Trazer laudos de punção, caso já tenha realizado\n• Retirar colares e acessórios do pescoço';
+  if (n.indexOf('PAREDE') >= 0 || n.indexOf('INGUIN') >= 0 || n.indexOf('ESCROT') >= 0 || n.indexOf('VIRILHA') >= 0 || n.indexOf('ÍNTIMA') >= 0 || n.indexOf('INTIMA') >= 0)
+    return '📋 *Preparo do exame:*\n• Em caso de excesso de pelos, recomenda-se depilação prévia, conforme sua preferência\n• ' + EX;
+  if (n.indexOf('TRANSVAGINAL') >= 0 || n.indexOf('PELVIC') >= 0 || n.indexOf('PÉLVIC') >= 0 || n.indexOf('URINAR') >= 0 || n.indexOf('URINÁR') >= 0 || n.indexOf('PROSTAT') >= 0 || n.indexOf('PRÓSTAT') >= 0)
+    return '📋 *Preparo do exame:*\n• ' + BEXIGA + '\n• ' + EX;
+  return '📋 *Preparo do exame:*\n• ' + EX; // genérico, caso entre um exame novo
 }
 
 // ================================================================
@@ -1761,6 +1793,15 @@ function doGet(e) {
     var waT = formatPhone(params.phone || '5521984341020');
     slackPost('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
     return ContentService.createTextOutput(JSON.stringify({ ok: true, wa: waT })).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'test-confirma' && params.key === 'paraser2026') {
+    var pNome = params.proc || 'USG DE ABDOMEN TOTAL';
+    var msgK = fillTemplate(TMPL.KATIA_PRESENCIAL, {
+      DATA: '17/06', HORA: '10:00', DIA_SEMANA: 'amanhã',
+      PREPARO: _preparoKatia({ _procNome: pNome })
+    });
+    if (params.phone) sendWhatsApp(params.phone, msgK);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, proc: pNome, msg: msgK })).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'test-link' && params.key === 'paraser2026') {
     var agT = params.ag || '000000';
