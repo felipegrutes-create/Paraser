@@ -1736,6 +1736,7 @@ function testeEnvio() {
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
+    _gravarMsgRecebida(body); // 📊 gravador temporário p/ mapear demandas da recepção (remover após análise)
     if (body.fromMe === true) return _okText();
 
     var r = interpretarResposta(body);
@@ -1793,6 +1794,16 @@ function doGet(e) {
     var waT = formatPhone(params.phone || '5521984341020');
     slackPost('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
     return ContentService.createTextOutput(JSON.stringify({ ok: true, wa: waT })).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'dump-msgs' && params.key === 'paraser2026') {
+    var dss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+    var dsh = dss.getSheetByName('Msgs_Recebidas');
+    var out = { total: 0, msgs: [] };
+    if (dsh && dsh.getLastRow() > 1) {
+      out.msgs = dsh.getRange(2, 1, dsh.getLastRow() - 1, 4).getValues();
+      out.total = out.msgs.length;
+    }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'test-confirma' && params.key === 'paraser2026') {
     var pNome = params.proc || 'USG DE ABDOMEN TOTAL';
@@ -1980,6 +1991,30 @@ function interpretarResposta(body) {
     answer = 'SIM';
   }
   return { phone: phone, answer: answer };
+}
+
+// ----------------------------------------------------------------
+// GRAVADOR TEMPORÁRIO — registra mensagens RECEBIDAS (texto) na aba
+// Msgs_Recebidas, só pra mapear os tipos de demanda da recepção.
+// Ignora mensagens da própria clínica (fromMe) e grupos. Remover após análise.
+// ----------------------------------------------------------------
+function _gravarMsgRecebida(body) {
+  try {
+    if (!body || body.fromMe || body.isGroup) return;
+    var txt = (body.text && body.text.message) ? body.text.message
+            : (typeof body.text === 'string' ? body.text : '');
+    if (!txt) return; // só mensagens de texto (ignora áudio/imagem/etc por ora)
+    var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+    var sh = ss.getSheetByName('Msgs_Recebidas');
+    if (!sh) {
+      sh = ss.insertSheet('Msgs_Recebidas');
+      sh.appendRow(['Timestamp', 'Telefone', 'Nome', 'Texto']);
+      sh.setFrozenRows(1);
+    }
+    sh.appendRow([new Date(), body.phone || '', body.senderName || body.chatName || '', txt]);
+  } catch (err) {
+    Logger.log('gravarMsg erro: ' + err.message);
+  }
 }
 
 // ----------------------------------------------------------------

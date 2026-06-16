@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guia Rápido da Recepção — Paraser</title>
+<style>
+  :root{ --roxo:#5b3a8c; --tinta:#2b2540; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:#e9e6f0; font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--tinta); }
+  .folha{ width:297mm; min-height:210mm; margin:14px auto; background:#fff; padding:9mm 9mm 7mm; box-shadow:0 6px 30px rgba(0,0,0,.15); }
+  header{ display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid var(--roxo); padding-bottom:6px; margin-bottom:8px; }
+  header h1{ font-size:21px; margin:0; color:var(--roxo); letter-spacing:.3px; }
+  header .sub{ font-size:11px; color:#8a7fa6; font-weight:600; }
+  .alerta{ background:#fdecef; border:2px solid #e23b5a; border-radius:10px; padding:8px 12px; margin-bottom:9px; }
+  .alerta b{ color:#c01933; font-size:13px; }
+  .alerta ul{ margin:4px 0 0; padding-left:18px; }
+  .alerta li{ font-size:11.5px; margin:2px 0; }
+  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .card{ border:1.5px solid var(--c); border-radius:10px; overflow:hidden; break-inside:avoid; }
+  .card h2{ background:var(--c); color:#fff; font-size:12.5px; margin:0; padding:5px 9px; display:flex; align-items:center; gap:6px; }
+  .card ul{ margin:0; padding:6px 9px 7px 24px; }
+  .card li{ font-size:10.8px; line-height:1.32; margin:2.5px 0; }
+  .card li b{ color:#000; }
+  .rodape{ margin-top:9px; background:#f3f0f8; border-radius:9px; padding:7px 12px; font-size:11px; color:var(--roxo); display:flex; gap:14px; flex-wrap:wrap; }
+  .rodape b{ color:var(--roxo); }
+  @media print{
+    html,body{ background:#fff; }
+    .folha{ margin:0; box-shadow:none; width:auto; min-height:auto; }
+    @page{ size:A4 landscape; margin:7mm; }
+    *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+<div class="folha">
+  <header>
+    <h1>🏥 RECEPÇÃO PARASER · Guia Rápido do Dia</h1>
+    <span class="sub">imprima e deixe na bancada · dúvida detalhada? consulte o POP completo</span>
+  </header>
+
+  <div class="alerta">
+    <b>🚨 ATENÇÃO MÁXIMA (toda manhã)</b>
+    <ul>
+      <li><b>Alguma paciente menstruou (sangue vivo)?</b> Registre e avise enfermagem/médico <b>na hora</b> (Guia FIV).</li>
+      <li><b>Tem punção / contagem de folículo amanhã?</b> Reserve o laboratório com antecedência.</li>
+    </ul>
+  </div>
+
+  <div class="grid">
+    <div class="card" style="--c:#e0892b">
+      <h2>☀️ AO ABRIR</h2>
+      <ul>
+        <li>Ligar LED, café e som (bluetooth)</li>
+        <li>Abrir <b>WhatsApp, Feegow, Slack, Visitantes</b></li>
+        <li>Criar evento do dia seguinte (Visitantes)</li>
+        <li>Anexar link de acesso na planilha (confirmações)</li>
+        <li>Mandar contatos das consultas online → Dr. Rodolfo</li>
+        <li>Iniciar confirmação da agenda de amanhã</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#2f6fd0">
+      <h2>👤 PACIENTE NOVA</h2>
+      <ul>
+        <li>Tirar <b>foto</b> para o cadastro</li>
+        <li>Cadastrar no Feegow (todos os dados)</li>
+        <li>Conferir se enviou exames à enfermagem</li>
+        <li>Apresentar o local à paciente</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#2e9e6b">
+      <h2>🟢 CHEGOU PACIENTE</h2>
+      <ul>
+        <li>Dar entrada no Feegow → status <b>"Aguardando"</b></li>
+        <li><b>Avisar o médico pelo ramal</b></li>
+        <li>USG da <b>Dra. Bianca</b>? Ligar para ela</li>
+        <li>Médico chamou? Conferir o nome e levar à sala</li>
+        <li>Oferecer café/água e indicar a espera</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#1f9d57">
+      <h2>💰 PAGAMENTO</h2>
+      <ul>
+        <li><b>Consulta:</b> cobrar na entrada · <b>Pós-beta:</b> cobrar ao chegar</li>
+        <li><b>Cartão:</b> nome na notinha + lançar/baixar no Feegow</li>
+        <li><b>Pix/link:</b> anotar (nome, valor, motivo, data) + lançar/baixar + <b>comprovante no Slack</b> (nome, valor, CNPJ)</li>
+        <li>NF: avisar que será enviada ao longo do dia</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#7b3fc4">
+      <h2>🔬 USG</h2>
+      <ul>
+        <li><b>Preparar sala:</b> maca, cadastrar na máquina, camisinha + gel, cobrir paciente</li>
+        <li><b>Contagem folículos:</b> imprimir laudo → pasta</li>
+        <li><b>Obstétrica:</b> laudo + imagens (pen-drive ↔ PC), salvar na pasta do mês, orçar pacote</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#4b4fc0">
+      <h2>🧬 PUNÇÃO / TEC (Embrion)</h2>
+      <ul>
+        <li>Olho nos grupos <b>"MEDICAÇÕES"</b></li>
+        <li>Confirmar agenda com Embrion + enviar conduta</li>
+        <li>Agendar: Feegow + <b>celular roxo</b> + grupos</li>
+        <li><b>Punção:</b> cadastrar no Embryoall</li>
+        <li><b>TEC:</b> termos no grupo LAB + protocolo Paulus (cobrar + avisar Cristiane)</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#0e9bb0">
+      <h2>📅 AGENDAR (pelos grupos)</h2>
+      <ul>
+        <li><b>"AGENDAMENTOS PACIENTES"</b> → agendar</li>
+        <li><b>"RESULTADOS DE BETAS":</b> positivo → USG 1º pós-beta · negativo → retorno médico</li>
+        <li><b>Iniciou tratamento?</b> Agendar as próximas <b>3 USGs</b></li>
+        <li>Alguém desmarcou? Puxar outra paciente p/ cobrir</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#d24b8e">
+      <h2>🩺 SAIU DA CONSULTA</h2>
+      <ul>
+        <li>Encaminhar ao <b>financeiro</b> (orçamento do tratamento)</li>
+        <li>Dr. Rodolfo indicou outro médico? Agendar<br>(consulta online = receber o pagamento na hora)</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--c:#3a4a6b">
+      <h2>🌙 AO FECHAR</h2>
+      <ul>
+        <li>Conferir dia seguinte: anamnese, foto (online), exames enviados</li>
+        <li>Revisar agenda dos médicos</li>
+        <li>Desligar USG, luzes e conferir tudo</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="rodape">
+    <span>💜 <b>SEMPRE:</b> gentileza e empatia (momento delicado)</span>
+    <span>🔒 <b>Privacidade:</b> não falar dados em voz alta</span>
+    <span>🗣️ Em vez de "não sei" → <b>"vou verificar e já te informo"</b></span>
+  </div>
+</div>
+</body>
+</html>
