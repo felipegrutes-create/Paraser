@@ -4099,6 +4099,14 @@
             #sec-estrutura .est-navbtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
             #sec-estrutura .est-navbtn:disabled{opacity:.25;cursor:not-allowed}
             #sec-estrutura .est-note{display:none;margin-top:14px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:9px 13px}
+
+            /* produção da clínica */
+            #sec-estrutura .est-prod{display:flex;gap:14px;flex-wrap:wrap}
+            #sec-estrutura .est-prodcard{flex:1 1 200px;background:var(--bg);border:1px solid var(--border);border-radius:13px;padding:18px 20px;display:flex;flex-direction:column;gap:5px}
+            #sec-estrutura .est-prodcard .est-pico{font-size:20px;line-height:1}
+            #sec-estrutura .est-prodcard .est-pnum{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1.1}
+            #sec-estrutura .est-prodcard .est-plabel{font-size:12.5px;color:var(--muted)}
+            #sec-estrutura .est-prodnote{margin-top:14px;font-size:12px;color:var(--muted);font-style:italic;line-height:1.5}
         </style>
         <section id="sec-estrutura" class="section">
             <!-- Intro amigável -->
@@ -4140,6 +4148,15 @@
                     <div style="color:var(--muted);text-align:center;padding:24px">Carregando…</div>
                 </div>
                 <div id="estNote" class="est-note"></div>
+            </div>
+
+            <!-- BLOCO C — PRODUÇÃO DA CLÍNICA -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>🏥 Produção da Clínica</h3><span>volume realizado no mês</span></div>
+                <div id="estProducao" class="est-prod">
+                    <div style="color:var(--muted);padding:16px">Carregando…</div>
+                </div>
+                <div class="est-prodnote">ⓘ Volume realizado no mês, de pacientes que entraram em meses variados (a jornada FIV leva semanas a meses). Não é conversão direta dos anúncios deste mês.</div>
             </div>
         </section>
 
@@ -13396,7 +13413,7 @@ GONAPEPTYL,56`;
                   body: '<div class="est-sub" style="opacity:1;font-weight:600">Feegow + Site</div>' },
                 { ico: '⚡', ttl: 'Eventos · mês', desc: 'O que as pessoas realmente fizeram neste mês.',
                   body: `<div class="est-num">${_mktFmtInt(ev.schedule)} <small>agendaram</small></div>
-                         <div class="est-sub">${_mktFmtInt(ev.completeRegistration)} se cadastraram · ${_mktFmtInt(ev.pageview)} visitaram</div>` },
+                         <div class="est-sub">${_mktFmtInt(ev.completeRegistration)} foram atendidos · ${_mktFmtInt(ev.pageview)} visitaram</div>` },
                 { ico: '👥', ttl: 'Públicos', desc: 'Listas que o robô monta sozinho com quem já é da casa.',
                   body: `<div class="est-num">${_estFmtBig(cli.count)} <small>clientes</small></div>
                          <div class="est-auto"><span class="est-dot"></span>atualiza sozinha${cli.updatedAt ? (' · ' + dt(cli.updatedAt)) : ''}</div>
@@ -13469,6 +13486,16 @@ GONAPEPTYL,56`;
                 </div>`;
             }).join('');
         }
+        function _estRenderProducao(p) {
+            const el = document.getElementById('estProducao');
+            if (!p) { el.innerHTML = '<div style="color:var(--muted);padding:16px">Sem dados.</div>'; return; }
+            const cards = [
+                { ico: '🩺', num: _mktFmtInt(p.atendidos), label: 'Foram atendidos (todos os tipos)', col: '#38bdf8' },
+                { ico: '🧪', num: _mktFmtInt(p.fiv), label: 'Procedimentos FIV (punção/transferência)', col: '#e879f9' }
+            ];
+            el.innerHTML = cards.map(c => `<div class="est-prodcard"><div class="est-pico">${c.ico}</div><div class="est-pnum" style="color:${c.col}">${c.num}</div><div class="est-plabel">${c.label}</div></div>`).join('');
+        }
+
         let _estYm = null; // null = mês corrente
         function _estCurrentYm() { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0'); }
         function estMonthShift(delta) {
@@ -13495,12 +13522,13 @@ GONAPEPTYL,56`;
                 document.getElementById('estMonthNext').disabled = !!resp.isCurrent;
                 _estRenderMachine(resp);
                 _estRenderFunnel(resp);
+                _estRenderProducao(resp.producao);
                 const note = document.getElementById('estNote');
                 const fs = resp.funnelSteps || [];
-                const semRastreio = !resp.isCurrent && fs[3] && fs[4] && fs[3].value === 0 && fs[4].value === 0;
+                const semRastreio = !resp.isCurrent && fs[3] && fs[3].value === 0;  // "Agendaram" (Schedule/CAPI)
                 if (semRastreio) {
                     note.style.display = 'block';
-                    note.innerHTML = 'ⓘ Agendamento e cadastro só passaram a ser rastreados a partir de mai/2026 — em meses anteriores aparecem como 0. (Anúncios e procedimentos têm histórico completo.)';
+                    note.innerHTML = 'ⓘ O agendamento (via Meta CAPI) só passou a ser rastreado em mai/2026 — em meses anteriores essa etapa aparece como 0. (Anúncios e procedimentos têm histórico completo.)';
                 } else { note.style.display = 'none'; }
                 if (resp.fetchedAt) document.getElementById('estFetchedAt').textContent = 'atualizado ' + new Date(resp.fetchedAt).toLocaleString('pt-BR');
                 _estLoaded = true;
