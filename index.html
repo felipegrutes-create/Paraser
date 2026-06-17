@@ -2402,6 +2402,9 @@
             font-size: 14px; font-weight: 700; color: var(--text);
             margin: 26px 0 10px;
         }
+        .salas-period-block { margin-bottom: 16px; }
+        .salas-period-label { font-size: 13.5px; font-weight: 800; color: var(--text); margin: 0 0 9px 2px; display: flex; align-items: baseline; gap: 8px; }
+        .salas-period-label span { font-weight: 400; color: var(--muted); font-size: 11.5px; }
         .salas-room-heat {
             cursor: pointer; position: relative;
         }
@@ -6721,28 +6724,43 @@
             const dayPct   = dayComp.cap ? Math.round(dayComp.occ / dayComp.cap * 100) : 0;
             const dayRoomAppts = dayComp.roomAppts;   // já tem médico fixo por sala no dia
 
+            // ===== OCUPAÇÃO POR PERÍODO: manhã (< 12h) e tarde (>= 12h) =====
+            const MEIODIA = 12 * 60;
+            const manhaSlotsArr = slotsArr.filter(x => x < MEIODIA);
+            const tardeSlotsArr = slotsArr.filter(x => x >= MEIODIA);
+            const manhaWin = manhaSlotsArr.length ? (manhaSlotsArr[manhaSlotsArr.length-1] - manhaSlotsArr[0])/30 + 1 : 0;
+            const tardeWin = tardeSlotsArr.length ? (tardeSlotsArr[tardeSlotsArr.length-1] - tardeSlotsArr[0])/30 + 1 : 0;
+
+            // sala mais ocupada no dia inteiro (pro sumário executivo)
             let topRoom = null, topPct = -1, topRoomArea = null;
-            const heatCells = SALAS_LAYOUT.map(s => {
+            SALAS_LAYOUT.filter(s => s.clinical).forEach(s => {
+                const pct = dayWindow ? Math.round((roomSlots[s.area] || new Set()).size / dayWindow * 100) : 0;
+                if (pct > topPct) { topPct = pct; topRoom = s.nome; topRoomArea = s.area; }
+            });
+
+            // monta a planta de UM período (verde=livre · vermelho conforme % do período)
+            const buildPeriodHeat = (filterFn, win) => SALAS_LAYOUT.map(s => {
                 if (!s.clinical) {
                     return `<div class="salas-room salas-room-aux" style="grid-area:${s.area}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
                 }
-                const occ = (roomSlots[s.area] || new Set()).size;
-                const pct = Math.round(occ / dayWindow * 100);
-                if (pct > topPct) { topPct = pct; topRoom = s.nome; topRoomArea = s.area; }
+                const occ = [...(roomSlots[s.area] || new Set())].filter(filterFn).length;
+                const pct = win ? Math.round(occ / win * 100) : 0;
                 if (occ === 0) {
-                    return `<div class="salas-room salas-room-heat-empty" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}" title="${escAttr(s.nome+'\nSem uso neste dia · clique para ver detalhe')}">
-                        <div class="salas-room-name">${s.nome}</div><div class="salas-room-heat-val">livre o dia</div></div>`;
+                    return `<div class="salas-room salas-room-heat-empty" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}" title="${escAttr(s.nome+'\nSem uso neste período · clique para ver detalhe')}">
+                        <div class="salas-room-name">${s.nome}</div><div class="salas-room-heat-val">livre</div></div>`;
                 }
-                const ratio = Math.min(1, occ / dayWindow);
+                const ratio = Math.min(1, occ / (win || 1));
                 const alpha = (0.16 + 0.64 * ratio).toFixed(3);   // mais ocupado = vermelho mais vivo
                 const bg = `linear-gradient(to top, rgba(239,68,68,${alpha}) ${pct}%, rgba(255,255,255,0.025) ${pct}%)`;
                 const bc = pct >= 60 ? 'rgba(239,68,68,0.65)' : pct >= 30 ? 'rgba(239,68,68,0.45)' : 'rgba(239,68,68,0.28)';
-                const tip = `${s.nome}\n${occ} de ${dayWindow} faixas de 30 min ocupadas (${pct}% do dia)\nClique para ver detalhe por médico`;
+                const tip = `${s.nome}\n${occ} de ${win} faixas de 30 min ocupadas (${pct}%)\nClique para ver detalhe por médico`;
                 return `<div class="salas-room salas-room-heat" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}; background:${bg}; border-color:${bc};" title="${escAttr(tip)}">
                     <div class="salas-room-name">${s.nome}</div>
                     <div class="salas-room-heat-val">${pct}%<span class="salas-room-prof"> · ${occ} faixa${occ===1?'':'s'}</span></div>
                 </div>`;
             }).join('');
+            const heatManha = buildPeriodHeat(x => x < MEIODIA, manhaWin);
+            const heatTarde = buildPeriodHeat(x => x >= MEIODIA, tardeWin);
             const dayLabel  = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
             const janelaTxt = slotsArr.length ? `${salasFmtMin(slotsArr[0])}–${salasFmtMin(slotsArr[slotsArr.length-1]+30)}` : '—';
 
@@ -6825,25 +6843,36 @@
                     <span>Salas clínicas agora: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
                 </div>
                 ${execHTML}
-                <div class="salas-heat-title">📊 Mapa de ocupação do dia inteiro — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(quanto mais cheia/viva a sala, mais tempo ficou ocupada · <b>clique numa sala para ver detalhe por médico</b>)</span></div>
-                <div class="salas-fp-wrap" id="salas-heat-wrap"><div class="salas-floorplan">${heatCells}</div></div>
+                <div class="salas-heat-title">📊 Ocupação por período — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(verde = livre · quanto mais vermelha, mais tempo ocupada · <b>clique numa sala para ver o detalhe por médico</b>)</span></div>
+                <div class="salas-period-block">
+                    <div class="salas-period-label">🌅 Manhã <span>· 07h–12h${manhaSlotsArr.length?` · ${manhaWin} faixas de 30 min`:' · sem atendimentos'}</span></div>
+                    <div class="salas-fp-wrap" id="salas-heat-manha"><div class="salas-floorplan">${heatManha}</div></div>
+                </div>
+                <div class="salas-period-block">
+                    <div class="salas-period-label">🌇 Tarde <span>· 12h–20h${tardeSlotsArr.length?` · ${tardeWin} faixas de 30 min`:' · sem atendimentos'}</span></div>
+                    <div class="salas-fp-wrap" id="salas-heat-tarde"><div class="salas-floorplan">${heatTarde}</div></div>
+                </div>
                 <div class="salas-summary">
                     <span>Janela do dia: <b>${dayWindow} faixas de 30 min</b>${slotsArr.length?` (${janelaTxt})`:''}</span>
-                    ${slotsArr.length ? `<span>Sala mais ocupada: <b style="color:#ef4444">${topRoom} (${topPct}%)</b></span>` : ''}
+                    ${slotsArr.length ? `<span>Sala mais ocupada (dia): <b style="color:#ef4444">${topRoom} (${topPct}%)</b></span>` : ''}
                 </div>`;
 
-            // === handler de click no mapa de ocupação → abre modal de detalhe por médico ===
-            const heatWrap = document.getElementById('salas-heat-wrap');
-            if (heatWrap) {
-                heatWrap.addEventListener('click', e => {
+            // === clique em cada planta de período → modal de detalhe por médico (filtrado pelo período) ===
+            [['salas-heat-manha', x => x < MEIODIA, manhaWin, '🌅 Manhã'],
+             ['salas-heat-tarde', x => x >= MEIODIA, tardeWin, '🌇 Tarde']].forEach(cfg => {
+                const wrap = document.getElementById(cfg[0]);
+                if (!wrap) return;
+                wrap.addEventListener('click', e => {
                     const cell = e.target.closest('[data-heat-area]');
                     if (!cell) return;
                     const area = cell.getAttribute('data-heat-area');
                     const sala = SALAS_LAYOUT.find(s => s.area === area);
                     if (!sala || !sala.clinical) return;
-                    openSalaDayDetail(sala, dayRoomAppts[area] || [], dayWindow, roomSlots[area] || new Set(), dayLabel);
+                    const appts = (dayRoomAppts[area] || []).filter(a => cfg[1](a.slot));
+                    const slots = new Set([...(roomSlots[area] || new Set())].filter(cfg[1]));
+                    openSalaDayDetail(sala, appts, cfg[2], slots, cfg[3] + ' · ' + dayLabel);
                 });
-            }
+            });
         }
 
         // === Modal: detalhe por médico de uma sala no dia inteiro ===
@@ -6886,7 +6915,7 @@
                     return `<div class="salas-detail-medico">
                         <div class="salas-detail-medico-head">
                             <div class="salas-detail-medico-nome">${escAttr2(m.nome)}</div>
-                            <div class="salas-detail-medico-meta">${m.qtd} atend. · ${m.faixas} faixa${m.faixas===1?'':'s'} (${pctMed}% do dia)</div>
+                            <div class="salas-detail-medico-meta">${m.qtd} atend. · ${m.faixas} faixa${m.faixas===1?'':'s'} (${pctMed}% do período)</div>
                         </div>
                         <div class="salas-detail-medico-bar"><div class="salas-detail-medico-bar-fill" style="width:${pctMed}%"></div></div>
                         ${apptsHTML}
@@ -6899,7 +6928,7 @@
                         <div class="salas-detail-head ${isEmpty?'empty':''}">
                             <div>
                                 <div class="salas-detail-title">${escAttr2(sala.nome)}</div>
-                                <div class="salas-detail-sub">${dayLabel} · ${occ} de ${dayWindow} faixas ocupadas (${pct}% do dia)</div>
+                                <div class="salas-detail-sub">${dayLabel} · ${occ} de ${dayWindow} faixas ocupadas (${pct}% do período)</div>
                             </div>
                             <button class="salas-detail-close" id="salas-detail-close" title="Fechar (Esc)">✕ Fechar</button>
                         </div>
@@ -6919,7 +6948,7 @@
                                 </div>
                                 <div class="salas-detail-kpi">
                                     <div class="salas-detail-kpi-num" style="color:${pct>=60?'#ef4444':pct>=30?'#f59e0b':'#10b981'}">${pct}%</div>
-                                    <div class="salas-detail-kpi-lab">Ocupação do dia</div>
+                                    <div class="salas-detail-kpi-lab">Ocupação no período</div>
                                 </div>
                             </div>
                             ${medicosHTML}
