@@ -2402,9 +2402,15 @@
             font-size: 14px; font-weight: 700; color: var(--text);
             margin: 26px 0 10px;
         }
-        .salas-period-block { margin-bottom: 16px; }
-        .salas-period-label { font-size: 13.5px; font-weight: 800; color: var(--text); margin: 0 0 9px 2px; display: flex; align-items: baseline; gap: 8px; }
-        .salas-period-label span { font-weight: 400; color: var(--muted); font-size: 11.5px; }
+        /* sala dividida ao meio: cima = manhã, baixo = tarde */
+        .salas-room-split { display: flex; flex-direction: column; padding: 0; overflow: hidden; cursor: pointer; }
+        .salas-room-split .salas-room-name { padding: 5px 7px 3px; flex: 0 0 auto; }
+        .salas-room-half { flex: 1 1 0; min-height: 20px; display: flex; align-items: center; gap: 4px; padding: 2px 7px; font-size: 11px; color: #fda4af; border-top: 1px solid rgba(255,255,255,0.07); transition: filter .15s; }
+        .salas-room-half:hover { filter: brightness(1.18); }
+        .salas-room-half .salas-half-per { opacity: .85; font-size: 11px; }
+        .salas-room-half b { color: #fff; font-size: 12px; font-weight: 800; }
+        .salas-room-half .salas-half-fx { color: rgba(255,255,255,0.55); font-size: 10px; }
+        .salas-room-half .salas-half-livre { color: #34d399; font-size: 10.5px; }
         .salas-room-heat {
             cursor: pointer; position: relative;
         }
@@ -6738,29 +6744,32 @@
                 if (pct > topPct) { topPct = pct; topRoom = s.nome; topRoomArea = s.area; }
             });
 
-            // monta a planta de UM período (verde=livre · vermelho conforme % do período)
-            const buildPeriodHeat = (filterFn, win) => SALAS_LAYOUT.map(s => {
+            // cor de fundo de cada metade conforme a ocupação do período (verde=livre, vermelho=ocupada)
+            const halfBg = (occ, win) => {
+                if (occ === 0) return 'background:rgba(16,185,129,0.10);';
+                const ratio = Math.min(1, occ / (win || 1));
+                const alpha = (0.16 + 0.64 * ratio).toFixed(3);
+                return `background:rgba(239,68,68,${alpha});`;
+            };
+            // UMA planta: cada sala DIVIDIDA AO MEIO (cima = manhã, baixo = tarde)
+            const heatCells = SALAS_LAYOUT.map(s => {
                 if (!s.clinical) {
                     return `<div class="salas-room salas-room-aux" style="grid-area:${s.area}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
                 }
-                const occ = [...(roomSlots[s.area] || new Set())].filter(filterFn).length;
-                const pct = win ? Math.round(occ / win * 100) : 0;
-                if (occ === 0) {
-                    return `<div class="salas-room salas-room-heat-empty" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}" title="${escAttr(s.nome+'\nSem uso neste período · clique para ver detalhe')}">
-                        <div class="salas-room-name">${s.nome}</div><div class="salas-room-heat-val">livre</div></div>`;
-                }
-                const ratio = Math.min(1, occ / (win || 1));
-                const alpha = (0.16 + 0.64 * ratio).toFixed(3);   // mais ocupado = vermelho mais vivo
-                const bg = `linear-gradient(to top, rgba(239,68,68,${alpha}) ${pct}%, rgba(255,255,255,0.025) ${pct}%)`;
-                const bc = pct >= 60 ? 'rgba(239,68,68,0.65)' : pct >= 30 ? 'rgba(239,68,68,0.45)' : 'rgba(239,68,68,0.28)';
-                const tip = `${s.nome}\n${occ} de ${win} faixas de 30 min ocupadas (${pct}%)\nClique para ver detalhe por médico`;
-                return `<div class="salas-room salas-room-heat" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}; background:${bg}; border-color:${bc};" title="${escAttr(tip)}">
+                const slotsSet = roomSlots[s.area] || new Set();
+                const occM = [...slotsSet].filter(x => x < MEIODIA).length;
+                const occT = [...slotsSet].filter(x => x >= MEIODIA).length;
+                const pctM = manhaWin ? Math.round(occM / manhaWin * 100) : 0;
+                const pctT = tardeWin ? Math.round(occT / tardeWin * 100) : 0;
+                const valM = occM === 0 ? '<span class="salas-half-livre">livre</span>' : `<b>${pctM}%</b><span class="salas-half-fx"> · ${occM}f</span>`;
+                const valT = occT === 0 ? '<span class="salas-half-livre">livre</span>' : `<b>${pctT}%</b><span class="salas-half-fx"> · ${occT}f</span>`;
+                const tip = `${s.nome}\n🌅 Manhã: ${occM} de ${manhaWin} faixas (${pctM}%)\n🌇 Tarde: ${occT} de ${tardeWin} faixas (${pctT}%)\nClique numa metade para ver o detalhe por médico`;
+                return `<div class="salas-room salas-room-split" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}" title="${escAttr(tip)}">
                     <div class="salas-room-name">${s.nome}</div>
-                    <div class="salas-room-heat-val">${pct}%<span class="salas-room-prof"> · ${occ} faixa${occ===1?'':'s'}</span></div>
+                    <div class="salas-room-half" data-period="manha" style="${halfBg(occM, manhaWin)}"><span class="salas-half-per">🌅</span>${valM}</div>
+                    <div class="salas-room-half" data-period="tarde" style="${halfBg(occT, tardeWin)}"><span class="salas-half-per">🌇</span>${valT}</div>
                 </div>`;
             }).join('');
-            const heatManha = buildPeriodHeat(x => x < MEIODIA, manhaWin);
-            const heatTarde = buildPeriodHeat(x => x >= MEIODIA, tardeWin);
             const dayLabel  = `${diasSemana[dtObj.getDay()]}, ${parseInt(dy)} de ${mesesNome[parseInt(mo)-1]}`;
             const janelaTxt = slotsArr.length ? `${salasFmtMin(slotsArr[0])}–${salasFmtMin(slotsArr[slotsArr.length-1]+30)}` : '—';
 
@@ -6843,36 +6852,33 @@
                     <span>Salas clínicas agora: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
                 </div>
                 ${execHTML}
-                <div class="salas-heat-title">📊 Ocupação por período — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(verde = livre · quanto mais vermelha, mais tempo ocupada · <b>clique numa sala para ver o detalhe por médico</b>)</span></div>
-                <div class="salas-period-block">
-                    <div class="salas-period-label">🌅 Manhã <span>· 07h–12h${manhaSlotsArr.length?` · ${manhaWin} faixas de 30 min`:' · sem atendimentos'}</span></div>
-                    <div class="salas-fp-wrap" id="salas-heat-manha"><div class="salas-floorplan">${heatManha}</div></div>
-                </div>
-                <div class="salas-period-block">
-                    <div class="salas-period-label">🌇 Tarde <span>· 12h–20h${tardeSlotsArr.length?` · ${tardeWin} faixas de 30 min`:' · sem atendimentos'}</span></div>
-                    <div class="salas-fp-wrap" id="salas-heat-tarde"><div class="salas-floorplan">${heatTarde}</div></div>
-                </div>
+                <div class="salas-heat-title">📊 Ocupação do dia — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(cada sala dividida: <b>🌅 cima = manhã · 🌇 baixo = tarde</b> · verde = livre, vermelho = ocupada · <b>clique numa metade pra ver o detalhe</b>)</span></div>
+                <div class="salas-fp-wrap" id="salas-heat-wrap"><div class="salas-floorplan">${heatCells}</div></div>
                 <div class="salas-summary">
                     <span>Janela do dia: <b>${dayWindow} faixas de 30 min</b>${slotsArr.length?` (${janelaTxt})`:''}</span>
                     ${slotsArr.length ? `<span>Sala mais ocupada (dia): <b style="color:#ef4444">${topRoom} (${topPct}%)</b></span>` : ''}
                 </div>`;
 
-            // === clique em cada planta de período → modal de detalhe por médico (filtrado pelo período) ===
-            [['salas-heat-manha', x => x < MEIODIA, manhaWin, '🌅 Manhã'],
-             ['salas-heat-tarde', x => x >= MEIODIA, tardeWin, '🌇 Tarde']].forEach(cfg => {
-                const wrap = document.getElementById(cfg[0]);
-                if (!wrap) return;
-                wrap.addEventListener('click', e => {
+            // === clique numa metade da sala → modal por médico filtrado pelo período (manhã/tarde) ===
+            const heatWrap = document.getElementById('salas-heat-wrap');
+            if (heatWrap) {
+                heatWrap.addEventListener('click', e => {
                     const cell = e.target.closest('[data-heat-area]');
                     if (!cell) return;
                     const area = cell.getAttribute('data-heat-area');
                     const sala = SALAS_LAYOUT.find(s => s.area === area);
                     if (!sala || !sala.clinical) return;
-                    const appts = (dayRoomAppts[area] || []).filter(a => cfg[1](a.slot));
-                    const slots = new Set([...(roomSlots[area] || new Set())].filter(cfg[1]));
-                    openSalaDayDetail(sala, appts, cfg[2], slots, cfg[3] + ' · ' + dayLabel);
+                    const half = e.target.closest('[data-period]');
+                    const per = half ? half.getAttribute('data-period') : 'dia';
+                    let filt, win, plab;
+                    if (per === 'manha')      { filt = x => x < MEIODIA;  win = manhaWin; plab = '🌅 Manhã'; }
+                    else if (per === 'tarde') { filt = x => x >= MEIODIA; win = tardeWin; plab = '🌇 Tarde'; }
+                    else                      { filt = () => true;        win = dayWindow; plab = 'Dia inteiro'; }
+                    const appts = (dayRoomAppts[area] || []).filter(a => filt(a.slot));
+                    const slots = new Set([...(roomSlots[area] || new Set())].filter(filt));
+                    openSalaDayDetail(sala, appts, win, slots, plab + ' · ' + dayLabel);
                 });
-            });
+            }
         }
 
         // === Modal: detalhe por médico de uma sala no dia inteiro ===
