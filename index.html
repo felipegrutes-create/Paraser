@@ -4091,6 +4091,14 @@
                 .est-fconv-col{flex-basis:46px;font-size:10px}
                 .est-fnum{font-size:14px}
             }
+
+            /* navegação de mês */
+            #sec-estrutura .est-monthnav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 22px}
+            #sec-estrutura .est-monthlabel{font-size:18px;font-weight:800;color:var(--text);min-width:190px;text-align:center;letter-spacing:-.3px}
+            #sec-estrutura .est-navbtn{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:var(--bg-elev);color:var(--text);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.2s;font-family:inherit}
+            #sec-estrutura .est-navbtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+            #sec-estrutura .est-navbtn:disabled{opacity:.25;cursor:not-allowed}
+            #sec-estrutura .est-note{display:none;margin-top:14px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:9px 13px}
         </style>
         <section id="sec-estrutura" class="section">
             <!-- Intro amigável -->
@@ -4102,6 +4110,13 @@
                     <span id="estFetchedAt" style="color:var(--muted);font-size:12px"></span>
                     <button class="est-refresh" onclick="loadAndRenderEstrutura(true)">🔄 Atualizar</button>
                 </div>
+            </div>
+
+            <!-- Navegação de mês -->
+            <div class="est-monthnav">
+                <button class="est-navbtn" onclick="estMonthShift(-1)" title="Mês anterior">◀</button>
+                <span id="estMonthLabel" class="est-monthlabel">—</span>
+                <button class="est-navbtn" id="estMonthNext" onclick="estMonthShift(1)" title="Próximo mês">▶</button>
             </div>
 
             <div id="estError" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;padding:14px 18px;border-radius:8px;margin-bottom:18px;font-size:13px"></div>
@@ -4124,6 +4139,7 @@
                 <div id="estFunnelBody" class="est-funnel">
                     <div style="color:var(--muted);text-align:center;padding:24px">Carregando…</div>
                 </div>
+                <div id="estNote" class="est-note"></div>
             </div>
         </section>
 
@@ -13423,16 +13439,12 @@ GONAPEPTYL,56`;
         function _estRenderFunnel(d) {
             const body = document.getElementById('estFunnelBody');
             const ts = document.getElementById('estFunnelTime');
-            if (!d || !d.ok || !d.hasData) {
-                body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:24px">${(d && d.msg) || 'Snapshot agendado pra 8h e 18h.'}</div>`;
+            const steps = (d && d.funnelSteps) || [];
+            if (!d || !d.ok || !steps.length) {
+                body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:24px">${(d && d.msg) || 'Sem dados pra este mês.'}</div>`;
                 if (ts) ts.textContent = ''; return;
             }
-            if (ts) {
-                const sd = new Date(d.snapshot.snapshotAt);
-                const mes = sd.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                ts.textContent = '📅 ' + mes.charAt(0).toUpperCase() + mes.slice(1) + ' · atualizado ' + sd.toLocaleString('pt-BR');
-            }
-            const steps = d.funnelSteps || [];
+            if (ts && d.fetchedAt) ts.textContent = 'atualizado ' + new Date(d.fetchedAt).toLocaleString('pt-BR');
             const n = steps.length || 1;
             const COL = ['#2dd4bf', '#22d3ee', '#38bdf8', '#6366f1', '#a855f7', '#d946ef', '#ec4899'];
             // larguras afunilando de 100% (topo) até ~26% (ponta)
@@ -13457,21 +13469,44 @@ GONAPEPTYL,56`;
                 </div>`;
             }).join('');
         }
+        let _estYm = null; // null = mês corrente
+        function _estCurrentYm() { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0'); }
+        function estMonthShift(delta) {
+            let ym = _estYm || _estCurrentYm();
+            let [y, m] = ym.split('-').map(Number);
+            m += delta;
+            while (m < 1) { m += 12; y--; }
+            while (m > 12) { m -= 12; y++; }
+            const target = y + '-' + String(m).padStart(2, '0');
+            if (target > _estCurrentYm()) return; // não passa do mês atual
+            _estYm = target;
+            loadAndRenderEstrutura(true);
+        }
         async function loadAndRenderEstrutura(force) {
             if (_estLoaded && !force) return;
             const err = document.getElementById('estError'); err.style.display = 'none';
+            const lbl = document.getElementById('estMonthLabel');
+            lbl.textContent = 'carregando…';
             try {
-                const [setup, funnel] = await Promise.all([
-                    fetch(MKT_WEBAPP_URL + '?action=marketing-setup&key=paraser2026').then(r => r.json()),
-                    fetch(MKT_WEBAPP_URL + '?action=marketing-funnel&key=paraser2026').then(r => r.json())
-                ]);
-                if (!setup.ok) { err.innerHTML = '❌ ' + (setup.error || 'erro ao carregar estrutura'); err.style.display = 'block'; }
-                _estRenderMachine(setup);
-                _estRenderFunnel(funnel);
-                if (setup.fetchedAt) document.getElementById('estFetchedAt').textContent = 'Atualizado em ' + new Date(setup.fetchedAt).toLocaleString('pt-BR');
+                const ym = _estYm || _estCurrentYm();
+                const resp = await fetch(MKT_WEBAPP_URL + '?action=estrutura-month&ym=' + ym + '&key=paraser2026').then(r => r.json());
+                if (!resp.ok) { err.innerHTML = '❌ ' + (resp.error || 'erro ao carregar'); err.style.display = 'block'; lbl.textContent = '—'; return; }
+                lbl.textContent = resp.label || '—';
+                document.getElementById('estMonthNext').disabled = !!resp.isCurrent;
+                _estRenderMachine(resp);
+                _estRenderFunnel(resp);
+                const note = document.getElementById('estNote');
+                const fs = resp.funnelSteps || [];
+                const semRastreio = !resp.isCurrent && fs[3] && fs[4] && fs[3].value === 0 && fs[4].value === 0;
+                if (semRastreio) {
+                    note.style.display = 'block';
+                    note.innerHTML = 'ⓘ Agendamento e cadastro só passaram a ser rastreados a partir de mai/2026 — em meses anteriores aparecem como 0. (Anúncios e procedimentos têm histórico completo.)';
+                } else { note.style.display = 'none'; }
+                if (resp.fetchedAt) document.getElementById('estFetchedAt').textContent = 'atualizado ' + new Date(resp.fetchedAt).toLocaleString('pt-BR');
                 _estLoaded = true;
             } catch (e) {
                 err.innerHTML = '❌ Falha ao conectar: ' + (e.message || e); err.style.display = 'block';
+                lbl.textContent = '—';
             }
         }
 
