@@ -3995,7 +3995,7 @@
             <!-- Funil -->
             <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:24px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-                    <h3 style="margin:0;font-size:15px;color:var(--text)">Funil completo (snapshot 7 dias)</h3>
+                    <h3 style="margin:0;font-size:15px;color:var(--text)">Funil completo (mês corrente)</h3>
                     <span id="mktFunnelTime" style="color:var(--muted);font-size:11px"></span>
                 </div>
                 <div id="mktFunnelBody" style="display:flex;flex-direction:column;gap:10px">
@@ -13364,7 +13364,7 @@ GONAPEPTYL,56`;
         function _estRenderMachine(s) {
             const el = document.getElementById('estMachine');
             if (!s || !s.ok) { el.innerHTML = '<div style="color:var(--muted);padding:24px;text-align:center;width:100%">Sem dados da estrutura.</div>'; return; }
-            const ev = s.events7d || {}, a = s.audiences || {};
+            const ev = s.eventsMes || s.events7d || {}, a = s.audiences || {};
             const cli = a.clientes || {}, lk = a.lookalike || {}, eng = a.engajados || {};
             const dt = u => { if (!u) return ''; try { return new Date(u * 1000).toLocaleDateString('pt-BR'); } catch (e) { return ''; } };
             const C = [
@@ -13378,7 +13378,7 @@ GONAPEPTYL,56`;
             const stages = [
                 { ico: '🏥', ttl: 'Origem', desc: 'De onde vêm os dados: agendamentos no Feegow e visitas no site.',
                   body: '<div class="est-sub" style="opacity:1;font-weight:600">Feegow + Site</div>' },
-                { ico: '⚡', ttl: 'Eventos · 7 dias', desc: 'O que as pessoas realmente fizeram.',
+                { ico: '⚡', ttl: 'Eventos · mês', desc: 'O que as pessoas realmente fizeram neste mês.',
                   body: `<div class="est-num">${_mktFmtInt(ev.schedule)} <small>agendaram</small></div>
                          <div class="est-sub">${_mktFmtInt(ev.completeRegistration)} se cadastraram · ${_mktFmtInt(ev.pageview)} visitaram</div>` },
                 { ico: '👥', ttl: 'Públicos', desc: 'Listas que o robô monta sozinho com quem já é da casa.',
@@ -13427,7 +13427,11 @@ GONAPEPTYL,56`;
                 body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:24px">${(d && d.msg) || 'Snapshot agendado pra 8h e 18h.'}</div>`;
                 if (ts) ts.textContent = ''; return;
             }
-            if (ts) ts.textContent = 'snapshot ' + new Date(d.snapshot.snapshotAt).toLocaleString('pt-BR');
+            if (ts) {
+                const sd = new Date(d.snapshot.snapshotAt);
+                const mes = sd.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                ts.textContent = '📅 ' + mes.charAt(0).toUpperCase() + mes.slice(1) + ' · atualizado ' + sd.toLocaleString('pt-BR');
+            }
             const steps = d.funnelSteps || [];
             const n = steps.length || 1;
             const COL = ['#2dd4bf', '#22d3ee', '#38bdf8', '#6366f1', '#a855f7', '#d946ef', '#ec4899'];
