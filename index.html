@@ -4077,7 +4077,8 @@
 
             /* funil em forma de funil (funnel chart) */
             .est-funnel{display:flex;flex-direction:column;gap:0;padding:6px 0}
-            .est-frow{display:flex;align-items:stretch;gap:12px;min-height:52px;opacity:0;animation:estIn .5s cubic-bezier(.2,.7,.3,1) forwards}
+            .est-frow{display:flex;align-items:stretch;gap:12px;min-height:52px;opacity:0;animation:estIn .5s cubic-bezier(.2,.7,.3,1) forwards;border-bottom:1px solid rgba(255,255,255,.22)}
+            .est-frow:last-child{border-bottom:none}
             .est-flabel-col{flex:0 0 134px;display:flex;flex-direction:column;justify-content:center;text-align:right}
             .est-flabel-col .est-flabel{font-size:13px;font-weight:700;color:var(--text);line-height:1.2}
             .est-flabel-col .est-ftech{font-size:10.5px;color:var(--muted);margin-top:2px}
@@ -4108,8 +4109,17 @@
             #sec-estrutura .est-prodcard .est-pnum{font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1.1}
             #sec-estrutura .est-prodcard .est-plabel{font-size:12.5px;color:var(--muted)}
             #sec-estrutura .est-breakdown{flex:1 1 320px;min-width:270px;display:flex;flex-direction:column;gap:0;justify-content:center}
-            #sec-estrutura .est-bkrow{display:grid;grid-template-columns:155px 1fr 46px;align-items:center;gap:10px;font-size:12.5px;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08)}
+            #sec-estrutura .est-bkrow{display:grid;grid-template-columns:155px 1fr 46px;align-items:center;gap:10px;font-size:12.5px;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.18)}
             #sec-estrutura .est-bkrow:last-child{border-bottom:none}
+            #sec-estrutura .est-bkrow-toggle{cursor:pointer;user-select:none}
+            #sec-estrutura .est-bkrow-toggle:hover{background:rgba(255,255,255,.04)}
+            #sec-estrutura .est-caret{display:inline-block;transition:transform .2s;font-size:9px;color:var(--muted);margin-right:6px}
+            #sec-estrutura .est-bkrow-toggle.open .est-caret{transform:rotate(90deg)}
+            #sec-estrutura .est-bkdetail{display:none;padding:6px 10px 10px 30px;animation:estIn .3s ease}
+            #sec-estrutura .est-bksub{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--muted);padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.14)}
+            #sec-estrutura .est-bksub:last-child{border-bottom:none}
+            #sec-estrutura .est-bksub .nm{text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            #sec-estrutura .est-bksub .vl{font-weight:700;color:var(--text)}
             #sec-estrutura .est-bklabel{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:capitalize}
             #sec-estrutura .est-bktrack{height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
             #sec-estrutura .est-bkfill{height:100%;border-radius:5px;background:linear-gradient(90deg,#2dd4bf,#818cf8);width:0;transition:width .7s cubic-bezier(.2,.7,.3,1)}
@@ -13503,14 +13513,25 @@ GONAPEPTYL,56`;
                 </div>`;
             }).join('');
         }
-        function _estBreakdownHtml(items, getLabel, isHl) {
+        function _estBreakdownHtml(items, getLabel, isHl, outrosDetalhe) {
             if (!items || !items.length) return '<div style="color:var(--muted);font-size:12px;padding:8px 0">Sem dados neste mês.</div>';
             const max = Math.max(...items.map(i => i.qtd || 0)) || 1;
             return items.map(i => {
                 const pctW = (i.qtd || 0) / max * 100;
                 const hl = (isHl && isHl(i)) ? ' hl' : '';
+                const lbl = getLabel(i);
+                const expand = (outrosDetalhe && outrosDetalhe.length && i.label === 'Outros');
+                if (expand) {
+                    const sub = outrosDetalhe.map(o => `<div class="est-bksub"><span class="nm" title="${(o.nome || '')}">${(o.nome || '').toLowerCase()}</span><span class="vl">${_mktFmtInt(o.qtd)}</span></div>`).join('');
+                    return `<div class="est-bkrow est-bkrow-toggle" onclick="this.classList.toggle('open');var d=this.nextElementSibling;d.style.display=(d.style.display==='block')?'none':'block';">
+                            <span class="est-bklabel"><span class="est-caret">▶</span>${lbl}</span>
+                            <span class="est-bktrack"><span class="est-bkfill" data-w="${pctW}"></span></span>
+                            <span class="est-bkval">${_mktFmtInt(i.qtd)}</span>
+                        </div>
+                        <div class="est-bkdetail">${sub}</div>`;
+                }
                 return `<div class="est-bkrow${hl}">
-                    <span class="est-bklabel" title="${getLabel(i)}">${getLabel(i)}</span>
+                    <span class="est-bklabel" title="${lbl}">${lbl}</span>
                     <span class="est-bktrack"><span class="est-bkfill" data-w="${pctW}"></span></span>
                     <span class="est-bkval">${_mktFmtInt(i.qtd)}</span>
                 </div>`;
@@ -13523,7 +13544,7 @@ GONAPEPTYL,56`;
             el.innerHTML = `
                 <div class="est-prodrow">
                     <div class="est-prodcard"><div class="est-pico">🩺</div><div class="est-pnum" style="color:#38bdf8">${_mktFmtInt(p.atendidos)}</div><div class="est-plabel">Foram atendidos (todos os tipos)</div></div>
-                    <div class="est-breakdown">${_estBreakdownHtml(p.atendidosBreakdown, i => lower(i.label), i => i.label === 'Procedimento FIV')}</div>
+                    <div class="est-breakdown">${_estBreakdownHtml(p.atendidosBreakdown, i => lower(i.label), i => i.label === 'Procedimento FIV', p.outrosDetalhe)}</div>
                 </div>
                 <div class="est-prodrow">
                     <div class="est-prodcard"><div class="est-pico">🧪</div><div class="est-pnum" style="color:#e879f9">${_mktFmtInt(p.fiv)}</div><div class="est-plabel">Procedimentos FIV (punção/transferência)</div></div>
