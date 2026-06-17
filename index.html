@@ -4143,6 +4143,18 @@
             #sec-estrutura .est-rcrow.diff{background:linear-gradient(90deg,rgba(192,132,252,.12),transparent);border-radius:9px;border-bottom:none;margin-top:4px;padding-left:10px}
             #sec-estrutura .est-rcrow.diff .vl{color:#c084fc}
             #sec-estrutura .est-reconc .rcnote{margin-top:14px;font-size:12px;color:var(--muted);font-style:italic;line-height:1.55}
+            /* recebimento por canal */
+            #sec-estrutura .est-recrow{display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid rgba(255,255,255,.18)}
+            #sec-estrutura .est-recrow:last-of-type{border-bottom:none}
+            #sec-estrutura .est-recrow .rcnm{flex:0 0 150px;font-size:13px;color:var(--text)}
+            #sec-estrutura .est-recrow .rcbar{flex:1;height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;min-width:40px}
+            #sec-estrutura .est-recrow .rcbar > span{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#2dd4bf,#34d399);width:0;transition:width .7s cubic-bezier(.2,.7,.3,1)}
+            #sec-estrutura .est-recrow .rcpct{flex:0 0 42px;text-align:right;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+            #sec-estrutura .est-recrow .rcvl{flex:0 0 118px;text-align:right;font-weight:800;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}
+            #sec-estrutura .est-rectotal{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:13px;border-top:1px solid rgba(255,255,255,.22)}
+            #sec-estrutura .est-rectotal .l{font-size:13.5px;color:var(--text);font-weight:600}
+            #sec-estrutura .est-rectotal .v{font-size:18px;font-weight:800;color:#34d399;font-variant-numeric:tabular-nums}
+            @media(max-width:560px){#sec-estrutura .est-recrow .rcnm{flex-basis:92px;font-size:11.5px}#sec-estrutura .est-recrow .rcvl{flex-basis:90px;font-size:12px}#sec-estrutura .est-recrow .rcpct{flex-basis:34px;font-size:10px}}
             @media(max-width:560px){
                 #sec-estrutura .est-prodcard{flex-basis:100%}
                 #sec-estrutura .est-bkrow{grid-template-columns:104px 1fr auto 32px;font-size:11px;gap:7px}
@@ -4204,6 +4216,14 @@
             <div class="est-block">
                 <div class="est-block-h"><h3>💰 Faturamento × Valor de Tabela</h3><span>de onde vem a diferença</span></div>
                 <div id="estReconc" class="est-reconc">
+                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
+                </div>
+            </div>
+
+            <!-- BLOCO E — RECEBIMENTO POR CANAL -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>💳 Recebimento por canal</h3><span>quanto entrou por Rede, PIX e dinheiro</span></div>
+                <div id="estRecebimento">
                     <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
                 </div>
             </div>
@@ -13584,18 +13604,37 @@ GONAPEPTYL,56`;
         }
 
         const _estReconcCache = {};
+        // Mapa de formas de pagamento do Feegow (CONFIRMAR com Felipe — inferido pelos valores)
+        const FORMAS_PAG = { '1': 'Dinheiro', '8': 'Cartão (Rede)', '9': 'Cartão débito / outro', '12': 'Outro', '15': 'PIX / Itaú' };
+        function _estRenderRecebimento(canais) {
+            const el = document.getElementById('estRecebimento');
+            const arr = Object.keys(canais).map(k => ({ k, nome: FORMAS_PAG[k] || ('Forma ' + k), valor: canais[k] })).sort((a, b) => b.valor - a.valor);
+            if (!arr.length) { el.innerHTML = '<div style="color:var(--muted);padding:14px;font-size:13px">Sem recebimento neste mês.</div>'; return; }
+            const max = Math.max(...arr.map(a => a.valor)) || 1;
+            const total = arr.reduce((s, a) => s + a.valor, 0) || 1;
+            el.innerHTML = arr.map(a => `<div class="est-recrow">
+                    <span class="rcnm" title="${a.nome}">${a.nome}</span>
+                    <span class="rcbar"><span data-w="${a.valor / max * 100}"></span></span>
+                    <span class="rcpct">${(a.valor / total * 100).toFixed(0)}%</span>
+                    <span class="rcvl">${_estFmtBRL(a.valor)}</span>
+                </div>`).join('') + `<div class="est-rectotal"><span class="l">Total recebido</span><span class="v">${_estFmtBRL(total)}</span></div>`;
+            requestAnimationFrame(() => { el.querySelectorAll('.rcbar > span').forEach(s => { s.style.width = (s.getAttribute('data-w') || 0) + '%'; }); });
+        }
         async function _estLoadReconc(ym, valorTabela) {
             const el = document.getElementById('estReconc');
-            const render = (faturado) => {
-                const diff = faturado - valorTabela;
+            const elR = document.getElementById('estRecebimento');
+            const render = (data) => {
+                const faturado = data.faturado, diff = faturado - valorTabela;
                 el.innerHTML = `
-                    <div class="est-rcrow real"><span class="lb">💰 Faturamento real <small>(lançamentos do mês · mesma fonte da aba Receitas)</small></span><span class="vl">${_estFmtBRL(faturado)}</span></div>
+                    <div class="est-rcrow real"><span class="lb">💰 Faturamento real <small>(itens não-cancelados do mês)</small></span><span class="vl">${_estFmtBRL(faturado)}</span></div>
                     <div class="est-rcrow tabela"><span class="lb">🧾 Valor de tabela dos atendimentos <small>(só preço avulso)</small></span><span class="vl">${_estFmtBRL(valorTabela)}</span></div>
                     <div class="est-rcrow diff"><span class="lb">📦 Diferença <small>(pacotes/FIV — não entram por agendamento)</small></span><span class="vl">${_estFmtBRL(diff)}</span></div>
                     <div class="rcnote">O "valor de tabela" soma só o preço avulso dos atendimentos. A FIV é vendida em <b>pacote</b>, então USG, preparo, punção e transferência entram como <b>R$ 0</b> no agendamento — por isso o faturamento real é bem maior. A diferença é essencialmente a receita de pacotes/FIV.</div>`;
+                _estRenderRecebimento(data.canais || {});
             };
-            if (_estReconcCache[ym] != null) { render(_estReconcCache[ym]); return; }
-            el.innerHTML = '<div style="color:var(--muted);padding:14px;font-size:13px">💰 Carregando faturamento do mês… (pode levar alguns segundos)</div>';
+            if (_estReconcCache[ym]) { render(_estReconcCache[ym]); return; }
+            el.innerHTML = '<div style="color:var(--muted);padding:14px;font-size:13px">💰 Carregando financeiro do mês… (pode levar alguns segundos)</div>';
+            elR.innerHTML = '<div style="color:var(--muted);padding:14px;font-size:13px">💳 Carregando…</div>';
             try {
                 const [y, m] = ym.split('-').map(Number);
                 const isCur = (ym === _estCurrentYm());
@@ -13605,16 +13644,22 @@ GONAPEPTYL,56`;
                 const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
                 const resp = await fetch(url).then(r => r.json());
                 const inv = resp.data || [];
-                // Faturamento = soma dos ITENS não-cancelados, líquido (− desconto + acréscimo).
-                // Valores em CENTAVOS (Feegow) → /100. NÃO usar detalhes[0].valor (é bruto, inclui cancelados).
+                // Faturamento = itens não-cancelados, líquido (− desconto + acréscimo), em CENTAVOS /100.
                 const faturado = inv.reduce((s, iv) => {
                     const its = iv.itens || [];
                     return s + its.reduce((a, it) => a + (it.is_cancelado ? 0 : (((it.valor || 0) - (it.desconto || 0) + (it.acrescimo || 0)))), 0);
                 }, 0) / 100;
-                _estReconcCache[ym] = faturado;
-                render(faturado);
+                // Recebimento por canal = soma dos pagamentos por forma_pagamento, em CENTAVOS /100.
+                const canais = {};
+                inv.forEach(iv => (iv.pagamentos || []).forEach(p => {
+                    const f = String(p.forma_pagamento);
+                    canais[f] = (canais[f] || 0) + ((p.valor || 0) / 100);
+                }));
+                _estReconcCache[ym] = { faturado, canais };
+                render(_estReconcCache[ym]);
             } catch (e) {
-                el.innerHTML = `<div style="color:var(--muted);padding:14px;font-size:13px">Não consegui carregar o faturamento agora. Valor de tabela (avulso): <b style="color:var(--text)">${_estFmtBRL(valorTabela)}</b>. O faturamento real está na aba Receitas.</div>`;
+                el.innerHTML = `<div style="color:var(--muted);padding:14px;font-size:13px">Não consegui carregar o financeiro agora. Valor de tabela (avulso): <b style="color:var(--text)">${_estFmtBRL(valorTabela)}</b>.</div>`;
+                elR.innerHTML = `<div style="color:var(--muted);padding:14px;font-size:13px">—</div>`;
             }
         }
 
