@@ -4226,7 +4226,7 @@
                 <div id="estRecebimento">
                     <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
                 </div>
-                <div class="est-prodnote">⚠️ Valores <b>registrados no Feegow</b> (podem incluir cancelados, estornos e duplicados). <b>Não é o apurado do banco.</b> Pro número real liquidado, é preciso integrar Rede + Itaú (Nível 2).</div>
+                <div class="est-prodnote">⚠️ Recebido <b>conforme o Feegow</b> (já capado por fatura). Mesmo assim fica <b>acima do apurado real</b> — cartão parcelado conta cheio de uma vez, e há taxas/estornos. Pro número liquidado de verdade, é preciso integrar <b>Rede + Itaú</b> (Nível 2).</div>
             </div>
         </section>
 
@@ -13650,12 +13650,19 @@ GONAPEPTYL,56`;
                     const its = iv.itens || [];
                     return s + its.reduce((a, it) => a + (it.is_cancelado ? 0 : (((it.valor || 0) - (it.desconto || 0) + (it.acrescimo || 0)))), 0);
                 }, 0) / 100;
-                // Recebimento por canal = soma dos pagamentos por forma_pagamento, em CENTAVOS /100.
+                // Recebimento por canal: pagamentos por forma, CAPADOS em min(pagamentos, fatura)
+                // por fatura (regra do dashboard: "Recebido = min, não soma bruta"). Em CENTAVOS /100.
                 const canais = {};
-                inv.forEach(iv => (iv.pagamentos || []).forEach(p => {
-                    const f = String(p.forma_pagamento);
-                    canais[f] = (canais[f] || 0) + ((p.valor || 0) / 100);
-                }));
+                inv.forEach(iv => {
+                    const pags = iv.pagamentos || [];
+                    const pagTotal = pags.reduce((s, p) => s + (p.valor || 0), 0);
+                    const fat = (iv.detalhes && iv.detalhes[0] && iv.detalhes[0].valor) || 0;
+                    const fator = (pagTotal > fat && pagTotal > 0) ? fat / pagTotal : 1;
+                    pags.forEach(p => {
+                        const f = String(p.forma_pagamento);
+                        canais[f] = (canais[f] || 0) + ((p.valor || 0) * fator / 100);
+                    });
+                });
                 _estReconcCache[ym] = { faturado, canais };
                 render(_estReconcCache[ym]);
             } catch (e) {
