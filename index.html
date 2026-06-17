@@ -13605,8 +13605,12 @@ GONAPEPTYL,56`;
                 const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
                 const resp = await fetch(url).then(r => r.json());
                 const inv = resp.data || [];
-                // valor vem em CENTAVOS no get_financial (igual crFmt do dashboard divide por 100)
-                const faturado = inv.reduce((s, iv) => s + ((iv.detalhes && iv.detalhes[0] && iv.detalhes[0].valor) || 0), 0) / 100;
+                // Faturamento = soma dos ITENS não-cancelados, líquido (− desconto + acréscimo).
+                // Valores em CENTAVOS (Feegow) → /100. NÃO usar detalhes[0].valor (é bruto, inclui cancelados).
+                const faturado = inv.reduce((s, iv) => {
+                    const its = iv.itens || [];
+                    return s + its.reduce((a, it) => a + (it.is_cancelado ? 0 : (((it.valor || 0) - (it.desconto || 0) + (it.acrescimo || 0)))), 0);
+                }, 0) / 100;
                 _estReconcCache[ym] = faturado;
                 render(faturado);
             } catch (e) {
