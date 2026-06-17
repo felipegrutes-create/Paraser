@@ -2600,6 +2600,7 @@
         </div>
 
         <button class="tab" onclick="showSection('sec-marketing',this)">📊 Marketing</button>
+        <button class="tab" onclick="showSection('sec-estrutura',this)">🧩 Estrutura</button>
     </div>
 
     <div class="container">
@@ -4012,6 +4013,116 @@
                     <a href="https://clarity.microsoft.com/projects/view/x7kb96gx87" target="_blank" rel="noopener" style="background:#a855f7;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">🔥 Abrir Clarity (heatmap + sessões)</a>
                     <a href="https://business.facebook.com/events_manager2/list/dataset/920108941023871/overview" target="_blank" rel="noopener" style="background:#3b82f6;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📊 Pixel "Leads Paraser" no BM</a>
                     <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=849546694121439" target="_blank" rel="noopener" style="background:#1877f2;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📣 Ads Manager (campanhas)</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== ESTRUTURA: a máquina + o resultado ===== -->
+        <style>
+            /* ===== Aba Estrutura — linha de montagem visual ===== */
+            #sec-estrutura .est-intro{
+                position:relative;overflow:hidden;border-radius:18px;padding:24px 26px;margin-bottom:22px;
+                background:linear-gradient(135deg,rgba(45,212,191,.10),rgba(168,85,247,.10));
+                border:1px solid var(--border);
+            }
+            #sec-estrutura .est-intro::before{
+                content:"";position:absolute;inset:0;pointer-events:none;
+                background:radial-gradient(680px 230px at 12% -30%,rgba(45,212,191,.22),transparent 70%),
+                          radial-gradient(540px 220px at 95% 130%,rgba(168,85,247,.20),transparent 70%);
+            }
+            #sec-estrutura .est-intro>*{position:relative}
+            #sec-estrutura .est-intro h2{margin:0 0 8px;font-size:23px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
+            #sec-estrutura .est-intro p{margin:0;color:var(--muted);font-size:14px;line-height:1.6;max-width:720px}
+            #sec-estrutura .est-intro .est-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+            #sec-estrutura .est-pill{font-size:12px;color:#34d399;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.28);padding:5px 13px;border-radius:999px;font-weight:600}
+            #sec-estrutura .est-refresh{background:rgba(0,212,170,.10);border:1px solid rgba(0,212,170,.3);color:var(--accent);padding:5px 13px;border-radius:999px;cursor:pointer;font-size:12px;font-family:inherit}
+
+            #sec-estrutura .est-block{background:var(--bg-elev);border:1px solid var(--border);border-radius:18px;padding:24px;margin-bottom:22px}
+            #sec-estrutura .est-block-h{display:flex;align-items:baseline;gap:9px;margin-bottom:22px;flex-wrap:wrap}
+            #sec-estrutura .est-block-h h3{margin:0;font-size:17px;font-weight:700;color:var(--text)}
+            #sec-estrutura .est-block-h span{color:var(--muted);font-size:12.5px}
+
+            /* pipeline */
+            .est-machine{display:flex;align-items:stretch;gap:0;flex-wrap:nowrap;overflow-x:auto;padding:6px 2px 12px}
+            .est-stage{
+                flex:1 1 0;min-width:156px;border-radius:15px;padding:16px 14px 17px;position:relative;
+                background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0));
+                border:1px solid var(--border);display:flex;flex-direction:column;gap:8px;
+                opacity:0;transform:translateY(16px);animation:estIn .55s cubic-bezier(.2,.7,.3,1) forwards;
+                transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;
+            }
+            .est-stage:hover{transform:translateY(-5px);border-color:var(--stage);box-shadow:0 16px 36px -16px var(--stage)}
+            @keyframes estIn{to{opacity:1;transform:translateY(0)}}
+            .est-badge{
+                width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;
+                background:linear-gradient(160deg,var(--stage-glow),transparent);
+                border:1px solid var(--stage-glow);box-shadow:0 0 26px -8px var(--stage);margin-bottom:2px;
+            }
+            .est-stage .est-ttl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
+            .est-stage .est-desc{font-size:12px;color:var(--muted);line-height:1.45;min-height:34px}
+            .est-stage .est-num{font-size:23px;font-weight:800;color:var(--stage);line-height:1.05;letter-spacing:-.5px}
+            .est-stage .est-num small{font-size:12px;font-weight:600;color:var(--text);opacity:.75;letter-spacing:0}
+            .est-stage .est-sub{font-size:11.5px;color:var(--text);opacity:.72;line-height:1.45}
+            .est-stage .est-auto{font-size:11px;color:#34d399;display:flex;align-items:center;gap:5px;font-weight:600}
+            .est-stage .est-auto .est-dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;animation:estPulse 1.8s infinite}
+            @keyframes estPulse{0%,100%{opacity:1}50%{opacity:.3}}
+            .est-arrow{display:flex;align-items:center;justify-content:center;flex:0 0 22px;color:var(--muted)}
+            .est-arrow svg{width:18px;height:18px;opacity:.5}
+            @media(max-width:820px){
+                .est-machine{flex-direction:column;overflow-x:visible}
+                .est-stage{min-width:0}
+                .est-stage .est-desc{min-height:0}
+                .est-arrow{flex:0 0 auto;height:26px;transform:rotate(90deg)}
+            }
+
+            /* funil em forma de funil (funnel chart) */
+            .est-funnel{display:flex;flex-direction:column;gap:0;padding:6px 0}
+            .est-frow{display:flex;align-items:stretch;gap:12px;min-height:52px;opacity:0;animation:estIn .5s cubic-bezier(.2,.7,.3,1) forwards}
+            .est-flabel-col{flex:0 0 134px;display:flex;flex-direction:column;justify-content:center;text-align:right}
+            .est-flabel-col .est-flabel{font-size:13px;font-weight:700;color:var(--text);line-height:1.2}
+            .est-flabel-col .est-ftech{font-size:10.5px;color:var(--muted);margin-top:2px}
+            .est-fseg-wrap{flex:1 1 auto;position:relative;min-width:0}
+            .est-fseg{position:absolute;inset:1px 0}
+            .est-fnum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.55);pointer-events:none}
+            .est-fconv-col{flex:0 0 62px;display:flex;align-items:center;font-size:11.5px;color:#34d399;font-weight:600}
+            @media(max-width:560px){
+                .est-flabel-col{flex-basis:100px}
+                .est-flabel-col .est-flabel{font-size:12px}
+                .est-fconv-col{flex-basis:46px;font-size:10px}
+                .est-fnum{font-size:14px}
+            }
+        </style>
+        <section id="sec-estrutura" class="section">
+            <!-- Intro amigável -->
+            <div class="est-intro">
+                <h2>🏭 A máquina que vira anúncio em paciente</h2>
+                <p>Cada peça abaixo pega o dado, faz o trabalho dela e passa pra próxima — <b style="color:var(--text)">sozinha, sem você fazer nada</b>. Da pessoa que vê o anúncio até quem agenda a consulta. Os números são <b style="color:var(--text)">reais</b>.</p>
+                <div class="est-meta">
+                    <span class="est-pill">🟢 Tudo no automático</span>
+                    <span id="estFetchedAt" style="color:var(--muted);font-size:12px"></span>
+                    <button class="est-refresh" onclick="loadAndRenderEstrutura(true)">🔄 Atualizar</button>
+                </div>
+            </div>
+
+            <div id="estError" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;padding:14px 18px;border-radius:8px;margin-bottom:18px;font-size:13px"></div>
+
+            <!-- BLOCO A — A MÁQUINA -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>⚙️ A Máquina</h3><span>como tudo se liga, peça por peça</span></div>
+                <div id="estMachine" class="est-machine">
+                    <div style="color:var(--muted);text-align:center;padding:24px;width:100%">Carregando…</div>
+                </div>
+            </div>
+
+            <!-- BLOCO B — O RESULTADO -->
+            <div class="est-block">
+                <div class="est-block-h">
+                    <h3>📈 O Resultado</h3>
+                    <span>de cada pessoa que vê o anúncio, quantas viram paciente</span>
+                    <span id="estFunnelTime" style="margin-left:auto;color:var(--muted);font-size:11px"></span>
+                </div>
+                <div id="estFunnelBody" class="est-funnel">
+                    <div style="color:var(--muted);text-align:center;padding:24px">Carregando…</div>
                 </div>
             </div>
         </section>
@@ -5631,6 +5742,7 @@
             if (id === 'sec-estoque') loadAndRenderEstoque();
             if (id === 'sec-cr') loadAndRenderCR();
             if (id === 'sec-marketing') loadAndRenderMarketing(false);
+            if (id === 'sec-estrutura') loadAndRenderEstrutura(false);
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
             if (id === 'sec-arquivo-morto') renderArquivoMorto();
@@ -13239,6 +13351,121 @@ GONAPEPTYL,56`;
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        // ===== Estrutura (a máquina + o resultado) =====
+        let _estLoaded = false;
+        function _estFmtBig(n) {
+            if (n == null || isNaN(n)) return '—';
+            n = Number(n);
+            if (n >= 1e6) return (n / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi';
+            return n.toLocaleString('pt-BR');
+        }
+        function _estRenderMachine(s) {
+            const el = document.getElementById('estMachine');
+            if (!s || !s.ok) { el.innerHTML = '<div style="color:var(--muted);padding:24px;text-align:center;width:100%">Sem dados da estrutura.</div>'; return; }
+            const ev = s.events7d || {}, a = s.audiences || {};
+            const cli = a.clientes || {}, lk = a.lookalike || {}, eng = a.engajados || {};
+            const dt = u => { if (!u) return ''; try { return new Date(u * 1000).toLocaleDateString('pt-BR'); } catch (e) { return ''; } };
+            const C = [
+                ['#2dd4bf', 'rgba(45,212,191,.22)'],
+                ['#22d3ee', 'rgba(34,211,238,.22)'],
+                ['#38bdf8', 'rgba(56,189,248,.22)'],
+                ['#818cf8', 'rgba(129,140,248,.22)'],
+                ['#c084fc', 'rgba(192,132,252,.22)'],
+                ['#e879f9', 'rgba(232,121,249,.22)']
+            ];
+            const stages = [
+                { ico: '🏥', ttl: 'Origem', desc: 'De onde vêm os dados: agendamentos no Feegow e visitas no site.',
+                  body: '<div class="est-sub" style="opacity:1;font-weight:600">Feegow + Site</div>' },
+                { ico: '⚡', ttl: 'Eventos · 7 dias', desc: 'O que as pessoas realmente fizeram.',
+                  body: `<div class="est-num">${_mktFmtInt(ev.schedule)} <small>agendaram</small></div>
+                         <div class="est-sub">${_mktFmtInt(ev.completeRegistration)} se cadastraram · ${_mktFmtInt(ev.pageview)} visitaram</div>` },
+                { ico: '👥', ttl: 'Públicos', desc: 'Listas que o robô monta sozinho com quem já é da casa.',
+                  body: `<div class="est-num">${_estFmtBig(cli.count)} <small>clientes</small></div>
+                         <div class="est-auto"><span class="est-dot"></span>atualiza sozinha${cli.updatedAt ? (' · ' + dt(cli.updatedAt)) : ''}</div>
+                         <div class="est-sub">+ ${_estFmtBig(eng.count)} engajados</div>` },
+                { ico: '🎯', ttl: 'Lookalike', desc: 'O Facebook acha gente parecida com quem agenda. O melhor público pra trazer paciente novo.',
+                  body: `<div class="est-num">${_estFmtBig(lk.count)}</div>
+                         <div class="est-sub">pessoas parecidas</div>` },
+                { ico: '🧠', ttl: 'Config da conta', desc: 'O que a gente ensina pro Facebook sobre quem é quem.',
+                  body: `<div class="est-sub" style="opacity:1">Cliente = <b style="color:var(--stage)">quem agendou</b></div>
+                         <div class="est-sub" style="opacity:1">Engajado = <b style="color:var(--stage)">quem se cadastrou</b></div>` },
+                { ico: '📣', ttl: 'Campanhas', desc: 'Os anúncios miram nessas pessoas certas. O resultado vem logo abaixo.',
+                  body: '<div class="est-sub" style="opacity:1;font-weight:600">👇 veja o funil</div>' }
+            ];
+            const chevron = '<div class="est-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>';
+            el.innerHTML = stages.map((st, i) => {
+                const col = C[i][0], glow = C[i][1];
+                const card = `<div class="est-stage" style="--stage:${col};--stage-glow:${glow};animation-delay:${i * 75}ms">
+                    <div class="est-badge">${st.ico}</div>
+                    <div class="est-ttl">${st.ttl}</div>
+                    <div class="est-desc">${st.desc}</div>
+                    ${st.body}
+                </div>`;
+                return card + (i < stages.length - 1 ? chevron : '');
+            }).join('');
+        }
+        function _estFriendlyFunnel(label) {
+            const m = {
+                'Impressões Meta': 'Viram o anúncio',
+                'Cliques': 'Clicaram',
+                'Contact (Pixel)': 'Chamaram no WhatsApp',
+                'Schedule (CAPI)': 'Agendaram consulta',
+                'Cadastro completo': 'Se cadastraram',
+                'Procedimento (Feegow)': 'Fizeram o procedimento'
+            };
+            return m[label] || label;
+        }
+        function _estRenderFunnel(d) {
+            const body = document.getElementById('estFunnelBody');
+            const ts = document.getElementById('estFunnelTime');
+            if (!d || !d.ok || !d.hasData) {
+                body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:24px">${(d && d.msg) || 'Snapshot agendado pra 8h e 18h.'}</div>`;
+                if (ts) ts.textContent = ''; return;
+            }
+            if (ts) ts.textContent = 'snapshot ' + new Date(d.snapshot.snapshotAt).toLocaleString('pt-BR');
+            const steps = d.funnelSteps || [];
+            const n = steps.length || 1;
+            const COL = ['#2dd4bf', '#22d3ee', '#38bdf8', '#6366f1', '#a855f7', '#d946ef', '#ec4899'];
+            // larguras afunilando de 100% (topo) até ~26% (ponta)
+            const W = []; for (let i = 0; i <= n; i++) W.push(100 - 74 * (i / n));
+            body.innerHTML = steps.map((s, i) => {
+                const topW = W[i], botW = W[i + 1];
+                const Lt = ((100 - topW) / 2).toFixed(1), Rt = (100 - (100 - topW) / 2).toFixed(1);
+                const Lb = ((100 - botW) / 2).toFixed(1), Rb = (100 - (100 - botW) / 2).toFixed(1);
+                const clip = `polygon(${Lt}% 0, ${Rt}% 0, ${Rb}% 100%, ${Lb}% 100%)`;
+                const c1 = COL[i] || '#2dd4bf', c2 = COL[i + 1] || c1;
+                const friendly = _estFriendlyFunnel(s.label);
+                const conv = s.conv != null
+                    ? `<span class="est-fconv-col" title="${s.conv.toFixed(1)}% do passo anterior">▼ ${s.conv.toFixed(1).replace('.', ',')}%</span>`
+                    : '<span class="est-fconv-col"></span>';
+                return `<div class="est-frow" style="animation-delay:${i * 70}ms">
+                    <div class="est-flabel-col"><span class="est-flabel">${friendly}</span><span class="est-ftech">${s.label}</span></div>
+                    <div class="est-fseg-wrap">
+                        <div class="est-fseg" style="clip-path:${clip};-webkit-clip-path:${clip};background:linear-gradient(180deg,${c1},${c2});box-shadow:0 6px 20px -10px ${c2}"></div>
+                        <div class="est-fnum">${_mktFmtInt(s.value)}</div>
+                    </div>
+                    ${conv}
+                </div>`;
+            }).join('');
+        }
+        async function loadAndRenderEstrutura(force) {
+            if (_estLoaded && !force) return;
+            const err = document.getElementById('estError'); err.style.display = 'none';
+            try {
+                const [setup, funnel] = await Promise.all([
+                    fetch(MKT_WEBAPP_URL + '?action=marketing-setup&key=paraser2026').then(r => r.json()),
+                    fetch(MKT_WEBAPP_URL + '?action=marketing-funnel&key=paraser2026').then(r => r.json())
+                ]);
+                if (!setup.ok) { err.innerHTML = '❌ ' + (setup.error || 'erro ao carregar estrutura'); err.style.display = 'block'; }
+                _estRenderMachine(setup);
+                _estRenderFunnel(funnel);
+                if (setup.fetchedAt) document.getElementById('estFetchedAt').textContent = 'Atualizado em ' + new Date(setup.fetchedAt).toLocaleString('pt-BR');
+                _estLoaded = true;
+            } catch (e) {
+                err.innerHTML = '❌ Falha ao conectar: ' + (e.message || e); err.style.display = 'block';
+            }
         }
 
         async function loadAndRenderCR() {
