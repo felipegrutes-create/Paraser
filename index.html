@@ -4132,6 +4132,17 @@
             #sec-estrutura .est-bkrow.hl .est-bkval{color:#e879f9;font-size:14px}
             #sec-estrutura .est-bkrow.hl .est-bkfill{background:linear-gradient(90deg,#e879f9,#a855f7)}
             #sec-estrutura .est-prodnote{margin-top:16px;font-size:12px;color:var(--muted);font-style:italic;line-height:1.5}
+            /* reconciliação financeira */
+            #sec-estrutura .est-reconc{display:flex;flex-direction:column;gap:0}
+            #sec-estrutura .est-rcrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 6px;border-bottom:1px solid rgba(255,255,255,.14)}
+            #sec-estrutura .est-rcrow:last-of-type{border-bottom:none}
+            #sec-estrutura .est-rcrow .lb{font-size:13.5px;color:var(--text);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+            #sec-estrutura .est-rcrow .lb small{color:var(--muted);font-size:11.5px}
+            #sec-estrutura .est-rcrow .vl{font-size:19px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+            #sec-estrutura .est-rcrow.real .vl{color:#34d399}
+            #sec-estrutura .est-rcrow.diff{background:linear-gradient(90deg,rgba(192,132,252,.12),transparent);border-radius:9px;border-bottom:none;margin-top:4px;padding-left:10px}
+            #sec-estrutura .est-rcrow.diff .vl{color:#c084fc}
+            #sec-estrutura .est-reconc .rcnote{margin-top:14px;font-size:12px;color:var(--muted);font-style:italic;line-height:1.55}
             @media(max-width:560px){
                 #sec-estrutura .est-prodcard{flex-basis:100%}
                 #sec-estrutura .est-bkrow{grid-template-columns:104px 1fr auto 32px;font-size:11px;gap:7px}
@@ -4187,6 +4198,14 @@
                     <div style="color:var(--muted);padding:16px">Carregando…</div>
                 </div>
                 <div class="est-prodnote">ⓘ Volume realizado no mês, de pacientes que entraram em meses variados (a jornada FIV leva semanas a meses). Não é conversão direta dos anúncios deste mês.</div>
+            </div>
+
+            <!-- BLOCO D — RECONCILIAÇÃO FINANCEIRA -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>💰 Faturamento × Valor de Tabela</h3><span>de onde vem a diferença</span></div>
+                <div id="estReconc" class="est-reconc">
+                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
+                </div>
             </div>
         </section>
 
@@ -13564,6 +13583,37 @@ GONAPEPTYL,56`;
             });
         }
 
+        const _estReconcCache = {};
+        async function _estLoadReconc(ym, valorTabela) {
+            const el = document.getElementById('estReconc');
+            const render = (faturado) => {
+                const diff = faturado - valorTabela;
+                el.innerHTML = `
+                    <div class="est-rcrow real"><span class="lb">💰 Faturamento real <small>(lançamentos do mês · mesma fonte da aba Receitas)</small></span><span class="vl">${_estFmtBRL(faturado)}</span></div>
+                    <div class="est-rcrow tabela"><span class="lb">🧾 Valor de tabela dos atendimentos <small>(só preço avulso)</small></span><span class="vl">${_estFmtBRL(valorTabela)}</span></div>
+                    <div class="est-rcrow diff"><span class="lb">📦 Diferença <small>(pacotes/FIV — não entram por agendamento)</small></span><span class="vl">${_estFmtBRL(diff)}</span></div>
+                    <div class="rcnote">O "valor de tabela" soma só o preço avulso dos atendimentos. A FIV é vendida em <b>pacote</b>, então USG, preparo, punção e transferência entram como <b>R$ 0</b> no agendamento — por isso o faturamento real é bem maior. A diferença é essencialmente a receita de pacotes/FIV.</div>`;
+            };
+            if (_estReconcCache[ym] != null) { render(_estReconcCache[ym]); return; }
+            el.innerHTML = '<div style="color:var(--muted);padding:14px;font-size:13px">💰 Carregando faturamento do mês… (pode levar alguns segundos)</div>';
+            try {
+                const [y, m] = ym.split('-').map(Number);
+                const isCur = (ym === _estCurrentYm());
+                const lastDay = isCur ? new Date().getDate() : new Date(y, m, 0).getDate();
+                const pad = n => String(n).padStart(2, '0');
+                const ds = `01/${pad(m)}/${y}`, de = `${pad(lastDay)}/${pad(m)}/${y}`;
+                const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
+                const resp = await fetch(url).then(r => r.json());
+                const inv = resp.data || [];
+                // valor vem em CENTAVOS no get_financial (igual crFmt do dashboard divide por 100)
+                const faturado = inv.reduce((s, iv) => s + ((iv.detalhes && iv.detalhes[0] && iv.detalhes[0].valor) || 0), 0) / 100;
+                _estReconcCache[ym] = faturado;
+                render(faturado);
+            } catch (e) {
+                el.innerHTML = `<div style="color:var(--muted);padding:14px;font-size:13px">Não consegui carregar o faturamento agora. Valor de tabela (avulso): <b style="color:var(--text)">${_estFmtBRL(valorTabela)}</b>. O faturamento real está na aba Receitas.</div>`;
+            }
+        }
+
         let _estYm = null; // null = mês corrente
         function _estCurrentYm() { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0'); }
         function estMonthShift(delta) {
@@ -13591,6 +13641,8 @@ GONAPEPTYL,56`;
                 _estRenderMachine(resp);
                 _estRenderFunnel(resp);
                 _estRenderProducao(resp.producao);
+                const valorTabela = ((resp.producao && resp.producao.atendidosBreakdown) || []).reduce((s, b) => s + (b.valor || 0), 0);
+                _estLoadReconc(ym, valorTabela);  // não-bloqueante
                 const note = document.getElementById('estNote');
                 const fs = resp.funnelSteps || [];
                 const semRastreio = !resp.isCurrent && fs[3] && fs[3].value === 0;  // "Agendaram" (Schedule/CAPI)
