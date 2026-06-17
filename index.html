@@ -4101,12 +4101,23 @@
             #sec-estrutura .est-note{display:none;margin-top:14px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:9px 13px}
 
             /* produção da clínica */
-            #sec-estrutura .est-prod{display:flex;gap:14px;flex-wrap:wrap}
-            #sec-estrutura .est-prodcard{flex:1 1 200px;background:var(--bg);border:1px solid var(--border);border-radius:13px;padding:18px 20px;display:flex;flex-direction:column;gap:5px}
+            #sec-estrutura .est-prod{display:flex;flex-direction:column;gap:18px}
+            #sec-estrutura .est-prodrow{display:flex;gap:18px;align-items:stretch;flex-wrap:wrap}
+            #sec-estrutura .est-prodcard{flex:0 0 190px;background:var(--bg);border:1px solid var(--border);border-radius:13px;padding:18px 20px;display:flex;flex-direction:column;gap:5px;justify-content:center}
             #sec-estrutura .est-prodcard .est-pico{font-size:20px;line-height:1}
-            #sec-estrutura .est-prodcard .est-pnum{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1.1}
+            #sec-estrutura .est-prodcard .est-pnum{font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1.1}
             #sec-estrutura .est-prodcard .est-plabel{font-size:12.5px;color:var(--muted)}
-            #sec-estrutura .est-prodnote{margin-top:14px;font-size:12px;color:var(--muted);font-style:italic;line-height:1.5}
+            #sec-estrutura .est-breakdown{flex:1 1 320px;min-width:270px;display:flex;flex-direction:column;gap:9px;justify-content:center}
+            #sec-estrutura .est-bkrow{display:grid;grid-template-columns:150px 1fr 42px;align-items:center;gap:10px;font-size:12.5px}
+            #sec-estrutura .est-bklabel{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:capitalize}
+            #sec-estrutura .est-bktrack{height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+            #sec-estrutura .est-bkfill{height:100%;border-radius:5px;background:linear-gradient(90deg,#2dd4bf,#818cf8);width:0;transition:width .7s cubic-bezier(.2,.7,.3,1)}
+            #sec-estrutura .est-bkval{font-weight:700;color:var(--text);text-align:right}
+            #sec-estrutura .est-prodnote{margin-top:16px;font-size:12px;color:var(--muted);font-style:italic;line-height:1.5}
+            @media(max-width:560px){
+                #sec-estrutura .est-prodcard{flex-basis:100%}
+                #sec-estrutura .est-bkrow{grid-template-columns:120px 1fr 36px;font-size:11.5px}
+            }
         </style>
         <section id="sec-estrutura" class="section">
             <!-- Intro amigável -->
@@ -13486,14 +13497,34 @@ GONAPEPTYL,56`;
                 </div>`;
             }).join('');
         }
+        function _estBreakdownHtml(items, getLabel) {
+            if (!items || !items.length) return '<div style="color:var(--muted);font-size:12px;padding:8px 0">Sem dados neste mês.</div>';
+            const max = Math.max(...items.map(i => i.qtd || 0)) || 1;
+            return items.map(i => {
+                const pctW = (i.qtd || 0) / max * 100;
+                return `<div class="est-bkrow">
+                    <span class="est-bklabel" title="${getLabel(i)}">${getLabel(i)}</span>
+                    <span class="est-bktrack"><span class="est-bkfill" data-w="${pctW}"></span></span>
+                    <span class="est-bkval">${_mktFmtInt(i.qtd)}</span>
+                </div>`;
+            }).join('');
+        }
         function _estRenderProducao(p) {
             const el = document.getElementById('estProducao');
             if (!p) { el.innerHTML = '<div style="color:var(--muted);padding:16px">Sem dados.</div>'; return; }
-            const cards = [
-                { ico: '🩺', num: _mktFmtInt(p.atendidos), label: 'Foram atendidos (todos os tipos)', col: '#38bdf8' },
-                { ico: '🧪', num: _mktFmtInt(p.fiv), label: 'Procedimentos FIV (punção/transferência)', col: '#e879f9' }
-            ];
-            el.innerHTML = cards.map(c => `<div class="est-prodcard"><div class="est-pico">${c.ico}</div><div class="est-pnum" style="color:${c.col}">${c.num}</div><div class="est-plabel">${c.label}</div></div>`).join('');
+            const lower = s => (s || '').toLowerCase();
+            el.innerHTML = `
+                <div class="est-prodrow">
+                    <div class="est-prodcard"><div class="est-pico">🩺</div><div class="est-pnum" style="color:#38bdf8">${_mktFmtInt(p.atendidos)}</div><div class="est-plabel">Foram atendidos (todos os tipos)</div></div>
+                    <div class="est-breakdown">${_estBreakdownHtml(p.atendidosBreakdown, i => lower(i.label))}</div>
+                </div>
+                <div class="est-prodrow">
+                    <div class="est-prodcard"><div class="est-pico">🧪</div><div class="est-pnum" style="color:#e879f9">${_mktFmtInt(p.fiv)}</div><div class="est-plabel">Procedimentos FIV (punção/transferência)</div></div>
+                    <div class="est-breakdown">${_estBreakdownHtml(p.fivPorMedico, i => lower(i.medico))}</div>
+                </div>`;
+            requestAnimationFrame(() => {
+                el.querySelectorAll('.est-bkfill').forEach(f => { f.style.width = (f.getAttribute('data-w') || 0) + '%'; });
+            });
         }
 
         let _estYm = null; // null = mês corrente
