@@ -6846,7 +6846,8 @@
         function salasRotaAgendamento(prof, proc) {
             const P = (prof||'').toUpperCase();
             const C = (proc||'').toUpperCase();
-            if (C.includes('ONLINE')) return null;                          // online não ocupa sala
+            // Consulta online NÃO é descartada: cai nas regras por médico abaixo e ocupa a sala dele,
+            // pra sinalizar o médico OCUPADO no horário (marcada com 💻 no mapa). Não conta como presencial.
             if (C.includes('ACUPUNTURA') || C.includes('FISIO') || P.includes('CRISTIANE')) return ['fisioAcup'];
             if (C.includes('PSIC') || P.includes('SARA'))                   return ['psico'];
             // USG de preparo/monitorização (ex.: "Usg Preparo Injúria") é ultrassom, NÃO procedimento invasivo.
@@ -6889,7 +6890,7 @@
             const daySlots = new Set();
             const rr = {};       // round-robin por grupo de salas (só dispara na 1ª vez de cada médico no grupo)
             const medArea = {};  // 'grupo||medico' → area atribuída no dia (médico fica fixo na sala)
-            let total = 0;
+            let total = 0, totalOnline = 0;
             rows.map(r => ({ r, hm: (r[gC.hora] || '').trim().slice(0, 5) }))
                 .filter(o => {
                     if (!/^\d{1,2}:\d{2}/.test(o.hm)) return false;
@@ -6901,6 +6902,8 @@
                 .sort((a, b) => a.slot - b.slot || a.hm.localeCompare(b.hm))
                 .forEach(o => {
                     total++;
+                    const isOnline = /online/i.test(o.r[gC.proc] || '');
+                    if (isOnline) totalOnline++;
                     daySlots.add(o.slot);
                     const t = salasRotaAgendamento(o.r[gC.prof], o.r[gC.proc]);
                     const med = (o.r[gC.prof] || '').trim();
@@ -6927,14 +6930,15 @@
                             prof: med,
                             proc: (o.r[gC.proc] || '').trim(),
                             hora: o.hm,
-                            slot: o.slot
+                            slot: o.slot,
+                            online: isOnline
                         });
                     }
                 });
             const slotsArr = [...daySlots].sort((a,b)=>a-b);
             const win = slotsArr.length ? (slotsArr[slotsArr.length-1] - slotsArr[0]) / 30 + 1 : 0;
             let occ = 0; clinicalAreas.forEach(a => occ += roomSlots[a].size);
-            return { roomSlots, roomCount, roomAppts, slotsArr, win, total, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
+            return { roomSlots, roomCount, roomAppts, slotsArr, win, total, totalOnline, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
         }
 
         // Conflitos de SALA: mesma sala física com 2+ atendimentos no MESMO horário exato (hh:mm).
@@ -6969,9 +6973,10 @@
                 let occ = 0, cap = 0, total = 0, ndias = 0, maxC = 0, maxD = null;
                 Object.keys(byMonth[mk]).sort().forEach(dk => {
                     const c = salasComputeDia(byMonth[mk][dk]);
-                    occ += c.occ; cap += c.cap; total += c.total;
-                    if (c.total > 0) ndias++;
-                    if (c.total > maxC) { maxC = c.total; maxD = dk; }
+                    const pres = c.total - (c.totalOnline || 0);   // exec/stats contam só presencial
+                    occ += c.occ; cap += c.cap; total += pres;
+                    if (pres > 0) ndias++;
+                    if (pres > maxC) { maxC = pres; maxD = dk; }
                 });
                 stats[mk] = { occ, cap, total, ndias, maxC, maxD, pct: cap ? Math.round(occ/cap*100) : 0 };
             });
@@ -7016,7 +7021,8 @@
             // Usa salasComputeDia que já garante: 1ª vez do médico no grupo → round-robin;
             // próximas vezes do MESMO médico → mesma sala.
             const dayComp = salasComputeDia(dayRows);
-            const totalDia = dayComp.total;
+            const totalOnlineDia = dayComp.totalOnline || 0;
+            const totalDia = dayComp.total - totalOnlineDia;   // presencial (online conta à parte, abaixo)
             const conflitos = salasConflitosDeSala(dayComp);
             const areasConflito = new Set(conflitos.map(c => c.area));
             // Filtra agendamentos do slot selecionado a partir da alocação do dia
@@ -7044,7 +7050,7 @@
                     inner += appts.slice(0,3).map(a => {
                         const nome = a.pac.split(' ').slice(0,2).join(' ');
                         const pn   = (a.prof||'').replace(/^Dr[a]?\.?\s*/i,'').split(' ')[0];
-                        return `<div class="salas-room-appt">${a.hora} ${nome}<span class="salas-room-prof"> · ${pn}</span></div>`;
+                        return `<div class="salas-room-appt">${a.hora} ${a.online ? '💻 ' : ''}${nome}<span class="salas-room-prof"> · ${pn}</span></div>`;
                     }).join('');
                     if (appts.length > 3) inner += `<div class="salas-room-appt salas-room-more">+${appts.length-3} agend.</div>`;
                 } else if (s.clinical) {
@@ -7200,7 +7206,7 @@
             detalheBlock.innerHTML = `
                 <div class="salas-fp-wrap"><div class="salas-floorplan">${cells}</div></div>
                 <div class="salas-summary">
-                    <span>Atendimentos presenciais no dia: <b>${totalDia}</b></span>
+                    <span>Atendimentos no dia: <b>${totalDia}</b> presenciais${totalOnlineDia ? ` · <b>💻 ${totalOnlineDia}</b> online` : ''}</span>
                     <span>Neste horário (${salasFmtMin(slotMin)}–${salasFmtMin(slotMin+30)}): <b>${totalSlot}</b></span>
                     <span>Salas clínicas agora: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
                 </div>`;
@@ -7263,7 +7269,7 @@
                         <div class="salas-detail-appt">
                             <div class="salas-detail-appt-hora">${a.hora}</div>
                             <div class="salas-detail-appt-pac">${escAttr2(a.pac)}</div>
-                            <div class="salas-detail-appt-proc">${escAttr2(a.proc)}</div>
+                            <div class="salas-detail-appt-proc">${a.online ? '💻 ' : ''}${escAttr2(a.proc)}</div>
                         </div>`).join('');
                     return `<div class="salas-detail-medico">
                         <div class="salas-detail-medico-head">
