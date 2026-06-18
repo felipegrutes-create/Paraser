@@ -6606,9 +6606,9 @@
             { area:'almox',     nome:'Almoxarifado',          clinical:false },
             { area:'dml',       nome:'DML',                   clinical:false },
             { area:'multiuso',  nome:'Geladeira / Armários',  clinical:false },
-            { area:'wcMF',      nome:'WC /M',                 clinical:false },
-            { area:'wcF',       nome:'WC /F',                 clinical:false },
-            { area:'wcPCD',     nome:'WC PCD',                clinical:false },
+            { area:'wcMF',      nome:'WC / M',                clinical:false },
+            { area:'wcF',       nome:'WC / F',                clinical:false },
+            { area:'wcPCD',     nome:'WC / PCD',              clinical:false },
             { area:'hallGr',    nome:'Sala de Espera',        clinical:false },
             { area:'areaADM',   nome:'Área ADM',              clinical:false },
         ];
@@ -6636,11 +6636,25 @@
             Object.keys(acc).forEach(a => { const o = acc[a]; pos[a] = { r: o.rMin + 1, c: o.cMin + 1, w: o.cMax - o.cMin + 1, h: o.rMax - o.rMin + 1 }; });
             return pos;
         }
+        // Versão da estrutura padrão. Quando eu mudo salas (add/remove/reorganiza),
+        // bumpo esta data e qualquer layout salvo ANTIGO no aparelho é descartado,
+        // pra todo mundo ver a disposição nova sem precisar "Resetar" na mão.
+        const SALAS_LAYOUT_VERSION = '2026-06-18b';
         let SALAS_POS = null;
         function salasPos() {
             if (SALAS_POS) return SALAS_POS;
             const base = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
-            try { const s = localStorage.getItem('salasLayout'); if (s) { SALAS_POS = Object.assign({}, base, JSON.parse(s)); } } catch (e) {}
+            try {
+                const ver = localStorage.getItem('salasLayoutVer');
+                const s = localStorage.getItem('salasLayout');
+                if (s && ver === SALAS_LAYOUT_VERSION) {
+                    SALAS_POS = Object.assign({}, base, JSON.parse(s));
+                } else if (s) {
+                    // layout salvo de uma estrutura antiga: descarta
+                    localStorage.removeItem('salasLayout');
+                    localStorage.removeItem('salasLayoutVer');
+                }
+            } catch (e) {}
             if (!SALAS_POS) SALAS_POS = base;
             return SALAS_POS;
         }
@@ -6731,13 +6745,16 @@
             });
         }
         function salasSaveLayout() {
-            try { localStorage.setItem('salasLayout', JSON.stringify(salasPos())); } catch (e) {}
+            try {
+                localStorage.setItem('salasLayout', JSON.stringify(salasPos()));
+                localStorage.setItem('salasLayoutVer', SALAS_LAYOUT_VERSION);
+            } catch (e) {}
             const m = document.getElementById('salasEditMsg');
             if (m) { m.textContent = '✅ Layout salvo neste aparelho.'; setTimeout(() => { if (m) m.textContent = ''; }, 3000); }
         }
         function salasResetLayout() {
             SALAS_POS = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
-            try { localStorage.removeItem('salasLayout'); } catch (e) {}
+            try { localStorage.removeItem('salasLayout'); localStorage.removeItem('salasLayoutVer'); } catch (e) {}
             salasRenderEditor();
         }
 
