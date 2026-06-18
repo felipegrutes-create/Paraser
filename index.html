@@ -2334,6 +2334,7 @@
         }
         .salas-edit-actions .salas-edit-save { border-color: rgba(0,212,170,.45); background: rgba(0,212,170,.16); color: var(--accent); }
         .salas-edit-room {
+            position: relative;
             border-radius: 8px; border: 1px dashed var(--border);
             display: flex; align-items: center; justify-content: center; text-align: center;
             padding: 5px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
@@ -2342,6 +2343,12 @@
         .salas-edit-room.clin { background: rgba(0,212,170,.15); border-color: rgba(0,212,170,.45); color: #7fffd4; }
         .salas-edit-room.aux { background: rgba(255,255,255,.04); color: var(--muted); }
         .salas-edit-room.dragging { cursor: grabbing; box-shadow: 0 10px 28px rgba(0,0,0,.55); opacity: .92; z-index: 50; }
+        .salas-edit-resize {
+            position: absolute; right: 3px; bottom: 3px; width: 15px; height: 15px;
+            border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+            opacity: .55; cursor: nwse-resize; touch-action: none;
+        }
+        .salas-edit-resize:hover { opacity: 1; }
         .salas-edit-msg { font-size: 12px; color: #34d399; margin-top: 8px; min-height: 16px; }
         .salas-date-input {
             background: var(--surface2);
@@ -6656,11 +6663,11 @@
             const pos = salasPos();
             const rooms = SALAS_LAYOUT.map(s => {
                 const p = pos[s.area] || { r: 1, c: 1, w: 1, h: 1 };
-                return `<div class="salas-edit-room ${s.clinical ? 'clin' : 'aux'}" data-area="${s.area}" style="grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};">${s.nome}</div>`;
+                return `<div class="salas-edit-room ${s.clinical ? 'clin' : 'aux'}" data-area="${s.area}" style="grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};"><span class="salas-edit-rname">${s.nome}</span><div class="salas-edit-resize" title="Arraste pra redimensionar"></div></div>`;
             }).join('');
             container.innerHTML = `
                 <div class="salas-edit-toolbar">
-                    <span class="salas-edit-hint">✋ <b>Arraste cada sala</b> para a posição que quiser (as verdes são as salas clínicas do mapa). Depois clique em <b>Salvar</b>.</span>
+                    <span class="salas-edit-hint">✋ <b>Arraste cada sala</b> para movê-la. Puxe o cantinho ◢ pra <b>aumentar ou diminuir</b> o tamanho (deixe células vazias entre as salas = corredor). Depois clique em <b>Salvar</b>.</span>
                     <div class="salas-edit-actions">
                         <button class="salas-edit-reset" onclick="salasResetLayout()">↺ Resetar</button>
                         <button class="salas-edit-save" onclick="salasSaveLayout()">💾 Salvar</button>
@@ -6674,29 +6681,50 @@
         function salasEditAttachDrag(grid) {
             if (!grid) return;
             const GAP = 6, ROWH = 80;
-            let area = null, el = null, sx = 0, sy = 0;
+            const cellAt = (x, y) => {
+                const rect = grid.getBoundingClientRect();
+                const colW = (rect.width - (SALAS_COLS - 1) * GAP) / SALAS_COLS;
+                return {
+                    col: Math.max(1, Math.min(SALAS_COLS, Math.floor((x - rect.left) / (colW + GAP)) + 1)),
+                    row: Math.max(1, Math.floor((y - rect.top) / (ROWH + GAP)) + 1)
+                };
+            };
+            let mode = null, area = null, el = null, sx = 0, sy = 0;
             grid.querySelectorAll('.salas-edit-room').forEach(room => {
                 room.addEventListener('pointerdown', e => {
                     e.preventDefault();
                     area = room.getAttribute('data-area'); el = room; sx = e.clientX; sy = e.clientY;
-                    room.classList.add('dragging'); room.setPointerCapture(e.pointerId);
+                    mode = e.target.classList.contains('salas-edit-resize') ? 'resize' : 'move';
+                    room.classList.add('dragging');
+                    try { room.setPointerCapture(e.pointerId); } catch (_) {}
                 });
                 room.addEventListener('pointermove', e => {
                     if (el !== room) return;
-                    room.style.transform = `translate(${e.clientX - sx}px, ${e.clientY - sy}px)`;
+                    const p = salasPos()[area];
+                    if (mode === 'move') {
+                        room.style.transform = `translate(${e.clientX - sx}px, ${e.clientY - sy}px)`;
+                    } else { // redimensiona com preview ao vivo
+                        const cell = cellAt(e.clientX, e.clientY);
+                        const w = Math.max(1, Math.min(SALAS_COLS - p.c + 1, cell.col - p.c + 1));
+                        const h = Math.max(1, cell.row - p.r + 1);
+                        room.style.gridColumn = `${p.c} / span ${w}`;
+                        room.style.gridRow = `${p.r} / span ${h}`;
+                    }
                 });
                 room.addEventListener('pointerup', e => {
                     if (el !== room) return;
-                    room.style.transform = ''; room.classList.remove('dragging');
-                    const rect = grid.getBoundingClientRect();
-                    const colW = (rect.width - (SALAS_COLS - 1) * GAP) / SALAS_COLS;
-                    let c = Math.floor((e.clientX - rect.left) / (colW + GAP)) + 1;
-                    let r = Math.floor((e.clientY - rect.top) / (ROWH + GAP)) + 1;
                     const p = salasPos()[area];
-                    c = Math.max(1, Math.min(SALAS_COLS - (p.w - 1), c));
-                    r = Math.max(1, r);
-                    p.c = c; p.r = r;
-                    area = null; el = null;
+                    const cell = cellAt(e.clientX, e.clientY);
+                    if (mode === 'move') {
+                        room.style.transform = '';
+                        p.c = Math.max(1, Math.min(SALAS_COLS - (p.w - 1), cell.col));
+                        p.r = Math.max(1, cell.row);
+                    } else {
+                        p.w = Math.max(1, Math.min(SALAS_COLS - p.c + 1, cell.col - p.c + 1));
+                        p.h = Math.max(1, cell.row - p.r + 1);
+                    }
+                    room.classList.remove('dragging');
+                    mode = null; area = null; el = null;
                     salasRenderEditor();
                 });
             });
