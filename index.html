@@ -6824,6 +6824,11 @@
             if (C.includes('ONLINE')) return null;                          // online não ocupa sala
             if (C.includes('ACUPUNTURA') || C.includes('FISIO') || P.includes('CRISTIANE')) return ['fisioAcup'];
             if (C.includes('PSIC') || P.includes('SARA'))                   return ['psico'];
+            // USG de preparo/monitorização (ex.: "Usg Preparo Injúria") é ultrassom, NÃO procedimento invasivo.
+            // Vai pras salas de USG, com preferência pela USG 2 (usgGen primeiro), mas pode usar a USG 1 no rodízio.
+            if ((C.includes('USG') || C.includes('ULTRASSOM') || C.includes('ULTRASSONOG')) &&
+                (C.includes('PREPARO') || C.includes('INJÚR') || C.includes('INJUR')))
+                return ['usgGen', 'usgErica'];
             if (C.match(/\bTEC\b/) && !C.includes('PREPARO TEC'))           return ['procedim'];
             if (C.includes('PUNÇÃO')||C.includes('PUNCAO')||C.includes('INJÚR')||C.includes('INJUR')||
                 C.includes('FILGRASTIM')||C.includes('PRP')||C.includes('DIU')||C.includes('PESA')||
