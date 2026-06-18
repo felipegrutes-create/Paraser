@@ -2328,6 +2328,8 @@
         .salas-conflito-med { color: var(--muted); }
         .salas-conflito-ok { font-size: 12.5px; color: #34d399; margin-bottom: 16px; padding: 2px 0; }
         .salas-room-conflito { outline: 2px solid var(--danger); outline-offset: -1px; }
+        /* Modo standalone "só Mapa de Salas" (mapa-salas.html → ?only=salas): esconde as abas, mantém cabeçalho c/ Atualizar */
+        body.only-salas .tabs-wrapper { display: none !important; }
         /* seletor de dia — destacado no topo */
         .salas-daynav {
             display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
@@ -2670,6 +2672,8 @@
       var lock = document.getElementById('pr-lock');
       function unlock(){ if (lock) lock.remove(); }
       function deny(t){ if (lock) lock.textContent = '🔒 ' + t; }
+      // Modo "só Mapa de Salas" (mapa-salas.html → ?only=salas): acesso direto, sem senha (não dá acesso ao resto do painel)
+      if (/[?&]only=salas\b/.test(location.search)) { try { document.body.classList.add('only-salas'); } catch(e){} unlock(); return; }
       try { if (sessionStorage.getItem('pr_ok') === HASH) { unlock(); return; } } catch(e){}
       var pwd = prompt('🔒 Senha do Sistema Paraser:');
       if (pwd === null) { deny('Acesso restrito.'); return; }
@@ -13610,6 +13614,7 @@ GONAPEPTYL,56`;
                 // clicar nessas tabs, abre instantâneo (cache hit via flags *DataLoaded).
                 // setTimeout 1500ms = dá respiro pro browser pintar a tela principal antes.
                 setTimeout(() => {
+                    if (document.body.classList.contains('only-salas')) return;  // modo só mapa: dispensa prefetch das abas pesadas
                     Promise.allSettled([
                         loadAndRenderFinanceiro().catch(e => { console.warn('prefetch Financeiro:', e.message); throw e; }),
                         loadAndRenderMedicos().catch(e => { console.warn('prefetch Médicos:', e.message); throw e; }),
@@ -13619,6 +13624,8 @@ GONAPEPTYL,56`;
                         console.log(`✓ Prefetch ${ok}/${results.length} tabs prontas em background`);
                     });
                 }, 1500);
+
+                if (document.body.classList.contains('only-salas')) showSection('sec-salas');  // modo só mapa: abre direto o mapa
             } catch(e) {
                 document.getElementById('loadingOverlay').style.display = 'none';
                 const eb = document.getElementById('errorBanner');

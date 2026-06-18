@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapa de Salas — Paraser</title>
+<link rel="icon" href="data:,">
+<script>
+  // Atalho: abre o painel já no Mapa de Salas (sem senha, sem as outras abas).
+  // Reusa 100% o código do dashboard (index.html), então nunca fica desatualizado.
+  location.replace('index.html?only=salas' + (location.hash || ''));
+</script>
+</head>
+<body style="background:#080d1a;color:#6b7a99;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+  Abrindo o Mapa de Salas…
+</body>
+</html>
