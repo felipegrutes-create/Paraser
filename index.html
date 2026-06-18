@@ -6636,24 +6636,16 @@
             Object.keys(acc).forEach(a => { const o = acc[a]; pos[a] = { r: o.rMin + 1, c: o.cMin + 1, w: o.cMax - o.cMin + 1, h: o.rMax - o.rMin + 1 }; });
             return pos;
         }
-        // Versão da estrutura padrão. Quando eu mudo salas (add/remove/reorganiza),
-        // bumpo esta data e qualquer layout salvo ANTIGO no aparelho é descartado,
-        // pra todo mundo ver a disposição nova sem precisar "Resetar" na mão.
         const SALAS_LAYOUT_VERSION = '2026-06-18b';
         let SALAS_POS = null;
         function salasPos() {
             if (SALAS_POS) return SALAS_POS;
             const base = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
             try {
-                const ver = localStorage.getItem('salasLayoutVer');
+                // NUNCA apaga o layout salvo do usuário. Aplica o que ele salvou;
+                // salas novas que ele ainda não tinha pegam a posição do molde padrão.
                 const s = localStorage.getItem('salasLayout');
-                if (s && ver === SALAS_LAYOUT_VERSION) {
-                    SALAS_POS = Object.assign({}, base, JSON.parse(s));
-                } else if (s) {
-                    // layout salvo de uma estrutura antiga: descarta
-                    localStorage.removeItem('salasLayout');
-                    localStorage.removeItem('salasLayoutVer');
-                }
+                if (s) { SALAS_POS = Object.assign({}, base, JSON.parse(s)); }
             } catch (e) {}
             if (!SALAS_POS) SALAS_POS = base;
             return SALAS_POS;
