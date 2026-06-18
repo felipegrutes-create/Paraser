@@ -2333,6 +2333,7 @@
             font-size: 12.5px; font-weight: 700; font-family: 'Outfit', sans-serif;
         }
         .salas-edit-actions .salas-edit-save { border-color: rgba(0,212,170,.45); background: rgba(0,212,170,.16); color: var(--accent); }
+        .salas-edit-actions .salas-edit-copy { border-color: rgba(120,160,255,.45); background: rgba(120,160,255,.16); color: #aac4ff; }
         .salas-edit-room {
             position: relative;
             border-radius: 8px; border: 1px dashed var(--border);
@@ -6678,6 +6679,7 @@
                     <div class="salas-edit-actions">
                         <button class="salas-edit-reset" onclick="salasResetLayout()">↺ Resetar</button>
                         <button class="salas-edit-save" onclick="salasSaveLayout()">💾 Salvar</button>
+                        <button class="salas-edit-copy" onclick="salasCopyLayout()">📋 Copiar meu layout</button>
                         <button onclick="salasToggleEdit()">✓ Concluir</button>
                     </div>
                 </div>
@@ -6748,6 +6750,18 @@
             SALAS_POS = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
             try { localStorage.removeItem('salasLayout'); localStorage.removeItem('salasLayoutVer'); } catch (e) {}
             salasRenderEditor();
+        }
+        function salasCopyLayout() {
+            const json = JSON.stringify(salasPos());
+            try { if (navigator.clipboard) navigator.clipboard.writeText(json); } catch (e) {}
+            const m = document.getElementById('salasEditMsg');
+            if (m) {
+                m.innerHTML = '✅ <b>Copiado!</b> Agora é só colar (Ctrl+V) aqui no chat do Claude. ' +
+                    'Se não colar, copie o texto abaixo:' +
+                    '<textarea readonly onclick="this.select()" style="width:100%;height:64px;margin-top:6px;font-size:11px;' +
+                    'background:#0b0f1a;color:#7fffd4;border:1px solid #334;border-radius:6px;padding:6px;font-family:monospace;">' +
+                    json.replace(/</g, '&lt;') + '</textarea>';
+            }
         }
 
         // Dado um agendamento, retorna lista de áreas-alvo (round-robin se >1) ou null se não ocupa sala física.
