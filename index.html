@@ -2416,9 +2416,9 @@
                 "esperaVIP esperaVIP psico     reproH    gineco    concierge adm       gerencia"
                 "enferm1   drRodolfo drRodolfo usgErica  usgErica  esperaGer esperaGer caixa"
                 "enferm1   drRodolfo drRodolfo usgGen    usgGen    esperaGer esperaGer wcMF"
-                "enferm2   usgDrSalv usgDrSalv enferm3   multiuso  recepcao  recepcao  wcPCD"
-                "drJoselmo drJoselmo fisioAcup fisioAcup multiuso  recepcao  recepcao  lounge"
-                "drJoselmo drJoselmo almox     copa      vestiario hallGr    hallGr    ."
+                "enferm2   usgDrSalv usgDrSalv enferm3   multiuso  recepcao  recepcao  wcF"
+                "drJoselmo drJoselmo fisioAcup fisioAcup multiuso  recepcao  recepcao  wcPCD"
+                "drJoselmo drJoselmo almox     copa      vestiario hallGr    hallGr    lounge"
                 "procedim  procedim  almox     dml       vestiario hallGr    hallGr    areaADM";
         }
         .salas-room {
@@ -6606,7 +6606,8 @@
             { area:'almox',     nome:'Almoxarifado',          clinical:false },
             { area:'dml',       nome:'DML',                   clinical:false },
             { area:'multiuso',  nome:'Geladeira / Armários',  clinical:false },
-            { area:'wcMF',      nome:'WC M / F',              clinical:false },
+            { area:'wcMF',      nome:'WC /M',                 clinical:false },
+            { area:'wcF',       nome:'WC /F',                 clinical:false },
             { area:'wcPCD',     nome:'WC PCD',                clinical:false },
             { area:'hallGr',    nome:'Sala de Espera',        clinical:false },
             { area:'areaADM',   nome:'Área ADM',              clinical:false },
@@ -6619,9 +6620,9 @@
             "esperaVIP esperaVIP psico     reproH    gineco    concierge adm       gerencia",
             "enferm1   drRodolfo drRodolfo usgErica  usgErica  esperaGer esperaGer caixa",
             "enferm1   drRodolfo drRodolfo usgGen    usgGen    esperaGer esperaGer wcMF",
-            "enferm2   usgDrSalv usgDrSalv enferm3   multiuso  recepcao  recepcao  wcPCD",
-            "drJoselmo drJoselmo fisioAcup fisioAcup multiuso  recepcao  recepcao  lounge",
-            "drJoselmo drJoselmo almox     copa      vestiario hallGr    hallGr    .",
+            "enferm2   usgDrSalv usgDrSalv enferm3   multiuso  recepcao  recepcao  wcF",
+            "drJoselmo drJoselmo fisioAcup fisioAcup multiuso  recepcao  recepcao  wcPCD",
+            "drJoselmo drJoselmo almox     copa      vestiario hallGr    hallGr    lounge",
             "procedim  procedim  almox     dml       vestiario hallGr    hallGr    areaADM"
         ];
         function salasParseTemplate(tpl) {
@@ -6638,8 +6639,9 @@
         let SALAS_POS = null;
         function salasPos() {
             if (SALAS_POS) return SALAS_POS;
-            try { const s = localStorage.getItem('salasLayout'); if (s) { SALAS_POS = JSON.parse(s); } } catch (e) {}
-            if (!SALAS_POS) SALAS_POS = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
+            const base = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
+            try { const s = localStorage.getItem('salasLayout'); if (s) { SALAS_POS = Object.assign({}, base, JSON.parse(s)); } } catch (e) {}
+            if (!SALAS_POS) SALAS_POS = base;
             return SALAS_POS;
         }
         function salasPosStyle(area) {
