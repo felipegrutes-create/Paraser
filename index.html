@@ -2277,14 +2277,50 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 14px;
             flex-wrap: wrap;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 14px;
         }
+        .salas-controls-lab {
+            font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .5px; color: var(--muted);
+        }
+        /* === Cards/seções do Mapa de Salas (hierarquia visual) === */
+        .salas-card {
+            border-radius: 16px; border: 1px solid var(--border);
+            background: var(--surface); padding: 15px 18px 18px; margin-bottom: 18px;
+        }
+        .salas-card-global {
+            background: rgba(99,102,241,0.07);
+            border: 1px solid rgba(99,102,241,0.28);
+            border-left: 4px solid var(--accent2);
+        }
+        .salas-card-detalhe {
+            background: rgba(0,212,170,0.05);
+            border: 1px solid rgba(0,212,170,0.26);
+            border-left: 4px solid var(--accent);
+        }
+        .salas-card-head {
+            font-size: 15px; font-weight: 800; color: var(--text);
+            margin-bottom: 13px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+        }
+        .salas-card-head .salas-card-sub { font-size: 12px; font-weight: 400; color: var(--muted); }
+        .salas-card-global .salas-card-head { color: #c7d2fe; }
+        .salas-card-detalhe .salas-card-head { color: #7fffd4; }
         /* seletor de dia — destacado no topo */
         .salas-daynav {
             display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-            background: var(--bg-elev); border: 1px solid var(--border);
-            border-radius: 14px; padding: 10px 14px; margin-bottom: 14px;
+            background: linear-gradient(135deg, var(--surface2), var(--surface));
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 14px; padding: 12px 16px; margin-bottom: 18px;
+            box-shadow: 0 2px 12px rgba(0,0,0,.22);
+        }
+        .salas-daynav-lab {
+            font-size: 11.5px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: .6px; color: var(--accent); margin-right: 2px;
         }
         .salas-day-btn {
             width: 44px; height: 44px; border-radius: 11px;
@@ -2564,8 +2600,9 @@
         .salas-room-heat-val { font-size: 14px; font-weight: 800; color: #fecaca; }
         .salas-room-heat-empty .salas-room-heat-val { color: #10b981; font-weight: 600; font-size: 11px; }
         .salas-exec {
-            margin: 22px 0; padding: 16px 18px;
-            background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+            margin: 0; padding: 16px 18px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-left: 4px solid var(--warning); border-radius: 16px;
         }
         .salas-exec-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
         .salas-exec-row {
@@ -3219,11 +3256,11 @@
         <!-- MAPA DE SALAS -->
         <section id="sec-salas" class="section">
             <p class="section-title">🗺️ Mapa de Salas</p>
-            <!-- Seletor de dia (destacado) -->
+            <!-- Seletor de DIA (mestre da página, destacado) -->
             <div class="salas-daynav">
+                <span class="salas-daynav-lab">📅 Dia</span>
                 <button class="salas-day-btn" onclick="salasNavDate(-1)" title="Dia anterior">◀</button>
                 <div class="salas-day-current" title="Clique para escolher a data">
-                    <span style="font-size:16px">📅</span>
                     <span class="salas-date-label" id="salasDateLabel">—</span>
                     <span style="opacity:.5;font-size:12px">▾</span>
                     <input type="date" class="salas-date-input" id="salasDatePicker" oninput="salasSetDate(this.value)">
@@ -3231,17 +3268,30 @@
                 <button class="salas-day-btn" onclick="salasNavDate(+1)" title="Próximo dia">▶</button>
                 <button class="salas-today-btn" onclick="salasSetNow()" title="Ir para hoje">Hoje</button>
             </div>
-            <div class="salas-controls">
-                <span style="font-size:13px;color:var(--muted);">⏱ Horário (para a visão detalhada):</span>
-                <input type="range" class="salas-time-slider" id="salasTimeSlider" min="0" max="26" step="1" value="6" oninput="salasSetTime(this.value)">
-                <span class="salas-date-label" id="salasTimeLabel" style="min-width:96px;">—</span>
-                <div class="salas-legend">
-                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#10b981"></div> Livre</div>
-                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#ef4444"></div> Ocupada</div>
-                    <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#475569"></div> Apoio</div>
-                </div>
+
+            <!-- CARD 1 · Visão global do dia (panorama manhã/tarde) -->
+            <div class="salas-card salas-card-global">
+                <div id="salasGlobalBlock"></div>
             </div>
-            <div id="salasGrid"></div>
+
+            <!-- CARD 2 · Visão detalhada por horário (o seletor de horário fica aqui em cima) -->
+            <div class="salas-card salas-card-detalhe">
+                <div class="salas-card-head">🔍 Visão detalhada por horário</div>
+                <div class="salas-controls">
+                    <span class="salas-controls-lab">⏱ Horário</span>
+                    <input type="range" class="salas-time-slider" id="salasTimeSlider" min="0" max="26" step="1" value="6" oninput="salasSetTime(this.value)">
+                    <span class="salas-date-label" id="salasTimeLabel" style="min-width:96px;">—</span>
+                    <div class="salas-legend">
+                        <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#10b981"></div> Livre</div>
+                        <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#ef4444"></div> Ocupada</div>
+                        <div class="salas-legend-item"><div class="salas-legend-dot" style="background:#475569"></div> Apoio</div>
+                    </div>
+                </div>
+                <div id="salasDetalheBlock"></div>
+            </div>
+
+            <!-- CARD 3 · Sumário executivo -->
+            <div id="salasExecBlock"></div>
         </section>
 
         <!-- DOADORAS / RECEPTORAS -->
@@ -6887,8 +6937,10 @@
 
         function renderMapaSalas() {
             salasInitDate();
-            const container = document.getElementById('salasGrid');
-            if (!container) return;
+            const globalBlock  = document.getElementById('salasGlobalBlock');
+            const detalheBlock = document.getElementById('salasDetalheBlock');
+            const execBlock    = document.getElementById('salasExecBlock');
+            if (!globalBlock || !detalheBlock || !execBlock) return;
 
             // sincroniza controles de data
             const picker = document.getElementById('salasDatePicker');
@@ -6907,7 +6959,8 @@
             if (tLabel) tLabel.textContent = salasFmtMin(slotMin) + '–' + salasFmtMin(slotMin+30);
 
             if (!gRaw.length) {
-                container.innerHTML = '<div class="salas-empty">Aguardando dados dos agendamentos...</div>';
+                globalBlock.innerHTML = '<div class="salas-empty">Aguardando dados dos agendamentos...</div>';
+                detalheBlock.innerHTML = ''; execBlock.innerHTML = '';
                 return;
             }
 
@@ -7076,21 +7129,21 @@
                     ${monthBars || '<div style="font-size:12px;color:var(--muted)">Sem dados mensais suficientes.</div>'}
                 </div>`;
 
-            container.innerHTML = `
-                <div class="salas-heat-title" style="margin-top:4px">📊 Visão global do dia — ${dayLabel} <span style="font-weight:400;color:var(--muted);font-size:12px;">(cada sala dividida: <b>🌅 cima = manhã · 🌇 baixo = tarde</b> · verde = livre, vermelho = ocupada · <b>clique numa metade pra ver o detalhe</b>)</span></div>
+            globalBlock.innerHTML = `
+                <div class="salas-card-head">📊 Visão global do dia <span class="salas-card-sub">— ${dayLabel} · cada sala dividida 🌅 cima = manhã · 🌇 baixo = tarde · verde = livre, vermelho = ocupada · clique numa metade pra ver o detalhe</span></div>
                 <div class="salas-fp-wrap" id="salas-heat-wrap"><div class="salas-floorplan">${heatCells}</div></div>
                 <div class="salas-summary">
                     <span>Janela do dia: <b>${dayWindow} faixas de 30 min</b>${slotsArr.length?` (${janelaTxt})`:''}</span>
                     ${slotsArr.length ? `<span>Sala mais ocupada (dia): <b style="color:#ef4444">${topRoom} (${topPct}%)</b></span>` : ''}
-                </div>
-                <div class="salas-heat-title">🔍 Visão detalhada por horário — ${salasFmtMin(slotMin)}–${salasFmtMin(slotMin+30)} <span style="font-weight:400;color:var(--muted);font-size:12px;">(arraste o controle de horário lá em cima pra mudar a faixa)</span></div>
+                </div>`;
+            detalheBlock.innerHTML = `
                 <div class="salas-fp-wrap"><div class="salas-floorplan">${cells}</div></div>
                 <div class="salas-summary">
                     <span>Atendimentos presenciais no dia: <b>${totalDia}</b></span>
                     <span>Neste horário (${salasFmtMin(slotMin)}–${salasFmtMin(slotMin+30)}): <b>${totalSlot}</b></span>
                     <span>Salas clínicas agora: <b style="color:#ef4444">${busy} ocupada${busy===1?'':'s'}</b> · <b style="color:#10b981">${freeC} livre${freeC===1?'':'s'}</b></span>
-                </div>
-                ${execHTML}`;
+                </div>`;
+            execBlock.innerHTML = execHTML;
 
             // === clique numa metade da sala → modal por médico filtrado pelo período (manhã/tarde) ===
             const heatWrap = document.getElementById('salas-heat-wrap');
