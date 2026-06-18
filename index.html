@@ -2310,6 +2310,24 @@
         .salas-card-head .salas-card-sub { font-size: 12px; font-weight: 400; color: var(--muted); }
         .salas-card-global .salas-card-head { color: #c7d2fe; }
         .salas-card-detalhe .salas-card-head { color: #7fffd4; }
+        /* Aviso de conflitos de sala */
+        .salas-conflito-box {
+            background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.40);
+            border-left: 4px solid var(--danger); border-radius: 14px;
+            padding: 13px 16px; margin-bottom: 18px;
+        }
+        .salas-conflito-head { font-size: 14px; font-weight: 800; color: #fca5a5; }
+        .salas-conflito-sub { font-size: 12px; color: var(--muted); margin: 3px 0 10px; }
+        .salas-conflito-item {
+            display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px;
+            padding: 7px 0; border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .salas-conflito-sala { font-weight: 700; color: #fff; font-size: 13px; min-width: 130px; }
+        .salas-conflito-ag { font-size: 12.5px; color: var(--text); }
+        .salas-conflito-ag b { color: #fca5a5; }
+        .salas-conflito-med { color: var(--muted); }
+        .salas-conflito-ok { font-size: 12.5px; color: #34d399; margin-bottom: 16px; padding: 2px 0; }
+        .salas-room-conflito { outline: 2px solid var(--danger); outline-offset: -1px; }
         /* seletor de dia — destacado no topo */
         .salas-daynav {
             display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
@@ -3268,6 +3286,9 @@
                 <button class="salas-day-btn" onclick="salasNavDate(+1)" title="Próximo dia">▶</button>
                 <button class="salas-today-btn" onclick="salasSetNow()" title="Ir para hoje">Hoje</button>
             </div>
+
+            <!-- Aviso de conflitos de sala (preenchido pelo render) -->
+            <div id="salasConflitos"></div>
 
             <!-- CARD 1 · Visão global do dia (panorama manhã/tarde) -->
             <div class="salas-card salas-card-global">
@@ -6912,6 +6933,20 @@
             return { roomSlots, roomCount, roomAppts, slotsArr, win, total, occ, cap: clinicalAreas.length * win, nClin: clinicalAreas.length };
         }
 
+        // Conflitos de SALA: mesma sala física com 2+ atendimentos no MESMO horário exato (hh:mm).
+        function salasConflitosDeSala(dayComp) {
+            const areaNome = {}; SALAS_LAYOUT.forEach(s => { areaNome[s.area] = s.nome; });
+            const conf = [];
+            Object.keys(dayComp.roomAppts || {}).forEach(area => {
+                const byHora = {};
+                (dayComp.roomAppts[area] || []).forEach(a => { (byHora[a.hora] = byHora[a.hora] || []).push(a); });
+                Object.keys(byHora).forEach(hora => {
+                    if (byHora[hora].length > 1) conf.push({ area, nome: areaNome[area] || area, hora, appts: byHora[hora] });
+                });
+            });
+            return conf.sort((a, b) => a.hora.localeCompare(b.hora) || a.nome.localeCompare(b.nome));
+        }
+
         // Ocupação média por mês (a partir de TODO o gRaw). Cacheado — gRaw não muda após carregar.
         let _salasMonthlyStats = null;
         function salasMonthlyStats() {
@@ -6966,6 +7001,7 @@
             if (!gRaw.length) {
                 globalBlock.innerHTML = '<div class="salas-empty">Aguardando dados dos agendamentos...</div>';
                 detalheBlock.innerHTML = ''; execBlock.innerHTML = '';
+                const ce0 = document.getElementById('salasConflitos'); if (ce0) ce0.innerHTML = '';
                 return;
             }
 
@@ -6977,6 +7013,8 @@
             // próximas vezes do MESMO médico → mesma sala.
             const dayComp = salasComputeDia(dayRows);
             const totalDia = dayComp.total;
+            const conflitos = salasConflitosDeSala(dayComp);
+            const areasConflito = new Set(conflitos.map(c => c.area));
             // Filtra agendamentos do slot selecionado a partir da alocação do dia
             const roomAppts = {}; SALAS_LAYOUT.forEach(s => roomAppts[s.area] = []);
             let totalSlot = 0;
@@ -7053,9 +7091,10 @@
                 const pctT = tardeWin ? Math.round(occT / tardeWin * 100) : 0;
                 const valM = occM === 0 ? '<span class="salas-half-livre">livre</span>' : `<b>${pctM}%</b><span class="salas-half-fx"> · ${occM}f</span>`;
                 const valT = occT === 0 ? '<span class="salas-half-livre">livre</span>' : `<b>${pctT}%</b><span class="salas-half-fx"> · ${occT}f</span>`;
-                const tip = `${s.nome}\n🌅 Manhã: ${occM} de ${manhaWin} faixas (${pctM}%)\n🌇 Tarde: ${occT} de ${tardeWin} faixas (${pctT}%)\nClique numa metade para ver o detalhe por médico`;
-                return `<div class="salas-room salas-room-split" data-heat-area="${escAttr(s.area)}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
-                    <div class="salas-room-name">${s.nome}</div>
+                const emConflito = areasConflito.has(s.area);
+                const tip = `${s.nome}\n🌅 Manhã: ${occM} de ${manhaWin} faixas (${pctM}%)\n🌇 Tarde: ${occT} de ${tardeWin} faixas (${pctT}%)${emConflito ? '\n⚠️ Conflito de sala neste dia (ver aviso no topo)' : ''}\nClique numa metade para ver o detalhe por médico`;
+                return `<div class="salas-room salas-room-split${emConflito ? ' salas-room-conflito' : ''}" data-heat-area="${escAttr(s.area)}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
+                    <div class="salas-room-name">${emConflito ? '⚠️ ' : ''}${s.nome}</div>
                     <div class="salas-room-half" data-period="manha" style="${halfBg(occM, manhaWin)}"><span class="salas-half-per">🌅</span>${valM}</div>
                     <div class="salas-room-half" data-period="tarde" style="${halfBg(occT, tardeWin)}"><span class="salas-half-per">🌇</span>${valT}</div>
                 </div>`;
@@ -7134,6 +7173,19 @@
                     ${monthBars || '<div style="font-size:12px;color:var(--muted)">Sem dados mensais suficientes.</div>'}
                 </div>`;
 
+            const conflitosEl = document.getElementById('salasConflitos');
+            if (conflitosEl) {
+                conflitosEl.innerHTML = conflitos.length
+                    ? `<div class="salas-conflito-box">
+                        <div class="salas-conflito-head">⚠️ ${conflitos.length} conflito${conflitos.length>1?'s':''} de sala em ${dayLabel}</div>
+                        <div class="salas-conflito-sub">Mesma sala com 2+ pacientes no mesmo horário. Vale conferir/remarcar no Feegow.</div>
+                        ${conflitos.map(c => `<div class="salas-conflito-item">
+                            <span class="salas-conflito-sala">${c.nome}</span>
+                            ${c.appts.map(a => `<span class="salas-conflito-ag"><b>${a.hora}</b> ${a.pac.split(' ').slice(0,2).join(' ')}<span class="salas-conflito-med"> · ${(a.prof||'').replace(/^Dr[a]?\.?\s*/i,'').split(' ')[0]}</span></span>`).join('')}
+                        </div>`).join('')}
+                    </div>`
+                    : `<div class="salas-conflito-ok">✓ Nenhum conflito de sala em ${dayLabel}</div>`;
+            }
             globalBlock.innerHTML = `
                 <div class="salas-card-head">📊 Visão global do dia <span class="salas-card-sub">— ${dayLabel} · cada sala dividida 🌅 cima = manhã · 🌇 baixo = tarde · verde = livre, vermelho = ocupada · clique numa metade pra ver o detalhe</span></div>
                 <div class="salas-fp-wrap" id="salas-heat-wrap"><div class="salas-floorplan">${heatCells}</div></div>
