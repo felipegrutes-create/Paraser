@@ -2312,6 +2312,37 @@
             font-family: 'Outfit', sans-serif;
         }
         .salas-today-btn:hover { background: rgba(0,212,170,.2); }
+        /* editor de layout (arrastar e soltar) */
+        .salas-edit-btn {
+            padding: 10px 16px; border-radius: 11px; margin-left: auto;
+            border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+            cursor: pointer; font-size: 13px; font-weight: 700; font-family: 'Outfit', sans-serif;
+        }
+        .salas-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .salas-edit-btn.on { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,.12); }
+        .salas-edit-toolbar {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+            background: rgba(0,212,170,.08); border: 1px solid rgba(0,212,170,.25);
+            border-radius: 12px; padding: 11px 15px; margin-bottom: 14px;
+        }
+        .salas-edit-hint { font-size: 12.5px; color: var(--text); }
+        .salas-edit-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .salas-edit-actions button {
+            padding: 8px 15px; border-radius: 9px; border: 1px solid var(--border);
+            background: var(--surface2); color: var(--text); cursor: pointer;
+            font-size: 12.5px; font-weight: 700; font-family: 'Outfit', sans-serif;
+        }
+        .salas-edit-actions .salas-edit-save { border-color: rgba(0,212,170,.45); background: rgba(0,212,170,.16); color: var(--accent); }
+        .salas-edit-room {
+            border-radius: 8px; border: 1px dashed var(--border);
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            padding: 5px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+            cursor: grab; user-select: none; touch-action: none; line-height: 1.15;
+        }
+        .salas-edit-room.clin { background: rgba(0,212,170,.15); border-color: rgba(0,212,170,.45); color: #7fffd4; }
+        .salas-edit-room.aux { background: rgba(255,255,255,.04); color: var(--muted); }
+        .salas-edit-room.dragging { cursor: grabbing; box-shadow: 0 10px 28px rgba(0,0,0,.55); opacity: .92; z-index: 50; }
+        .salas-edit-msg { font-size: 12px; color: #34d399; margin-top: 8px; min-height: 16px; }
         .salas-date-input {
             background: var(--surface2);
             border: 1px solid var(--border);
@@ -3191,6 +3222,7 @@
                 </div>
                 <button class="salas-day-btn" onclick="salasNavDate(+1)" title="Próximo dia">▶</button>
                 <button class="salas-today-btn" onclick="salasSetNow()" title="Ir para hoje">Hoje</button>
+                <button class="salas-edit-btn" id="salasEditBtn" onclick="salasToggleEdit()" title="Reorganizar a disposição das salas">✏️ Editar layout</button>
             </div>
             <div class="salas-controls">
                 <span style="font-size:13px;color:var(--muted);">⏱ Horário (planta de cima):</span>
@@ -6574,6 +6606,112 @@
             { area:'areaADM',   nome:'Área ADM',              clinical:false },
         ];
 
+        // ===== Posição das salas (editável via arrastar e soltar) =====
+        const SALAS_COLS = 8;
+        // Molde padrão (mesma disposição do CSS grid-template-areas). Cada token = 1 célula; nomes repetidos = sala maior.
+        const SALAS_DEFAULT_TEMPLATE = [
+            "esperaVIP esperaVIP psico     reproH    gineco    concierge adm       gerencia",
+            "enferm1   drRodolfo drRodolfo usgErica  usgErica  esperaGer esperaGer caixa",
+            "enferm1   drRodolfo drRodolfo usgGen    usgGen    esperaGer esperaGer wcMF",
+            "enferm2   usgDrSalv usgDrSalv enferm3   multiuso  recepcao  recepcao  wcPCD",
+            "drJoselmo drJoselmo fisioAcup fisioAcup multiuso  recepcao  recepcao  lounge",
+            "drJoselmo drJoselmo almox     copa      vestiario hallGr    hallGr    elevad",
+            "procedim  procedim  almox     dml       vestiario hallGr    hallGr    areaADM"
+        ];
+        function salasParseTemplate(tpl) {
+            const acc = {};
+            tpl.forEach((row, r) => row.trim().split(/\s+/).forEach((a, c) => {
+                if (!acc[a]) acc[a] = { rMin: r, rMax: r, cMin: c, cMax: c };
+                acc[a].rMin = Math.min(acc[a].rMin, r); acc[a].rMax = Math.max(acc[a].rMax, r);
+                acc[a].cMin = Math.min(acc[a].cMin, c); acc[a].cMax = Math.max(acc[a].cMax, c);
+            }));
+            const pos = {};
+            Object.keys(acc).forEach(a => { const o = acc[a]; pos[a] = { r: o.rMin + 1, c: o.cMin + 1, w: o.cMax - o.cMin + 1, h: o.rMax - o.rMin + 1 }; });
+            return pos;
+        }
+        let SALAS_POS = null;
+        function salasPos() {
+            if (SALAS_POS) return SALAS_POS;
+            try { const s = localStorage.getItem('salasLayout'); if (s) { SALAS_POS = JSON.parse(s); } } catch (e) {}
+            if (!SALAS_POS) SALAS_POS = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
+            return SALAS_POS;
+        }
+        function salasPosStyle(area) {
+            const p = salasPos()[area];
+            if (!p) return `grid-area:${area}`;
+            return `grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};`;
+        }
+
+        // ===== Editor de layout (arrastar e soltar) =====
+        let _salasEdit = false;
+        function salasToggleEdit() {
+            _salasEdit = !_salasEdit;
+            const btn = document.getElementById('salasEditBtn');
+            if (btn) { btn.classList.toggle('on', _salasEdit); btn.textContent = _salasEdit ? '✓ Sair do editor' : '✏️ Editar layout'; }
+            if (_salasEdit) salasRenderEditor(); else renderMapaSalas();
+        }
+        function salasRenderEditor() {
+            const container = document.getElementById('salasGrid');
+            if (!container) return;
+            const pos = salasPos();
+            const rooms = SALAS_LAYOUT.map(s => {
+                const p = pos[s.area] || { r: 1, c: 1, w: 1, h: 1 };
+                return `<div class="salas-edit-room ${s.clinical ? 'clin' : 'aux'}" data-area="${s.area}" style="grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};">${s.nome}</div>`;
+            }).join('');
+            container.innerHTML = `
+                <div class="salas-edit-toolbar">
+                    <span class="salas-edit-hint">✋ <b>Arraste cada sala</b> para a posição que quiser (as verdes são as salas clínicas do mapa). Depois clique em <b>Salvar</b>.</span>
+                    <div class="salas-edit-actions">
+                        <button class="salas-edit-reset" onclick="salasResetLayout()">↺ Resetar</button>
+                        <button class="salas-edit-save" onclick="salasSaveLayout()">💾 Salvar</button>
+                        <button onclick="salasToggleEdit()">✓ Concluir</button>
+                    </div>
+                </div>
+                <div class="salas-fp-wrap"><div class="salas-floorplan" id="salasEditGrid">${rooms}</div></div>
+                <div id="salasEditMsg" class="salas-edit-msg"></div>`;
+            salasEditAttachDrag(document.getElementById('salasEditGrid'));
+        }
+        function salasEditAttachDrag(grid) {
+            if (!grid) return;
+            const GAP = 6, ROWH = 80;
+            let area = null, el = null, sx = 0, sy = 0;
+            grid.querySelectorAll('.salas-edit-room').forEach(room => {
+                room.addEventListener('pointerdown', e => {
+                    e.preventDefault();
+                    area = room.getAttribute('data-area'); el = room; sx = e.clientX; sy = e.clientY;
+                    room.classList.add('dragging'); room.setPointerCapture(e.pointerId);
+                });
+                room.addEventListener('pointermove', e => {
+                    if (el !== room) return;
+                    room.style.transform = `translate(${e.clientX - sx}px, ${e.clientY - sy}px)`;
+                });
+                room.addEventListener('pointerup', e => {
+                    if (el !== room) return;
+                    room.style.transform = ''; room.classList.remove('dragging');
+                    const rect = grid.getBoundingClientRect();
+                    const colW = (rect.width - (SALAS_COLS - 1) * GAP) / SALAS_COLS;
+                    let c = Math.floor((e.clientX - rect.left) / (colW + GAP)) + 1;
+                    let r = Math.floor((e.clientY - rect.top) / (ROWH + GAP)) + 1;
+                    const p = salasPos()[area];
+                    c = Math.max(1, Math.min(SALAS_COLS - (p.w - 1), c));
+                    r = Math.max(1, r);
+                    p.c = c; p.r = r;
+                    area = null; el = null;
+                    salasRenderEditor();
+                });
+            });
+        }
+        function salasSaveLayout() {
+            try { localStorage.setItem('salasLayout', JSON.stringify(salasPos())); } catch (e) {}
+            const m = document.getElementById('salasEditMsg');
+            if (m) { m.textContent = '✅ Layout salvo neste aparelho.'; setTimeout(() => { if (m) m.textContent = ''; }, 3000); }
+        }
+        function salasResetLayout() {
+            SALAS_POS = salasParseTemplate(SALAS_DEFAULT_TEMPLATE);
+            try { localStorage.removeItem('salasLayout'); } catch (e) {}
+            salasRenderEditor();
+        }
+
         // Dado um agendamento, retorna lista de áreas-alvo (round-robin se >1) ou null se não ocupa sala física.
         function salasRotaAgendamento(prof, proc) {
             const P = (prof||'').toUpperCase();
@@ -6760,7 +6898,7 @@
                 const tip = appts.length
                     ? s.nome + '\n' + appts.map(a=>`${a.hora}  ${a.pac}  (${a.proc})  —  ${a.prof}`).join('\n')
                     : (s.clinical ? s.nome + '\nLivre neste horário' : s.nome);
-                return `<div class="${cls}" style="grid-area:${s.area}" title="${escAttr(tip)}">${inner}</div>`;
+                return `<div class="${cls}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">${inner}</div>`;
             }).join('');
 
             // ===== OCUPAÇÃO DO DIA INTEIRO (usa a mesma alocação coerente da planta) =====
@@ -6793,7 +6931,7 @@
             // UMA planta: cada sala DIVIDIDA AO MEIO (cima = manhã, baixo = tarde)
             const heatCells = SALAS_LAYOUT.map(s => {
                 if (!s.clinical) {
-                    return `<div class="salas-room salas-room-aux" style="grid-area:${s.area}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
+                    return `<div class="salas-room salas-room-aux" style="${salasPosStyle(s.area)}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
                 }
                 const slotsSet = roomSlots[s.area] || new Set();
                 const occM = [...slotsSet].filter(x => x < MEIODIA).length;
@@ -6803,7 +6941,7 @@
                 const valM = occM === 0 ? '<span class="salas-half-livre">livre</span>' : `<b>${pctM}%</b><span class="salas-half-fx"> · ${occM}f</span>`;
                 const valT = occT === 0 ? '<span class="salas-half-livre">livre</span>' : `<b>${pctT}%</b><span class="salas-half-fx"> · ${occT}f</span>`;
                 const tip = `${s.nome}\n🌅 Manhã: ${occM} de ${manhaWin} faixas (${pctM}%)\n🌇 Tarde: ${occT} de ${tardeWin} faixas (${pctT}%)\nClique numa metade para ver o detalhe por médico`;
-                return `<div class="salas-room salas-room-split" data-heat-area="${escAttr(s.area)}" style="grid-area:${s.area}" title="${escAttr(tip)}">
+                return `<div class="salas-room salas-room-split" data-heat-area="${escAttr(s.area)}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
                     <div class="salas-room-name">${s.nome}</div>
                     <div class="salas-room-half" data-period="manha" style="${halfBg(occM, manhaWin)}"><span class="salas-half-per">🌅</span>${valM}</div>
                     <div class="salas-room-half" data-period="tarde" style="${halfBg(occT, tardeWin)}"><span class="salas-half-per">🌇</span>${valT}</div>
