@@ -1736,6 +1736,7 @@ function testeEnvio() {
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
+    if (body && body.src === 'manychat') { _gravarNayara(body); return _okText(); } // 📊 coletor das conversas do front da Nayara (Manychat)
     _gravarMsgRecebida(body); // 📊 gravador temporário p/ mapear demandas da recepção (remover após análise)
     if (body.fromMe === true) return _okText();
 
@@ -1747,6 +1748,20 @@ function doPost(e) {
     Logger.log('doPost erro: ' + err.message);
   }
   return _okText(); // sempre 200 pro Z-API não reenviar em loop
+}
+
+// 📊 Coletor das conversas do front da Nayara — o Manychat manda (via External Request) uma cópia de cada msg do lead
+function _gravarNayara(body) {
+  try {
+    var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+    var sh = ss.getSheetByName('Msgs_Nayara');
+    if (!sh) { sh = ss.insertSheet('Msgs_Nayara'); sh.appendRow(['Data', 'Telefone', 'Nome', 'Mensagem']); }
+    var tel  = String(body.tel  || body.phone || '');
+    var nome = String(body.nome || body.name  || '');
+    var msg  = String(body.msg  || body.text  || '');
+    if (!tel && !msg) return;
+    sh.appendRow([new Date(), tel, nome, msg]);
+  } catch (err) { Logger.log('_gravarNayara erro: ' + err.message); }
 }
 
 function doGet(e) {
@@ -1813,6 +1828,16 @@ function doGet(e) {
       out.total = out.msgs.length;
     }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'dump-nayara' && params.key === 'paraser2026') {
+    var nss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+    var nsh = nss.getSheetByName('Msgs_Nayara');
+    var nout = { total: 0, msgs: [], aba: 'Msgs_Nayara' };
+    if (nsh && nsh.getLastRow() > 1) {
+      nout.msgs = nsh.getRange(2, 1, nsh.getLastRow() - 1, 4).getValues();
+      nout.total = nout.msgs.length;
+    }
+    return ContentService.createTextOutput(JSON.stringify(nout)).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'test-confirma' && params.key === 'paraser2026') {
     var pNome = params.proc || 'USG DE ABDOMEN TOTAL';
