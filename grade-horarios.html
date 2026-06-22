@@ -62,6 +62,19 @@
   .salas-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
   .salas-summary b{color:var(--text)}
 
+  /* ===== BAIAS (funcionários) ===== */
+  .baia-room{padding:0;overflow:hidden}
+  .baia-room .salas-room-name{padding:5px 7px 3px;flex:0 0 auto}
+  .baias{flex:1 1 0;display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:0 5px 5px;align-content:stretch}
+  .baia{border-radius:5px;border:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;padding:2px 3px;min-height:24px;overflow:hidden;line-height:1.1}
+  .baia-nm{font-size:9px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .baia-st{font-size:7.5px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .baia-e{border-style:dashed;background:rgba(255,255,255,0.02);opacity:.45}
+  .baia-p{background:rgba(16,185,129,0.16);border-color:rgba(16,185,129,0.5);color:#34d399}
+  .baia-h{background:rgba(96,165,250,0.16);border-color:rgba(96,165,250,0.5);color:#93c5fd}
+  .baia-f{background:rgba(255,255,255,0.03);color:var(--muted)}
+
   /* ===== CARDS detalhe (grade dos médicos) ===== */
   .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
   .cards-sep{grid-column:1/-1;font-size:13px;font-weight:700;color:var(--green);
@@ -114,7 +127,8 @@
 <footer>
   Mapa na <b>mesma planta do Mapa de Salas</b>, mas aqui cada sala mostra os <b>horários disponíveis</b> conforme a grade cadastrada (não a agenda do Feegow).
   Cada sala dividida 🌅 cima = manhã · 🌇 baixo = tarde: <b style="color:#34d399">verde</b> = médico disponível no período, cinza = sem atendimento.
-  A <b>sala é escolhida por dia</b> no dropdown de cada card e fica <b>compartilhada</b> com todos os aparelhos da recepção. Pra incluir um médico, me avise.
+  A <b>sala é escolhida por dia</b> no dropdown de cada card e fica <b>compartilhada</b> com todos os aparelhos da recepção.
+  <b>Funcionários (baias):</b> <span style="color:#34d399">verde</span> = presencial, <span style="color:#93c5fd">azul</span> = home office, cinza = folga. Pra incluir um médico ou funcionário, me avise.
 </footer>
 
 <script>
@@ -157,7 +171,7 @@
     { area:'hallGr',    nome:'Sala de Espera',       clinical:false },
     { area:'areaADM',   nome:'Área ADM',             clinical:false },
   ];
-  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":1,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":1},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":2}};
+  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":1,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":1},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":3}};
   function salasPosStyle(area){ const p=SALAS_POS[area]; if(!p) return `grid-area:${area}`; return `grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};`; }
 
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
@@ -217,6 +231,33 @@
       1:[{ini:'09:30',fim:'12:50',dur:40}],
     }},
   };
+
+  // ===== FUNCIONÁRIOS (baias) =====
+  // Salas com baias: {L:n esquerda, R:n direita}. Baia = '<area>:L1..Ln' / '<area>:R1..Rn'
+  // R1 = topo direita · R3 = canto inferior direita (corner). escala por dia: {t:'P',h:'09–18'} presencial OU {t:'H'} home.
+  const BAIAS = { areaADM: { L:3, R:3 } };
+  const FUNCIONARIOS = {
+    nayara:  { nome:'Nayara',  baia:'areaADM:R3', escala:{ 1:{t:'P',h:'09–18'}, 2:{t:'P',h:'09–18'}, 3:{t:'P',h:'09–18'}, 4:{t:'P',h:'09–18'}, 5:{t:'H'} } },
+    lavinia: { nome:'Lavínia', baia:'areaADM:R1', escala:{ 1:{t:'P'}, 2:{t:'H'}, 3:{t:'P'}, 4:{t:'H'}, 5:{t:'P'} } },
+  };
+  function renderBaias(s, wd){
+    const cfg = BAIAS[s.area];
+    const bySlot={};
+    Object.values(FUNCIONARIOS).forEach(f=>{ const p=f.baia.split(':'); if(p[0]===s.area) bySlot[p[1]]=f; });
+    const cell = slot => {
+      const f=bySlot[slot];
+      if(!f) return `<div class="baia baia-e" title="Baia ${slot} (vazia)"></div>`;
+      const esc=f.escala[wd];
+      let cls='baia-f', st='folga', tip=`${f.nome} — folga`;
+      if(esc && esc.t==='P'){ cls='baia-p'; st=esc.h||'presencial'; tip=`${f.nome} — presencial${esc.h?' ('+esc.h+')':''}`; }
+      else if(esc && esc.t==='H'){ cls='baia-h'; st='🏠 home'; tip=`${f.nome} — home office`; }
+      return `<div class="baia ${cls}" title="${escAttr(tip)}"><span class="baia-nm">${f.nome}</span><span class="baia-st">${st}</span></div>`;
+    };
+    let grid='';
+    const n=Math.max(cfg.L,cfg.R);
+    for(let i=1;i<=n;i++){ grid += (i<=cfg.L?cell('L'+i):'<div></div>') + (i<=cfg.R?cell('R'+i):'<div></div>'); }
+    return `<div class="salas-room baia-room" style="${salasPosStyle(s.area)}"><div class="salas-room-name">${s.nome}</div><div class="baias">${grid}</div></div>`;
+  }
 
   // ===== Helpers =====
   const pad = n => String(n).padStart(2,'0');
@@ -289,6 +330,7 @@
     let totalDisp=0, topRoom='—', topN=0;
 
     const cells=SALAS_LAYOUT.map(s=>{
+      if(BAIAS[s.area]) return renderBaias(s, wd);   // salas com baias (funcionários)
       const slots=comp.roomSlots[s.area]||[];
       // sala vira "ativa" (dividida) se é clínica OU recebeu um médico remanejado
       if(!s.clinical && !slots.length){
