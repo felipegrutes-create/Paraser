@@ -276,6 +276,7 @@
   const BAIAS = {
     areaADM:  { cols:2, slots:['L1','R1','L2','R2','L3','R3'] },   // 3 esq + 3 dir
     recepcao: { cols:1, slots:['F','B1','B2','B3'] },              // empilhadas: Francisca (atrás/topo) · Bruna · Andressa · Julya (embaixo, perto do Lounge)
+    gerencia: { cols:1, slots:['G1'] },                            // Felipe
   };
   const PH = h => ({ 1:{t:'P',h}, 2:{t:'P',h}, 3:{t:'P',h}, 4:{t:'P',h}, 5:{t:'P',h} });   // Seg-Sex presencial no mesmo horário
   const FUNCIONARIOS = {
@@ -285,6 +286,7 @@
     andressa: { nome:'Andressa', baia:'recepcao:B2', escala: PH('08–18') },                 // meio
     julya:    { nome:'Julya',    baia:'recepcao:B3', escala: PH('08–18') },                 // embaixo (perto do Lounge)
     francisca:{ nome:'Francisca',baia:'recepcao:F',  escala: PH('08–18') },                 // atrás, transversal
+    felipe:   { nome:'Felipe',   baia:'gerencia:G1', escala:{ 1:{t:'H'}, 2:{t:'P',h:'flexível'}, 3:{t:'H'}, 4:{t:'P',h:'flexível'}, 5:{t:'P',h:'flexível'} } },
   };
   function renderBaias(s, wd){
     const cfg = BAIAS[s.area];
