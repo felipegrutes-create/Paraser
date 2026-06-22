@@ -299,6 +299,7 @@ function enviarConfirmacoes() {
   }
 
   var enviados = 0, semTemplate = 0, semTelefone = 0, erros = 0;
+  var revisar = [];   // auditoria: exame caindo em template de consulta
 
   agendamentos.forEach(function(ag) {
     ag._profNome = profMap[ag.profissional_id] || '';
@@ -323,6 +324,9 @@ function enviarConfirmacoes() {
         semTemplate++;
         return;
       }
+
+      var _aud = _auditarRoteamento(ag, tmplKey);
+      if (_aud) revisar.push((ag.paciente_nome || ('id ' + ag.paciente_id)) + ' ' + formatHora(ag.horario || '') + ' — ' + _aud);
 
       var hora = formatHora(ag.horario || '');
       var msg  = fillTemplate(TMPL[tmplKey], {
@@ -375,7 +379,7 @@ function enviarConfirmacoes() {
     ' | Erros: ' + erros
   );
 
-  notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone, erros, agendamentos.length);
+  notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone, erros, agendamentos.length, revisar);
 }
 
 // ================================================================
@@ -551,6 +555,7 @@ function getPatientData(pacienteId) {
 // procId=69  confirmado: INJÚRIA ENDOMETRIAL (Priscila 29/07/2025 14:45)
 // procId=152 confirmado: APLICAÇÃO DE FILGRASTIM (Marcelle 05/08/2025 12:30)
 // procId=153 USG REAPLICAÇÃO DE FILGRASTIM
+// procId=374 confirmado: INJÚRIA ENDOMETRIAL - DR. RODOLFO SALVATO (23/06/2026) — caía no template do Rodolfo
 var IDS_INJURIA = [69, 152, 153, 374];
 
 // procId=42  confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
@@ -753,6 +758,30 @@ function resolveTemplateKey(ag) {
   // Érica faz só exames; qualquer procId não identificado → tratamento
   if (prof.includes('ERICA') || prof.includes('ÉRICA'))             return 'ULTRAS_TRATAMENTO';
 
+  return null;
+}
+
+// ================================================================
+// AUDITORIA DE ROTEAMENTO — pega exame/injúria caindo em template de CONSULTA
+// (foi o que aconteceu com a INJÚRIA ENDOMETRIAL procId 374 → RODOLFO_PRESENCIAL)
+// Devolve um aviso (string) se suspeito, ou null se ok.
+// ================================================================
+var TMPL_CONSULTA = [
+  'RODOLFO_PRESENCIAL','RODOLFO_ONLINE','PRISCILA_PRESENCIAL','PRISCILA_ONLINE',
+  'MARCELLE_PRESENCIAL','MARCELLE_ONLINE','BRUNA_PRESENCIAL','BRUNA_ONLINE',
+  'MARIO_PRESENCIAL','MARIO_ONLINE','JOSELMO_PRESENCIAL','JOSELMO_ONLINE',
+  'HELCE_PRESENCIAL','HELCE_ONLINE','MAGALI_PRESENCIAL','MAGALI_ONLINE',
+  'NUTRI_PRESENCIAL','NUTRI_ONLINE'
+];
+function _auditarRoteamento(ag, tmplKey) {
+  var proc = (ag._procNome || '').toUpperCase();
+  // palavras que indicam EXAME/procedimento (não consulta)
+  var ehExame = /INJ[ÚU]R|FILGRASTIM|\bUSG\b|ULTRASS|PREPARO|\bFIV\b|PUN[ÇC][ÃA]O|EMBRI|DOPPLER|FOL[ÍI]CUL|MONITORIZA/.test(proc);
+  if (!ehExame) return null;
+  if (TMPL_CONSULTA.indexOf(tmplKey) >= 0) {
+    return 'procId ' + ag.procedimento_id + ' "' + (ag._procNome || '?') + '" → ' + tmplKey +
+           ' (parece EXAME indo p/ CONSULTA — conferir mapeamento)';
+  }
   return null;
 }
 
@@ -974,7 +1003,7 @@ function enviarKeyaccessSlack(nomes, dataStr) {
 // ================================================================
 // SLACK — notifica resultado do envio de confirmações
 // ================================================================
-function notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone, erros, total) {
+function notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone, erros, total, revisar) {
   try {
     var channelId = slackGetChannelId(CF_SLACK_CHANNEL);
     var texto;
@@ -992,6 +1021,10 @@ function notificarSlackConfirmacoes(dataStr, enviados, semTemplate, semTelefone,
       texto = '✅ *Confirmações enviadas — ' + dataStr + '*\n' +
               'Enviados: ' + enviados + ' de ' + total + ' pacientes.' +
               (semTemplate > 0 ? ' (' + semTemplate + ' sem template)' : '');
+    }
+
+    if (revisar && revisar.length) {
+      texto += '\n\n🔎 *REVISAR ROTEAMENTO (' + revisar.length + ')* — pode ter ido no template errado:\n• ' + revisar.join('\n• ');
     }
 
     UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
