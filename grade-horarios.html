@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grade de Horários — Médicos Paraser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --roxo:#5b2a86; --roxo2:#7c3aed; --dourado:#c2922f; --creme:#faf6ef;
+    --text:#2d2438; --muted:#8a7f95; --linha:#ece4f2;
+    --livre:#15803d; --livre-bg:#dcfce7; --livre-bd:#86efac;
+    --ocup:#9f1239;  --ocup-bg:#fbe9ee;  --ocup-bd:#f3c0cd;
+    --off:#f4f1f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--creme);color:var(--text);
+    font-family:'Inter',system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  header.top{background:linear-gradient(120deg,var(--roxo),var(--roxo2));color:#fff;padding:22px 24px 18px}
+  header.top h1{font-family:'Playfair Display',serif;font-weight:700;margin:0;font-size:26px;letter-spacing:.2px}
+  header.top .sub{opacity:.9;margin-top:4px;font-size:14px}
+
+  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:12px 24px;background:#fff;border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:5}
+  .btn{border:none;background:var(--roxo2);color:#fff;font-weight:600;font-size:14px;
+    padding:9px 16px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.55;cursor:default}
+  .btn.ghost{background:#fff;color:var(--roxo);border:1px solid var(--linha)}
+  .weeknav{display:flex;align-items:center;gap:8px}
+  .weeknav .lbl{font-weight:700;font-size:15px;min-width:200px;text-align:center;text-transform:capitalize}
+  .bar .meta{color:var(--muted);font-size:13px;margin-left:auto}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 24px;background:#fff;border-bottom:1px solid var(--linha);font-size:13px;color:var(--muted)}
+  .legend i{display:inline-block;width:13px;height:13px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid}
+  .legend i.l{background:var(--livre-bg);border-color:var(--livre-bd)}
+  .legend i.o{background:var(--ocup-bg);border-color:var(--ocup-bd)}
+  .legend i.x{background:var(--off);border-color:var(--linha)}
+
+  main{padding:22px 24px 60px;max-width:1320px;margin:0 auto}
+  #erro:empty{display:none}
+  .erro{background:var(--ocup-bg);color:var(--ocup);border:1px solid var(--ocup-bd);padding:14px 18px;border-radius:11px;margin-bottom:20px}
+
+  .scroll{overflow-x:auto;padding-bottom:8px}
+  table.grade{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;background:#fff;border:1px solid var(--linha);border-radius:14px;overflow:hidden}
+  table.grade th,table.grade td{border-bottom:1px solid var(--linha);border-right:1px solid var(--linha);vertical-align:top}
+  table.grade th:last-child,table.grade td:last-child{border-right:none}
+  table.grade tr:last-child td{border-bottom:none}
+  thead th{background:linear-gradient(90deg,rgba(124,58,237,.08),transparent);padding:12px 10px;font-size:13px;font-weight:700;text-align:center;text-transform:capitalize;color:var(--roxo)}
+  thead th small{display:block;color:var(--muted);font-weight:500;font-size:11px}
+  thead th.hoje{background:rgba(124,58,237,.18)}
+  th.doc{position:sticky;left:0;z-index:2;background:#fff;text-align:left;min-width:190px;padding:14px 14px}
+  td.doc{position:sticky;left:0;z-index:1;background:#fff;padding:12px 14px;min-width:190px}
+  td.doc .nome{font-weight:700;font-size:14.5px}
+  td.doc .esp{color:var(--muted);font-size:12px;margin-top:2px}
+  td.doc .resumo{margin-top:7px;font-size:11.5px;color:var(--livre);font-weight:700}
+  td.day{padding:8px;min-width:120px}
+  td.day.off{background:var(--off)}
+  td.day.off .dash{color:var(--muted);font-size:13px;text-align:center;display:block;padding:8px 0}
+  .slot{border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;font-size:13px;border:1px solid;margin-bottom:6px}
+  .slot:last-child{margin-bottom:0}
+  .slot.livre{background:var(--livre-bg);border-color:var(--livre-bd);color:var(--livre)}
+  .slot.ocup{background:var(--ocup-bg);border-color:var(--ocup-bd);color:var(--ocup)}
+  .slot .lab{display:block;font-size:9.5px;font-weight:700;letter-spacing:.3px;margin-top:1px;text-transform:uppercase;opacity:.85}
+
+  .skel{padding:40px;text-align:center;color:var(--muted);font-size:15px}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px}
+  @keyframes r{to{transform:rotate(360deg)}}
+  footer{max-width:1320px;margin:0 auto;padding:18px 24px 50px;color:var(--muted);font-size:12.5px;line-height:1.6}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Grade de Horários — Médicos</h1>
+  <div class="sub">Escala de atendimento × ocupação ao vivo do Feegow — uso da recepção</div>
+</header>
+
+<div class="bar">
+  <div class="weeknav">
+    <button class="btn ghost" onclick="mudaSemana(-1)">◀</button>
+    <span class="lbl" id="lblSemana">—</span>
+    <button class="btn ghost" onclick="mudaSemana(1)">▶</button>
+  </div>
+  <button class="btn" onclick="irHoje()">Hoje</button>
+  <button class="btn ghost" id="btnRefresh" onclick="carregar()">🔄 Atualizar</button>
+  <span class="meta" id="metaAtualizado">Carregando…</span>
+</div>
+<div class="legend">
+  <span><i class="l"></i> Livre</span>
+  <span><i class="o"></i> Ocupado</span>
+  <span><i class="x"></i> Não atende</span>
+</div>
+
+<main>
+  <div id="erro"></div>
+  <div class="scroll"><div id="tabela"><div class="skel">Carregando grade…</div></div></div>
+</main>
+
+<footer>
+  A <b>grade</b> (dias e horários que cada médico atende) está gravada no código, conforme configurado no Feegow.
+  A <b>ocupação</b> é lida ao vivo do Feegow: verde = horário livre, vermelho = já agendado.
+  Cancelados/remarcados liberam o horário automaticamente. Para incluir um novo médico ou mudar a grade, me avise.
+</footer>
+
+<script>
+  // ===== Config =====
+  const PROXY_URL = "https://script.google.com/macros/s/AKfycbzVhtXPGjYwJmoKTj3sd9_EF86xcIyLuQMWWyMT33R59C-B4xVZMoD70qEn7pK6MF1ncA/exec";
+  const GONE      = [11,15,22];        // desmarcado / remarcado / cancelado → libera o horário
+  const REFRESH_MS= 5*60*1000;
+  const DIAS      = [1,2,3,4,5,6];     // Seg..Sáb (0=domingo; raramente atende)
+  const NOME_DIA  = {0:'Domingo',1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
+
+  // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
+  // Chave = profissional_id do Feegow. dias: 1=Seg ... 6=Sáb.
+  // Cada bloco: {ini:'HH:MM', fim:'HH:MM', dur:minutos}. Vários blocos por dia = manhã+tarde.
+  const GRADE = {
+    20: { nome:'Bruna Ortiz', esp:'Ginecologia', dias:{
+      2:[{ini:'09:00', fim:'12:00', dur:60}],   // terça
+      3:[{ini:'09:00', fim:'12:00', dur:60}],   // quarta
+    }},
+    // ↓ próximos médicos entram aqui (me mande o print da tela "Horários de Atendimento")
+  };
+
+  // ===== Helpers =====
+  const pad = n => String(n).padStart(2,'0');
+  const fmtFeegow = d => pad(d.getDate())+'-'+pad(d.getMonth()+1)+'-'+d.getFullYear();
+  const keyOf = d => pad(d.getDate())+'-'+pad(d.getMonth()+1)+'-'+d.getFullYear();
+  const hmToMin = hm => { const [a,b]=hm.split(':'); return (+a)*60+(+b); };
+  const minToHm = m => pad(Math.floor(m/60))+':'+pad(m%60);
+
+  function inicioSemana(d){ // segunda-feira da semana de d
+    const x = new Date(d); x.setHours(0,0,0,0);
+    const dow = x.getDay();               // 0=dom
+    const diff = (dow===0?-6:1-dow);      // volta até segunda
+    x.setDate(x.getDate()+diff);
+    return x;
+  }
+
+  async function feegowFetch(endpoint, params={}) {
+    const qs = new URLSearchParams({ action:'feegow_proxy', endpoint });
+    Object.entries(params).forEach(([k,v]) => { if(v!==undefined&&v!==null&&v!=='') qs.set(k,v); });
+    const r = await fetch(PROXY_URL + '?' + qs.toString());
+    if(!r.ok) throw new Error('Proxy HTTP '+r.status);
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    return d;
+  }
+
+  // ===== Estado =====
+  let segAtual = inicioSemana(new Date());
+
+  function mudaSemana(delta){ segAtual.setDate(segAtual.getDate()+delta*7); carregar(); }
+  function irHoje(){ segAtual = inicioSemana(new Date()); carregar(); }
+
+  // ===== Render =====
+  function render(byDoc){
+    const hojeKey = keyOf(new Date());
+    const diasData = DIAS.map(i => { const d=new Date(segAtual); d.setDate(d.getDate()+(i-1)); return d; });
+
+    let head = '<tr><th class="doc">Médico</th>';
+    diasData.forEach(d => {
+      const k = keyOf(d);
+      head += `<th class="${k===hojeKey?'hoje':''}">${NOME_DIA[d.getDay()]}<small>${pad(d.getDate())}/${pad(d.getMonth()+1)}</small></th>`;
+    });
+    head += '</tr>';
+
+    let body = '';
+    Object.entries(GRADE).forEach(([profId, doc]) => {
+      let livreTot=0, ocupTot=0;
+      let row = `<td class="doc"><div class="nome">${doc.nome}</div><div class="esp">${doc.esp||''}</div><div class="resumo" id="res-${profId}"></div></td>`;
+      diasData.forEach((d,idx) => {
+        const dia = DIAS[idx];
+        const blocos = doc.dias[dia];
+        if(!blocos || !blocos.length){ row += '<td class="day off"><span class="dash">—</span></td>'; return; }
+        const k = keyOf(d);
+        const ocupSet = (byDoc[profId] && byDoc[profId][k]) || [];
+        let cell = '';
+        blocos.forEach(b => {
+          for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){
+            const fimSlot = m+b.dur;
+            const ocupado = ocupSet.some(a => a.start < fimSlot && (a.start+a.dur) > m);
+            if(ocupado) ocupTot++; else livreTot++;
+            cell += `<div class="slot ${ocupado?'ocup':'livre'}">${minToHm(m)}<span class="lab">${ocupado?'ocupado':'livre'}</span></div>`;
+          }
+        });
+        row += `<td class="day">${cell}</td>`;
+      });
+      body += `<tr>${row}</tr>`;
+      // guarda resumo p/ pintar depois
+      doc._resumo = `🟢 ${livreTot} livre${livreTot!==1?'s':''} · 🔴 ${ocupTot}`;
+    });
+
+    document.getElementById('tabela').innerHTML = `<table class="grade"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    Object.entries(GRADE).forEach(([profId, doc]) => {
+      const el = document.getElementById('res-'+profId); if(el) el.textContent = doc._resumo||'';
+    });
+
+    const fimSemana = new Date(segAtual); fimSemana.setDate(fimSemana.getDate()+5);
+    document.getElementById('lblSemana').textContent =
+      `${pad(segAtual.getDate())}/${pad(segAtual.getMonth()+1)} – ${pad(fimSemana.getDate())}/${pad(fimSemana.getMonth()+1)}`;
+  }
+
+  // ===== Carga =====
+  let _carregando = false;
+  async function carregar(){
+    if(_carregando) return;
+    _carregando = true;
+    const btn = document.getElementById('btnRefresh');
+    const meta = document.getElementById('metaAtualizado');
+    const erro = document.getElementById('erro');
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Atualizando…';
+    erro.innerHTML='';
+    try{
+      const fim = new Date(segAtual); fim.setDate(fim.getDate()+5);
+      const data = await feegowFetch('/appoints/search', { data_start:fmtFeegow(segAtual), data_end:fmtFeegow(fim) });
+      const todos = Array.isArray(data.content) ? data.content : [];
+
+      // byDoc[profId][dataKey] = [{start,dur}] (vivos)
+      const byDoc = {};
+      todos.forEach(a => {
+        if(GONE.indexOf(Number(a.status_id))>=0) return;
+        const pid = String(a.profissional_id);
+        if(!GRADE[pid]) return; // só médicos da grade
+        const hm = (a.horario||'').slice(0,5);
+        if(!/^\d{2}:\d{2}$/.test(hm)) return;
+        const start = hmToMin(hm);
+        const dur = Math.max(15, parseInt(a.duracao)||30);
+        (byDoc[pid] = byDoc[pid]||{});
+        (byDoc[pid][a.data] = byDoc[pid][a.data]||[]).push({start,dur});
+      });
+
+      render(byDoc);
+      const agora = new Date();
+      meta.textContent = `Atualizado ${pad(agora.getHours())}:${pad(agora.getMinutes())} · ao vivo do Feegow`;
+    }catch(e){
+      erro.innerHTML = `<div class="erro"><b>Não consegui carregar.</b> ${e.message}. Tente “Atualizar” de novo.</div>`;
+      meta.textContent = 'Falha ao atualizar';
+    }finally{
+      btn.disabled=false; btn.innerHTML='🔄 Atualizar';
+      _carregando=false;
+    }
+  }
+
+  carregar();
+  setInterval(()=>{ if(!document.hidden) carregar(); }, REFRESH_MS);
+</script>
+</body>
+</html>
