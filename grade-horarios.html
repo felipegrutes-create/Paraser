@@ -8,77 +8,73 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#f1f4fb; --surface:#ffffff; --surface2:#eef1f8;
-    --border:#e3e8f2; --accent:#7c3aed; --accent2:#5b2a86;
-    --text:#22293d; --muted:#8893a8;
-    --green:#15803d; --green-bg:#dcfce7; --green-bd:#a7e3bd;
-    --red:#b91c1c;   --red-bd:#f0b7b7;
+    --bg:#080d1a; --surface:#0d1427; --surface2:#111c35;
+    --border:rgba(255,255,255,0.07); --accent:#00d4aa; --danger:#ef4444;
+    --text:#e2e8f4; --muted:#6b7a99;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:'Outfit',-apple-system,Segoe UI,Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-  header.top{background:linear-gradient(120deg,var(--accent2),var(--accent));color:#fff;padding:20px 24px 16px}
-  header.top h1{font-weight:800;margin:0;font-size:25px;letter-spacing:.2px}
-  header.top .sub{opacity:.92;margin-top:4px;font-size:13.5px}
+  header.top{padding:20px 24px 6px}
+  header.top h1{font-weight:800;margin:0;font-size:23px}
+  header.top .sub{color:var(--muted);margin-top:4px;font-size:13px}
 
-  .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 24px;background:var(--surface);
-    border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
-  .navbtn{background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);
-    font-family:inherit;font-size:15px;font-weight:600;padding:7px 14px;cursor:pointer;line-height:1}
+  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 24px}
+  .navbtn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);
+    font-family:inherit;font-size:15px;padding:6px 12px;cursor:pointer;line-height:1}
   .navbtn:hover{border-color:var(--accent);color:var(--accent)}
-  .daylbl{font-size:15px;font-weight:700;min-width:215px;text-align:center;text-transform:capitalize}
-  .primary{background:var(--accent);border:none;border-radius:9px;color:#fff;font-family:inherit;font-weight:600;font-size:14px;padding:8px 16px;cursor:pointer}
-  .primary:hover{filter:brightness(1.08)}
-  .primary:disabled{opacity:.55}
+  .daylbl{font-size:15px;font-weight:600;min-width:215px;text-align:center;text-transform:capitalize}
+  .today{background:rgba(0,212,170,.14);border:1px solid rgba(0,212,170,.4);border-radius:8px;color:var(--accent);
+    font-family:inherit;font-weight:600;font-size:13px;padding:7px 13px;cursor:pointer}
+  .today:hover{background:rgba(0,212,170,.22)}
   .meta{color:var(--muted);font-size:13px;margin-left:auto}
-  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,212,170,.3);border-top-color:var(--accent);border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px}
   @keyframes r{to{transform:rotate(360deg)}}
 
-  main{padding:20px 24px 60px;max-width:1480px;margin:0 auto}
-  .panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:22px;
-    box-shadow:0 8px 28px rgba(60,40,110,.06)}
-  .panel-head{font-size:16px;font-weight:700;margin-bottom:4px;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;color:var(--accent2)}
-  .panel-sub{color:var(--muted);font-weight:400;font-size:12.5px}
-  .erro{background:#fdeaea;color:#b91c1c;border:1px solid #f0b7b7;padding:13px 16px;border-radius:11px;margin-bottom:18px}
+  main{padding:6px 24px 60px;max-width:1480px;margin:0 auto}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:22px}
+  .salas-card-head{font-size:15px;font-weight:700;margin-bottom:8px}
+  .salas-card-sub{color:var(--muted);font-weight:400;font-size:12px}
+  .erro{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.4);padding:13px 16px;border-radius:11px;margin-bottom:18px}
   #erro:empty{display:none}
 
-  /* ===== MAPA (quadros divididos manhã/tarde, igual salas) ===== */
-  .mapa{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:10px;margin:14px 0 6px}
-  .room{border-radius:11px;border:1.5px solid var(--border);overflow:hidden;background:var(--surface);min-height:96px;
-    display:flex;flex-direction:column;transition:transform .08s}
-  .room:hover{transform:translateY(-2px)}
-  .room-name{font-size:12.5px;font-weight:700;padding:9px 11px 5px;
+  /* ===== MAPA DE SALAS (idêntico ao dashboard) ===== */
+  .salas-fp-wrap{overflow-x:auto;padding-bottom:6px;margin-bottom:14px}
+  .salas-floorplan{
+    display:grid;
+    grid-template-columns:repeat(8,minmax(78px,1fr));
+    grid-auto-rows:66px;gap:6px;min-width:666px;
+  }
+  .salas-room{border-radius:8px;border:1px solid var(--border);padding:6px 8px;
+    display:flex;flex-direction:column;gap:2px;overflow:hidden;font-size:11px;transition:transform .08s}
+  .salas-room-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .room-esp{font-size:10.5px;font-weight:500;color:var(--muted);margin-top:2px}
-  .half{flex:1 1 0;min-height:26px;display:flex;align-items:center;gap:6px;padding:4px 11px;font-size:12px;
-    border-top:1px solid var(--border)}
-  .half .per{font-size:12px}
-  .half b{color:var(--text);font-size:13px;font-weight:800}
-  .half .fx{color:var(--muted);font-size:10.5px}
-  .half .livre{color:var(--green);font-size:11.5px;font-weight:600}
-  .half .na{color:var(--muted);font-size:11px;opacity:.7}
-  .room-off{background:var(--surface2)}
-  .room-off .room-name{color:var(--muted)}
-  .room-off .off-msg{padding:0 11px 11px;color:var(--muted);font-size:11px}
-  .room-nogr{background:repeating-linear-gradient(45deg,#fafbff,#fafbff 8px,#f1f3fa 8px,#f1f3fa 16px)}
-  .room-nogr .room-name{color:var(--muted)}
-  .room-nogr .off-msg{padding:0 11px 11px;color:#a78bdb;font-size:11px;font-weight:600}
+  .salas-room-aux{background:var(--surface);border-color:var(--border);cursor:default}
+  .salas-room-aux .salas-room-name{color:var(--muted);opacity:.8}
+  .salas-room-conflito{outline:2px solid var(--danger);outline-offset:-1px}
+  .salas-room-split{display:flex;flex-direction:column;padding:0;overflow:hidden;cursor:default}
+  .salas-room-split .salas-room-name{padding:5px 7px 3px;flex:0 0 auto}
+  .salas-room-half{flex:1 1 0;min-height:20px;display:flex;align-items:center;gap:4px;padding:2px 7px;font-size:11px;
+    color:#fda4af;border-top:1px solid rgba(255,255,255,0.07);transition:filter .15s}
+  .salas-room-half .salas-half-per{opacity:.85;font-size:11px}
+  .salas-room-half b{color:#fff;font-size:12px;font-weight:800}
+  .salas-room-half .salas-half-fx{color:rgba(255,255,255,0.55);font-size:10px}
+  .salas-room-half .salas-half-livre{color:#34d399;font-size:10.5px}
+  .salas-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .salas-summary b{color:var(--text)}
 
-  .summary{display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:12px;padding-top:13px;border-top:1px solid var(--border)}
-  .summary b{color:var(--text)}
-
-  /* ===== CARDS detalhe ===== */
-  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 16px;box-shadow:0 6px 20px rgba(60,40,110,.05)}
+  /* ===== CARDS detalhe (grade dos médicos) ===== */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
   .card .ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:11px}
-  .card .ch .nm{font-weight:700;font-size:15px}
-  .card .ch .nm small{display:block;color:var(--muted);font-weight:400;font-size:12px}
-  .bd{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+  .card .ch .nm{font-weight:700;font-size:14.5px}
+  .card .ch .nm small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
+  .bd{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:rgba(16,185,129,.14);color:#34d399;border:1px solid rgba(16,185,129,.4)}
   .bd.zero{background:var(--surface2);color:var(--muted);border-color:var(--border)}
-  .chips{display:flex;flex-wrap:wrap;gap:7px}
-  .chip{font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid;min-width:62px;text-align:center}
-  .chip.livre{background:var(--green-bg);color:var(--green);border-color:var(--green-bd)}
-  .chip.ocup{background:#fce8e8;color:var(--red);border-color:var(--red-bd)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:12.5px;font-weight:600;padding:6px 9px;border-radius:7px;border:1px solid;min-width:60px;text-align:center}
+  .chip.livre{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.4)}
+  .chip.ocup{background:rgba(239,68,68,.14);color:#fca5a5;border-color:rgba(239,68,68,.45)}
   .card .nota{color:var(--muted);font-size:12.5px}
   .skel{padding:34px;text-align:center;color:var(--muted)}
   footer{max-width:1480px;margin:0 auto;padding:6px 24px 50px;color:var(--muted);font-size:12px;line-height:1.6}
@@ -87,15 +83,15 @@
 <body>
 <header class="top">
   <h1>🗺️ Grade de Horários — Médicos</h1>
-  <div class="sub">Visão global do dia · cada médico dividido 🌅 cima = manhã · 🌇 baixo = tarde · verde = livre, vermelho = ocupado</div>
+  <div class="sub">Mesma planta do Mapa de Salas, ao vivo do Feegow · cards de horários dos médicos abaixo</div>
 </header>
 
 <div class="bar">
   <button class="navbtn" onclick="mudaDia(-1)">◀</button>
   <span class="daylbl" id="lblDia">—</span>
   <button class="navbtn" onclick="mudaDia(1)">▶</button>
-  <button class="primary" onclick="irHoje()">Hoje</button>
-  <button class="navbtn" id="btnRefresh" onclick="carregar(true)">🔄 Atualizar</button>
+  <button class="today" onclick="irHoje()">Hoje</button>
+  <button class="today" id="btnRefresh" onclick="carregar(true)" style="background:var(--surface2);border-color:var(--border);color:var(--text)">🔄 Atualizar</button>
   <span class="meta" id="metaAtualizado">Carregando…</span>
 </div>
 
@@ -103,39 +99,104 @@
   <div id="erro"></div>
 
   <div class="panel">
-    <div class="panel-head">📊 Visão global do dia <span class="panel-sub" id="panelSub"></span></div>
-    <div class="mapa" id="mapa"><div class="skel">Carregando mapa…</div></div>
-    <div class="summary" id="summary"></div>
+    <div class="salas-card-head">📊 Visão global do dia <span class="salas-card-sub" id="mapaSub"></span></div>
+    <div class="salas-fp-wrap"><div class="salas-floorplan" id="floorplan"><div class="skel">Carregando mapa…</div></div></div>
+    <div class="salas-summary" id="summary"></div>
   </div>
 
-  <div class="panel-head" style="margin:0 0 12px 2px">📋 Detalhe por médico</div>
+  <div class="salas-card-head" style="margin:0 0 12px 2px">📋 Detalhe por médico (grade)</div>
   <div class="cards" id="cards"></div>
 </main>
 
 <footer>
-  A <b>grade</b> (dias/horários de cada médico) está gravada no código conforme o Feegow. A <b>ocupação</b> é lida ao vivo:
-  cada metade mostra a % de horários já agendados no período. Médicos com fundo riscado ainda estão <b>sem grade cadastrada</b> (me mande o print).
-  Cancelados/remarcados liberam o horário.
+  Mapa <b>idêntico ao Mapa de Salas</b>: cada sala dividida 🌅 cima = manhã · 🌇 baixo = tarde, verde = livre, vermelho = ocupada (% de faixas de 30 min agendadas).
+  Lido ao vivo do Feegow; cancelados/remarcados liberam o horário. Os <b>cards</b> embaixo mostram a grade de horários de cada médico. Pra incluir um médico na grade, me avise.
 </footer>
 
 <script>
   // ===== Config =====
   const PROXY_URL = "https://script.google.com/macros/s/AKfycbzVhtXPGjYwJmoKTj3sd9_EF86xcIyLuQMWWyMT33R59C-B4xVZMoD70qEn7pK6MF1ncA/exec";
-  const GONE      = [11,15,22];        // desmarcado / remarcado / cancelado → libera o horário
+  const GONE      = [11,15,22];
   const REFRESH_MS= 5*60*1000;
-  const MEIODIA   = 720;               // 12:00 em minutos
+  const MEIODIA   = 720;
   const SEMANA    = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
   const MES       = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 
-  // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
-  // Chave = profissional_id do Feegow. dias: 0=Dom 1=Seg ... 6=Sáb.
-  // Cada bloco: {ini:'HH:MM', fim:'HH:MM', dur:minutos}. Vários blocos por dia = manhã+tarde.
+  // ===== Layout do mapa (copiado IGUAL do dashboard) =====
+  const SALAS_LAYOUT = [
+    { area:'drRodolfo', nome:'Sala Dr. Rodolfo',    clinical:true },
+    { area:'usgDrSalv', nome:'Sala USG Dr. Salvato', clinical:true },
+    { area:'drJoselmo', nome:'Sala Dr. Joselmo',     clinical:true },
+    { area:'procedim',  nome:'Sala Procedimento',    clinical:true },
+    { area:'usgErica',  nome:'Sala USG',             clinical:true },
+    { area:'usgGen',    nome:'Sala USG 2',           clinical:true },
+    { area:'reproH',    nome:'Sala Reprodução H.',   clinical:true },
+    { area:'gineco',    nome:'Sala Ginecologia',     clinical:true },
+    { area:'psico',     nome:'Sala Psicologia',      clinical:true },
+    { area:'fisioAcup', nome:'Sala Físio e Acup.',   clinical:true },
+    { area:'enferm1',   nome:'Enfermagem 1',         clinical:false },
+    { area:'enferm2',   nome:'Enfermagem 2',         clinical:false },
+    { area:'enferm3',   nome:'Enfermagem 3',         clinical:false },
+    { area:'esperaVIP', nome:'Espera VIP',           clinical:false },
+    { area:'esperaGer', nome:'Bioimpedância',        clinical:false },
+    { area:'recepcao',  nome:'Recepção / Entrada',   clinical:false },
+    { area:'concierge', nome:'Comercial',            clinical:false },
+    { area:'adm',       nome:'ADM',                  clinical:false },
+    { area:'caixa',     nome:'Caixa',                clinical:false },
+    { area:'gerencia',  nome:'Gerência',             clinical:false },
+    { area:'copa',      nome:'Copa',                 clinical:false },
+    { area:'lounge',    nome:'Lounge Café',          clinical:false },
+    { area:'vestiario', nome:'Vestiário',            clinical:false },
+    { area:'almox',     nome:'Almoxarifado',         clinical:false },
+    { area:'dml',       nome:'DML',                  clinical:false },
+    { area:'multiuso',  nome:'Geladeira / Armários', clinical:false },
+    { area:'wcMF',      nome:'WC / M',               clinical:false },
+    { area:'wcF',       nome:'WC / F',               clinical:false },
+    { area:'wcPCD',     nome:'WC / PCD',             clinical:false },
+    { area:'hallGr',    nome:'Sala de Espera',       clinical:false },
+    { area:'areaADM',   nome:'Área ADM',             clinical:false },
+  ];
+  // Disposição OFICIAL do Felipe (18/06/2026) — mesma planta do dashboard
+  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":1,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":1},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":2}};
+  function salasPosStyle(area){ const p=SALAS_POS[area]; if(!p) return `grid-area:${area}`; return `grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};`; }
+
+  // de-para agendamento → sala (copiado IGUAL do dashboard)
+  function salasRotaAgendamento(prof, proc){
+    const P=(prof||'').toUpperCase(), C=(proc||'').toUpperCase();
+    if(C.includes('ACUPUNTURA')||C.includes('FISIO')||P.includes('CRISTIANE')) return ['fisioAcup'];
+    if(C.includes('PSIC')||P.includes('SARA')) return ['psico'];
+    if((C.includes('USG')||C.includes('ULTRASSOM')||C.includes('ULTRASSONOG'))&&(C.includes('PREPARO')||C.includes('INJÚR')||C.includes('INJUR'))) return ['usgGen','usgErica'];
+    if(C.match(/\bTEC\b/)&&!C.includes('PREPARO TEC')) return ['procedim'];
+    if(C.includes('PUNÇÃO')||C.includes('PUNCAO')||C.includes('INJÚR')||C.includes('INJUR')||C.includes('FILGRASTIM')||C.includes('PRP')||C.includes('DIU')||C.includes('PESA')||C.includes('ASPIRAÇÃO')||C.includes('ASPIRACAO')||C.includes('EMBRION')||C.includes('EMBRIÃO')||C.includes('FOT ')||C.includes('ORIGEN')||C.includes('PRIMÓRDIA')||C.includes('PRIMORDIA')) return ['procedim'];
+    if(C.includes('COLETA')||C.includes('PREVENTIVO')||C.includes('VITAMINA')||C.includes('ENFERMAGEM')) return null;
+    if(C.includes('USG')||C.includes('ULTRASSOM')||C.includes('ULTRASSONOG')){
+      if(P.includes('RODOLFO')) return ['usgDrSalv'];
+      if(P.includes('ÉRICA')||P.includes('ERICA')) return ['usgErica'];
+      return ['usgErica','usgGen'];
+    }
+    if(P.includes('JOSELMO')) return ['drJoselmo'];
+    if(P.includes('RODOLFO')) return ['drRodolfo'];
+    if(P.includes('BIANCA')) return ['usgDrSalv'];
+    if(P.includes('ÉRICA')||P.includes('ERICA')) return ['usgErica'];
+    if(P.includes('PRISCIL')||P.includes('MARCELLE')||P.includes('MARIO')||P.includes('MÁRIO')||P.includes('BRUNA')||P.includes('HELCE')||P.includes('MAGALI')||P.includes('ANA CAROL')) return ['reproH','gineco'];
+    if(C.includes('CONSULTA')) return ['reproH','gineco'];
+    return null;
+  }
+
+  // cor da metade (igual dashboard)
+  const halfBg = (occ, win) => {
+    if(occ===0) return 'background:rgba(16,185,129,0.10);';
+    const ratio=Math.min(1,occ/(win||1));
+    const alpha=(0.16+0.64*ratio).toFixed(3);
+    return `background:rgba(239,68,68,${alpha});`;
+  };
+
+  // ===== GRADE DOS MÉDICOS (cards abaixo) =====
   const GRADE = {
-    20: { dias:{
-      2:[{ini:'09:00', fim:'12:00', dur:60}],   // terça
-      3:[{ini:'09:00', fim:'12:00', dur:60}],   // quarta
+    20: { nome:'Bruna Ortiz', esp:'Ginecologia', dias:{
+      2:[{ini:'09:00', fim:'12:00', dur:60}],
+      3:[{ini:'09:00', fim:'12:00', dur:60}],
     }},
-    // ↓ próximos médicos entram aqui (me mande o print da tela "Horários de Atendimento")
   };
 
   // ===== Helpers =====
@@ -146,19 +207,10 @@
   const escAttr = s => String(s).replace(/"/g,'&quot;');
   const titleCase = s => String(s).toLowerCase().replace(/\b([a-zà-ú])/g, c=>c.toUpperCase());
 
-  // cor da metade conforme ocupação (mesma ideia do mapa de salas, tons claros)
-  const halfBg = (occ, win) => {
-    if(win===0) return 'background:#f4f6fb;';
-    if(occ===0) return 'background:var(--green-bg);';
-    const ratio = Math.min(1, occ/(win||1));
-    const alpha = (0.14 + 0.52*ratio).toFixed(3);
-    return `background:rgba(239,68,68,${alpha});`;
-  };
-
   // ===== Estado =====
   let diaAtual = new Date(); diaAtual.setHours(0,0,0,0);
-  let _byDoc   = {};
-  let _profs   = null;   // [{id, nome, esp}] do Feegow (cache)
+  let _profMap = null;   // id → nome
+  let _procMap = null;   // id → nome
 
   function mudaDia(delta){ diaAtual.setDate(diaAtual.getDate()+delta); carregar(); }
   function irHoje(){ diaAtual=new Date(); diaAtual.setHours(0,0,0,0); carregar(); }
@@ -173,134 +225,142 @@
     return d;
   }
 
-  const slotOcupado = (ocupSet, m, dur) => ocupSet.some(a => a.start < m+dur && (a.start+a.dur) > m);
-
-  function computaDoc(blocos, ocupSet){
-    const slots=[]; let occM=0,winM=0,occT=0,winT=0,minIni=24*60,maxFim=0;
-    blocos.forEach(b=>{
-      const ini=hmToMin(b.ini), fim=hmToMin(b.fim);
-      if(ini<minIni)minIni=ini; if(fim>maxFim)maxFim=fim;
-      for(let m=ini;m<fim;m+=b.dur){
-        const oc=slotOcupado(ocupSet,m,b.dur);
-        slots.push({m,oc});
-        if(m<MEIODIA){ winM++; if(oc)occM++; } else { winT++; if(oc)occT++; }
-      }
-    });
-    const total=slots.length, livres=slots.filter(s=>!s.oc).length;
-    return {slots,occM,winM,occT,winT,livres,total,minIni,maxFim};
+  // distribui agendamentos do dia nas salas (round-robin, médico fixo na sala) — igual dashboard
+  function computeDia(appts){
+    const clinicalAreas = SALAS_LAYOUT.filter(s=>s.clinical).map(s=>s.area);
+    const roomSlots={}, roomAppts={};
+    clinicalAreas.forEach(a=>{ roomSlots[a]=new Set(); roomAppts[a]=[]; });
+    const daySlots=new Set(); const rr={}, medArea={};
+    appts.map(a=>{
+        const hm=(a.horario||'').slice(0,5);
+        const prof=_profMap[String(a.profissional_id)]||'';
+        const proc=_procMap[String(a.procedimento_id)]||'';
+        return {a,hm,prof,proc};
+      })
+      .filter(o=>{
+        if(!/^\d{1,2}:\d{2}/.test(o.hm)) return false;
+        if(GONE.indexOf(Number(o.a.status_id))>=0) return false;
+        return !!salasRotaAgendamento(o.prof,o.proc);
+      })
+      .map(o=>{ const [hh,mm]=o.hm.split(':').map(Number); o.slot=Math.floor((hh*60+mm)/30)*30; return o; })
+      .sort((x,y)=>x.slot-y.slot||x.hm.localeCompare(y.hm))
+      .forEach(o=>{
+        daySlots.add(o.slot);
+        const t=salasRotaAgendamento(o.prof,o.proc);
+        let area;
+        if(t.length===1){ area=t[0]; }
+        else{
+          const k=t.join('|'), memo=k+'||'+o.prof;
+          if(medArea[memo]) area=medArea[memo];
+          else{ const i=(rr[k]||0)%t.length; rr[k]=(rr[k]||0)+1; area=t[i]; medArea[memo]=area; }
+        }
+        if(roomSlots[area]){ roomSlots[area].add(o.slot); roomAppts[area].push({hora:o.hm,prof:o.prof}); }
+      });
+    return {roomSlots, roomAppts, daySlots};
   }
 
-  // ===== Render =====
-  function pintar(){
-    const wd = diaAtual.getDay();
-    const k  = fmtFeegow(diaAtual);
-    document.getElementById('lblDia').textContent = `${SEMANA[wd]}, ${pad(diaAtual.getDate())}/${pad(diaAtual.getMonth()+1)}`;
-    document.getElementById('panelSub').textContent = `— ${SEMANA[wd]}, ${diaAtual.getDate()} de ${MES[diaAtual.getMonth()]}`;
+  // ===== Render mapa (idêntico ao dashboard) =====
+  function pintarMapa(comp){
+    const slotsArr=[...comp.daySlots].sort((a,b)=>a-b);
+    const manhaSlotsArr=slotsArr.filter(x=>x<MEIODIA);
+    const tardeSlotsArr=slotsArr.filter(x=>x>=MEIODIA);
+    const manhaWin=manhaSlotsArr.length?(manhaSlotsArr[manhaSlotsArr.length-1]-manhaSlotsArr[0])/30+1:0;
+    const tardeWin=tardeSlotsArr.length?(tardeSlotsArr[tardeSlotsArr.length-1]-tardeSlotsArr[0])/30+1:0;
+    const dayWindow=slotsArr.length?(slotsArr[slotsArr.length-1]-slotsArr[0])/30+1:0;
+    const janelaTxt=slotsArr.length?`${minToHm(slotsArr[0])}–${minToHm(slotsArr[slotsArr.length-1]+30)}`:'';
 
-    // ordena: com grade primeiro, depois sem grade; alfabético dentro
-    const lista = (_profs||[]).slice().sort((a,b)=>{
-      const ga=!!GRADE[a.id], gb=!!GRADE[b.id];
-      if(ga!==gb) return ga?-1:1;
-      return a.nome.localeCompare(b.nome);
-    });
-
-    let mapa='', cards='';
-    let atendendo=0, semGrade=0, topNome='—', topPct=-1, diaMin=24*60, diaMax=0;
-
-    lista.forEach(p => {
-      const g = GRADE[p.id];
-      const nome = p.nome, esp = p.esp||'';
-
-      // sem grade cadastrada
-      if(!g){
-        semGrade++;
-        mapa += `<div class="room room-nogr" title="${escAttr(nome)} — sem grade cadastrada"><div class="room-name">${nome}<div class="room-esp">${esp}</div></div><div class="off-msg">sem grade ainda</div></div>`;
-        return;
+    let topRoom='—', topPct=0;
+    const cells = SALAS_LAYOUT.map(s=>{
+      if(!s.clinical){
+        return `<div class="salas-room salas-room-aux" style="${salasPosStyle(s.area)}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
       }
-      const blocos = g.dias[wd] || [];
-      const ocupSet = (_byDoc[p.id] && _byDoc[p.id][k]) || [];
-
-      // tem grade mas não atende hoje
-      if(!blocos.length){
-        mapa += `<div class="room room-off" title="${escAttr(nome)} — não atende"><div class="room-name">${nome}<div class="room-esp">${esp}</div></div><div class="off-msg">não atende hoje</div></div>`;
-        cards += `<div class="card"><div class="ch"><div class="nm">${nome}<small>${esp}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div></div>`;
-        return;
-      }
-      atendendo++;
-      const c = computaDoc(blocos, ocupSet);
-      if(c.minIni<diaMin)diaMin=c.minIni; if(c.maxFim>diaMax)diaMax=c.maxFim;
-      const pctDia = c.total ? Math.round((c.total-c.livres)/c.total*100) : 0;
-      if(pctDia>topPct){ topPct=pctDia; topNome=nome; }
-
-      const pctM = c.winM ? Math.round(c.occM/c.winM*100) : 0;
-      const pctT = c.winT ? Math.round(c.occT/c.winT*100) : 0;
-      const valM = c.winM===0 ? '<span class="na">—</span>' : (c.occM===0 ? '<span class="livre">livre</span>' : `<b>${pctM}%</b><span class="fx"> · ${c.occM}/${c.winM}</span>`);
-      const valT = c.winT===0 ? '<span class="na">—</span>' : (c.occT===0 ? '<span class="livre">livre</span>' : `<b>${pctT}%</b><span class="fx"> · ${c.occT}/${c.winT}</span>`);
-      const tip = `${nome} (${esp})\n🌅 Manhã: ${c.occM} de ${c.winM} (${pctM}%)\n🌇 Tarde: ${c.occT} de ${c.winT} (${pctT}%)`;
-      mapa += `<div class="room" title="${escAttr(tip)}">
-        <div class="room-name">${nome}<div class="room-esp">${esp}</div></div>
-        <div class="half" style="${halfBg(c.occM,c.winM)}"><span class="per">🌅</span>${valM}</div>
-        <div class="half" style="${halfBg(c.occT,c.winT)}"><span class="per">🌇</span>${valT}</div>
+      const slotsSet=comp.roomSlots[s.area]||new Set();
+      const occM=[...slotsSet].filter(x=>x<MEIODIA).length;
+      const occT=[...slotsSet].filter(x=>x>=MEIODIA).length;
+      const occDia=slotsSet.size;
+      const pctDia=dayWindow?Math.round(occDia/dayWindow*100):0;
+      if(pctDia>topPct){ topPct=pctDia; topRoom=s.nome; }
+      const pctM=manhaWin?Math.round(occM/manhaWin*100):0;
+      const pctT=tardeWin?Math.round(occT/tardeWin*100):0;
+      const valM=occM===0?'<span class="salas-half-livre">livre</span>':`<b>${pctM}%</b><span class="salas-half-fx"> · ${occM}f</span>`;
+      const valT=occT===0?'<span class="salas-half-livre">livre</span>':`<b>${pctT}%</b><span class="salas-half-fx"> · ${occT}f</span>`;
+      const tip=`${s.nome}\n🌅 Manhã: ${occM} de ${manhaWin} faixas (${pctM}%)\n🌇 Tarde: ${occT} de ${tardeWin} faixas (${pctT}%)`;
+      return `<div class="salas-room salas-room-split" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
+        <div class="salas-room-name">${s.nome}</div>
+        <div class="salas-room-half" style="${halfBg(occM,manhaWin)}"><span class="salas-half-per">🌅</span>${valM}</div>
+        <div class="salas-room-half" style="${halfBg(occT,tardeWin)}"><span class="salas-half-per">🌇</span>${valT}</div>
       </div>`;
+    }).join('');
 
-      let chips='';
-      c.slots.forEach(s => chips += `<span class="chip ${s.oc?'ocup':'livre'}">${minToHm(s.m)}</span>`);
-      const bd = c.livres ? `<span class="bd">${c.livres} livre${c.livres!==1?'s':''}</span>` : `<span class="bd zero">cheia</span>`;
-      cards += `<div class="card"><div class="ch"><div class="nm">${nome}<small>${esp}</small></div>${bd}</div><div class="chips">${chips}</div></div>`;
-    });
-
-    document.getElementById('mapa').innerHTML = mapa || '<div class="skel">Nenhum profissional encontrado.</div>';
-    document.getElementById('cards').innerHTML = cards || '<div class="skel">Nenhum médico com grade cadastrada ainda.</div>';
-
-    const janela = diaMax>diaMin ? `${minToHm(diaMin)}–${minToHm(diaMax)}` : '—';
+    document.getElementById('floorplan').innerHTML = cells;
     document.getElementById('summary').innerHTML =
-      `<span><b>${atendendo}</b> atendendo hoje</span>`+
-      `<span>Janela do dia: <b>${janela}</b></span>`+
-      (topPct>=0 ? `<span>Mais ocupado: <b style="color:var(--red)">${topNome} (${topPct}%)</b></span>` : '')+
-      (semGrade ? `<span><b>${semGrade}</b> sem grade cadastrada</span>` : '');
+      `<span>Janela do dia: <b>${dayWindow} faixas de 30 min</b>${slotsArr.length?` (${janelaTxt})`:''}</span>`+
+      (slotsArr.length?`<span>Sala mais ocupada (dia): <b style="color:#ef4444">${topRoom} (${topPct}%)</b></span>`:'');
+  }
+
+  // ===== Render cards (grade dos médicos) =====
+  const slotOcupadoGrade = (ocupSet, m, dur) => ocupSet.some(a => a.start < m+dur && (a.start+a.dur) > m);
+  function pintarCards(byDoc){
+    const wd=diaAtual.getDay();
+    let cards='';
+    Object.entries(GRADE).forEach(([pid,doc])=>{
+      const blocos=doc.dias[wd]||[];
+      const ocupSet=byDoc[pid]||[];
+      if(!blocos.length){
+        cards+=`<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div></div>`;
+        return;
+      }
+      let chips='',livres=0;
+      blocos.forEach(b=>{ for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ const oc=slotOcupadoGrade(ocupSet,m,b.dur); if(!oc)livres++; chips+=`<span class="chip ${oc?'ocup':'livre'}">${minToHm(m)}</span>`; } });
+      const bd=livres?`<span class="bd">${livres} livre${livres!==1?'s':''}</span>`:`<span class="bd zero">cheia</span>`;
+      cards+=`<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div>${bd}</div><div class="chips">${chips}</div></div>`;
+    });
+    document.getElementById('cards').innerHTML = cards;
   }
 
   // ===== Carga =====
-  let _carregando = false;
+  let _carregando=false;
   async function carregar(force){
     if(_carregando) return;
-    _carregando = true;
-    const btn = document.getElementById('btnRefresh');
-    const meta = document.getElementById('metaAtualizado');
-    const erro = document.getElementById('erro');
-    btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+    _carregando=true;
+    const btn=document.getElementById('btnRefresh');
+    const meta=document.getElementById('metaAtualizado');
+    const erro=document.getElementById('erro');
+    btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
     erro.innerHTML='';
+    const wd=diaAtual.getDay();
+    document.getElementById('lblDia').textContent=`${SEMANA[wd]}, ${pad(diaAtual.getDate())}/${pad(diaAtual.getMonth()+1)}`;
+    document.getElementById('mapaSub').textContent=`— ${SEMANA[wd]}, ${diaAtual.getDate()} de ${MES[diaAtual.getMonth()]} · cada sala dividida 🌅 manhã / 🌇 tarde · verde = livre, vermelho = ocupada`;
     try{
-      // profissionais (1x, cache)
-      if(!_profs || force){
-        const pr = await feegowFetch('/professional/list');
-        _profs = (Array.isArray(pr.content)?pr.content:[])
-          .filter(p => p.ativo)
-          .map(p => ({ id:String(p.profissional_id), nome:titleCase(p.nome),
-                       esp:(p.especialidades&&p.especialidades[0]&&p.especialidades[0].nome_especialidade)||'' }));
+      if(!_profMap || force){
+        const pr=await feegowFetch('/professional/list');
+        _profMap={}; (pr.content||[]).forEach(p=>{ _profMap[String(p.profissional_id)]=titleCase(p.nome); });
       }
-      // agendamentos do dia
-      const k = fmtFeegow(diaAtual);
-      const data = await feegowFetch('/appoints/search', { data_start:k, data_end:k });
-      const todos = Array.isArray(data.content) ? data.content : [];
-      _byDoc = {};
-      todos.forEach(a => {
+      if(!_procMap || force){
+        const pc=await feegowFetch('/procedures/list');
+        _procMap={}; (pc.content||[]).forEach(p=>{ _procMap[String(p.procedimento_id)]=p.nome; });
+      }
+      const k=fmtFeegow(diaAtual);
+      const data=await feegowFetch('/appoints/search',{data_start:k,data_end:k});
+      const appts=Array.isArray(data.content)?data.content:[];
+
+      pintarMapa(computeDia(appts));
+
+      // grade cards: ocupação por médico da GRADE
+      const byDoc={};
+      appts.forEach(a=>{
         if(GONE.indexOf(Number(a.status_id))>=0) return;
-        const pid = String(a.profissional_id);
-        if(!GRADE[pid]) return;
-        const hm = (a.horario||'').slice(0,5);
-        if(!/^\d{2}:\d{2}$/.test(hm)) return;
-        const start = hmToMin(hm);
-        const dur = Math.max(15, parseInt(a.duracao)||30);
-        (_byDoc[pid] = _byDoc[pid]||{});
-        (_byDoc[pid][a.data] = _byDoc[pid][a.data]||[]).push({start,dur});
+        const pid=String(a.profissional_id); if(!GRADE[pid]) return;
+        const hm=(a.horario||'').slice(0,5); if(!/^\d{2}:\d{2}$/.test(hm)) return;
+        (byDoc[pid]=byDoc[pid]||[]).push({start:hmToMin(hm),dur:Math.max(15,parseInt(a.duracao)||30)});
       });
-      pintar();
-      const agora = new Date();
-      meta.textContent = `Atualizado ${pad(agora.getHours())}:${pad(agora.getMinutes())} · ao vivo do Feegow`;
+      pintarCards(byDoc);
+
+      const agora=new Date();
+      meta.textContent=`Atualizado ${pad(agora.getHours())}:${pad(agora.getMinutes())} · ao vivo do Feegow`;
     }catch(e){
-      erro.innerHTML = `<div class="erro"><b>Não consegui carregar.</b> ${e.message}. Tente “Atualizar” de novo.</div>`;
-      meta.textContent = 'Falha ao atualizar';
+      erro.innerHTML=`<div class="erro"><b>Não consegui carregar.</b> ${e.message}. Tente “Atualizar” de novo.</div>`;
+      meta.textContent='Falha ao atualizar';
     }finally{
       btn.disabled=false; btn.innerHTML='🔄 Atualizar';
       _carregando=false;
