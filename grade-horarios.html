@@ -65,6 +65,13 @@
   .salas-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
   .salas-summary b{color:var(--text)}
 
+  /* marcador "Entrada" (fluxo pra dentro) */
+  .entrada-marker{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    background:transparent;border:none}
+  .entrada-marker .entrada-txt{font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#9fb0cc}
+  .entrada-marker .entrada-seta{font-size:24px;line-height:1;color:var(--accent);animation:setaDown 1.6s ease-in-out infinite}
+  @keyframes setaDown{0%,100%{transform:translateY(-2px);opacity:.7}50%{transform:translateY(3px);opacity:1}}
+
   /* ===== EDITOR DE LAYOUT (só desta grade) ===== */
   .navbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(0,212,170,.12)}
   .g-edit-toolbar{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px}
@@ -413,7 +420,8 @@
         <div class="salas-room-half ${sT.length?'av':''}" style="${avBg(sT.length)}"><span class="salas-half-per">🌇</span>${half(sT)}</div>
       </div>`;
     }).join('');
-    document.getElementById('floorplan').innerHTML=cells;
+    const entrada = `<div class="entrada-marker" style="grid-column:8 / span 1;grid-row:7 / span 1"><span class="entrada-txt">Entrada</span><span class="entrada-seta">⬇</span></div>`;
+    document.getElementById('floorplan').innerHTML=cells + entrada;
 
     const areaNome={}; SALAS_LAYOUT.forEach(s=>areaNome[s.area]=s.nome);
     document.getElementById('summary').innerHTML=
