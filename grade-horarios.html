@@ -80,6 +80,8 @@
   .baia-h{background:rgba(96,165,250,0.30);border-color:rgba(96,165,250,0.85);color:#dbeafe;box-shadow:0 0 0 1px rgba(96,165,250,.25) inset}
   .baia-h .baia-nm{color:#fff}
   .baia-f{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.2);color:var(--muted)}
+  .baia-vert .baia-nm,.baia-vert .baia-st{writing-mode:vertical-rl;transform:rotate(180deg);line-height:1}
+  .baia-vert{gap:2px}
 
   /* ===== CARDS detalhe (grade dos médicos) ===== */
   .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
@@ -177,7 +179,7 @@
     { area:'hallGr',    nome:'Sala de Espera',       clinical:false },
     { area:'areaADM',   nome:'Área ADM',             clinical:false },
   ];
-  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":1,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":1},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":3}};
+  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":2,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":1},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":3}};
   function salasPosStyle(area){ const p=SALAS_POS[area]; if(!p) return `grid-area:${area}`; return `grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};`; }
 
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
@@ -241,34 +243,51 @@
   // ===== FUNCIONÁRIOS (baias) =====
   // Salas com baias: {L:n esquerda, R:n direita}. Baia = '<area>:L1..Ln' / '<area>:R1..Rn'
   // R1 = topo direita · R3 = canto inferior direita (corner). escala por dia: {t:'P',h:'09–18'} presencial OU {t:'H'} home.
-  // BAIAS por sala: cols = colunas; slots = ordem das posições (preenche linha a linha)
+  // BAIAS por sala. Modo simples: {cols, slots:[...]}. Modo posicionado: {cols, rows, cells:[{slot,col,row,colspan,rowspan,vert}]}
   const BAIAS = {
     areaADM:  { cols:2, slots:['L1','R1','L2','R2','L3','R3'] },   // 3 esq + 3 dir
-    recepcao: { cols:1, slots:['B1','B2','B3'] },                  // empilhadas: B1 topo … B3 embaixo (perto do Lounge)
+    recepcao: { cols:3, rows:3, cells:[                            // meninas no corredor (direita) + Francisca atravessada atrás (esquerda)
+      { slot:'F',  col:1, row:1, colspan:1, rowspan:3, vert:true },// Francisca: faixa transversal atrás das três
+      { slot:'B1', col:2, row:1, colspan:2 },                      // Bruna   (topo)
+      { slot:'B2', col:2, row:2, colspan:2 },                      // Andressa(meio)
+      { slot:'B3', col:2, row:3, colspan:2 },                      // Julya   (embaixo, perto do Lounge)
+    ]},
   };
   const PH = h => ({ 1:{t:'P',h}, 2:{t:'P',h}, 3:{t:'P',h}, 4:{t:'P',h}, 5:{t:'P',h} });   // Seg-Sex presencial no mesmo horário
   const FUNCIONARIOS = {
-    lavinia: { nome:'Lavínia', baia:'areaADM:R1',  escala:{ 1:{t:'P'}, 2:{t:'H'}, 3:{t:'P'}, 4:{t:'H'}, 5:{t:'P'} } },
-    nayara:  { nome:'Nayara',  baia:'areaADM:R3',  escala:{ 1:{t:'P',h:'09–18'}, 2:{t:'P',h:'09–18'}, 3:{t:'P',h:'09–18'}, 4:{t:'P',h:'09–18'}, 5:{t:'H'} } },
-    bruna_r: { nome:'Bruna',   baia:'recepcao:B1', escala: PH('09:30–19:30') },             // topo
-    andressa:{ nome:'Andressa',baia:'recepcao:B2', escala: PH('08–18') },                    // meio
-    julya:   { nome:'Julya',   baia:'recepcao:B3', escala: PH('08–18') },                    // embaixo (perto do Lounge)
+    lavinia:  { nome:'Lavínia',  baia:'areaADM:R1',  escala:{ 1:{t:'P'}, 2:{t:'H'}, 3:{t:'P'}, 4:{t:'H'}, 5:{t:'P'} } },
+    nayara:   { nome:'Nayara',   baia:'areaADM:R3',  escala:{ 1:{t:'P',h:'09–18'}, 2:{t:'P',h:'09–18'}, 3:{t:'P',h:'09–18'}, 4:{t:'P',h:'09–18'}, 5:{t:'H'} } },
+    bruna_r:  { nome:'Bruna',    baia:'recepcao:B1', escala: PH('09:30–19:30') },           // topo
+    andressa: { nome:'Andressa', baia:'recepcao:B2', escala: PH('08–18') },                 // meio
+    julya:    { nome:'Julya',    baia:'recepcao:B3', escala: PH('08–18') },                 // embaixo (perto do Lounge)
+    francisca:{ nome:'Francisca',baia:'recepcao:F',  escala: PH('08–18') },                 // atrás, transversal
   };
   function renderBaias(s, wd){
     const cfg = BAIAS[s.area];
     const bySlot={};
     Object.values(FUNCIONARIOS).forEach(f=>{ const p=f.baia.split(':'); if(p[0]===s.area) bySlot[p[1]]=f; });
-    const cell = slot => {
+    const cellHtml = (slot, style, vert) => {
       const f=bySlot[slot];
-      if(!f) return `<div class="baia baia-e" title="Baia vazia"></div>`;
+      const vc = vert ? ' baia-vert' : '';
+      if(!f) return `<div class="baia baia-e${vc}" style="${style||''}" title="Baia vazia"></div>`;
       const esc=f.escala[wd];
       let cls='baia-f', st='folga', tip=`${f.nome} — folga`;
       if(esc && esc.t==='P'){ cls='baia-p'; st=esc.h||'presencial'; tip=`${f.nome} — presencial${esc.h?' ('+esc.h+')':''}`; }
       else if(esc && esc.t==='H'){ cls='baia-h'; st='🏠 home'; tip=`${f.nome} — home office`; }
-      return `<div class="baia ${cls}" title="${escAttr(tip)}"><span class="baia-nm">${f.nome}</span><span class="baia-st">${st}</span></div>`;
+      return `<div class="baia ${cls}${vc}" style="${style||''}" title="${escAttr(tip)}"><span class="baia-nm">${f.nome}</span><span class="baia-st">${st}</span></div>`;
     };
-    const grid = cfg.slots.map(cell).join('');
-    return `<div class="salas-room baia-room" style="${salasPosStyle(s.area)}"><div class="salas-room-name">${s.nome}</div><div class="baias" style="grid-template-columns:repeat(${cfg.cols},1fr)">${grid}</div></div>`;
+    let inner, gridStyle;
+    if(cfg.cells){
+      gridStyle=`grid-template-columns:repeat(${cfg.cols},1fr);grid-template-rows:repeat(${cfg.rows},1fr)`;
+      inner=cfg.cells.map(c=>{
+        const stl=`grid-column:${c.col} / span ${c.colspan||1};grid-row:${c.row} / span ${c.rowspan||1}`;
+        return cellHtml(c.slot, stl, c.vert);
+      }).join('');
+    } else {
+      gridStyle=`grid-template-columns:repeat(${cfg.cols},1fr)`;
+      inner=cfg.slots.map(slot=>cellHtml(slot)).join('');
+    }
+    return `<div class="salas-room baia-room" style="${salasPosStyle(s.area)}"><div class="salas-room-name">${s.nome}</div><div class="baias" style="${gridStyle}">${inner}</div></div>`;
   }
 
   // ===== Helpers =====
