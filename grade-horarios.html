@@ -241,10 +241,18 @@
   // ===== FUNCIONÁRIOS (baias) =====
   // Salas com baias: {L:n esquerda, R:n direita}. Baia = '<area>:L1..Ln' / '<area>:R1..Rn'
   // R1 = topo direita · R3 = canto inferior direita (corner). escala por dia: {t:'P',h:'09–18'} presencial OU {t:'H'} home.
-  const BAIAS = { areaADM: { L:3, R:3 } };
+  // BAIAS por sala: cols = colunas; slots = ordem das posições (preenche linha a linha)
+  const BAIAS = {
+    areaADM:  { cols:2, slots:['L1','R1','L2','R2','L3','R3'] },   // 3 esq + 3 dir
+    recepcao: { cols:1, slots:['B1','B2','B3'] },                  // empilhadas: B1 topo … B3 embaixo (perto do Lounge)
+  };
+  const PH = h => ({ 1:{t:'P',h}, 2:{t:'P',h}, 3:{t:'P',h}, 4:{t:'P',h}, 5:{t:'P',h} });   // Seg-Sex presencial no mesmo horário
   const FUNCIONARIOS = {
-    nayara:  { nome:'Nayara',  baia:'areaADM:R3', escala:{ 1:{t:'P',h:'09–18'}, 2:{t:'P',h:'09–18'}, 3:{t:'P',h:'09–18'}, 4:{t:'P',h:'09–18'}, 5:{t:'H'} } },
-    lavinia: { nome:'Lavínia', baia:'areaADM:R1', escala:{ 1:{t:'P'}, 2:{t:'H'}, 3:{t:'P'}, 4:{t:'H'}, 5:{t:'P'} } },
+    lavinia: { nome:'Lavínia', baia:'areaADM:R1',  escala:{ 1:{t:'P'}, 2:{t:'H'}, 3:{t:'P'}, 4:{t:'H'}, 5:{t:'P'} } },
+    nayara:  { nome:'Nayara',  baia:'areaADM:R3',  escala:{ 1:{t:'P',h:'09–18'}, 2:{t:'P',h:'09–18'}, 3:{t:'P',h:'09–18'}, 4:{t:'P',h:'09–18'}, 5:{t:'H'} } },
+    bruna_r: { nome:'Bruna',   baia:'recepcao:B1', escala: PH('09:30–19:30') },             // topo
+    andressa:{ nome:'Andressa',baia:'recepcao:B2', escala: PH('08–18') },                    // meio
+    julya:   { nome:'Julya',   baia:'recepcao:B3', escala: PH('08–18') },                    // embaixo (perto do Lounge)
   };
   function renderBaias(s, wd){
     const cfg = BAIAS[s.area];
@@ -252,17 +260,15 @@
     Object.values(FUNCIONARIOS).forEach(f=>{ const p=f.baia.split(':'); if(p[0]===s.area) bySlot[p[1]]=f; });
     const cell = slot => {
       const f=bySlot[slot];
-      if(!f) return `<div class="baia baia-e" title="Baia ${slot} (vazia)"></div>`;
+      if(!f) return `<div class="baia baia-e" title="Baia vazia"></div>`;
       const esc=f.escala[wd];
       let cls='baia-f', st='folga', tip=`${f.nome} — folga`;
       if(esc && esc.t==='P'){ cls='baia-p'; st=esc.h||'presencial'; tip=`${f.nome} — presencial${esc.h?' ('+esc.h+')':''}`; }
       else if(esc && esc.t==='H'){ cls='baia-h'; st='🏠 home'; tip=`${f.nome} — home office`; }
       return `<div class="baia ${cls}" title="${escAttr(tip)}"><span class="baia-nm">${f.nome}</span><span class="baia-st">${st}</span></div>`;
     };
-    let grid='';
-    const n=Math.max(cfg.L,cfg.R);
-    for(let i=1;i<=n;i++){ grid += (i<=cfg.L?cell('L'+i):'<div></div>') + (i<=cfg.R?cell('R'+i):'<div></div>'); }
-    return `<div class="salas-room baia-room" style="${salasPosStyle(s.area)}"><div class="salas-room-name">${s.nome}</div><div class="baias">${grid}</div></div>`;
+    const grid = cfg.slots.map(cell).join('');
+    return `<div class="salas-room baia-room" style="${salasPosStyle(s.area)}"><div class="salas-room-name">${s.nome}</div><div class="baias" style="grid-template-columns:repeat(${cfg.cols},1fr)">${grid}</div></div>`;
   }
 
   // ===== Helpers =====
