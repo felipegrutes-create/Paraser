@@ -38,30 +38,30 @@
   .salas-fp-wrap{overflow-x:auto;padding-bottom:6px;margin-bottom:14px}
   .salas-floorplan{
     display:grid;
-    grid-template-columns:repeat(8,minmax(78px,1fr));
-    grid-auto-rows:66px;gap:6px;min-width:666px;
+    grid-template-columns:repeat(8,minmax(92px,1fr));
+    grid-auto-rows:78px;gap:7px;min-width:780px;
   }
-  .salas-room{border-radius:8px;border:1px solid rgba(255,255,255,0.14);padding:6px 8px;
-    display:flex;flex-direction:column;gap:2px;overflow:hidden;font-size:11px;transition:transform .08s}
-  .salas-room-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;
+  .salas-room{border-radius:9px;border:2px solid rgba(255,255,255,0.24);padding:6px 9px;
+    display:flex;flex-direction:column;gap:2px;overflow:hidden;font-size:12px;transition:transform .08s}
+  .salas-room-name{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .salas-room-aux{background:var(--surface);border-color:var(--border);cursor:default}
+  .salas-room-aux{background:var(--surface);border-color:rgba(255,255,255,0.18);cursor:default}
   .salas-room-aux .salas-room-name{color:var(--muted);opacity:.8}
   .salas-room-split{display:flex;flex-direction:column;padding:0;overflow:hidden;cursor:default}
   .salas-room-split .salas-room-name{padding:5px 7px 2px;flex:0 0 auto}
   /* sala com médico no dia: borda verde forte + leve brilho, pra saltar do mapa */
   .salas-room-split.room-ativo{border:1.5px solid rgba(16,185,129,.65);box-shadow:0 0 0 1px rgba(16,185,129,.18) inset, 0 4px 16px rgba(16,185,129,.10)}
   .salas-room-split.room-ativo .salas-room-name{color:#7fffd4}
-  .salas-room-doc{flex:0 0 auto;padding:0 7px 3px;font-size:9.5px;font-weight:700;color:var(--green);
+  .salas-room-doc{flex:0 0 auto;padding:0 8px 3px;font-size:11.5px;font-weight:700;color:var(--green);
     text-transform:none;letter-spacing:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .salas-room-half{flex:1 1 0;min-height:20px;display:flex;align-items:center;gap:4px;padding:2px 7px;font-size:11px;
-    color:var(--muted);border-top:1px solid rgba(255,255,255,0.07)}
-  .salas-room-half .salas-half-per{opacity:.85;font-size:11px}
-  .salas-room-half b{color:#fff;font-size:12px;font-weight:800}
-  .salas-room-half .salas-half-fx{color:rgba(255,255,255,0.55);font-size:10px}
+  .salas-room-half{flex:1 1 0;min-height:22px;display:flex;align-items:center;gap:5px;padding:2px 8px;font-size:13px;
+    color:var(--muted);border-top:1.5px solid rgba(255,255,255,0.12)}
+  .salas-room-half .salas-half-per{opacity:.85;font-size:13px}
+  .salas-room-half b{color:#fff;font-size:15px;font-weight:800}
+  .salas-room-half .salas-half-fx{color:rgba(255,255,255,0.6);font-size:11.5px}
   .salas-room-half.av{color:#d1fae5}
-  .salas-room-half.av b{color:#fff;font-size:13px}
-  .salas-room-half .salas-half-na{color:var(--muted);opacity:.45}
+  .salas-room-half.av b{color:#fff;font-size:16px}
+  .salas-room-half .salas-half-na{color:var(--muted);opacity:.45;font-size:13px}
   .salas-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
   .salas-summary b{color:var(--text)}
 
@@ -69,11 +69,11 @@
   .baia-room{padding:0;overflow:hidden}
   .baia-room .salas-room-name{padding:5px 7px 3px;flex:0 0 auto}
   .baias{flex:1 1 0;display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:0 4px 4px;align-content:stretch}
-  .baia{border-radius:5px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.05);
+  .baia{border-radius:6px;border:1.5px solid rgba(255,255,255,0.26);background:rgba(255,255,255,0.05);
     display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
-    padding:1px 2px;min-height:20px;overflow:hidden;line-height:1.1}
-  .baia-nm{font-size:9px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .baia-st{font-size:8px;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+    padding:2px 3px;min-height:24px;overflow:hidden;line-height:1.12}
+  .baia-nm{font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .baia-st{font-size:9.5px;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .baia-e{border-style:dashed;border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.045)}
   .baia-p{background:rgba(16,185,129,0.30);border-color:rgba(16,185,129,0.85);color:#d1fae5;box-shadow:0 0 0 1px rgba(16,185,129,.25) inset}
   .baia-p .baia-nm{color:#fff}
