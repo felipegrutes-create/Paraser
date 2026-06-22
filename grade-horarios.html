@@ -48,7 +48,9 @@
   .salas-room-aux{background:var(--surface);border-color:var(--border);cursor:default}
   .salas-room-aux .salas-room-name{color:var(--muted);opacity:.8}
   .salas-room-split{display:flex;flex-direction:column;padding:0;overflow:hidden;cursor:default}
-  .salas-room-split .salas-room-name{padding:5px 7px 3px;flex:0 0 auto}
+  .salas-room-split .salas-room-name{padding:5px 7px 2px;flex:0 0 auto}
+  .salas-room-doc{flex:0 0 auto;padding:0 7px 3px;font-size:9.5px;font-weight:700;color:var(--green);
+    text-transform:none;letter-spacing:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .salas-room-half{flex:1 1 0;min-height:20px;display:flex;align-items:center;gap:4px;padding:2px 7px;font-size:11px;
     color:var(--muted);border-top:1px solid rgba(255,255,255,0.07)}
   .salas-room-half .salas-half-per{opacity:.85;font-size:11px}
@@ -157,7 +159,7 @@
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
   // Horários DISPONIBILIZADOS por cada médico. sala = área da planta. dias: 0=Dom..6=Sáb. Blocos {ini,fim,dur}.
   const GRADE = {
-    20: { nome:'Bruna Ortiz', esp:'Ginecologia', sala:'gineco', dias:{
+    20: { nome:'Bruna Ortiz', trat:'Dra.', esp:'Ginecologia', sala:'gineco', dias:{
       2:[{ini:'09:00', fim:'12:00', dur:60}],   // terça
       3:[{ini:'09:00', fim:'12:00', dur:60}],   // quarta
     }},
@@ -169,6 +171,7 @@
   const hmToMin = hm => { const [a,b]=hm.split(':'); return (+a)*60+(+b); };
   const minToHm = m => pad(Math.floor(m/60))+':'+pad(m%60);
   const escAttr = s => String(s).replace(/"/g,'&quot;');
+  const dispName = doc => (doc.trat ? doc.trat+' ' : '') + doc.nome;
 
   // ===== Estado =====
   let diaAtual = new Date(); diaAtual.setHours(0,0,0,0);
@@ -200,7 +203,7 @@
       const blocos=doc.dias[wd]||[]; if(!blocos.length) return;
       const area=getSala(id); if(!area) return;
       if(!roomSlots[area]){ roomSlots[area]=[]; roomDocs[area]=[]; }   // permite remanejar p/ qualquer sala
-      roomDocs[area].push(doc.nome);
+      roomDocs[area].push(dispName(doc));
       blocos.forEach(b=>{ for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){ roomSlots[area].push(m); } });
     });
     Object.keys(roomSlots).forEach(a=>{ roomSlots[a]=[...new Set(roomSlots[a])].sort((x,y)=>x-y); });
@@ -233,8 +236,9 @@
       const docs=comp.roomDocs[s.area]||[];
       const horasTxt = slots.length ? slots.map(minToHm).join(', ') : 'sem atendimento';
       const tip=`${s.nome}${docs.length?` — ${docs.join(', ')}`:''}\n🌅 Manhã: ${sM.length} horário(s)\n🌇 Tarde: ${sT.length} horário(s)\nDisponíveis: ${horasTxt}`;
+      const docLine = docs.length ? `<div class="salas-room-doc">${docs.join(' · ')}</div>` : '';
       return `<div class="salas-room salas-room-split" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
-        <div class="salas-room-name">${s.nome}</div>
+        <div class="salas-room-name">${s.nome}</div>${docLine}
         <div class="salas-room-half ${sM.length?'av':''}" style="${avBg(sM.length)}"><span class="salas-half-per">🌅</span>${half(sM)}</div>
         <div class="salas-room-half ${sT.length?'av':''}" style="${avBg(sT.length)}"><span class="salas-half-per">🌇</span>${half(sT)}</div>
       </div>`;
@@ -252,12 +256,12 @@
       const blocos=doc.dias[wd]||[];
       const sel=`<div class="salaSel">🚪 <select onchange="setSala('${id}',this.value)">${optionsHtml(getSala(id))}</select></div>`;
       if(!blocos.length){
-        cards+=`<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div>${sel}</div>`;
+        cards+=`<div class="card"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div>${sel}</div>`;
         return;
       }
       let chips='',n=0;
       blocos.forEach(b=>{ for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ n++; chips+=`<span class="chip">${minToHm(m)}</span>`; } });
-      cards+=`<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div><span class="bd">${n} disponíve${n!==1?'is':'l'}</span></div><div class="chips">${chips}</div>${sel}</div>`;
+      cards+=`<div class="card"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd">${n} disponíve${n!==1?'is':'l'}</span></div><div class="chips">${chips}</div>${sel}</div>`;
     });
     document.getElementById('cards').innerHTML=cards||'<div class="skel">Nenhum médico cadastrado na grade ainda.</div>';
   }
