@@ -248,12 +248,7 @@
   // BAIAS por sala. Modo simples: {cols, slots:[...]}. Modo posicionado: {cols, rows, cells:[{slot,col,row,colspan,rowspan,vert}]}
   const BAIAS = {
     areaADM:  { cols:2, slots:['L1','R1','L2','R2','L3','R3'] },   // 3 esq + 3 dir
-    recepcao: { cols:4, rows:3, cells:[                            // meninas no corredor (direita) + Francisca atravessada atrás (esquerda, faixa fina)
-      { slot:'F',  col:1, row:1, colspan:1, rowspan:3, vert:true },// Francisca: faixa transversal atrás das três
-      { slot:'B1', col:2, row:1, colspan:3 },                      // Bruna   (topo)
-      { slot:'B2', col:2, row:2, colspan:3 },                      // Andressa(meio)
-      { slot:'B3', col:2, row:3, colspan:3 },                      // Julya   (embaixo, perto do Lounge)
-    ]},
+    recepcao: { cols:1, slots:['F','B1','B2','B3'] },              // empilhadas: Francisca (atrás/topo) · Bruna · Andressa · Julya (embaixo, perto do Lounge)
   };
   const PH = h => ({ 1:{t:'P',h}, 2:{t:'P',h}, 3:{t:'P',h}, 4:{t:'P',h}, 5:{t:'P',h} });   // Seg-Sex presencial no mesmo horário
   const FUNCIONARIOS = {
