@@ -64,6 +64,10 @@
 
   /* ===== CARDS detalhe (grade dos médicos) ===== */
   .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .cards-sep{grid-column:1/-1;font-size:13px;font-weight:700;color:var(--green);
+    margin:6px 0 -2px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .cards-sep.off{color:var(--muted);margin-top:18px}
+  .card-off{opacity:.62}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
   .card .ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:11px}
   .card .ch .nm{font-weight:700;font-size:14.5px}
@@ -301,22 +305,27 @@
       `<span><b>${totalDisp}</b> ${totalDisp===1?'horário disponível':'horários disponíveis'} no dia</span>`+
       (totalDisp?`<span>Sala com mais horários: <b style="color:#34d399">${topRoom} (${topN})</b></span>`:'<span>Nenhum médico escalado neste dia.</span>');
 
-    // ===== Cards (grade por médico — todos os horários + seletor de sala) =====
-    let cards='';
+    // ===== Cards: quem ATENDE no dia em cima, quem NÃO ATENDE embaixo =====
+    let comCards='', semCards=''; let nCom=0, nSem=0;
     Object.entries(GRADE).forEach(([id,doc])=>{
       const blocos=doc.dias[wd]||[];
       const sel=`<div class="salaSel">🚪 <select onchange="setSala('${id}',this.value)">${optionsHtml(getSala(id))}</select></div>`;
       if(!blocos.length){
-        cards+=`<div class="card"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div>${sel}</div>`;
+        nSem++;
+        semCards+=`<div class="card card-off"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div>${sel}</div>`;
         return;
       }
+      nCom++;
       let chips='',n=0;
       blocos.forEach(b=>{
         if(b.horarios){ b.horarios.forEach(h=>{ n++; chips+=`<span class="chip">${h}</span>`; }); }
         else { for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ n++; chips+=`<span class="chip">${minToHm(m)}</span>`; } }
       });
-      cards+=`<div class="card"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd">${n} disponíve${n!==1?'is':'l'}</span></div><div class="chips">${chips}</div>${sel}</div>`;
+      comCards+=`<div class="card"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd">${n} disponíve${n!==1?'is':'l'}</span></div><div class="chips">${chips}</div>${sel}</div>`;
     });
+    let cards = '';
+    if(nCom) cards += `<div class="cards-sep">✅ Atendem ${SEMANA[wd].toLowerCase()} (${nCom})</div>` + comCards;
+    if(nSem) cards += `<div class="cards-sep off">🚫 Não atendem ${SEMANA[wd].toLowerCase()} (${nSem})</div>` + semCards;
     document.getElementById('cards').innerHTML=cards||'<div class="skel">Nenhum médico cadastrado na grade ainda.</div>';
   }
 
