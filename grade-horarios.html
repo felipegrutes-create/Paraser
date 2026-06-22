@@ -49,6 +49,9 @@
   .salas-room-aux .salas-room-name{color:var(--muted);opacity:.8}
   .salas-room-split{display:flex;flex-direction:column;padding:0;overflow:hidden;cursor:default}
   .salas-room-split .salas-room-name{padding:5px 7px 2px;flex:0 0 auto}
+  /* sala com médico no dia: borda verde forte + leve brilho, pra saltar do mapa */
+  .salas-room-split.room-ativo{border:1.5px solid rgba(16,185,129,.65);box-shadow:0 0 0 1px rgba(16,185,129,.18) inset, 0 4px 16px rgba(16,185,129,.10)}
+  .salas-room-split.room-ativo .salas-room-name{color:#7fffd4}
   .salas-room-doc{flex:0 0 auto;padding:0 7px 3px;font-size:9.5px;font-weight:700;color:var(--green);
     text-transform:none;letter-spacing:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .salas-room-half{flex:1 1 0;min-height:20px;display:flex;align-items:center;gap:4px;padding:2px 7px;font-size:11px;
@@ -56,8 +59,8 @@
   .salas-room-half .salas-half-per{opacity:.85;font-size:11px}
   .salas-room-half b{color:#fff;font-size:12px;font-weight:800}
   .salas-room-half .salas-half-fx{color:rgba(255,255,255,0.55);font-size:10px}
-  .salas-room-half.av{color:var(--green)}
-  .salas-room-half.av b{color:var(--green)}
+  .salas-room-half.av{color:#d1fae5}
+  .salas-room-half.av b{color:#fff;font-size:13px}
   .salas-room-half .salas-half-na{color:var(--muted);opacity:.45}
   .salas-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
   .salas-summary b{color:var(--text)}
@@ -342,12 +345,12 @@
       const half=arr=> arr.length
         ? `<b>${arr.length}</b><span class="salas-half-fx"> horário${arr.length!==1?'s':''}</span>`
         : `<span class="salas-half-na">—</span>`;
-      const avBg = n => n>0 ? 'background:rgba(16,185,129,0.13);' : 'background:rgba(255,255,255,0.02);';
+      const avBg = n => n>0 ? 'background:rgba(16,185,129,0.28);' : 'background:rgba(255,255,255,0.015);';
       const docs=comp.roomDocs[s.area]||[];
       const horasTxt = slots.length ? slots.map(minToHm).join(', ') : 'sem atendimento';
       const tip=`${s.nome}${docs.length?` — ${docs.join(', ')}`:''}\n🌅 Manhã: ${sM.length} horário(s)\n🌇 Tarde: ${sT.length} horário(s)\nDisponíveis: ${horasTxt}`;
       const docLine = docs.length ? `<div class="salas-room-doc">${docs.join(' · ')}</div>` : '';
-      return `<div class="salas-room salas-room-split" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
+      return `<div class="salas-room salas-room-split${slots.length?' room-ativo':''}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
         <div class="salas-room-name">${s.nome}</div>${docLine}
         <div class="salas-room-half ${sM.length?'av':''}" style="${avBg(sM.length)}"><span class="salas-half-per">🌅</span>${half(sM)}</div>
         <div class="salas-room-half ${sT.length?'av':''}" style="${avBg(sT.length)}"><span class="salas-half-per">🌇</span>${half(sT)}</div>
