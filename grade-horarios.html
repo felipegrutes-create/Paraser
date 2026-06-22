@@ -68,11 +68,11 @@
   /* ===== BAIAS (funcionários) ===== */
   .baia-room{padding:0;overflow:hidden}
   .baia-room .salas-room-name{padding:5px 7px 3px;flex:0 0 auto}
-  .baias{flex:1 1 0;display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:0 5px 5px;align-content:stretch}
-  .baia{border-radius:6px;border:1.5px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.05);
+  .baias{flex:1 1 0;display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:0 4px 4px;align-content:stretch}
+  .baia{border-radius:5px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.05);
     display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
-    padding:3px;min-height:30px;overflow:hidden;line-height:1.15}
-  .baia-nm{font-size:9.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+    padding:1px 2px;min-height:20px;overflow:hidden;line-height:1.1}
+  .baia-nm{font-size:9px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .baia-st{font-size:8px;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .baia-e{border-style:dashed;border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.045)}
   .baia-p{background:rgba(16,185,129,0.30);border-color:rgba(16,185,129,0.85);color:#d1fae5;box-shadow:0 0 0 1px rgba(16,185,129,.25) inset}
@@ -179,7 +179,7 @@
     { area:'hallGr',    nome:'Sala de Espera',       clinical:false },
     { area:'areaADM',   nome:'Área ADM',             clinical:false },
   ];
-  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":2,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":1},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":3}};
+  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":1,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":1},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":3}};
   function salasPosStyle(area){ const p=SALAS_POS[area]; if(!p) return `grid-area:${area}`; return `grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};`; }
 
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
@@ -246,11 +246,11 @@
   // BAIAS por sala. Modo simples: {cols, slots:[...]}. Modo posicionado: {cols, rows, cells:[{slot,col,row,colspan,rowspan,vert}]}
   const BAIAS = {
     areaADM:  { cols:2, slots:['L1','R1','L2','R2','L3','R3'] },   // 3 esq + 3 dir
-    recepcao: { cols:3, rows:3, cells:[                            // meninas no corredor (direita) + Francisca atravessada atrás (esquerda)
+    recepcao: { cols:4, rows:3, cells:[                            // meninas no corredor (direita) + Francisca atravessada atrás (esquerda, faixa fina)
       { slot:'F',  col:1, row:1, colspan:1, rowspan:3, vert:true },// Francisca: faixa transversal atrás das três
-      { slot:'B1', col:2, row:1, colspan:2 },                      // Bruna   (topo)
-      { slot:'B2', col:2, row:2, colspan:2 },                      // Andressa(meio)
-      { slot:'B3', col:2, row:3, colspan:2 },                      // Julya   (embaixo, perto do Lounge)
+      { slot:'B1', col:2, row:1, colspan:3 },                      // Bruna   (topo)
+      { slot:'B2', col:2, row:2, colspan:3 },                      // Andressa(meio)
+      { slot:'B3', col:2, row:3, colspan:3 },                      // Julya   (embaixo, perto do Lounge)
     ]},
   };
   const PH = h => ({ 1:{t:'P',h}, 2:{t:'P',h}, 3:{t:'P',h}, 4:{t:'P',h}, 5:{t:'P',h} });   // Seg-Sex presencial no mesmo horário
