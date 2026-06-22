@@ -80,8 +80,10 @@
   .baia-h{background:rgba(96,165,250,0.30);border-color:rgba(96,165,250,0.85);color:#dbeafe;box-shadow:0 0 0 1px rgba(96,165,250,.25) inset}
   .baia-h .baia-nm{color:#fff}
   .baia-f{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.2);color:var(--muted)}
-  .baia-vert .baia-nm,.baia-vert .baia-st{writing-mode:vertical-rl;transform:rotate(180deg);line-height:1}
-  .baia-vert{gap:2px}
+  /* faixa vertical (ex: Francisca): nome e horario na MESMA coluna (nome em cima, horario embaixo) */
+  .baia-vert .baia-vline{writing-mode:vertical-rl;text-orientation:mixed;white-space:nowrap;line-height:1.2;text-align:center}
+  .baia-vert .baia-vline .baia-st{opacity:.95}
+  .baia-vert .baia-vline .baia-sep{opacity:.45}
 
   /* ===== CARDS detalhe (grade dos médicos) ===== */
   .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
@@ -274,7 +276,10 @@
       let cls='baia-f', st='folga', tip=`${f.nome} — folga`;
       if(esc && esc.t==='P'){ cls='baia-p'; st=esc.h||'presencial'; tip=`${f.nome} — presencial${esc.h?' ('+esc.h+')':''}`; }
       else if(esc && esc.t==='H'){ cls='baia-h'; st='🏠 home'; tip=`${f.nome} — home office`; }
-      return `<div class="baia ${cls}${vc}" style="${style||''}" title="${escAttr(tip)}"><span class="baia-nm">${f.nome}</span><span class="baia-st">${st}</span></div>`;
+      const inner = vert
+        ? `<span class="baia-vline"><span class="baia-nm">${f.nome}</span><span class="baia-sep"> · </span><span class="baia-st">${st}</span></span>`
+        : `<span class="baia-nm">${f.nome}</span><span class="baia-st">${st}</span>`;
+      return `<div class="baia ${cls}${vc}" style="${style||''}" title="${escAttr(tip)}">${inner}</div>`;
     };
     let inner, gridStyle;
     if(cfg.cells){
