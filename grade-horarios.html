@@ -28,40 +28,61 @@
   .btn:hover{filter:brightness(1.08)}
   .btn:disabled{opacity:.55;cursor:default}
   .btn.ghost{background:#fff;color:var(--roxo);border:1px solid var(--linha)}
-  .weeknav{display:flex;align-items:center;gap:8px}
-  .weeknav .lbl{font-weight:700;font-size:15px;min-width:200px;text-align:center;text-transform:capitalize}
+  .daynav{display:flex;align-items:center;gap:8px}
+  .daynav .lbl{font-weight:700;font-size:15px;min-width:210px;text-align:center;text-transform:capitalize}
+  .timebox{display:flex;align-items:center;gap:10px}
+  .timebox .hr{font-weight:700;font-size:18px;color:var(--roxo);min-width:58px;text-align:center}
+  .slider{-webkit-appearance:none;appearance:none;width:220px;height:6px;border-radius:3px;
+    background:var(--linha);cursor:pointer}
+  .slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--roxo2);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--roxo2);cursor:pointer;border:2px solid #fff}
   .bar .meta{color:var(--muted);font-size:13px;margin-left:auto}
-  .legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 24px;background:#fff;border-bottom:1px solid var(--linha);font-size:13px;color:var(--muted)}
-  .legend i{display:inline-block;width:13px;height:13px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid}
-  .legend i.l{background:var(--livre-bg);border-color:var(--livre-bd)}
-  .legend i.o{background:var(--ocup-bg);border-color:var(--ocup-bd)}
-  .legend i.x{background:var(--off);border-color:var(--linha)}
 
   main{padding:22px 24px 60px;max-width:1320px;margin:0 auto}
   #erro:empty{display:none}
   .erro{background:var(--ocup-bg);color:var(--ocup);border:1px solid var(--ocup-bd);padding:14px 18px;border-radius:11px;margin-bottom:20px}
 
-  .scroll{overflow-x:auto;padding-bottom:8px}
-  table.grade{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;background:#fff;border:1px solid var(--linha);border-radius:14px;overflow:hidden}
-  table.grade th,table.grade td{border-bottom:1px solid var(--linha);border-right:1px solid var(--linha);vertical-align:top}
-  table.grade th:last-child,table.grade td:last-child{border-right:none}
-  table.grade tr:last-child td{border-bottom:none}
-  thead th{background:linear-gradient(90deg,rgba(124,58,237,.08),transparent);padding:12px 10px;font-size:13px;font-weight:700;text-align:center;text-transform:capitalize;color:var(--roxo)}
-  thead th small{display:block;color:var(--muted);font-weight:500;font-size:11px}
-  thead th.hoje{background:rgba(124,58,237,.18)}
-  th.doc{position:sticky;left:0;z-index:2;background:#fff;text-align:left;min-width:190px;padding:14px 14px}
-  td.doc{position:sticky;left:0;z-index:1;background:#fff;padding:12px 14px;min-width:190px}
-  td.doc .nome{font-weight:700;font-size:14.5px}
-  td.doc .esp{color:var(--muted);font-size:12px;margin-top:2px}
-  td.doc .resumo{margin-top:7px;font-size:11.5px;color:var(--livre);font-weight:700}
-  td.day{padding:8px;min-width:120px}
-  td.day.off{background:var(--off)}
-  td.day.off .dash{color:var(--muted);font-size:13px;text-align:center;display:block;padding:8px 0}
-  .slot{border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;font-size:13px;border:1px solid;margin-bottom:6px}
-  .slot:last-child{margin-bottom:0}
-  .slot.livre{background:var(--livre-bg);border-color:var(--livre-bd);color:var(--livre)}
-  .slot.ocup{background:var(--ocup-bg);border-color:var(--ocup-bd);color:var(--ocup)}
-  .slot .lab{display:block;font-size:9.5px;font-weight:700;letter-spacing:.3px;margin-top:1px;text-transform:uppercase;opacity:.85}
+  h2.secn{font-family:'Playfair Display',serif;font-size:19px;margin:4px 0 14px;color:var(--roxo)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-bottom:14px}
+  .legend i{display:inline-block;width:13px;height:13px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid}
+  .legend i.l{background:var(--livre-bg);border-color:var(--livre-bd)}
+  .legend i.o{background:var(--ocup-bg);border-color:var(--ocup-bd)}
+  .legend i.f{background:#fff;border-color:var(--linha)}
+  .legend i.x{background:var(--off);border-color:var(--linha)}
+
+  /* ===== MAPA (caixinhas, estilo salas) ===== */
+  .mapa{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin-bottom:34px}
+  .box{border-radius:13px;border:1.5px solid var(--linha);background:#fff;padding:13px 14px;min-height:96px;
+    display:flex;flex-direction:column;gap:3px;transition:transform .08s}
+  .box:hover{transform:translateY(-2px)}
+  .box .nm{font-weight:700;font-size:14.5px;line-height:1.2}
+  .box .es{font-size:11.5px;color:var(--muted)}
+  .box .st{margin-top:auto;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}
+  .box .ct{font-size:11.5px;color:var(--muted);font-weight:600}
+  .box.livre{background:var(--livre-bg);border-color:var(--livre-bd)}
+  .box.livre .st{color:var(--livre)}
+  .box.ocup{background:var(--ocup-bg);border-color:var(--ocup-bd)}
+  .box.ocup .st{color:var(--ocup)}
+  .box.fora .st{color:var(--muted)}
+  .box.off{background:var(--off)}
+  .box.off .nm,.box.off .es{opacity:.75}
+  .box.off .st{color:var(--muted)}
+
+  /* ===== CARDS (detalhe do dia) ===== */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+  .card{background:#fff;border:1px solid var(--linha);border-radius:13px;padding:14px 16px}
+  .card .ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .card .ch .nm{font-weight:700;font-size:15px}
+  .card .ch .nm small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+  .card .ch .bd{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--livre-bg);color:var(--livre);border:1px solid var(--livre-bd)}
+  .card .ch .bd.zero{background:var(--off);color:var(--muted);border-color:var(--linha)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid;text-align:center;min-width:62px}
+  .chip.livre{background:var(--livre-bg);color:var(--livre);border-color:var(--livre-bd)}
+  .chip.ocup{background:var(--ocup-bg);color:var(--ocup);border-color:var(--ocup-bd)}
+  .chip.now{outline:2px solid var(--roxo2);outline-offset:1px}
+  .card .nota{color:var(--muted);font-size:13px}
 
   .skel{padding:40px;text-align:center;color:var(--muted);font-size:15px}
   .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px}
@@ -72,34 +93,44 @@
 <body>
 <header class="top">
   <h1>Grade de Horários — Médicos</h1>
-  <div class="sub">Escala de atendimento × ocupação ao vivo do Feegow — uso da recepção</div>
+  <div class="sub">Mapa do dia × ocupação ao vivo do Feegow — uso da recepção</div>
 </header>
 
 <div class="bar">
-  <div class="weeknav">
-    <button class="btn ghost" onclick="mudaSemana(-1)">◀</button>
-    <span class="lbl" id="lblSemana">—</span>
-    <button class="btn ghost" onclick="mudaSemana(1)">▶</button>
+  <div class="daynav">
+    <button class="btn ghost" onclick="mudaDia(-1)">◀</button>
+    <span class="lbl" id="lblDia">—</span>
+    <button class="btn ghost" onclick="mudaDia(1)">▶</button>
   </div>
   <button class="btn" onclick="irHoje()">Hoje</button>
+  <div class="timebox">
+    <input type="range" class="slider" id="slider" min="420" max="1200" step="30" oninput="onSlider()">
+    <span class="hr" id="lblHora">--:--</span>
+  </div>
   <button class="btn ghost" id="btnRefresh" onclick="carregar()">🔄 Atualizar</button>
   <span class="meta" id="metaAtualizado">Carregando…</span>
-</div>
-<div class="legend">
-  <span><i class="l"></i> Livre</span>
-  <span><i class="o"></i> Ocupado</span>
-  <span><i class="x"></i> Não atende</span>
 </div>
 
 <main>
   <div id="erro"></div>
-  <div class="scroll"><div id="tabela"><div class="skel">Carregando grade…</div></div></div>
+
+  <h2 class="secn">🗺️ Mapa do dia <span id="mapaHora" style="font-weight:400;color:var(--muted);font-size:14px"></span></h2>
+  <div class="legend">
+    <span><i class="l"></i> Livre agora</span>
+    <span><i class="o"></i> Ocupado agora</span>
+    <span><i class="f"></i> Fora do horário</span>
+    <span><i class="x"></i> Não atende hoje</span>
+  </div>
+  <div class="mapa" id="mapa"><div class="skel">Carregando mapa…</div></div>
+
+  <h2 class="secn">📋 Detalhe do dia</h2>
+  <div class="cards" id="cards"></div>
 </main>
 
 <footer>
-  A <b>grade</b> (dias e horários que cada médico atende) está gravada no código, conforme configurado no Feegow.
-  A <b>ocupação</b> é lida ao vivo do Feegow: verde = horário livre, vermelho = já agendado.
-  Cancelados/remarcados liberam o horário automaticamente. Para incluir um novo médico ou mudar a grade, me avise.
+  O <b>mapa</b> mostra cada médico no horário escolhido no slider (verde = livre, vermelho = ocupado, fora do horário ou não atende em cinza).
+  Os <b>cards</b> embaixo detalham todos os horários do dia. A <b>grade</b> (dias/horários de cada médico) está gravada no código conforme o Feegow;
+  a <b>ocupação</b> é lida ao vivo. Cancelados/remarcados liberam o horário. Para incluir um médico ou mudar a grade, me avise.
 </footer>
 
 <script>
@@ -107,11 +138,10 @@
   const PROXY_URL = "https://script.google.com/macros/s/AKfycbzVhtXPGjYwJmoKTj3sd9_EF86xcIyLuQMWWyMT33R59C-B4xVZMoD70qEn7pK6MF1ncA/exec";
   const GONE      = [11,15,22];        // desmarcado / remarcado / cancelado → libera o horário
   const REFRESH_MS= 5*60*1000;
-  const DIAS      = [1,2,3,4,5,6];     // Seg..Sáb (0=domingo; raramente atende)
-  const NOME_DIA  = {0:'Domingo',1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
+  const SEMANA    = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
-  // Chave = profissional_id do Feegow. dias: 1=Seg ... 6=Sáb.
+  // Chave = profissional_id do Feegow. dias: 0=Dom 1=Seg ... 6=Sáb.
   // Cada bloco: {ini:'HH:MM', fim:'HH:MM', dur:minutos}. Vários blocos por dia = manhã+tarde.
   const GRADE = {
     20: { nome:'Bruna Ortiz', esp:'Ginecologia', dias:{
@@ -124,17 +154,17 @@
   // ===== Helpers =====
   const pad = n => String(n).padStart(2,'0');
   const fmtFeegow = d => pad(d.getDate())+'-'+pad(d.getMonth()+1)+'-'+d.getFullYear();
-  const keyOf = d => pad(d.getDate())+'-'+pad(d.getMonth()+1)+'-'+d.getFullYear();
   const hmToMin = hm => { const [a,b]=hm.split(':'); return (+a)*60+(+b); };
   const minToHm = m => pad(Math.floor(m/60))+':'+pad(m%60);
 
-  function inicioSemana(d){ // segunda-feira da semana de d
-    const x = new Date(d); x.setHours(0,0,0,0);
-    const dow = x.getDay();               // 0=dom
-    const diff = (dow===0?-6:1-dow);      // volta até segunda
-    x.setDate(x.getDate()+diff);
-    return x;
-  }
+  // ===== Estado =====
+  let diaAtual = new Date(); diaAtual.setHours(0,0,0,0);
+  let horaSel  = Math.min(1200, Math.max(420, Math.round((new Date().getHours()*60+new Date().getMinutes())/30)*30));
+  let _byDoc   = {};   // cache da carga: byDoc[profId][dataKey] = [{start,dur}]
+
+  function mudaDia(delta){ diaAtual.setDate(diaAtual.getDate()+delta); carregar(); }
+  function irHoje(){ diaAtual=new Date(); diaAtual.setHours(0,0,0,0); carregar(); }
+  function onSlider(){ horaSel = +document.getElementById('slider').value; pintar(); }
 
   async function feegowFetch(endpoint, params={}) {
     const qs = new URLSearchParams({ action:'feegow_proxy', endpoint });
@@ -146,61 +176,63 @@
     return d;
   }
 
-  // ===== Estado =====
-  let segAtual = inicioSemana(new Date());
+  // ocupado em determinado minuto?
+  function ocupadoEm(ocupSet, min){ return ocupSet.some(a => a.start<=min && min < a.start+a.dur); }
+  // ocupado em algum ponto do slot [m, m+dur)?
+  function slotOcupado(ocupSet, m, dur){ return ocupSet.some(a => a.start < m+dur && (a.start+a.dur) > m); }
 
-  function mudaSemana(delta){ segAtual.setDate(segAtual.getDate()+delta*7); carregar(); }
-  function irHoje(){ segAtual = inicioSemana(new Date()); carregar(); }
+  // ===== Pintar (usa cache _byDoc; roda também ao mexer no slider) =====
+  function pintar(){
+    const wd = diaAtual.getDay();
+    const k  = fmtFeegow(diaAtual);
+    document.getElementById('lblHora').textContent = minToHm(horaSel);
+    document.getElementById('slider').value = horaSel;
+    document.getElementById('mapaHora').textContent = '· ' + minToHm(horaSel);
+    document.getElementById('lblDia').textContent = `${SEMANA[wd]}, ${pad(diaAtual.getDate())}/${pad(diaAtual.getMonth()+1)}`;
 
-  // ===== Render =====
-  function render(byDoc){
-    const hojeKey = keyOf(new Date());
-    const diasData = DIAS.map(i => { const d=new Date(segAtual); d.setDate(d.getDate()+(i-1)); return d; });
+    let mapa='', cards='';
+    Object.entries(GRADE).forEach(([pid, doc]) => {
+      const blocos = doc.dias[wd] || [];
+      const ocupSet = (_byDoc[pid] && _byDoc[pid][k]) || [];
 
-    let head = '<tr><th class="doc">Médico</th>';
-    diasData.forEach(d => {
-      const k = keyOf(d);
-      head += `<th class="${k===hojeKey?'hoje':''}">${NOME_DIA[d.getDay()]}<small>${pad(d.getDate())}/${pad(d.getMonth()+1)}</small></th>`;
-    });
-    head += '</tr>';
+      // ---- MAPA: status no horário do slider ----
+      let cls='off', st='Não atende', ct='';
+      if(blocos.length){
+        const dentro = blocos.some(b => horaSel>=hmToMin(b.ini) && horaSel<hmToMin(b.fim));
+        // conta livres do dia
+        let livres=0,total=0;
+        blocos.forEach(b=>{ for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ total++; if(!slotOcupado(ocupSet,m,b.dur)) livres++; } });
+        ct = `${livres} livre${livres!==1?'s':''} de ${total} hoje`;
+        if(!dentro){ cls='fora'; st='⏸️ Fora do horário'; }
+        else if(ocupadoEm(ocupSet,horaSel)){ cls='ocup'; st='🔴 Ocupado'; }
+        else { cls='livre'; st='🟢 Livre'; }
+      }
+      mapa += `<div class="box ${cls}"><div class="nm">${doc.nome}</div><div class="es">${doc.esp||''}</div>`+
+              `<div class="st">${st}</div>${ct?`<div class="ct">${ct}</div>`:''}</div>`;
 
-    let body = '';
-    Object.entries(GRADE).forEach(([profId, doc]) => {
-      let livreTot=0, ocupTot=0;
-      let row = `<td class="doc"><div class="nome">${doc.nome}</div><div class="esp">${doc.esp||''}</div><div class="resumo" id="res-${profId}"></div></td>`;
-      diasData.forEach((d,idx) => {
-        const dia = DIAS[idx];
-        const blocos = doc.dias[dia];
-        if(!blocos || !blocos.length){ row += '<td class="day off"><span class="dash">—</span></td>'; return; }
-        const k = keyOf(d);
-        const ocupSet = (byDoc[profId] && byDoc[profId][k]) || [];
-        let cell = '';
-        blocos.forEach(b => {
-          for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){
-            const fimSlot = m+b.dur;
-            const ocupado = ocupSet.some(a => a.start < fimSlot && (a.start+a.dur) > m);
-            if(ocupado) ocupTot++; else livreTot++;
-            cell += `<div class="slot ${ocupado?'ocup':'livre'}">${minToHm(m)}<span class="lab">${ocupado?'ocupado':'livre'}</span></div>`;
+      // ---- CARD: timeline do dia ----
+      if(!blocos.length){
+        cards += `<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div>`+
+                 `<span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div></div>`;
+      } else {
+        let chips='', livres=0;
+        blocos.forEach(b=>{
+          for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){
+            const oc = slotOcupado(ocupSet,m,b.dur); if(!oc) livres++;
+            const now = (horaSel>=m && horaSel<m+b.dur) ? ' now' : '';
+            chips += `<span class="chip ${oc?'ocup':'livre'}${now}">${minToHm(m)}</span>`;
           }
         });
-        row += `<td class="day">${cell}</td>`;
-      });
-      body += `<tr>${row}</tr>`;
-      // guarda resumo p/ pintar depois
-      doc._resumo = `🟢 ${livreTot} livre${livreTot!==1?'s':''} · 🔴 ${ocupTot}`;
+        const bd = livres ? `<span class="bd">${livres} livre${livres!==1?'s':''}</span>` : `<span class="bd zero">cheia</span>`;
+        cards += `<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div>${bd}</div>`+
+                 `<div class="chips">${chips}</div></div>`;
+      }
     });
-
-    document.getElementById('tabela').innerHTML = `<table class="grade"><thead>${head}</thead><tbody>${body}</tbody></table>`;
-    Object.entries(GRADE).forEach(([profId, doc]) => {
-      const el = document.getElementById('res-'+profId); if(el) el.textContent = doc._resumo||'';
-    });
-
-    const fimSemana = new Date(segAtual); fimSemana.setDate(fimSemana.getDate()+5);
-    document.getElementById('lblSemana').textContent =
-      `${pad(segAtual.getDate())}/${pad(segAtual.getMonth()+1)} – ${pad(fimSemana.getDate())}/${pad(fimSemana.getMonth()+1)}`;
+    document.getElementById('mapa').innerHTML = mapa || '<div class="skel">Nenhum médico cadastrado na grade.</div>';
+    document.getElementById('cards').innerHTML = cards;
   }
 
-  // ===== Carga =====
+  // ===== Carga (busca agendamentos do dia) =====
   let _carregando = false;
   async function carregar(){
     if(_carregando) return;
@@ -211,25 +243,22 @@
     btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Atualizando…';
     erro.innerHTML='';
     try{
-      const fim = new Date(segAtual); fim.setDate(fim.getDate()+5);
-      const data = await feegowFetch('/appoints/search', { data_start:fmtFeegow(segAtual), data_end:fmtFeegow(fim) });
+      const k = fmtFeegow(diaAtual);
+      const data = await feegowFetch('/appoints/search', { data_start:k, data_end:k });
       const todos = Array.isArray(data.content) ? data.content : [];
-
-      // byDoc[profId][dataKey] = [{start,dur}] (vivos)
-      const byDoc = {};
+      _byDoc = {};
       todos.forEach(a => {
         if(GONE.indexOf(Number(a.status_id))>=0) return;
         const pid = String(a.profissional_id);
-        if(!GRADE[pid]) return; // só médicos da grade
+        if(!GRADE[pid]) return;
         const hm = (a.horario||'').slice(0,5);
         if(!/^\d{2}:\d{2}$/.test(hm)) return;
         const start = hmToMin(hm);
         const dur = Math.max(15, parseInt(a.duracao)||30);
-        (byDoc[pid] = byDoc[pid]||{});
-        (byDoc[pid][a.data] = byDoc[pid][a.data]||[]).push({start,dur});
+        (_byDoc[pid] = _byDoc[pid]||{});
+        (_byDoc[pid][a.data] = _byDoc[pid][a.data]||[]).push({start,dur});
       });
-
-      render(byDoc);
+      pintar();
       const agora = new Date();
       meta.textContent = `Atualizado ${pad(agora.getHours())}:${pad(agora.getMinutes())} · ao vivo do Feegow`;
     }catch(e){
