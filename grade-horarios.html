@@ -65,6 +65,24 @@
   .salas-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
   .salas-summary b{color:var(--text)}
 
+  /* ===== EDITOR DE LAYOUT (só desta grade) ===== */
+  .navbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(0,212,170,.12)}
+  .g-edit-toolbar{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+  .g-edit-hint{font-size:12.5px;color:var(--text)}
+  .g-edit-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .g-edit-actions button{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 12px;font-family:inherit;font-size:13px;cursor:pointer}
+  .g-edit-actions .save{border-color:rgba(0,212,170,.45);background:rgba(0,212,170,.16);color:var(--accent)}
+  .g-edit-actions .copy{border-color:rgba(120,160,255,.45);background:rgba(120,160,255,.16);color:#aac4ff}
+  .g-edit-msg{font-size:12px;color:#34d399;margin-top:8px;min-height:16px}
+  .g-edit-room{border-radius:9px;border:2px solid var(--border);padding:8px;display:flex;flex-direction:column;
+    justify-content:space-between;font-size:12px;font-weight:700;cursor:grab;position:relative;overflow:hidden;
+    user-select:none;touch-action:none}
+  .g-edit-room.clin{background:rgba(0,212,170,.15);border-color:rgba(0,212,170,.45);color:#7fffd4}
+  .g-edit-room.aux{background:rgba(255,255,255,.04);color:var(--muted)}
+  .g-edit-room.dragging{cursor:grabbing;box-shadow:0 10px 28px rgba(0,0,0,.55);opacity:.92;z-index:50}
+  .g-edit-resize{position:absolute;right:2px;bottom:2px;width:15px;height:15px;cursor:nwse-resize;opacity:.6;
+    background:linear-gradient(135deg,transparent 50%,currentColor 50%)}
+
   /* ===== BAIAS (funcionários) ===== */
   .baia-room{padding:0;overflow:hidden}
   .baia-room .salas-room-name{padding:5px 7px 3px;flex:0 0 auto}
@@ -120,12 +138,14 @@
   <span class="daylbl" id="lblDia">—</span>
   <button class="navbtn" onclick="mudaDia(1)">▶</button>
   <button class="today" onclick="irHoje()">Hoje</button>
+  <button class="navbtn" id="gEditBtn" onclick="gToggleEdit()">✏️ Editar layout</button>
   <span class="meta" id="metaInfo"></span>
 </div>
 
 <main>
   <div class="panel">
     <div class="salas-card-head">📊 Visão global do dia <span class="salas-card-sub" id="mapaSub"></span></div>
+    <div id="gEditTools"></div>
     <div class="salas-fp-wrap"><div class="salas-floorplan" id="floorplan"></div></div>
     <div class="salas-summary" id="summary"></div>
   </div>
@@ -181,8 +201,16 @@
     { area:'hallGr',    nome:'Sala de Espera',       clinical:false },
     { area:'areaADM',   nome:'Área ADM',             clinical:false },
   ];
-  const SALAS_POS = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":1,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":2},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":3}};
-  function salasPosStyle(area){ const p=SALAS_POS[area]; if(!p) return `grid-area:${area}`; return `grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};`; }
+  const SALAS_POS_DEFAULT = {"esperaVIP":{"r":1,"c":1,"w":1,"h":2},"psico":{"r":1,"c":2,"w":1,"h":2},"reproH":{"r":1,"c":3,"w":1,"h":2},"gineco":{"r":1,"c":4,"w":1,"h":2},"concierge":{"r":1,"c":6,"w":1,"h":2},"adm":{"r":1,"c":5,"w":1,"h":2},"gerencia":{"r":1,"c":8,"w":1,"h":2},"enferm1":{"r":3,"c":1,"w":1,"h":1},"drRodolfo":{"r":4,"c":1,"w":1,"h":2},"usgErica":{"r":4,"c":4,"w":1,"h":2},"esperaGer":{"r":4,"c":5,"w":1,"h":2},"caixa":{"r":1,"c":7,"w":1,"h":2},"usgGen":{"r":4,"c":3,"w":1,"h":2},"wcMF":{"r":3,"c":8,"w":1,"h":1},"enferm2":{"r":6,"c":3,"w":1,"h":1},"usgDrSalv":{"r":6,"c":1,"w":1,"h":1},"enferm3":{"r":6,"c":4,"w":1,"h":1},"multiuso":{"r":8,"c":5,"w":1,"h":1},"recepcao":{"r":4,"c":6,"w":1,"h":2},"wcF":{"r":4,"c":8,"w":1,"h":1},"drJoselmo":{"r":7,"c":1,"w":1,"h":2},"fisioAcup":{"r":6,"c":5,"w":1,"h":2},"wcPCD":{"r":5,"c":8,"w":1,"h":2},"almox":{"r":8,"c":4,"w":1,"h":1},"copa":{"r":9,"c":4,"w":1,"h":1},"vestiario":{"r":9,"c":5,"w":1,"h":1},"hallGr":{"r":8,"c":6,"w":2,"h":2},"lounge":{"r":6,"c":6,"w":1,"h":2},"procedim":{"r":9,"c":1,"w":2,"h":1},"dml":{"r":8,"c":3,"w":1,"h":2},"areaADM":{"r":8,"c":8,"w":1,"h":3}};
+  // Posições editáveis SÓ desta grade (chave própria; NÃO mexe no Mapa de Salas do dashboard)
+  let _gpos = null;
+  function gradePos(){
+    if(_gpos) return _gpos;
+    _gpos = JSON.parse(JSON.stringify(SALAS_POS_DEFAULT));
+    try{ var s=localStorage.getItem('gradeHorariosLayout'); if(s) _gpos=Object.assign(_gpos, JSON.parse(s)); }catch(e){}
+    return _gpos;
+  }
+  function salasPosStyle(area){ const p=gradePos()[area]; if(!p) return `grid-area:${area}`; return `grid-column:${p.c} / span ${p.w}; grid-row:${p.r} / span ${p.h};`; }
 
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
   // Horários DISPONIBILIZADOS por cada médico. sala = área da planta. dias: 0=Dom..6=Sáb. Blocos {ini,fim,dur}.
@@ -413,6 +441,74 @@
     if(nCom) cards += `<div class="cards-sep">✅ Atendem ${SEMANA[wd].toLowerCase()} (${nCom})</div>` + comCards;
     if(nSem) cards += `<div class="cards-sep off">🚫 Não atendem ${SEMANA[wd].toLowerCase()} (${nSem})</div>` + semCards;
     document.getElementById('cards').innerHTML=cards||'<div class="skel">Nenhum médico cadastrado na grade ainda.</div>';
+  }
+
+  // ===== EDITOR DE LAYOUT (arrastar/redimensionar) — só desta grade =====
+  let _gEdit = false;
+  function gToggleEdit(){
+    _gEdit = !_gEdit;
+    const btn = document.getElementById('gEditBtn');
+    btn.textContent = _gEdit ? '✓ Sair do editor' : '✏️ Editar layout';
+    btn.classList.toggle('on', _gEdit);
+    if(_gEdit) gRenderEditor();
+    else { document.getElementById('gEditTools').innerHTML=''; render(); }
+  }
+  function gRenderEditor(){
+    const pos = gradePos();
+    const tiles = SALAS_LAYOUT.map(s=>{
+      const p = pos[s.area] || {r:1,c:1,w:1,h:1};
+      return `<div class="g-edit-room ${s.clinical?'clin':'aux'}" data-area="${s.area}" style="grid-column:${p.c} / span ${p.w};grid-row:${p.r} / span ${p.h}"><span>${s.nome}</span><div class="g-edit-resize" title="Arraste pra redimensionar"></div></div>`;
+    }).join('');
+    document.getElementById('gEditTools').innerHTML =
+      `<div class="g-edit-toolbar">
+        <span class="g-edit-hint">✋ <b>Arraste cada sala</b> pra mover. Puxe o cantinho ◢ pra <b>redimensionar</b>. Depois <b>Salvar</b>. (não muda o Mapa de Salas)</span>
+        <div class="g-edit-actions">
+          <button onclick="gResetLayout()">↺ Resetar</button>
+          <button class="save" onclick="gSaveLayout()">💾 Salvar</button>
+          <button class="copy" onclick="gCopyLayout()">📋 Copiar layout</button>
+          <button onclick="gToggleEdit()">✓ Concluir</button>
+        </div>
+        <div id="gEditMsg" class="g-edit-msg"></div>
+      </div>`;
+    const fp = document.getElementById('floorplan');
+    fp.innerHTML = tiles;
+    gAttachDrag(fp);
+    document.getElementById('summary').innerHTML = '';
+  }
+  function gAttachDrag(grid){
+    if(!grid) return;
+    const COLS=8, GAP=7, ROWH=78;
+    const cellAt=(x,y)=>{ const r=grid.getBoundingClientRect(); const colW=(r.width-(COLS-1)*GAP)/COLS;
+      return { col:Math.max(1,Math.min(COLS,Math.floor((x-r.left)/(colW+GAP))+1)), row:Math.max(1,Math.floor((y-r.top)/(ROWH+GAP))+1) }; };
+    let mode=null,area=null,el=null,sx=0,sy=0;
+    grid.querySelectorAll('.g-edit-room').forEach(room=>{
+      room.addEventListener('pointerdown',e=>{ e.preventDefault(); area=room.getAttribute('data-area'); el=room; sx=e.clientX; sy=e.clientY;
+        mode=e.target.classList.contains('g-edit-resize')?'resize':'move'; room.classList.add('dragging'); try{room.setPointerCapture(e.pointerId);}catch(_){} });
+      room.addEventListener('pointermove',e=>{ if(el!==room) return; const p=gradePos()[area];
+        if(mode==='move'){ room.style.transform=`translate(${e.clientX-sx}px,${e.clientY-sy}px)`; }
+        else { const cell=cellAt(e.clientX,e.clientY); const w=Math.max(1,Math.min(COLS-p.c+1,cell.col-p.c+1)); const h=Math.max(1,cell.row-p.r+1);
+          room.style.gridColumn=`${p.c} / span ${w}`; room.style.gridRow=`${p.r} / span ${h}`; } });
+      room.addEventListener('pointerup',e=>{ if(el!==room) return; const p=gradePos()[area]; const cell=cellAt(e.clientX,e.clientY);
+        if(mode==='move'){ room.style.transform=''; p.c=Math.max(1,Math.min(COLS-(p.w-1),cell.col)); p.r=Math.max(1,cell.row); }
+        else { p.w=Math.max(1,Math.min(COLS-p.c+1,cell.col-p.c+1)); p.h=Math.max(1,cell.row-p.r+1); }
+        room.classList.remove('dragging'); mode=null;area=null;el=null; gRenderEditor(); });
+    });
+  }
+  function gSaveLayout(){
+    try{ localStorage.setItem('gradeHorariosLayout', JSON.stringify(gradePos())); }catch(e){}
+    const m=document.getElementById('gEditMsg'); if(m){ m.textContent='✅ Layout salvo neste aparelho. (Pra valer pra todos, clique em Copiar e me mande)'; setTimeout(()=>{if(m)m.textContent='';},5000); }
+  }
+  function gResetLayout(){
+    _gpos = JSON.parse(JSON.stringify(SALAS_POS_DEFAULT));
+    try{ localStorage.removeItem('gradeHorariosLayout'); }catch(e){}
+    gRenderEditor();
+  }
+  function gCopyLayout(){
+    const json = JSON.stringify(gradePos());
+    try{ if(navigator.clipboard) navigator.clipboard.writeText(json); }catch(e){}
+    const m=document.getElementById('gEditMsg');
+    if(m){ m.innerHTML='✅ <b>Copiado!</b> Cole (Ctrl+V) aqui no chat do Claude pra eu gravar permanente. Se não colar, copie abaixo:'+
+      '<textarea readonly onclick="this.select()" style="width:100%;height:60px;margin-top:6px;font-size:11px;background:#0b0f1a;color:#7fffd4;border:1px solid #334;border-radius:6px;padding:6px;font-family:monospace">'+json.replace(/</g,'&lt;')+'</textarea>'; }
   }
 
   carregarShared();
