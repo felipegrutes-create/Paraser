@@ -159,11 +159,59 @@
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
   // Horários DISPONIBILIZADOS por cada médico. sala = área da planta. dias: 0=Dom..6=Sáb. Blocos {ini,fim,dur}.
   const GRADE = {
-    20: { nome:'Bruna Ortiz', trat:'Dra.', esp:'Ginecologia', sala:'gineco', dias:{
-      2:[{ini:'09:00', fim:'12:00', dur:60}],   // terça
-      3:[{ini:'09:00', fim:'12:00', dur:60}],   // quarta
+    // Dias: 1=Seg 2=Ter 3=Qua 4=Qui 5=Sex 6=Sáb. Bloco {ini,fim,dur} OU {horarios:[...],dur} (grade livre)
+    3:  { nome:'Rodolfo Salvato', trat:'Dr.',  esp:'Gineco e Obstetrícia', sala:'drRodolfo', dias:{
+      1:[{ini:'09:00',fim:'18:00',dur:30}], 2:[{ini:'09:00',fim:'18:00',dur:30}], 3:[{ini:'08:30',fim:'18:00',dur:30}],
+      4:[{ini:'09:00',fim:'18:00',dur:30}], 5:[{ini:'09:00',fim:'17:59',dur:30}], 6:[{ini:'08:00',fim:'11:59',dur:30}],
     }},
-    // ↓ próximos médicos: { nome, esp, sala:'<area>', dias:{...} }
+    15: { nome:'Joselmo Salvato', trat:'Dr.',  esp:'Gineco e Obstetrícia', sala:'drJoselmo', dias:{
+      1:[{ini:'08:20',fim:'11:20',dur:40},{ini:'14:00',fim:'17:20',dur:40}],
+      2:[{ini:'08:20',fim:'11:20',dur:40},{ini:'14:00',fim:'16:40',dur:40}],
+      3:[{ini:'08:20',fim:'16:00',dur:40}],
+      4:[{ini:'08:20',fim:'11:20',dur:40},{ini:'14:00',fim:'16:40',dur:40}],
+      5:[{ini:'08:20',fim:'12:00',dur:40}],
+    }},
+    7:  { nome:'Priscila Loyola', trat:'Dra.', esp:'Gineco e Obstetrícia', sala:'reproH', dias:{
+      1:[{ini:'10:00',fim:'14:00',dur:30}], 2:[{ini:'14:00',fim:'17:00',dur:20}], 3:[{ini:'09:00',fim:'13:00',dur:30}],
+      4:[{ini:'10:00',fim:'14:00',dur:60}], 5:[{ini:'10:00',fim:'14:00',dur:30}],
+    }},
+    11: { nome:'Marcelle Moura', trat:'Dra.', esp:'Gineco e Obstetrícia', sala:'gineco', dias:{
+      2:[{ini:'09:00',fim:'17:00',dur:20}], 4:[{ini:'09:00',fim:'13:00',dur:60}],
+    }},
+    4:  { nome:'Érica Stein', trat:'Dra.', esp:'Gineco e Obstetrícia', sala:'reproH', dias:{
+      1:[{ini:'09:00',fim:'17:30',dur:20}], 3:[{ini:'14:00',fim:'17:30',dur:20}], 5:[{ini:'09:00',fim:'12:30',dur:20}],
+    }},
+    20: { nome:'Bruna Ortiz', trat:'Dra.', esp:'Ginecologia', sala:'gineco', dias:{
+      2:[{ini:'09:00',fim:'12:00',dur:60}], 3:[{ini:'09:00',fim:'12:00',dur:60}],
+    }},
+    19: { nome:'Mário Barroso', trat:'Dr.', esp:'', sala:'reproH', dias:{
+      3:[{ini:'14:00',fim:'18:00',dur:60}],
+    }},
+    6:  { nome:'Helce Junior', trat:'Dr.', esp:'Urologia', sala:'reproH', dias:{
+      2:[{ini:'15:00',fim:'16:30',dur:30}], 3:[{ini:'17:00',fim:'18:00',dur:30}],
+    }},
+    23: { nome:'Magali Miranda', trat:'Dra.', esp:'Endocrinologia', sala:'gineco', dias:{
+      4:[{ini:'14:00',fim:'18:00',dur:45}],
+    }},
+    26: { nome:'Katia Chamorro', trat:'Dra.', esp:'Clínica Médica', sala:'reproH', dias:{
+      3:[{ini:'09:00',fim:'11:30',dur:15}],
+    }},
+    25: { nome:'Verônica Rezende', trat:'Dra.', esp:'Clínica Médica', sala:'gineco', dias:{
+      2:[{ini:'08:00',fim:'13:30',dur:60}],
+    }},
+    24: { nome:'Mabel Iglesias', trat:'Dra.', esp:'', sala:'gineco', dias:{
+      4:[{ini:'14:00',fim:'17:30',dur:30}],
+    }},
+    14: { nome:'Graziela Siqueira', trat:'Dra.', esp:'Nutrição', sala:'reproH', dias:{
+      2:[{horarios:['09:00','10:30','13:30','15:30','17:00'], dur:90}],
+      4:[{horarios:['09:00','10:30','13:30','15:30','17:00'], dur:90}],
+    }},
+    21: { nome:'Cristiane Vidal', trat:'Dra.', esp:'Acupuntura', sala:'fisioAcup', dias:{
+      1:[{ini:'14:00',fim:'18:00',dur:30}], 4:[{ini:'14:00',fim:'18:00',dur:30}],
+    }},
+    9:  { nome:'Sara Estruc', trat:'Dra.', esp:'Psicologia', sala:'psico', dias:{
+      1:[{ini:'09:30',fim:'12:50',dur:40}],
+    }},
   };
 
   // ===== Helpers =====
@@ -204,7 +252,10 @@
       const area=getSala(id); if(!area) return;
       if(!roomSlots[area]){ roomSlots[area]=[]; roomDocs[area]=[]; }   // permite remanejar p/ qualquer sala
       roomDocs[area].push(dispName(doc));
-      blocos.forEach(b=>{ for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){ roomSlots[area].push(m); } });
+      blocos.forEach(b=>{
+        if(b.horarios){ b.horarios.forEach(h=>roomSlots[area].push(hmToMin(h))); }
+        else { for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){ roomSlots[area].push(m); } }
+      });
     });
     Object.keys(roomSlots).forEach(a=>{ roomSlots[a]=[...new Set(roomSlots[a])].sort((x,y)=>x-y); });
     return {roomSlots, roomDocs};
@@ -260,7 +311,10 @@
         return;
       }
       let chips='',n=0;
-      blocos.forEach(b=>{ for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ n++; chips+=`<span class="chip">${minToHm(m)}</span>`; } });
+      blocos.forEach(b=>{
+        if(b.horarios){ b.horarios.forEach(h=>{ n++; chips+=`<span class="chip">${h}</span>`; }); }
+        else { for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ n++; chips+=`<span class="chip">${minToHm(m)}</span>`; } }
+      });
       cards+=`<div class="card"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd">${n} disponíve${n!==1?'is':'l'}</span></div><div class="chips">${chips}</div>${sel}</div>`;
     });
     document.getElementById('cards').innerHTML=cards||'<div class="skel">Nenhum médico cadastrado na grade ainda.</div>';
