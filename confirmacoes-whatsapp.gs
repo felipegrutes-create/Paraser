@@ -551,7 +551,7 @@ function getPatientData(pacienteId) {
 // procId=69  confirmado: INJÚRIA ENDOMETRIAL (Priscila 29/07/2025 14:45)
 // procId=152 confirmado: APLICAÇÃO DE FILGRASTIM (Marcelle 05/08/2025 12:30)
 // procId=153 USG REAPLICAÇÃO DE FILGRASTIM
-var IDS_INJURIA = [69, 152, 153];
+var IDS_INJURIA = [69, 152, 153, 374];
 
 // procId=42  confirmado: USG TRANSLUCÊNCIA NUCAL (Érica 01/10/2025 14:00)
 // procId=40  confirmado: USG 1 PÓS BETA (Marcelle 05/05/2026 12:00)
@@ -720,7 +720,7 @@ function resolveTemplateKey(ag) {
   // --- 2. Nome do procedimento (vem de /procedures/list — ver resolveNomeProc) ---
   // Itens de cobrança/honorário/pacote — não são agendamentos de exame
   if (proc.includes('HONORARIO') || proc.includes('HONORÁRIO') || proc.startsWith('PACOTE'))      return null;
-  if (proc.includes('INJUR') || proc.includes('FILGRASTIM'))                                      return 'INJURIA';
+  if (proc.includes('INJUR') || proc.includes('INJÚR') || proc.includes('FILGRASTIM'))            return 'INJURIA';
   // TEC (transferência de embrião) / punção — NUNCA recebem confirmação.
   // Qualquer "...TEC..." cai aqui, EXCETO "USG PREPARO TEC..." (contém "PREPARO").
   if (proc.includes('PUNÇÃO') || proc.includes('PUNCAO'))                                         return null;
