@@ -5,132 +5,110 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grade de Horários — Médicos Paraser</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --roxo:#5b2a86; --roxo2:#7c3aed; --dourado:#c2922f; --creme:#faf6ef;
-    --text:#2d2438; --muted:#8a7f95; --linha:#ece4f2;
-    --livre:#15803d; --livre-bg:#dcfce7; --livre-bd:#86efac;
-    --ocup:#9f1239;  --ocup-bg:#fbe9ee;  --ocup-bd:#f3c0cd;
-    --off:#f4f1f7;
+    --bg:#080d1a; --surface:#0d1427; --surface2:#111c35;
+    --border:rgba(255,255,255,0.07); --accent:#00d4aa; --danger:#ef4444;
+    --text:#e2e8f4; --muted:#6b7a99;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--creme);color:var(--text);
-    font-family:'Inter',system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-  header.top{background:linear-gradient(120deg,var(--roxo),var(--roxo2));color:#fff;padding:22px 24px 18px}
-  header.top h1{font-family:'Playfair Display',serif;font-weight:700;margin:0;font-size:26px;letter-spacing:.2px}
-  header.top .sub{opacity:.9;margin-top:4px;font-size:14px}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:'Outfit',-apple-system,Segoe UI,Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  header.top{padding:20px 24px 6px}
+  header.top h1{font-weight:800;margin:0;font-size:24px;letter-spacing:.2px}
+  header.top .sub{color:var(--muted);margin-top:4px;font-size:13.5px}
 
-  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:12px 24px;background:#fff;border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:5}
-  .btn{border:none;background:var(--roxo2);color:#fff;font-weight:600;font-size:14px;
-    padding:9px 16px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
-  .btn:hover{filter:brightness(1.08)}
-  .btn:disabled{opacity:.55;cursor:default}
-  .btn.ghost{background:#fff;color:var(--roxo);border:1px solid var(--linha)}
-  .daynav{display:flex;align-items:center;gap:8px}
-  .daynav .lbl{font-weight:700;font-size:15px;min-width:210px;text-align:center;text-transform:capitalize}
-  .timebox{display:flex;align-items:center;gap:10px}
-  .timebox .hr{font-weight:700;font-size:18px;color:var(--roxo);min-width:58px;text-align:center}
-  .slider{-webkit-appearance:none;appearance:none;width:220px;height:6px;border-radius:3px;
-    background:var(--linha);cursor:pointer}
-  .slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
-    background:var(--roxo2);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
-  .slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--roxo2);cursor:pointer;border:2px solid #fff}
-  .bar .meta{color:var(--muted);font-size:13px;margin-left:auto}
-
-  main{padding:22px 24px 60px;max-width:1320px;margin:0 auto}
-  #erro:empty{display:none}
-  .erro{background:var(--ocup-bg);color:var(--ocup);border:1px solid var(--ocup-bd);padding:14px 18px;border-radius:11px;margin-bottom:20px}
-
-  h2.secn{font-family:'Playfair Display',serif;font-size:19px;margin:4px 0 14px;color:var(--roxo)}
-  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-bottom:14px}
-  .legend i{display:inline-block;width:13px;height:13px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid}
-  .legend i.l{background:var(--livre-bg);border-color:var(--livre-bd)}
-  .legend i.o{background:var(--ocup-bg);border-color:var(--ocup-bd)}
-  .legend i.f{background:#fff;border-color:var(--linha)}
-  .legend i.x{background:var(--off);border-color:var(--linha)}
-
-  /* ===== MAPA (caixinhas, estilo salas) ===== */
-  .mapa{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin-bottom:34px}
-  .box{border-radius:13px;border:1.5px solid var(--linha);background:#fff;padding:13px 14px;min-height:96px;
-    display:flex;flex-direction:column;gap:3px;transition:transform .08s}
-  .box:hover{transform:translateY(-2px)}
-  .box .nm{font-weight:700;font-size:14.5px;line-height:1.2}
-  .box .es{font-size:11.5px;color:var(--muted)}
-  .box .st{margin-top:auto;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}
-  .box .ct{font-size:11.5px;color:var(--muted);font-weight:600}
-  .box.livre{background:var(--livre-bg);border-color:var(--livre-bd)}
-  .box.livre .st{color:var(--livre)}
-  .box.ocup{background:var(--ocup-bg);border-color:var(--ocup-bd)}
-  .box.ocup .st{color:var(--ocup)}
-  .box.fora .st{color:var(--muted)}
-  .box.off{background:var(--off)}
-  .box.off .nm,.box.off .es{opacity:.75}
-  .box.off .st{color:var(--muted)}
-
-  /* ===== CARDS (detalhe do dia) ===== */
-  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
-  .card{background:#fff;border:1px solid var(--linha);border-radius:13px;padding:14px 16px}
-  .card .ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px}
-  .card .ch .nm{font-weight:700;font-size:15px}
-  .card .ch .nm small{display:block;color:var(--muted);font-weight:500;font-size:12px}
-  .card .ch .bd{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--livre-bg);color:var(--livre);border:1px solid var(--livre-bd)}
-  .card .ch .bd.zero{background:var(--off);color:var(--muted);border-color:var(--linha)}
-  .chips{display:flex;flex-wrap:wrap;gap:7px}
-  .chip{font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid;text-align:center;min-width:62px}
-  .chip.livre{background:var(--livre-bg);color:var(--livre);border-color:var(--livre-bd)}
-  .chip.ocup{background:var(--ocup-bg);color:var(--ocup);border-color:var(--ocup-bd)}
-  .chip.now{outline:2px solid var(--roxo2);outline-offset:1px}
-  .card .nota{color:var(--muted);font-size:13px}
-
-  .skel{padding:40px;text-align:center;color:var(--muted);font-size:15px}
-  .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px}
+  .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 24px}
+  .navbtn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);
+    font-family:inherit;font-size:15px;padding:6px 13px;cursor:pointer;line-height:1}
+  .navbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .daylbl{font-size:15px;font-weight:600;min-width:215px;text-align:center;text-transform:capitalize}
+  .today{background:rgba(0,212,170,.14);border:1px solid rgba(0,212,170,.4);border-radius:8px;color:var(--accent);
+    font-family:inherit;font-weight:600;font-size:13px;padding:7px 14px;cursor:pointer}
+  .today:hover{background:rgba(0,212,170,.22)}
+  .meta{color:var(--muted);font-size:13px;margin-left:auto}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,212,170,.3);border-top-color:var(--accent);border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px}
   @keyframes r{to{transform:rotate(360deg)}}
-  footer{max-width:1320px;margin:0 auto;padding:18px 24px 50px;color:var(--muted);font-size:12.5px;line-height:1.6}
+
+  main{padding:6px 24px 60px;max-width:1480px;margin:0 auto}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:22px}
+  .panel-head{font-size:15px;font-weight:700;margin-bottom:4px;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+  .panel-sub{color:var(--muted);font-weight:400;font-size:12.5px}
+  .erro{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.4);padding:13px 16px;border-radius:11px;margin-bottom:18px}
+  #erro:empty{display:none}
+
+  /* ===== MAPA (quadros divididos manhã/tarde, igual salas) ===== */
+  .mapa{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:8px;margin:14px 0 6px}
+  .room{border-radius:8px;border:1px solid var(--border);overflow:hidden;background:var(--surface2);min-height:92px;
+    display:flex;flex-direction:column}
+  .room-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:7px 9px 4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .room-esp{font-size:9.5px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;margin-top:1px}
+  .room-split{cursor:default}
+  .half{flex:1 1 0;min-height:24px;display:flex;align-items:center;gap:5px;padding:3px 9px;font-size:11px;
+    border-top:1px solid rgba(255,255,255,0.07)}
+  .half .per{opacity:.85}
+  .half b{color:#fff;font-size:12px;font-weight:800}
+  .half .fx{color:rgba(255,255,255,0.55);font-size:10px}
+  .half .livre{color:#34d399;font-size:10.5px}
+  .half .na{color:var(--muted);font-size:10.5px;opacity:.7}
+  .room-off{background:var(--surface);opacity:.85}
+  .room-off .room-name{color:var(--muted)}
+  .room-off .off-msg{padding:0 9px 9px;color:var(--muted);font-size:10.5px}
+
+  .summary{display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .summary b{color:var(--text)}
+
+  /* ===== CARDS detalhe ===== */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
+  .card .ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:11px}
+  .card .ch .nm{font-weight:700;font-size:14.5px}
+  .card .ch .nm small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
+  .bd{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;
+    background:rgba(16,185,129,.14);color:#34d399;border:1px solid rgba(16,185,129,.4)}
+  .bd.zero{background:var(--surface2);color:var(--muted);border-color:var(--border)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:12.5px;font-weight:600;padding:6px 9px;border-radius:7px;border:1px solid;min-width:60px;text-align:center}
+  .chip.livre{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.4)}
+  .chip.ocup{background:rgba(239,68,68,.14);color:#fca5a5;border-color:rgba(239,68,68,.45)}
+  .card .nota{color:var(--muted);font-size:12.5px}
+  .skel{padding:34px;text-align:center;color:var(--muted)}
+  footer{max-width:1480px;margin:0 auto;padding:6px 24px 50px;color:var(--muted);font-size:12px;line-height:1.6}
 </style>
 </head>
 <body>
 <header class="top">
-  <h1>Grade de Horários — Médicos</h1>
-  <div class="sub">Mapa do dia × ocupação ao vivo do Feegow — uso da recepção</div>
+  <h1>🗺️ Grade de Horários — Médicos</h1>
+  <div class="sub">Visão global do dia · cada médico dividido 🌅 cima = manhã · 🌇 baixo = tarde · verde = livre, vermelho = ocupado</div>
 </header>
 
 <div class="bar">
-  <div class="daynav">
-    <button class="btn ghost" onclick="mudaDia(-1)">◀</button>
-    <span class="lbl" id="lblDia">—</span>
-    <button class="btn ghost" onclick="mudaDia(1)">▶</button>
-  </div>
-  <button class="btn" onclick="irHoje()">Hoje</button>
-  <div class="timebox">
-    <input type="range" class="slider" id="slider" min="420" max="1200" step="30" oninput="onSlider()">
-    <span class="hr" id="lblHora">--:--</span>
-  </div>
-  <button class="btn ghost" id="btnRefresh" onclick="carregar()">🔄 Atualizar</button>
+  <button class="navbtn" onclick="mudaDia(-1)">◀</button>
+  <span class="daylbl" id="lblDia">—</span>
+  <button class="navbtn" onclick="mudaDia(1)">▶</button>
+  <button class="today" onclick="irHoje()">Hoje</button>
+  <button class="today" id="btnRefresh" onclick="carregar()" style="background:var(--surface2);border-color:var(--border);color:var(--text)">🔄 Atualizar</button>
   <span class="meta" id="metaAtualizado">Carregando…</span>
 </div>
 
 <main>
   <div id="erro"></div>
 
-  <h2 class="secn">🗺️ Mapa do dia <span id="mapaHora" style="font-weight:400;color:var(--muted);font-size:14px"></span></h2>
-  <div class="legend">
-    <span><i class="l"></i> Livre agora</span>
-    <span><i class="o"></i> Ocupado agora</span>
-    <span><i class="f"></i> Fora do horário</span>
-    <span><i class="x"></i> Não atende hoje</span>
+  <div class="panel">
+    <div class="panel-head">📊 Visão global do dia <span class="panel-sub" id="panelSub"></span></div>
+    <div class="mapa" id="mapa"><div class="skel">Carregando mapa…</div></div>
+    <div class="summary" id="summary"></div>
   </div>
-  <div class="mapa" id="mapa"><div class="skel">Carregando mapa…</div></div>
 
-  <h2 class="secn">📋 Detalhe do dia</h2>
+  <div class="panel-head" style="margin:0 0 12px 2px">📋 Detalhe por médico</div>
   <div class="cards" id="cards"></div>
 </main>
 
 <footer>
-  O <b>mapa</b> mostra cada médico no horário escolhido no slider (verde = livre, vermelho = ocupado, fora do horário ou não atende em cinza).
-  Os <b>cards</b> embaixo detalham todos os horários do dia. A <b>grade</b> (dias/horários de cada médico) está gravada no código conforme o Feegow;
-  a <b>ocupação</b> é lida ao vivo. Cancelados/remarcados liberam o horário. Para incluir um médico ou mudar a grade, me avise.
+  A <b>grade</b> (dias/horários de cada médico) está gravada no código conforme o Feegow. A <b>ocupação</b> é lida ao vivo:
+  cada metade mostra a % de horários já agendados no período. Cancelados/remarcados liberam o horário. Para incluir um médico ou mudar a grade, me avise.
 </footer>
 
 <script>
@@ -138,7 +116,9 @@
   const PROXY_URL = "https://script.google.com/macros/s/AKfycbzVhtXPGjYwJmoKTj3sd9_EF86xcIyLuQMWWyMT33R59C-B4xVZMoD70qEn7pK6MF1ncA/exec";
   const GONE      = [11,15,22];        // desmarcado / remarcado / cancelado → libera o horário
   const REFRESH_MS= 5*60*1000;
+  const MEIODIA   = 720;               // 12:00 em minutos
   const SEMANA    = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  const MES       = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 
   // ===== GRADE DOS MÉDICOS (gravada no código — permanente) =====
   // Chave = profissional_id do Feegow. dias: 0=Dom 1=Seg ... 6=Sáb.
@@ -156,15 +136,23 @@
   const fmtFeegow = d => pad(d.getDate())+'-'+pad(d.getMonth()+1)+'-'+d.getFullYear();
   const hmToMin = hm => { const [a,b]=hm.split(':'); return (+a)*60+(+b); };
   const minToHm = m => pad(Math.floor(m/60))+':'+pad(m%60);
+  const escAttr = s => String(s).replace(/"/g,'&quot;');
+
+  // cor da metade conforme ocupação (idêntico ao mapa de salas)
+  const halfBg = (occ, win) => {
+    if(win===0) return 'background:rgba(255,255,255,0.03);';
+    if(occ===0) return 'background:rgba(16,185,129,0.10);';
+    const ratio = Math.min(1, occ/(win||1));
+    const alpha = (0.16 + 0.64*ratio).toFixed(3);
+    return `background:rgba(239,68,68,${alpha});`;
+  };
 
   // ===== Estado =====
   let diaAtual = new Date(); diaAtual.setHours(0,0,0,0);
-  let horaSel  = Math.min(1200, Math.max(420, Math.round((new Date().getHours()*60+new Date().getMinutes())/30)*30));
-  let _byDoc   = {};   // cache da carga: byDoc[profId][dataKey] = [{start,dur}]
+  let _byDoc   = {};
 
   function mudaDia(delta){ diaAtual.setDate(diaAtual.getDate()+delta); carregar(); }
   function irHoje(){ diaAtual=new Date(); diaAtual.setHours(0,0,0,0); carregar(); }
-  function onSlider(){ horaSel = +document.getElementById('slider').value; pintar(); }
 
   async function feegowFetch(endpoint, params={}) {
     const qs = new URLSearchParams({ action:'feegow_proxy', endpoint });
@@ -176,63 +164,78 @@
     return d;
   }
 
-  // ocupado em determinado minuto?
-  function ocupadoEm(ocupSet, min){ return ocupSet.some(a => a.start<=min && min < a.start+a.dur); }
-  // ocupado em algum ponto do slot [m, m+dur)?
-  function slotOcupado(ocupSet, m, dur){ return ocupSet.some(a => a.start < m+dur && (a.start+a.dur) > m); }
+  const slotOcupado = (ocupSet, m, dur) => ocupSet.some(a => a.start < m+dur && (a.start+a.dur) > m);
 
-  // ===== Pintar (usa cache _byDoc; roda também ao mexer no slider) =====
+  // devolve {slots:[{m,dur,oc}], occM,winM, occT,winT, livres,total, minIni,maxFim}
+  function computaDoc(blocos, ocupSet){
+    const slots=[]; let occM=0,winM=0,occT=0,winT=0,minIni=24*60,maxFim=0;
+    blocos.forEach(b=>{
+      const ini=hmToMin(b.ini), fim=hmToMin(b.fim);
+      if(ini<minIni)minIni=ini; if(fim>maxFim)maxFim=fim;
+      for(let m=ini;m<fim;m+=b.dur){
+        const oc=slotOcupado(ocupSet,m,b.dur);
+        slots.push({m,dur:b.dur,oc});
+        if(m<MEIODIA){ winM++; if(oc)occM++; } else { winT++; if(oc)occT++; }
+      }
+    });
+    const total=slots.length, livres=slots.filter(s=>!s.oc).length;
+    return {slots,occM,winM,occT,winT,livres,total,minIni,maxFim};
+  }
+
+  // ===== Render =====
   function pintar(){
     const wd = diaAtual.getDay();
     const k  = fmtFeegow(diaAtual);
-    document.getElementById('lblHora').textContent = minToHm(horaSel);
-    document.getElementById('slider').value = horaSel;
-    document.getElementById('mapaHora').textContent = '· ' + minToHm(horaSel);
     document.getElementById('lblDia').textContent = `${SEMANA[wd]}, ${pad(diaAtual.getDate())}/${pad(diaAtual.getMonth()+1)}`;
+    document.getElementById('panelSub').textContent = `— ${SEMANA[wd]}, ${diaAtual.getDate()} de ${MES[diaAtual.getMonth()]}`;
 
     let mapa='', cards='';
+    let atendendo=0, topNome='—', topPct=-1, diaMin=24*60, diaMax=0;
+
     Object.entries(GRADE).forEach(([pid, doc]) => {
       const blocos = doc.dias[wd] || [];
       const ocupSet = (_byDoc[pid] && _byDoc[pid][k]) || [];
 
-      // ---- MAPA: status no horário do slider ----
-      let cls='off', st='Não atende', ct='';
-      if(blocos.length){
-        const dentro = blocos.some(b => horaSel>=hmToMin(b.ini) && horaSel<hmToMin(b.fim));
-        // conta livres do dia
-        let livres=0,total=0;
-        blocos.forEach(b=>{ for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ total++; if(!slotOcupado(ocupSet,m,b.dur)) livres++; } });
-        ct = `${livres} livre${livres!==1?'s':''} de ${total} hoje`;
-        if(!dentro){ cls='fora'; st='⏸️ Fora do horário'; }
-        else if(ocupadoEm(ocupSet,horaSel)){ cls='ocup'; st='🔴 Ocupado'; }
-        else { cls='livre'; st='🟢 Livre'; }
-      }
-      mapa += `<div class="box ${cls}"><div class="nm">${doc.nome}</div><div class="es">${doc.esp||''}</div>`+
-              `<div class="st">${st}</div>${ct?`<div class="ct">${ct}</div>`:''}</div>`;
-
-      // ---- CARD: timeline do dia ----
       if(!blocos.length){
-        cards += `<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div>`+
-                 `<span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div></div>`;
-      } else {
-        let chips='', livres=0;
-        blocos.forEach(b=>{
-          for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){
-            const oc = slotOcupado(ocupSet,m,b.dur); if(!oc) livres++;
-            const now = (horaSel>=m && horaSel<m+b.dur) ? ' now' : '';
-            chips += `<span class="chip ${oc?'ocup':'livre'}${now}">${minToHm(m)}</span>`;
-          }
-        });
-        const bd = livres ? `<span class="bd">${livres} livre${livres!==1?'s':''}</span>` : `<span class="bd zero">cheia</span>`;
-        cards += `<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div>${bd}</div>`+
-                 `<div class="chips">${chips}</div></div>`;
+        mapa += `<div class="room room-off" title="${escAttr(doc.nome)} — não atende"><div class="room-name">${doc.nome}<div class="room-esp">${doc.esp||''}</div></div><div class="off-msg">não atende</div></div>`;
+        cards += `<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div></div>`;
+        return;
       }
+      atendendo++;
+      const c = computaDoc(blocos, ocupSet);
+      if(c.minIni<diaMin)diaMin=c.minIni; if(c.maxFim>diaMax)diaMax=c.maxFim;
+      const pctDia = c.total ? Math.round((c.total-c.livres)/c.total*100) : 0;
+      if(pctDia>topPct){ topPct=pctDia; topNome=doc.nome; }
+
+      const pctM = c.winM ? Math.round(c.occM/c.winM*100) : 0;
+      const pctT = c.winT ? Math.round(c.occT/c.winT*100) : 0;
+      const valM = c.winM===0 ? '<span class="na">—</span>' : (c.occM===0 ? '<span class="livre">livre</span>' : `<b>${pctM}%</b><span class="fx"> · ${c.occM}/${c.winM}</span>`);
+      const valT = c.winT===0 ? '<span class="na">—</span>' : (c.occT===0 ? '<span class="livre">livre</span>' : `<b>${pctT}%</b><span class="fx"> · ${c.occT}/${c.winT}</span>`);
+      const tip = `${doc.nome} (${doc.esp||''})\n🌅 Manhã: ${c.occM} de ${c.winM} (${pctM}%)\n🌇 Tarde: ${c.occT} de ${c.winT} (${pctT}%)`;
+      mapa += `<div class="room room-split" title="${escAttr(tip)}">
+        <div class="room-name">${doc.nome}<div class="room-esp">${doc.esp||''}</div></div>
+        <div class="half" style="${halfBg(c.occM,c.winM)}"><span class="per">🌅</span>${valM}</div>
+        <div class="half" style="${halfBg(c.occT,c.winT)}"><span class="per">🌇</span>${valT}</div>
+      </div>`;
+
+      // card detalhe
+      let chips='';
+      c.slots.forEach(s => chips += `<span class="chip ${s.oc?'ocup':'livre'}">${minToHm(s.m)}</span>`);
+      const bd = c.livres ? `<span class="bd">${c.livres} livre${c.livres!==1?'s':''}</span>` : `<span class="bd zero">cheia</span>`;
+      cards += `<div class="card"><div class="ch"><div class="nm">${doc.nome}<small>${doc.esp||''}</small></div>${bd}</div><div class="chips">${chips}</div></div>`;
     });
+
     document.getElementById('mapa').innerHTML = mapa || '<div class="skel">Nenhum médico cadastrado na grade.</div>';
     document.getElementById('cards').innerHTML = cards;
+
+    const janela = diaMax>diaMin ? `${minToHm(diaMin)}–${minToHm(diaMax)}` : '—';
+    document.getElementById('summary').innerHTML =
+      `<span><b>${atendendo}</b> médico${atendendo!==1?'s':''} atendendo hoje</span>`+
+      `<span>Janela do dia: <b>${janela}</b></span>`+
+      (topPct>=0 ? `<span>Mais ocupado: <b style="color:#fca5a5">${topNome} (${topPct}%)</b></span>` : '');
   }
 
-  // ===== Carga (busca agendamentos do dia) =====
+  // ===== Carga =====
   let _carregando = false;
   async function carregar(){
     if(_carregando) return;
