@@ -114,7 +114,7 @@
 <footer>
   Mapa na <b>mesma planta do Mapa de Salas</b>, mas aqui cada sala mostra os <b>horários disponíveis</b> conforme a grade cadastrada (não a agenda do Feegow).
   Cada sala dividida 🌅 cima = manhã · 🌇 baixo = tarde: <b style="color:#34d399">verde</b> = médico disponível no período, cinza = sem atendimento.
-  Cada médico fica numa sala da planta. Pra incluir um médico ou trocar a sala, me avise.
+  A <b>sala é escolhida por dia</b> no dropdown de cada card e fica <b>compartilhada</b> com todos os aparelhos da recepção. Pra incluir um médico, me avise.
 </footer>
 
 <script>
@@ -230,13 +230,26 @@
   function mudaDia(delta){ diaAtual.setDate(diaAtual.getDate()+delta); render(); }
   function irHoje(){ diaAtual=new Date(); diaAtual.setHours(0,0,0,0); render(); }
 
-  // Remanejamento de sala (salvo neste aparelho; sala da GRADE é o padrão)
-  let _override = {};
-  try { _override = JSON.parse(localStorage.getItem('gradeSalaOverride')||'{}') || {}; } catch(e){ _override={}; }
-  const getSala = id => _override[id] || (GRADE[id] && GRADE[id].sala) || '';
-  function setSala(id, area){
-    _override[id] = area;
-    try { localStorage.setItem('gradeSalaOverride', JSON.stringify(_override)); } catch(e){}
+  // Remanejamento de sala POR DIA, COMPARTILHADO entre aparelhos (Apps Script) + cache local de segurança
+  const PROXY_URL = "https://script.google.com/macros/s/AKfycbzVhtXPGjYwJmoKTj3sd9_EF86xcIyLuQMWWyMT33R59C-B4xVZMoD70qEn7pK6MF1ncA/exec";
+  let _shared = {};   // chave 'medicoId|dia' -> sala
+  function loadLocal(){ try{ return JSON.parse(localStorage.getItem('gradeSalas')||'{}')||{}; }catch(e){ return {}; } }
+  function saveLocal(){ try{ localStorage.setItem('gradeSalas', JSON.stringify(_shared)); }catch(e){} }
+  const getSala = (id, wd) => _shared[id+'|'+wd] || (GRADE[id] && GRADE[id].sala) || '';
+  function setSala(id, wd, area){
+    _shared[id+'|'+wd] = area;
+    saveLocal();
+    render();
+    // grava no compartilhado (não trava a tela se falhar)
+    fetch(`${PROXY_URL}?action=grade_salas_set&med=${encodeURIComponent(id)}&dia=${wd}&sala=${encodeURIComponent(area)}`).catch(()=>{});
+  }
+  async function carregarShared(){
+    _shared = loadLocal();                 // começa com o cache local (offline-first)
+    try{
+      const r = await fetch(`${PROXY_URL}?action=grade_salas_get`);
+      const d = await r.json();
+      if(d && d.salas && typeof d.salas==='object'){ _shared = Object.assign({}, _shared, d.salas); saveLocal(); }
+    }catch(e){}
     render();
   }
   function optionsHtml(sel){
@@ -253,7 +266,7 @@
     clinicalAreas.forEach(a=>{ roomSlots[a]=[]; roomDocs[a]=[]; });
     Object.entries(GRADE).forEach(([id,doc])=>{
       const blocos=doc.dias[wd]||[]; if(!blocos.length) return;
-      const area=getSala(id); if(!area) return;
+      const area=getSala(id, wd); if(!area) return;
       if(!roomSlots[area]){ roomSlots[area]=[]; roomDocs[area]=[]; }   // permite remanejar p/ qualquer sala
       roomDocs[area].push(dispName(doc));
       blocos.forEach(b=>{
@@ -309,7 +322,7 @@
     let comCards='', semCards=''; let nCom=0, nSem=0;
     Object.entries(GRADE).forEach(([id,doc])=>{
       const blocos=doc.dias[wd]||[];
-      const sel=`<div class="salaSel">🚪 <select onchange="setSala('${id}',this.value)">${optionsHtml(getSala(id))}</select></div>`;
+      const sel=`<div class="salaSel">🚪 <select onchange="setSala('${id}',${wd},this.value)">${optionsHtml(getSala(id, wd))}</select></div>`;
       if(!blocos.length){
         nSem++;
         semCards+=`<div class="card card-off"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd zero">não atende</span></div><div class="nota">Não atende ${SEMANA[wd].toLowerCase()}.</div>${sel}</div>`;
@@ -329,7 +342,7 @@
     document.getElementById('cards').innerHTML=cards||'<div class="skel">Nenhum médico cadastrado na grade ainda.</div>';
   }
 
-  render();
+  carregarShared();
 </script>
 </body>
 </html>

@@ -82,6 +82,28 @@ function doGet(e) {
       return handleGetFinancial(e.parameter);
     }
 
+    // Grade de Horários — salas por médico+dia (compartilhado entre todos os aparelhos)
+    if (action === 'grade_salas_get') {
+      var raw = PropertiesService.getScriptProperties().getProperty('GRADE_SALAS') || '{}';
+      return jsonOk({ salas: JSON.parse(raw) });
+    }
+    if (action === 'grade_salas_set') {
+      var med = String(e.parameter.med || '');
+      var dia = String(e.parameter.dia || '');
+      var sala = String(e.parameter.sala || '');
+      if (!med || !dia) return jsonOk({ ok: false, error: 'faltou med/dia' });
+      var lock = LockService.getScriptLock();
+      try { lock.waitLock(8000); } catch (le) { return jsonOk({ ok: false, error: 'lock' }); }
+      try {
+        var props = PropertiesService.getScriptProperties();
+        var map = JSON.parse(props.getProperty('GRADE_SALAS') || '{}');
+        var key = med + '|' + dia;
+        if (sala) map[key] = sala; else delete map[key];
+        props.setProperty('GRADE_SALAS', JSON.stringify(map));
+        return jsonOk({ ok: true, salas: map });
+      } finally { lock.releaseLock(); }
+    }
+
     // Retornar fichas de pacientes
     if (action === 'get_fichas') {
       const fSheet = getOrCreateFichaSheet();
