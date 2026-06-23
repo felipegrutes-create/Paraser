@@ -3787,6 +3787,15 @@
                     <b style="color:#e2e8f4">Como ler:</b> a <b>geração</b> mostra quem traz faturamento; a <b>retirada</b> é dividida pela participação (Rodolfo 80% / Joselmo 20%), não por quem gera. Como o Dr. Joselmo passou a atender em abril, o período jan–mar conta 100% para o Dr. Rodolfo. O caixa do semestre fechou perto de zero (+R$ 49 mil), sustentado por empréstimo da obra, então as retiradas saíram quase no limite do que a operação gerou.
                 </div>
             </div>
+
+            <div class="chart-card" style="margin-top:20px">
+                <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    📈 Evolução mensal — Geração × Despesa por sócio
+                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026</span>
+                </h3>
+                <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5"><b style="color:#e2e8f4">Linha cheia</b> = faturamento gerado no mês · <b style="color:#e2e8f4">linha tracejada</b> = despesa coberta (a fatia do sócio do custo total da empresa, 80/20; jan–mar o operacional é 100% do Rodolfo).</p>
+                <canvas id="socEvolChart" height="120"></canvas>
+            </div>
         </section>
 
         <!-- CONTAS A RECEBER -->
@@ -6065,6 +6074,7 @@
             if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
+            if (id === 'sec-socios') renderSociosChart();
             if (id === 'sec-caixa') loadAndRenderMedicos();
             if (id === 'sec-exec')    loadAndRenderExec();
             if (id === 'sec-estoque') loadAndRenderEstoque();
@@ -11249,6 +11259,41 @@
             document.querySelectorAll('.fin-view-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
             renderReceitaDespesa();
+        }
+
+        // ===== Sócios — gráfico de evolução mensal (fechamento manual Jan–Jun/2026; atualizar junto com o painel, ver memória decisao_2026-06-23_socios_geracao_retirada) =====
+        function renderSociosChart() {
+            const labels = ['Jan','Fev','Mar','Abr','Mai','Jun'];
+            const gerouR = [259876, 237835, 297858, 346990, 442571, 211860];
+            const gerouJ = [0, 2428, 6855, 21640, 37290, 52548];
+            const despR  = [679550, 505382, 628191, 451610, 378269, 416127];
+            const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
+            const mkLine = (label, data, color, dash) => ({
+                label, data, borderColor: color, backgroundColor: color,
+                borderWidth: 2.5, borderDash: dash || [], tension: .3,
+                pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: color, fill: false
+            });
+            mkChart('socEvolChart', {
+                type: 'line',
+                data: { labels, datasets: [
+                    mkLine('Rodolfo — gerou', gerouR, '#00d4aa'),
+                    mkLine('Rodolfo — despesa', despR, '#00d4aa', [6, 4]),
+                    mkLine('Joselmo — gerou', gerouJ, '#818cf8'),
+                    mkLine('Joselmo — despesa', despJ, '#818cf8', [6, 4]),
+                ]},
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#cbd5e1', usePointStyle: true, padding: 14, font: { size: 12 } } },
+                        tooltip: { callbacks: { label: c => `${c.dataset.label}: R$ ${fmt(Math.round(c.parsed.y))}` } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.05)' } },
+                        y: { ticks: { color: '#94a3b8', callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }, grid: { color: 'rgba(255,255,255,.06)' } }
+                    }
+                }
+            });
         }
 
         async function renderReceitaDespesa() {
