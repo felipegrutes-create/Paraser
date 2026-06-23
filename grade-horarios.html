@@ -54,6 +54,16 @@
   .salas-room-split.room-ativo .salas-room-name{color:#7fffd4}
   .salas-room-doc{flex:0 0 auto;padding:0 8px 3px;font-size:11.5px;font-weight:700;color:var(--green);
     text-transform:none;letter-spacing:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* sala com conflito: 2+ médicos com horários sobrepostos na mesma sala */
+  .salas-room-split.room-conflito{border:2px solid #ef4444;animation:conflitoPulse 1.05s ease-in-out infinite}
+  .salas-room-split.room-conflito .salas-room-name{color:#fca5a5}
+  @keyframes conflitoPulse{0%,100%{box-shadow:0 0 0 1px rgba(239,68,68,.30) inset, 0 0 9px rgba(239,68,68,.20)}
+    50%{box-shadow:0 0 0 2px rgba(239,68,68,.95) inset, 0 0 22px rgba(239,68,68,.70)}}
+  .salas-room-conf{flex:0 0 auto;padding:1px 8px 4px;display:flex;flex-direction:column;gap:1px}
+  .salas-room-conf .conf-doc{font-size:11px;font-weight:700;color:#fecaca;text-transform:none;letter-spacing:0;
+    line-height:1.25;display:flex;gap:5px;align-items:baseline}
+  .salas-room-conf .conf-doc .cn{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .salas-room-conf .conf-doc b{flex:0 0 auto;color:#fff;font-weight:800}
   .salas-room-half{flex:1 1 0;min-height:22px;display:flex;align-items:center;gap:5px;padding:2px 8px;font-size:13px;
     color:var(--muted);border-top:1.5px solid rgba(255,255,255,0.12)}
   .salas-room-half .salas-half-per{opacity:.85;font-size:13px}
@@ -384,20 +394,33 @@
   // monta DISPONIBILIDADE das salas a partir da GRADE (horários que cada médico disponibiliza)
   function computeFromGrade(wd){
     const clinicalAreas = SALAS_LAYOUT.filter(s=>s.clinical).map(s=>s.area);
-    const roomSlots={}, roomDocs={};
-    clinicalAreas.forEach(a=>{ roomSlots[a]=[]; roomDocs[a]=[]; });
+    const roomSlots={}, roomDocs={}, roomDocList={};
+    clinicalAreas.forEach(a=>{ roomSlots[a]=[]; roomDocs[a]=[]; roomDocList[a]=[]; });
     Object.entries(GRADE).forEach(([id,doc])=>{
       const blocos=doc.dias[wd]||[]; if(!blocos.length) return;
       const area=getSala(id, wd); if(!area) return;
-      if(!roomSlots[area]){ roomSlots[area]=[]; roomDocs[area]=[]; }   // permite remanejar p/ qualquer sala
+      if(!roomSlots[area]){ roomSlots[area]=[]; roomDocs[area]=[]; roomDocList[area]=[]; }   // permite remanejar p/ qualquer sala
       roomDocs[area].push(dispName(doc));
+      const mins=[];
       blocos.forEach(b=>{
-        if(b.horarios){ b.horarios.forEach(h=>roomSlots[area].push(hmToMin(h))); }
-        else { for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){ roomSlots[area].push(m); } }
+        if(b.horarios){ b.horarios.forEach(h=>mins.push(hmToMin(h))); }
+        else { for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){ mins.push(m); } }
       });
+      roomSlots[area].push(...mins);
+      const sh = t => String(t).replace(':00','');   // 09:00→09, 13:30 fica 13:30
+      const hours = blocos.map(b=> b.horarios ? `${sh(b.horarios[0])}–${sh(b.horarios[b.horarios.length-1])}` : `${sh(b.ini)}–${sh(b.fim)}`).join(', ');
+      roomDocList[area].push({ name:dispName(doc), mins, hours });
     });
     Object.keys(roomSlots).forEach(a=>{ roomSlots[a]=[...new Set(roomSlots[a])].sort((x,y)=>x-y); });
-    return {roomSlots, roomDocs};
+    // conflito = mesma sala, mesmo minuto ocupado por 2+ médicos (compartilhar por turno NÃO é conflito)
+    const roomConflict={};
+    Object.keys(roomDocList).forEach(a=>{
+      if(roomDocList[a].length<2){ roomConflict[a]=false; return; }
+      const seen={}; let conf=false;
+      roomDocList[a].forEach(d=>d.mins.forEach(m=>{ if(seen[m]) conf=true; else seen[m]=true; }));
+      roomConflict[a]=conf;
+    });
+    return {roomSlots, roomDocs, roomDocList, roomConflict};
   }
 
   // ===== Render =====
@@ -425,11 +448,17 @@
         : `<span class="salas-half-na">—</span>`;
       const avBg = n => n>0 ? 'background:rgba(16,185,129,0.28);' : 'background:rgba(255,255,255,0.015);';
       const docs=comp.roomDocs[s.area]||[];
+      const docList=comp.roomDocList[s.area]||[];
+      const conflito=comp.roomConflict[s.area];
       const horasTxt = slots.length ? slots.map(minToHm).join(', ') : 'sem atendimento';
-      const tip=`${s.nome}${docs.length?` — ${docs.join(', ')}`:''}\n🌅 Manhã: ${sM.length} horário(s)\n🌇 Tarde: ${sT.length} horário(s)\nDisponíveis: ${horasTxt}`;
-      const docLine = docs.length ? `<div class="salas-room-doc">${docs.join(' · ')}</div>` : '';
-      return `<div class="salas-room salas-room-split${slots.length?' room-ativo':''}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
-        <div class="salas-room-name">${s.nome}</div>${docLine}
+      const docsTip = docList.length ? '\n'+docList.map(d=>`• ${d.name}: ${d.hours}`).join('\n') : '';
+      const tip=`${s.nome}${conflito?' ⚠️ CONFLITO DE SALA':''}${docsTip}\n🌅 Manhã: ${sM.length} horário(s)\n🌇 Tarde: ${sT.length} horário(s)`;
+      const docBlock = conflito
+        ? `<div class="salas-room-conf">${docList.map(d=>`<span class="conf-doc"><span class="cn">${d.name}</span><b>${d.hours}</b></span>`).join('')}</div>`
+        : (docs.length ? `<div class="salas-room-doc">${docs.join(' · ')}</div>` : '');
+      const stateCls = conflito ? ' room-conflito' : (slots.length ? ' room-ativo' : '');
+      return `<div class="salas-room salas-room-split${stateCls}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
+        <div class="salas-room-name">${conflito?'⚠️ ':''}${s.nome}</div>${docBlock}
         <div class="salas-room-half ${sM.length?'av':''}" style="${avBg(sM.length)}"><span class="salas-half-per">🌅</span>${half(sM)}</div>
         <div class="salas-room-half ${sT.length?'av':''}" style="${avBg(sT.length)}"><span class="salas-half-per">🌇</span>${half(sT)}</div>
       </div>`;
