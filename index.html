@@ -2733,6 +2733,7 @@
                 <button class="tab-dropdown-item" onclick="showSection('sec-fin',null)">💰 Financeiro</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-socios',null)">🤝 Sócios</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-exec',null)">🧠 Análise Executiva</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-estoque',null)">💊 Estoque Medicamentos</button>
             </div>
@@ -3725,9 +3726,11 @@
                 <canvas id="finChartReceitaDespesa" height="120"></canvas>
                 <div id="finCaixaBox" style="margin-top:18px"></div>
             </div>
+        </section>
 
-            <!-- ===== Sócios: Geração × Retirada (fechamento manual — atualizar a cada fechamento, ver memória decisao_2026-06-23_socios_geracao_retirada). Só aparece na "Visão Sócios" ===== -->
-            <div id="finSociosPanel" class="chart-card" style="margin-top:20px;display:none">
+        <!-- ===== Sócios — Geração × Retirada: página própria (menu Financeiro). Fechamento manual, atualizar a cada fechamento (ver memória decisao_2026-06-23_socios_geracao_retirada) ===== -->
+        <section id="sec-socios" class="section">
+            <div class="chart-card">
                 <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                     🤝 Sócios — Geração × Retirada
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">Fechamento Jan–Jun/2026</span>
@@ -6012,6 +6015,7 @@
             'sec-fin':           'group-fin',
             'sec-cr':            'group-fin',
             'sec-caixa':         'group-fin',
+            'sec-socios':        'group-fin',
             'sec-exec':          'group-fin',
             'sec-estoque':       'group-fin',
         };
@@ -11244,8 +11248,6 @@
             finViewMode = mode;
             document.querySelectorAll('.fin-view-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
-            const sp = document.getElementById('finSociosPanel');
-            if (sp) sp.style.display = (mode === 'socios') ? 'block' : 'none';
             renderReceitaDespesa();
         }
 
