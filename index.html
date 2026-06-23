@@ -3725,6 +3725,65 @@
                 <canvas id="finChartReceitaDespesa" height="120"></canvas>
                 <div id="finCaixaBox" style="margin-top:18px"></div>
             </div>
+
+            <!-- ===== Sócios: Geração × Retirada (fechamento manual — atualizar a cada fechamento, ver memória decisao_2026-06-23_socios_geracao_retirada) ===== -->
+            <div class="chart-card" style="margin-top:20px">
+                <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    🤝 Sócios — Geração × Retirada
+                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Fechamento Jan–Jun/2026</span>
+                </h3>
+                <p style="font-size:13px;color:var(--muted);margin:0 0 18px;line-height:1.5">Dois números propositalmente <b>desacoplados</b>: o que cada sócio <b>gera</b> de faturamento, e quanto cada um pode <b>retirar</b> (pela participação societária, não por quem gera mais).</p>
+
+                <div style="font-weight:700;color:#e2e8f4;margin-bottom:10px;font-size:14px">1 · Quanto cada sócio gera <span style="font-weight:400;color:var(--muted);font-size:12px">· faturamento bruto no Feegow</span></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+                    <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.25);border-radius:12px;padding:14px 16px">
+                        <div style="font-size:13px;color:var(--muted)">Dr. Rodolfo <span style="color:#00d4aa">· 80% da sociedade</span></div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 1.796.990</div>
+                        <div style="font-size:12px;color:var(--muted)">94% de tudo que os sócios geram</div>
+                    </div>
+                    <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:12px;padding:14px 16px">
+                        <div style="font-size:13px;color:var(--muted)">Dr. Joselmo <span style="color:#818cf8">· 20% da sociedade</span></div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 120.310</div>
+                        <div style="font-size:12px;color:var(--muted)">6% · entrou em abril, em rampa (0 → 52k/mês)</div>
+                    </div>
+                </div>
+
+                <div style="font-weight:700;color:#e2e8f4;margin-bottom:4px;font-size:14px">2 · Quanto cada sócio pode retirar <span style="font-weight:400;color:var(--muted);font-size:12px">· pela participação 80/20, em caixa</span></div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Disponível para os sócios no período: <b style="color:#e2e8f4">R$ 661.343</b></div>
+                <div style="overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse;font-size:14px">
+                        <thead>
+                            <tr style="color:var(--muted);font-size:12px;text-align:right">
+                                <th style="text-align:left;padding:8px 6px">Sócio</th>
+                                <th style="padding:8px 6px">Participação</th>
+                                <th style="padding:8px 6px">Pode retirar</th>
+                                <th style="padding:8px 6px">Já retirou</th>
+                                <th style="padding:8px 6px">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
+                                <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Rodolfo</td>
+                                <td style="padding:11px 6px;color:var(--muted)">80%</td>
+                                <td style="padding:11px 6px">R$ 596.207</td>
+                                <td style="padding:11px 6px">R$ 591.124</td>
+                                <td style="padding:11px 6px;font-weight:700;color:#fbbf24">+R$ 5.083 <span style="font-size:11px;font-weight:400;color:var(--muted)">no limite</span></td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
+                                <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Joselmo</td>
+                                <td style="padding:11px 6px;color:var(--muted)">20%</td>
+                                <td style="padding:11px 6px">R$ 65.136</td>
+                                <td style="padding:11px 6px">R$ 20.000</td>
+                                <td style="padding:11px 6px;font-weight:700;color:#34d399">+R$ 45.136 <span style="font-size:11px;font-weight:400;color:var(--muted)">a receber</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top:16px;padding:12px 14px;background:rgba(255,255,255,.03);border-radius:10px;font-size:12.5px;color:var(--muted);line-height:1.55">
+                    <b style="color:#e2e8f4">Como ler:</b> a <b>geração</b> mostra quem traz faturamento; a <b>retirada</b> é dividida pela participação (Rodolfo 80% / Joselmo 20%), não por quem gera. Como o Dr. Joselmo passou a atender em abril, o período jan–mar conta 100% para o Dr. Rodolfo. O caixa do semestre fechou perto de zero (+R$ 49 mil), sustentado por empréstimo da obra, então as retiradas saíram quase no limite do que a operação gerou.
+                </div>
+            </div>
         </section>
 
         <!-- CONTAS A RECEBER -->
