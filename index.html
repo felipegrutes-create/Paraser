@@ -3741,13 +3741,13 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
                     <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.25);border-radius:12px;padding:14px 16px">
                         <div style="font-size:13px;color:var(--muted)">Dr. Rodolfo <span style="color:#00d4aa">· 80% da sociedade</span></div>
-                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 1.796.990</div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 1.799.290</div>
                         <div style="font-size:12px;color:var(--muted)">94% de tudo que os sócios geram</div>
                     </div>
                     <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:12px;padding:14px 16px">
                         <div style="font-size:13px;color:var(--muted)">Dr. Joselmo <span style="color:#818cf8">· 20% da sociedade</span></div>
-                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 120.310</div>
-                        <div style="font-size:12px;color:var(--muted)">6% · entrou em abril, em rampa (0 → 52k/mês)</div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 122.660</div>
+                        <div style="font-size:12px;color:var(--muted)">6% · entrou em abril, em rampa (0 → 54k/mês)</div>
                     </div>
                 </div>
 
@@ -11267,8 +11267,9 @@
         // ===== Sócios — gráfico de evolução mensal (fechamento manual Jan–Jun/2026; atualizar junto com o painel, ver memória decisao_2026-06-23_socios_geracao_retirada) =====
         function renderSociosChart() {
             const labels = ['Jan','Fev','Mar','Abr','Mai','Jun'];
-            const gerouR = [259876, 237835, 297858, 346990, 442571, 211860];
-            const gerouJ = [0, 2428, 6855, 21640, 37290, 52548];
+            const gerouR = [259876, 237835, 297858, 346990, 442571, 214160];
+            const gerouJ = [0, 2428, 6855, 21640, 37290, 54448];
+            const outras = [193797, 163865, 223012, 274131, 569277, 430987];   // faturamento de outras fontes (outros médicos + pacotes/lab)
             const despR  = [679550, 505382, 628191, 451610, 378269, 416127];
             const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
 
@@ -11277,21 +11278,36 @@
             if (tbl) {
                 const f0 = n => Math.round(n).toLocaleString('pt-BR');
                 const sum = a => a.reduce((s, v) => s + v, 0);
-                const th = labels.map(l => `<th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600;font-size:12px">${l}</th>`).join('');
-                const row = (nome, arr, color) => `<tr style="border-top:1px solid rgba(255,255,255,.05)">
-                        <td style="padding:8px 12px;color:${color};font-weight:600;white-space:nowrap">${nome}</td>
-                        ${arr.map(v => `<td style="padding:8px 10px;text-align:right;color:#cbd5e1;font-variant-numeric:tabular-nums">${f0(v)}</td>`).join('')}
-                        <td style="padding:8px 12px;text-align:right;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.03)">${f0(sum(arr))}</td></tr>`;
-                const grp = txt => `<tr><td colspan="8" style="padding:13px 12px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:700">${txt}</td></tr>`;
-                tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:680px">
-                        <thead><tr><th style="text-align:left;padding:8px 12px"></th>${th}<th style="padding:8px 12px;text-align:right;color:#e2e8f4;font-weight:700;font-size:12px">Total</th></tr></thead>
+                const colSum = (...arrs) => labels.map((_, i) => arrs.reduce((s, a) => s + a[i], 0));
+                const th = labels.map(l => `<th style="padding:9px 10px;text-align:right;color:var(--muted);font-weight:600;font-size:12px">${l}</th>`).join('');
+                // faixa colorida (faturamento): fundo + borda na cor do destaque
+                const band = (nome, arr, accent) => `<tr style="background:${accent}16">
+                        <td style="padding:9px 12px;border-left:4px solid ${accent};color:${accent};font-weight:700;white-space:nowrap">${nome}</td>
+                        ${arr.map(v => `<td style="padding:9px 10px;text-align:right;color:#eef2f8;font-variant-numeric:tabular-nums">${f0(v)}</td>`).join('')}
+                        <td style="padding:9px 12px;text-align:right;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.05)">${f0(sum(arr))}</td></tr>`;
+                // linha simples (despesa): só borda-accent à esquerda, sem fundo forte
+                const plain = (nome, arr, accent) => `<tr style="border-top:1px solid rgba(255,255,255,.05)">
+                        <td style="padding:9px 12px;border-left:3px solid ${accent}aa;color:${accent};font-weight:600;white-space:nowrap">${nome}</td>
+                        ${arr.map(v => `<td style="padding:9px 10px;text-align:right;color:#cbd5e1;font-variant-numeric:tabular-nums">${f0(v)}</td>`).join('')}
+                        <td style="padding:9px 12px;text-align:right;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.03)">${f0(sum(arr))}</td></tr>`;
+                // subtotal
+                const sub = (nome, arr, accent) => `<tr style="border-top:2px solid rgba(255,255,255,.14)">
+                        <td style="padding:9px 12px;color:#fff;font-weight:800;white-space:nowrap">${nome}</td>
+                        ${arr.map(v => `<td style="padding:9px 10px;text-align:right;color:#fff;font-weight:700;font-variant-numeric:tabular-nums">${f0(v)}</td>`).join('')}
+                        <td style="padding:9px 12px;text-align:right;font-weight:800;color:${accent};font-variant-numeric:tabular-nums;background:rgba(255,255,255,.06)">${f0(sum(arr))}</td></tr>`;
+                const grp = (txt, bg, color) => `<tr><td colspan="8" style="padding:13px 12px 7px;background:${bg};font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:${color};font-weight:800">${txt}</td></tr>`;
+                tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px">
+                        <thead><tr><th style="text-align:left;padding:9px 12px"></th>${th}<th style="padding:9px 12px;text-align:right;color:#e2e8f4;font-weight:700;font-size:12px">Total</th></tr></thead>
                         <tbody>
-                            ${grp('💰 Faturamento gerado')}
-                            ${row('Dr. Rodolfo', gerouR, '#00d4aa')}
-                            ${row('Dr. Joselmo', gerouJ, '#818cf8')}
-                            ${grp('🧾 Despesa coberta (80/20)')}
-                            ${row('Dr. Rodolfo', despR, '#00d4aa')}
-                            ${row('Dr. Joselmo', despJ, '#818cf8')}
+                            ${grp('💰 Faturamento gerado', 'rgba(0,212,170,.10)', '#5eead4')}
+                            ${band('Dr. Rodolfo', gerouR, '#00d4aa')}
+                            ${band('Dr. Joselmo', gerouJ, '#818cf8')}
+                            ${band('Outras fontes', outras, '#f59e0b')}
+                            ${sub('Total faturado', colSum(gerouR, gerouJ, outras), '#5eead4')}
+                            ${grp('🧾 Despesa coberta (80/20)', 'rgba(255,255,255,.03)', '#94a3b8')}
+                            ${plain('Dr. Rodolfo', despR, '#00d4aa')}
+                            ${plain('Dr. Joselmo', despJ, '#818cf8')}
+                            ${sub('Total despesa', colSum(despR, despJ), '#cbd5e1')}
                         </tbody></table>`;
             }
 
