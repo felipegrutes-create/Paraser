@@ -290,6 +290,7 @@
     enferm1:  { cols:1, slots:['EN1'] },                           // Érica
     enferm2:  { cols:1, slots:['EN2'] },                           // Bruna (enfermagem)
     enferm3:  { cols:1, slots:['EN3'] },                           // Josineide
+    copa:     { cols:1, slots:['CP1'] },                           // Ariane (terceirizada)
   };
   const PH = h => ({ 1:{t:'P',h}, 2:{t:'P',h}, 3:{t:'P',h}, 4:{t:'P',h}, 5:{t:'P',h} });   // Seg-Sex presencial no mesmo horário
   const FUNCIONARIOS = {
@@ -306,6 +307,7 @@
     erica:    { nome:'Érica',    baia:'enferm1:EN1', escala: PH('10–19') },
     bruna_enf:{ nome:'Bruna Enfermeira', baia:'enferm2:EN2', escala: PH('09–18') },
     josineide:{ nome:'Josineide', baia:'enferm3:EN3', escala:{ 1:{t:'P',h:'09–18'}, 2:{t:'H'}, 3:{t:'P',h:'09–18'}, 4:{t:'H'}, 5:{t:'P',h:'09–18'} } },
+    ariane:   { nome:'Ariane (terceirizada)', baia:'copa:CP1', escala: PH('08–17') },
   };
   function renderBaias(s, wd){
     const cfg = BAIAS[s.area];
