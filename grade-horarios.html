@@ -286,6 +286,7 @@
     gerencia: { cols:1, slots:['G1'] },                            // Felipe
     caixa:    { cols:1, slots:['C1'] },                            // Sophia
     concierge:{ cols:1, slots:['CM1'] },                           // Leticia
+    adm:      { cols:1, slots:['A1'] },                            // Isabela
   };
   const PH = h => ({ 1:{t:'P',h}, 2:{t:'P',h}, 3:{t:'P',h}, 4:{t:'P',h}, 5:{t:'P',h} });   // Seg-Sex presencial no mesmo horário
   const FUNCIONARIOS = {
@@ -298,6 +299,7 @@
     felipe:   { nome:'Felipe',   baia:'gerencia:G1', escala:{ 1:{t:'H'}, 2:{t:'P',h:'flexível'}, 3:{t:'H'}, 4:{t:'P',h:'flexível'}, 5:{t:'P',h:'flexível'} } },
     sophia:   { nome:'Sophia',   baia:'caixa:C1',    escala:{ 1:{t:'P',h:'09–18'}, 2:{t:'H'}, 3:{t:'P',h:'09–18'}, 4:{t:'P',h:'09–18'}, 5:{t:'H'} } },
     leticia:  { nome:'Leticia',  baia:'concierge:CM1', escala: PH('08–18') },
+    isabela:  { nome:'Isabela',  baia:'adm:A1',      escala:{ 1:{t:'P',h:'10–19'}, 2:{t:'P',h:'10–19'}, 3:{t:'P',h:'10–19'}, 4:{t:'P',h:'10–19'}, 5:{t:'H'} } },
   };
   function renderBaias(s, wd){
     const cfg = BAIAS[s.area];
