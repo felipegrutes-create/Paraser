@@ -3726,8 +3726,8 @@
                 <div id="finCaixaBox" style="margin-top:18px"></div>
             </div>
 
-            <!-- ===== Sócios: Geração × Retirada (fechamento manual — atualizar a cada fechamento, ver memória decisao_2026-06-23_socios_geracao_retirada) ===== -->
-            <div class="chart-card" style="margin-top:20px">
+            <!-- ===== Sócios: Geração × Retirada (fechamento manual — atualizar a cada fechamento, ver memória decisao_2026-06-23_socios_geracao_retirada). Só aparece na "Visão Sócios" ===== -->
+            <div id="finSociosPanel" class="chart-card" style="margin-top:20px;display:none">
                 <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                     🤝 Sócios — Geração × Retirada
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">Fechamento Jan–Jun/2026</span>
@@ -11244,6 +11244,8 @@
             finViewMode = mode;
             document.querySelectorAll('.fin-view-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
+            const sp = document.getElementById('finSociosPanel');
+            if (sp) sp.style.display = (mode === 'socios') ? 'block' : 'none';
             renderReceitaDespesa();
         }
 
