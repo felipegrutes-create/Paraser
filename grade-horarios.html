@@ -233,6 +233,10 @@
   // Horários DISPONIBILIZADOS por cada médico. sala = área da planta. dias: 0=Dom..6=Sáb. Blocos {ini,fim,dur}.
   const GRADE = {
     // Dias: 1=Seg 2=Ter 3=Qua 4=Qui 5=Sex 6=Sáb. Bloco {ini,fim,dur} OU {horarios:[...],dur} (grade livre)
+    1:  { nome:'Bianca Salvato', trat:'Dra.', esp:'Radiologia e Diag. por Imagem', sala:'usgDrSalv', dias:{
+      1:[{ini:'08:30',fim:'12:00',dur:30}], 2:[{ini:'08:30',fim:'12:00',dur:30}], 3:[{ini:'08:30',fim:'12:00',dur:30}],
+      4:[{ini:'10:00',fim:'13:30',dur:30}], 5:[{ini:'08:30',fim:'12:00',dur:30}],
+    }},
     3:  { nome:'Rodolfo Salvato', trat:'Dr.',  esp:'Gineco e Obstetrícia', sala:'drRodolfo', dias:{
       1:[{ini:'09:00',fim:'18:00',dur:30}], 2:[{ini:'09:00',fim:'18:00',dur:30}], 3:[{ini:'08:30',fim:'18:00',dur:30}],
       4:[{ini:'09:00',fim:'18:00',dur:30}], 5:[{ini:'09:00',fim:'17:59',dur:30}], 6:[{ini:'08:00',fim:'11:59',dur:30}],
