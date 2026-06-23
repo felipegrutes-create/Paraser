@@ -132,6 +132,7 @@
   .card .ch .nm small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
   .bd{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:rgba(16,185,129,.14);color:var(--green);border:1px solid rgba(16,185,129,.4)}
   .bd.zero{background:var(--surface2);color:var(--muted);border-color:var(--border)}
+  .bd.home{background:rgba(96,165,250,.16);color:#93c5fd;border-color:rgba(96,165,250,.45)}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chip{font-size:12.5px;font-weight:600;padding:6px 9px;border-radius:7px;border:1px solid;min-width:60px;text-align:center;
     background:rgba(0,212,170,.1);color:var(--accent);border-color:rgba(0,212,170,.35)}
@@ -492,6 +493,26 @@
     let cards = '';
     if(nCom) cards += `<div class="cards-sep">✅ Atendem ${SEMANA[wd].toLowerCase()} (${nCom})</div>` + comCards;
     if(nSem) cards += `<div class="cards-sep off">🚫 Não atendem ${SEMANA[wd].toLowerCase()} (${nSem})</div>` + semCards;
+
+    // ===== Cards funcionários: trabalham no dia em cima (presencial/home), folga embaixo =====
+    let fOn='', fOff=''; let nfOn=0, nfOff=0;
+    Object.values(FUNCIONARIOS).forEach(f=>{
+      const e=f.escala[wd];
+      const local=areaNome[(f.baia||'').split(':')[0]]||'';
+      if(!e){
+        nfOff++;
+        fOff+=`<div class="card card-off"><div class="ch"><div class="nm">${f.nome}<small>${local}</small></div><span class="bd zero">folga</span></div><div class="nota">Folga ${SEMANA[wd].toLowerCase()}.</div></div>`;
+        return;
+      }
+      nfOn++;
+      const home=e.t==='H';
+      const badge=home?`<span class="bd home">🏠 home office</span>`:`<span class="bd">presencial</span>`;
+      const chip=e.h?`<span class="chip">${e.h}</span>`:(home?`<span class="chip">home</span>`:'');
+      fOn+=`<div class="card"><div class="ch"><div class="nm">${f.nome}<small>${local}</small></div>${badge}</div><div class="chips">${chip}</div></div>`;
+    });
+    if(nfOn) cards += `<div class="cards-sep">👥 Funcionários — trabalham ${SEMANA[wd].toLowerCase()} (${nfOn})</div>` + fOn;
+    if(nfOff) cards += `<div class="cards-sep off">🛌 Funcionários — folga ${SEMANA[wd].toLowerCase()} (${nfOff})</div>` + fOff;
+
     document.getElementById('cards').innerHTML=cards||'<div class="skel">Nenhum médico cadastrado na grade ainda.</div>';
   }
 
