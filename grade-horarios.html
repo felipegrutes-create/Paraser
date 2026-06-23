@@ -127,6 +127,9 @@
   .cards-sep.off{color:var(--muted);margin-top:18px}
   .card-off{opacity:.62}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
+  .card.card-conflito{border:2px solid #ef4444;animation:conflitoPulse 1.05s ease-in-out infinite}
+  .card.card-conflito .nm{color:#fca5a5}
+  .bd.conf{background:rgba(239,68,68,.16);color:#fca5a5;border-color:rgba(239,68,68,.5)}
   .card .ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:11px}
   .card .ch .nm{font-weight:700;font-size:14.5px}
   .card .ch .nm small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
@@ -414,18 +417,19 @@
       roomSlots[area].push(...mins);
       const sh = t => String(t).replace(':00','');   // 09:00→09, 13:30 fica 13:30
       const hours = blocos.map(b=> b.horarios ? `${sh(b.horarios[0])}–${sh(b.horarios[b.horarios.length-1])}` : `${sh(b.ini)}–${sh(b.fim)}`).join(', ');
-      roomDocList[area].push({ name:dispName(doc), mins, hours });
+      roomDocList[area].push({ id, name:dispName(doc), mins:[...new Set(mins)], hours });
     });
     Object.keys(roomSlots).forEach(a=>{ roomSlots[a]=[...new Set(roomSlots[a])].sort((x,y)=>x-y); });
     // conflito = mesma sala, mesmo minuto ocupado por 2+ médicos (compartilhar por turno NÃO é conflito)
-    const roomConflict={};
+    const roomConflict={}, conflictDocs=new Set();
     Object.keys(roomDocList).forEach(a=>{
       if(roomDocList[a].length<2){ roomConflict[a]=false; return; }
-      const seen={}; let conf=false;
-      roomDocList[a].forEach(d=>d.mins.forEach(m=>{ if(seen[m]) conf=true; else seen[m]=true; }));
+      const minMap={}; let conf=false;
+      roomDocList[a].forEach(d=>d.mins.forEach(m=>{ (minMap[m]=minMap[m]||[]).push(d.id); }));
+      Object.values(minMap).forEach(ids=>{ if(ids.length>1){ conf=true; ids.forEach(id=>conflictDocs.add(id)); } });
       roomConflict[a]=conf;
     });
-    return {roomSlots, roomDocs, roomDocList, roomConflict};
+    return {roomSlots, roomDocs, roomDocList, roomConflict, conflictDocs};
   }
 
   // ===== Render =====
@@ -492,7 +496,9 @@
         if(b.horarios){ b.horarios.forEach(h=>{ n++; chips+=`<span class="chip">${h}</span>`; }); }
         else { for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ n++; chips+=`<span class="chip">${minToHm(m)}</span>`; } }
       });
-      comCards+=`<div class="card"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span class="bd">${n} disponíve${n!==1?'is':'l'}</span></div><div class="chips">${chips}</div>${sel}</div>`;
+      const conf=comp.conflictDocs.has(id);
+      const badge=conf?`<span class="bd conf">⚠️ conflito de sala</span>`:`<span class="bd">${n} disponíve${n!==1?'is':'l'}</span>`;
+      comCards+=`<div class="card${conf?' card-conflito':''}"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div>${badge}</div><div class="chips">${chips}</div>${sel}</div>`;
     });
     let cards = '';
     if(nCom) cards += `<div class="cards-sep">✅ Atendem ${SEMANA[wd].toLowerCase()} (${nCom})</div>` + comCards;
