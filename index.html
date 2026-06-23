@@ -3790,11 +3790,14 @@
 
             <div class="chart-card" style="margin-top:20px">
                 <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-                    📈 Evolução mensal — Geração × Despesa por sócio
-                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026</span>
+                    📊 Mês a mês — Faturamento × Despesa por sócio
+                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026 · valores em R$</span>
                 </h3>
-                <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5"><b style="color:#e2e8f4">Linha</b> = faturamento gerado no mês · <b style="color:#e2e8f4">barra</b> = despesa coberta (a fatia do sócio do custo total da empresa, 80/20; jan–mar o operacional é 100% do Rodolfo). Cor por sócio: <b style="color:#00d4aa">verde Rodolfo</b>, <b style="color:#818cf8">lilás Joselmo</b>.</p>
-                <canvas id="socEvolChart" height="120"></canvas>
+                <div id="socMonthlyTable" style="overflow-x:auto;margin:6px 0 4px"></div>
+
+                <div style="font-weight:700;color:#e2e8f4;font-size:14px;margin:24px 0 4px">📈 Evolução por sócio</div>
+                <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5"><b style="color:#e2e8f4">Linha</b> = faturamento gerado · <b style="color:#e2e8f4">barra</b> = despesa coberta (fatia do sócio do custo total, 80/20; jan–mar o operacional é 100% do Rodolfo). Cor por sócio: <b style="color:#00d4aa">verde Rodolfo</b>, <b style="color:#818cf8">lilás Joselmo</b>.</p>
+                <canvas id="socEvolChart" height="110"></canvas>
             </div>
         </section>
 
@@ -11268,6 +11271,30 @@
             const gerouJ = [0, 2428, 6855, 21640, 37290, 52548];
             const despR  = [679550, 505382, 628191, 451610, 378269, 416127];
             const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
+
+            // ---- Tabela mensal (faturamento + despesa por sócio) ----
+            const tbl = document.getElementById('socMonthlyTable');
+            if (tbl) {
+                const f0 = n => Math.round(n).toLocaleString('pt-BR');
+                const sum = a => a.reduce((s, v) => s + v, 0);
+                const th = labels.map(l => `<th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600;font-size:12px">${l}</th>`).join('');
+                const row = (nome, arr, color) => `<tr style="border-top:1px solid rgba(255,255,255,.05)">
+                        <td style="padding:8px 12px;color:${color};font-weight:600;white-space:nowrap">${nome}</td>
+                        ${arr.map(v => `<td style="padding:8px 10px;text-align:right;color:#cbd5e1;font-variant-numeric:tabular-nums">${f0(v)}</td>`).join('')}
+                        <td style="padding:8px 12px;text-align:right;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.03)">${f0(sum(arr))}</td></tr>`;
+                const grp = txt => `<tr><td colspan="8" style="padding:13px 12px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:700">${txt}</td></tr>`;
+                tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:680px">
+                        <thead><tr><th style="text-align:left;padding:8px 12px"></th>${th}<th style="padding:8px 12px;text-align:right;color:#e2e8f4;font-weight:700;font-size:12px">Total</th></tr></thead>
+                        <tbody>
+                            ${grp('💰 Faturamento gerado')}
+                            ${row('Dr. Rodolfo', gerouR, '#00d4aa')}
+                            ${row('Dr. Joselmo', gerouJ, '#818cf8')}
+                            ${grp('🧾 Despesa coberta (80/20)')}
+                            ${row('Dr. Rodolfo', despR, '#00d4aa')}
+                            ${row('Dr. Joselmo', despJ, '#818cf8')}
+                        </tbody></table>`;
+            }
+
             // Despesa = barras empilhadas por sócio (cor por sócio); Geração = linha por sócio por cima
             const bar = (label, data, color) => ({
                 type: 'bar', label, data, backgroundColor: color, borderColor: color,
