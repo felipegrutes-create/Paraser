@@ -3800,6 +3800,15 @@
                 <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5"><b style="color:#e2e8f4">Linha</b> = faturamento gerado · <b style="color:#e2e8f4">barra</b> = despesa coberta (fatia do sócio do custo total, 80/20; jan–mar o operacional é 100% do Rodolfo). Cor por sócio: <b style="color:#00d4aa">verde Rodolfo</b>, <b style="color:#818cf8">lilás Joselmo</b>.</p>
                 <canvas id="socEvolChart" height="110"></canvas>
             </div>
+
+            <div class="chart-card" style="margin-top:20px;border:1.5px solid rgba(96,165,250,.45);box-shadow:0 0 0 1px rgba(96,165,250,.12) inset">
+                <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    🏦 Conta Corrente dos Sócios
+                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026</span>
+                </h3>
+                <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5">O que cada sócio gera (faturamento direto + a fatia 80/20 das outras fontes, que são proporcionais ao resultado deles) contra a despesa que ele arca. O que sobra é o lucro dele pra retirar.</p>
+                <div id="socContaCorrente"></div>
+            </div>
         </section>
 
         <!-- CONTAS A RECEBER -->
@@ -11276,6 +11285,15 @@
             const emprestimo = [75118, 0, 150236, 75118, 108713, 33595];        // parcela/amortização do empréstimo (capital de giro Itaú 48x + 24x)
             const retR = [180000, 132000, 29000, 51124, 108000, 91000];         // retiradas Dr. Rodolfo (inclui Alma Mater + Bianca)
             const retJ = [0, 0, 0, 0, 0, 20000];                                // retiradas Dr. Joselmo
+            // ---- Fluxo de caixa (valores reais da planilha, as 2 empresas; atualizar a cada fechamento) ----
+            const cxReceita  = [564378, 567319, 639653, 637594, 769298, 721613];   // receita recebida
+            const cxBankIn   = [607000, 145000, 0, 0, 0, 0];                        // empréstimo do banco (Itaú) captado
+            const cxAporte   = [45000, 20000, 30000, 200000, 0, 0];                 // aporte do sócio Joselmo
+            const cxDespesa  = [742805, 533730, 654950, 564513, 472837, 520189];   // despesa (saídas, exceto financiamento e retirada)
+            const cxParcela  = [75118, 0, 150236, 75118, 108713, 33595];           // parcela paga ao banco (amortização)
+            const cxRetirada = [180000, 132000, 29000, 51124, 108000, 131000];     // retiradas dos sócios
+            const cxOutras   = [-190948, -32000, 95900, -91600, -41569, -111610];  // conta garantida + aplicação + transf. internas (líquido, sem vai-e-vem)
+            const cxSaldo = labels.map((_, i) => cxReceita[i] + cxBankIn[i] + cxAporte[i] + cxOutras[i] - cxDespesa[i] - cxParcela[i] - cxRetirada[i]);
 
             // ---- Tabela mensal (faturamento + despesa por sócio) ----
             const tbl = document.getElementById('socMonthlyTable');
@@ -11301,15 +11319,6 @@
                         <td style="padding:9px 12px;text-align:right;font-weight:800;color:${accent};font-variant-numeric:tabular-nums;background:rgba(255,255,255,.06)">${f0(sum(arr))}</td></tr>`;
                 const grp = (txt, bg, color) => `<tr><td colspan="8" style="padding:13px 12px 7px;background:${bg};font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:${color};font-weight:800">${txt}</td></tr>`;
                 const fatTot = colSum(gerouR, gerouJ, outras);
-                // ---- Fluxo de caixa (valores reais da planilha, as 2 empresas; atualizar a cada fechamento) ----
-                const cxReceita  = [564378, 567319, 639653, 637594, 769298, 721613];   // receita recebida
-                const cxBankIn   = [607000, 145000, 0, 0, 0, 0];                        // empréstimo do banco (Itaú) captado
-                const cxAporte   = [45000, 20000, 30000, 200000, 0, 0];                 // aporte do sócio Joselmo
-                const cxDespesa  = [742805, 533730, 654950, 564513, 472837, 520189];   // despesa (saídas, exceto financiamento e retirada)
-                const cxParcela  = [75118, 0, 150236, 75118, 108713, 33595];           // parcela paga ao banco (amortização)
-                const cxRetirada = [180000, 132000, 29000, 51124, 108000, 131000];     // retiradas dos sócios
-                const cxOutras   = [-190948, -32000, 95900, -91600, -41569, -111610];  // conta garantida + aplicação + transf. internas (líquido, sem vai-e-vem)
-                const cxSaldo = labels.map((_, i) => cxReceita[i] + cxBankIn[i] + cxAporte[i] + cxOutras[i] - cxDespesa[i] - cxParcela[i] - cxRetirada[i]);
                 const money = v => (v < 0 ? '−' : '') + f0(Math.abs(v));
                 const resRow = (nome, arr) => `<tr style="border-top:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.02)">
                         <td style="padding:12px 12px;color:#fff;font-weight:800;white-space:nowrap">${nome}</td>
@@ -11366,6 +11375,41 @@
                     }
                 }
             });
+
+            // ===== Conta Corrente dos Sócios =====
+            const cc = document.getElementById('socContaCorrente');
+            if (cc) {
+                const sm = a => a.reduce((s, v) => s + v, 0);
+                const f0 = n => Math.round(n).toLocaleString('pt-BR');
+                const sig = n => (n < 0 ? '−' : '+') + f0(Math.abs(n));
+                const fatRT = sm(gerouR), fatJT = sm(gerouJ), outT = sm(outras);
+                const recR = fatRT + 0.8 * outT, recJ = fatJT + 0.2 * outT;
+                const despT = sm(cxDespesa), parcT = sm(cxParcela);
+                const arcaR = 0.8 * despT + parcT, arcaJ = 0.2 * despT;
+                const resR = recR - arcaR, resJ = recJ - arcaJ;
+                const beR = arcaR / 6, beJ = arcaJ / 6, geraR = recR / 6, geraJ = recJ / 6;
+                const row = (lbl, r, j, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.12);' : ''}">
+                        <td style="padding:10px 12px;color:${o.lc || '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap">${lbl}</td>
+                        <td style="padding:10px 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;color:${o.cR || '#eef2f8'}">${o.s ? sig(r) : f0(r)}</td>
+                        <td style="padding:10px 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;color:${o.cJ || '#eef2f8'}">${o.s ? sig(j) : f0(j)}</td></tr>`;
+                cc.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px">
+                        <thead><tr><th style="text-align:left;padding:10px 12px"></th>
+                            <th style="padding:10px 12px;text-align:right;color:#00d4aa;font-weight:700">Dr. Rodolfo <span style="font-weight:400;color:var(--muted);font-size:11px">80%</span></th>
+                            <th style="padding:10px 12px;text-align:right;color:#818cf8;font-weight:700">Dr. Joselmo <span style="font-weight:400;color:var(--muted);font-size:11px">20%</span></th></tr></thead>
+                        <tbody>
+                            ${row('FAT direto', fatRT, fatJT)}
+                            ${row('(+) Outras fontes (80/20)', 0.8 * outT, 0.2 * outT)}
+                            ${row('= Receita gerada', recR, recJ, { top: true, b: true })}
+                            ${row('(−) Despesa que arca *', arcaR, arcaJ)}
+                            ${row('= Resultado (lucro a retirar)', resR, resJ, { top: true, b: true, s: true, cR: resR < 0 ? '#fca5a5' : '#34d399', cJ: resJ < 0 ? '#fca5a5' : '#34d399' })}
+                        </tbody></table></div>
+                    <div style="font-size:11.5px;color:var(--muted);margin-top:6px">* Rodolfo = 80% da despesa + parcela do empréstimo · Joselmo = 20% da despesa. FAT total dos sócios: R$ ${f0(fatRT + fatJT)}.</div>
+                    <div style="margin-top:14px;padding:13px 15px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.28);border-radius:10px;font-size:12.5px;color:#cbd5e1;line-height:1.65">
+                        <b style="color:#93c5fd">📌 Quanto precisa gerar pra retirar lucro</b> (cada um precisa gerar pelo menos o que arca):<br>
+                        <b style="color:#00d4aa">Rodolfo</b> · equilíbrio <b>R$ ${f0(beR)}/mês</b> (~R$ ${f0(beR / 4.33)}/sem). Gera R$ ${f0(geraR)}/mês → ${resR >= 0 ? `<span style="color:#34d399">sobra R$ ${f0(resR / 6)}/mês de lucro</span>` : `<span style="color:#fca5a5">falta R$ ${f0(-resR / 6)}/mês</span>`}.<br>
+                        <b style="color:#818cf8">Joselmo</b> · equilíbrio <b>R$ ${f0(beJ)}/mês</b> (~R$ ${f0(beJ / 4.33)}/sem). Gera R$ ${f0(geraJ)}/mês → ${resJ >= 0 ? `<span style="color:#34d399">sobra R$ ${f0(resJ / 6)}/mês de lucro</span>` : `<span style="color:#fca5a5">falta R$ ${f0(-resJ / 6)}/mês pra cobrir</span>`}.
+                    </div>`;
+            }
         }
 
         async function renderReceitaDespesa() {
