@@ -11533,7 +11533,7 @@
                             ${rr('= Saldo do sócio', sldJm, { b: true, s: true, col: true, top: true })}
                         </tbody></table></div>`;
             }
-            window._socData = { labels, gerouR, gerouJ, outras, cxDespesa, cxParcela };
+            window._socData = { labels, gerouR, gerouJ, outras, cxDespesa, cxParcela, retR, retJ };
             calcPL();
         }
 
@@ -11576,6 +11576,7 @@
             document.getElementById('plResultadoBody').innerHTML = `
                         ${r2(despLbl, f0(arcaR), f0(arcaJ), { lc: 'var(--muted)' })}
                         ${r2('(+) PL alvo (retirada)', f0(XR), f0(XJ), { lc: 'var(--muted)' })}
+                        ${r2('↳ já retirou neste mês', f0(avg(D.retR)), f0(avg(D.retJ)), { lc: 'var(--muted)', cR: 'var(--muted)', cJ: 'var(--muted)' })}
                         ${r2('= Receita necessária', f0(cR.rec), f0(cJ.rec), { top: true, b: true })}
                         ${r2('(−) Receita residual (mês)', f0(S.R.resid), f0(S.J.resid), { lc: 'var(--muted)', cR: 'var(--muted)', cJ: 'var(--muted)' })}
                         ${r2('🎯 FAT direto necessário', f0(cR.fat), f0(cJ.fat), { top: true, b: true, big: true, size: '19px', cR: '#0a0f1e', cJ: '#0a0f1e', bgR: '#00d4aa', bgJ: '#818cf8' })}
