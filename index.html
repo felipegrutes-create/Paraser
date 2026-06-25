@@ -3836,11 +3836,11 @@
                                 <th style="text-align:left;padding:9px 12px;color:var(--muted);font-weight:600;font-size:12px;vertical-align:bottom">PL alvo (retirada/mês) →</th>
                                 <th style="padding:9px 12px;text-align:right;vertical-align:bottom">
                                     <div style="color:#00d4aa;font-weight:700;margin-bottom:5px">Dr. Rodolfo</div>
-                                    <div style="white-space:nowrap"><span style="color:var(--muted);font-size:12px">R$ </span><input id="plAlvoR" type="number" value="50000" step="5000" min="0" oninput="calcPL()" style="width:115px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right"></div>
+                                    <div style="white-space:nowrap"><span style="color:var(--muted);font-size:12px">R$ </span><input id="plAlvoR" type="text" inputmode="numeric" value="50.000" oninput="fmtMoedaInput(this)" style="width:115px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right"></div>
                                 </th>
                                 <th style="padding:9px 12px;text-align:right;vertical-align:bottom">
                                     <div style="color:#818cf8;font-weight:700;margin-bottom:5px">Dr. Joselmo</div>
-                                    <div style="white-space:nowrap"><span style="color:var(--muted);font-size:12px">R$ </span><input id="plAlvoJ" type="number" value="50000" step="5000" min="0" oninput="calcPL()" style="width:115px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right"></div>
+                                    <div style="white-space:nowrap"><span style="color:var(--muted);font-size:12px">R$ </span><input id="plAlvoJ" type="text" inputmode="numeric" value="50.000" oninput="fmtMoedaInput(this)" style="width:115px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right"></div>
                                 </th>
                             </tr>
                         </thead>
@@ -11518,10 +11518,16 @@
         }
 
         // Calculadora: quanto cada sócio precisa gerar (FAT direto) p/ retirar o PL alvo (independente por sócio). Bases mensais do fechamento Jan-Jun/2026.
+        // máscara de moeda nos campos de PL (formata milhar enquanto digita)
+        function fmtMoedaInput(el) {
+            const digits = (el.value || '').replace(/\D/g, '');
+            el.value = digits ? parseInt(digits, 10).toLocaleString('pt-BR') : '';
+            calcPL();
+        }
         function calcPL() {
             const elR = document.getElementById('plAlvoR'), elJ = document.getElementById('plAlvoJ');
             if (!elR || !elJ) return;
-            const XR = parseFloat(elR.value) || 0, XJ = parseFloat(elJ.value) || 0;
+            const XR = parseInt((elR.value || '').replace(/\D/g, ''), 10) || 0, XJ = parseInt((elJ.value || '').replace(/\D/g, ''), 10) || 0;
             const f0 = n => Math.round(n).toLocaleString('pt-BR');
             const S = {
                 R: { arca: 538999, resid: 263720, fat: 299882 },
