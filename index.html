@@ -11270,9 +11270,9 @@
             const gerouR = [259876, 237835, 297858, 346990, 442571, 214160];
             const gerouJ = [0, 2428, 6855, 21640, 37290, 54448];
             const outras = [193797, 163865, 223012, 274131, 569277, 430987];   // faturamento de outras fontes (outros médicos + pacotes/lab)
-            const despR  = [674337, 499437, 619579, 437553, 368852, 414816];   // despesa coberta SEM juros (juros vão p/ "Outros custos")
-            const despJ  = [63255, 28348, 26759, 109389, 92213, 103704];
-            const emprestimo = [5213, 5945, 8612, 17572, 11771, 1639];          // outros custos: juros/multas/IOF do empréstimo
+            const despR  = [679550, 505382, 628191, 451610, 378269, 416127];   // despesa coberta (inclui juros = despesas gerais)
+            const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
+            const emprestimo = [75118, 0, 150236, 75118, 108713, 33595];        // parcela/amortização do empréstimo (capital de giro Itaú 48x + 24x)
             const retR = [180000, 132000, 29000, 51124, 108000, 91000];         // retiradas Dr. Rodolfo (inclui Alma Mater + Bianca)
             const retJ = [0, 0, 0, 0, 0, 20000];                                // retiradas Dr. Joselmo
 
@@ -11322,7 +11322,7 @@
                             ${plain('Dr. Joselmo', despJ, '#818cf8')}
                             ${sub('Total despesa', despTot, '#cbd5e1')}
                             ${grp('🏦 Outros custos & retiradas', 'rgba(255,255,255,.03)', '#94a3b8')}
-                            ${plain('Outros custos (empréstimo · juros/IOF)', emprestimo, '#f59e0b')}
+                            ${plain('Empréstimo (parcela / amortização)', emprestimo, '#f59e0b')}
                             ${plain('Retiradas dos sócios', retTot, '#f87171')}
                             ${resRow('= Resultado do período', resArr)}
                         </tbody></table>`;
