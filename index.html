@@ -3790,9 +3790,10 @@
 
             <div class="chart-card" style="margin-top:20px">
                 <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-                    📊 Mês a mês — Faturamento × Despesa por sócio
+                    📊 Mês a mês — Faturamento e Fluxo de Caixa
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026 · valores em R$</span>
                 </h3>
+                <p style="font-size:12.5px;color:var(--muted);margin:0 0 6px;line-height:1.5"><b style="color:#e2e8f4">Faturamento</b> = o que foi faturado (Feegow, por sócio). <b style="color:#e2e8f4">Fluxo de caixa</b> = o que de fato entrou e saiu da conta no período e fecha no saldo. A receita recebida difere do faturamento porque são bases diferentes.</p>
                 <div id="socMonthlyTable" style="overflow-x:auto;margin:6px 0 4px"></div>
 
                 <div style="font-weight:700;color:#e2e8f4;font-size:14px;margin:24px 0 4px">📈 Evolução por sócio</div>
@@ -11299,11 +11300,14 @@
                         ${arr.map(v => `<td style="padding:9px 10px;text-align:right;color:#fff;font-weight:700;font-variant-numeric:tabular-nums">${f0(v)}</td>`).join('')}
                         <td style="padding:9px 12px;text-align:right;font-weight:800;color:${accent};font-variant-numeric:tabular-nums;background:rgba(255,255,255,.06)">${f0(sum(arr))}</td></tr>`;
                 const grp = (txt, bg, color) => `<tr><td colspan="8" style="padding:13px 12px 7px;background:${bg};font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:${color};font-weight:800">${txt}</td></tr>`;
-                // linha de RESULTADO (sinal e cor por valor)
                 const fatTot = colSum(gerouR, gerouJ, outras);
-                const despTot = colSum(despR, despJ);
-                const retTot = colSum(retR, retJ);
-                const resArr = labels.map((_, i) => fatTot[i] - despTot[i] - emprestimo[i] - retTot[i]);
+                // ---- Fluxo de caixa (valores reais da planilha, as 2 empresas; atualizar a cada fechamento) ----
+                const cxReceita  = [564378, 567319, 639653, 637594, 769298, 721613];   // receita recebida
+                const cxEmpCapt  = [1009352, 501000, 418500, 617000, 661531, 256000];  // empréstimos/aportes captados
+                const cxDespesa  = [742805, 533730, 654950, 564513, 472837, 520189];   // despesa (saídas, exceto empréstimo e retirada)
+                const cxEmpPago  = [623418, 368000, 442836, 583718, 811813, 401205];   // empréstimos pagos
+                const cxRetirada = [180000, 132000, 29000, 51124, 108000, 131000];     // retiradas dos sócios
+                const cxSaldo = labels.map((_, i) => cxReceita[i] + cxEmpCapt[i] - cxDespesa[i] - cxEmpPago[i] - cxRetirada[i]);
                 const money = v => (v < 0 ? '−' : '') + f0(Math.abs(v));
                 const resRow = (nome, arr) => `<tr style="border-top:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.02)">
                         <td style="padding:12px 12px;color:#fff;font-weight:800;white-space:nowrap">${nome}</td>
@@ -11317,14 +11321,13 @@
                             ${band('Dr. Joselmo', gerouJ, '#818cf8')}
                             ${band('Outras fontes', outras, '#f59e0b')}
                             ${sub('Total faturado', colSum(gerouR, gerouJ, outras), '#5eead4')}
-                            ${grp('🧾 Despesa coberta (80/20)', 'rgba(255,255,255,.03)', '#94a3b8')}
-                            ${plain('Dr. Rodolfo', despR, '#00d4aa')}
-                            ${plain('Dr. Joselmo', despJ, '#818cf8')}
-                            ${sub('Total despesa', despTot, '#cbd5e1')}
-                            ${grp('🏦 Outros custos & retiradas', 'rgba(255,255,255,.03)', '#94a3b8')}
-                            ${plain('Empréstimo (parcela / amortização)', emprestimo, '#f59e0b')}
-                            ${plain('Retiradas dos sócios', retTot, '#f87171')}
-                            ${resRow('= Resultado do período', resArr)}
+                            ${grp('💧 Fluxo de caixa do período', 'rgba(96,165,250,.12)', '#93c5fd')}
+                            ${plain('(+) Receita recebida', cxReceita, '#34d399')}
+                            ${plain('(+) Empréstimos / aportes captados', cxEmpCapt, '#f59e0b')}
+                            ${plain('(−) Despesa', cxDespesa, '#f87171')}
+                            ${plain('(−) Empréstimos pagos', cxEmpPago, '#f87171')}
+                            ${plain('(−) Retiradas dos sócios', cxRetirada, '#f87171')}
+                            ${resRow('= Saldo de caixa', cxSaldo)}
                         </tbody></table>`;
             }
 
