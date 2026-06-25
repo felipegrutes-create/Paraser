@@ -11395,6 +11395,7 @@
                 const despT = sm(cxDespesa), parcT = sm(cxParcela);
                 const arcaR = 0.8 * despT + parcT, arcaJ = 0.2 * despT;
                 const resR = recR - arcaR, resJ = recJ - arcaJ;
+                const apoR = 0, apoJ = sm(cxAporte), posR = resR + apoR, posJ = resJ + apoJ;
                 const beR = arcaR / 6, beJ = arcaJ / 6, geraR = recR / 6, geraJ = recJ / 6;
                 const row = (lbl, r, j, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.12);' : ''}">
                         <td style="padding:10px 12px;color:${o.lc || '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap">${lbl}</td>
@@ -11409,7 +11410,9 @@
                             ${row('(+) Outras fontes (80/20)', 0.8 * outT, 0.2 * outT)}
                             ${row('= Receita gerada', recR, recJ, { top: true, b: true })}
                             ${row('(−) Despesa que arca *', arcaR, arcaJ)}
-                            ${row('= Resultado (lucro a retirar)', resR, resJ, { top: true, b: true, s: true, cR: resR < 0 ? '#fca5a5' : '#34d399', cJ: resJ < 0 ? '#fca5a5' : '#34d399' })}
+                            ${row('= Resultado operacional', resR, resJ, { top: true, b: true, s: true, cR: resR < 0 ? '#fca5a5' : '#34d399', cJ: resJ < 0 ? '#fca5a5' : '#34d399' })}
+                            ${row('(+) Aporte do sócio', apoR, apoJ)}
+                            ${row('= Posição total', posR, posJ, { top: true, b: true, s: true, cR: posR < 0 ? '#fca5a5' : '#34d399', cJ: posJ < 0 ? '#fca5a5' : '#34d399' })}
                         </tbody></table></div>
                     <div style="font-size:11.5px;color:var(--muted);margin-top:6px">* Rodolfo = 80% da despesa + parcela do empréstimo · Joselmo = 20% da despesa. FAT total dos sócios: R$ ${f0(fatRT + fatJT)}.</div>
                     <div style="margin-top:14px;padding:13px 15px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.28);border-radius:10px;font-size:12.5px;color:#cbd5e1;line-height:1.65">
@@ -11433,6 +11436,10 @@
                 const resJ = labels.map((_, i) => recJ[i] - arcJ[i]);
                 const residR = labels.map((_, i) => 0.8 * outras[i]);
                 const residJ = labels.map((_, i) => 0.2 * outras[i]);
+                const apoRm = labels.map(() => 0);
+                const apoJm = labels.map((_, i) => cxAporte[i]);
+                const posRm = labels.map((_, i) => resR[i] + apoRm[i]);
+                const posJm = labels.map((_, i) => resJ[i] + apoJm[i]);
                 const th = labels.map(l => `<th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600;font-size:12px">${l}</th>`).join('');
                 const rr = (lbl, arr, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.1);' : ''}">
                         <td style="padding:${o.sub ? '6px' : '8px'} 12px;color:${o.sub ? 'var(--muted)' : '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap;font-size:${o.sub ? '12px' : '13px'}">${lbl}</td>
@@ -11447,13 +11454,17 @@
                             ${rr('&nbsp;&nbsp;&nbsp;↳ FAT direto', gerouR, { sub: true })}
                             ${rr('&nbsp;&nbsp;&nbsp;↳ Receita residual (80%)', residR, { sub: true })}
                             ${rr('Despesa que arca', arcR)}
-                            ${rr('= Resultado', resR, { b: true, s: true, col: true, top: true })}
+                            ${rr('= Resultado operacional', resR, { b: true, s: true, col: true, top: true })}
+                            ${rr('(+) Aporte do sócio', apoRm, { sub: true })}
+                            ${rr('= Posição total', posRm, { b: true, s: true, col: true })}
                             ${ghdr('🟣 Dr. Joselmo (20%)', '#818cf8')}
                             ${rr('Receita gerada', recJ, { b: true })}
                             ${rr('&nbsp;&nbsp;&nbsp;↳ FAT direto', gerouJ, { sub: true })}
                             ${rr('&nbsp;&nbsp;&nbsp;↳ Receita residual (20%)', residJ, { sub: true })}
                             ${rr('Despesa que arca', arcJ)}
-                            ${rr('= Resultado', resJ, { b: true, s: true, col: true, top: true })}
+                            ${rr('= Resultado operacional', resJ, { b: true, s: true, col: true, top: true })}
+                            ${rr('(+) Aporte do sócio', apoJm, { sub: true })}
+                            ${rr('= Posição total', posJm, { b: true, s: true, col: true })}
                         </tbody></table></div>`;
             }
         }
