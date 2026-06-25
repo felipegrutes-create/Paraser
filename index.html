@@ -3749,18 +3749,18 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
                     <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.25);border-radius:12px;padding:14px 16px">
                         <div style="font-size:13px;color:var(--muted)">Dr. Rodolfo <span style="color:#00d4aa">· 80% da sociedade</span></div>
-                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 1.799.290</div>
-                        <div style="font-size:12px;color:var(--muted)">94% de tudo que os sócios geram</div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 1.819.090</div>
+                        <div style="font-size:12px;color:var(--muted)">93% de tudo que os sócios geram</div>
                     </div>
                     <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:12px;padding:14px 16px">
                         <div style="font-size:13px;color:var(--muted)">Dr. Joselmo <span style="color:#818cf8">· 20% da sociedade</span></div>
-                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 122.660</div>
-                        <div style="font-size:12px;color:var(--muted)">6% · entrou em abril, em rampa (0 → 54k/mês)</div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 128.060</div>
+                        <div style="font-size:12px;color:var(--muted)">7% · entrou em abril, em rampa (0 → 60k/mês)</div>
                     </div>
                 </div>
 
                 <div style="font-weight:700;color:#e2e8f4;margin-bottom:4px;font-size:14px">2 · Quanto cada sócio pode retirar <span style="font-weight:400;color:var(--muted);font-size:12px">· pela participação 80/20, em caixa</span></div>
-                <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Disponível para os sócios no período: <b style="color:#e2e8f4">R$ 661.343</b></div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Disponível para os sócios no período: <b style="color:#e2e8f4">R$ 643.226</b></div>
                 <div style="overflow-x:auto">
                     <table style="width:100%;border-collapse:collapse;font-size:14px">
                         <thead>
@@ -3776,16 +3776,16 @@
                             <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
                                 <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Rodolfo</td>
                                 <td style="padding:11px 6px;color:var(--muted)">80%</td>
-                                <td style="padding:11px 6px">R$ 596.207</td>
-                                <td style="padding:11px 6px">R$ 591.124</td>
-                                <td style="padding:11px 6px;font-weight:700;color:#fbbf24">+R$ 5.083 <span style="font-size:11px;font-weight:400;color:var(--muted)">no limite</span></td>
+                                <td style="padding:11px 6px">R$ 581.473</td>
+                                <td style="padding:11px 6px">R$ 611.124</td>
+                                <td style="padding:11px 6px;font-weight:700;color:#fca5a5">−R$ 29.651 <span style="font-size:11px;font-weight:400;color:var(--muted)">acima do limite</span></td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
                                 <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Joselmo</td>
                                 <td style="padding:11px 6px;color:var(--muted)">20%</td>
-                                <td style="padding:11px 6px">R$ 65.136</td>
+                                <td style="padding:11px 6px">R$ 61.753</td>
                                 <td style="padding:11px 6px">R$ 20.000</td>
-                                <td style="padding:11px 6px;font-weight:700;color:#34d399">+R$ 45.136 <span style="font-size:11px;font-weight:400;color:var(--muted)">a receber</span></td>
+                                <td style="padding:11px 6px;font-weight:700;color:#34d399">+R$ 41.753 <span style="font-size:11px;font-weight:400;color:var(--muted)">a receber</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -11319,13 +11319,13 @@
         // ===== Sócios — gráfico de evolução mensal (fechamento manual Jan–Jun/2026; atualizar junto com o painel, ver memória decisao_2026-06-23_socios_geracao_retirada) =====
         function renderSociosChart() {
             const labels = ['Jan','Fev','Mar','Abr','Mai','Jun'];
-            const gerouR = [259876, 237835, 297858, 346990, 442571, 214160];
-            const gerouJ = [0, 2428, 6855, 21640, 37290, 54448];
-            const outras = [304502, 327056, 334940, 268964, 289437, 453005];   // outras fontes = receita recebida − Rodolfo − Joselmo (absorve o gap p/ bater com o caixa: outros médicos + medicamentos + defasagem de pagamento)
+            const gerouR = [259876, 237835, 297858, 346990, 442571, 233960];
+            const gerouJ = [0, 2428, 6855, 21640, 37290, 59848];
+            const outras = [304502, 327056, 334940, 268964, 289437, 427806];   // outras fontes = receita recebida − Rodolfo − Joselmo (absorve o gap p/ bater com o caixa: outros médicos + medicamentos + defasagem de pagamento)
             const despR  = [679550, 505382, 628191, 451610, 378269, 416127];   // despesa coberta (inclui juros = despesas gerais)
             const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
             const emprestimo = [75118, 0, 150236, 75118, 108713, 33595];        // parcela/amortização do empréstimo (capital de giro Itaú 48x + 24x)
-            const retR = [180000, 132000, 29000, 51124, 108000, 91000];         // retiradas Dr. Rodolfo (inclui Alma Mater + Bianca)
+            const retR = [180000, 132000, 29000, 51124, 108000, 111000];         // retiradas Dr. Rodolfo (inclui Alma Mater + Bianca)
             const retJ = [0, 0, 0, 0, 0, 20000];                                // retiradas Dr. Joselmo
             // ---- Fluxo de caixa (valores reais da planilha, as 2 empresas; atualizar a cada fechamento) ----
             const cxReceita  = [564378, 567319, 639653, 637594, 769298, 721613];   // receita recebida
@@ -11533,8 +11533,8 @@
             const XR = parseInt((elR.value || '').replace(/\D/g, ''), 10) || 0, XJ = parseInt((elJ.value || '').replace(/\D/g, ''), 10) || 0;
             const f0 = n => Math.round(n).toLocaleString('pt-BR');
             const S = {
-                R: { arca: 538999, resid: 263720, fat: 299882 },
-                J: { arca: 116301, resid: 65930, fat: 20444 }
+                R: { arca: 538999, resid: 260361, fat: 303182 },
+                J: { arca: 116301, resid: 65090, fat: 21343 }
             };
             const cR = { rec: S.R.arca + XR, fat: S.R.arca + XR - S.R.resid }; cR.falta = cR.fat - S.R.fat;
             const cJ = { rec: S.J.arca + XJ, fat: S.J.arca + XJ - S.J.resid }; cJ.falta = cJ.fat - S.J.fat;
