@@ -3793,7 +3793,7 @@
                     📊 Mês a mês — Faturamento e Fluxo de Caixa
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026 · valores em R$</span>
                 </h3>
-                <p style="font-size:12.5px;color:var(--muted);margin:0 0 6px;line-height:1.5"><b style="color:#e2e8f4">Faturamento por sócio</b> (Feegow). "Outras fontes" inclui outros médicos, medicamentos e a defasagem de pagamento, de forma que o <b style="color:#e2e8f4">Total faturado bate com a Receita recebida</b> (caixa). Abaixo, o <b style="color:#e2e8f4">Fluxo de caixa</b> fecha no saldo do período.</p>
+                <p style="font-size:12.5px;color:var(--muted);margin:0 0 6px;line-height:1.5"><b style="color:#e2e8f4">Faturamento por sócio</b> (Feegow). "Outras fontes" inclui outros médicos, medicamentos e a defasagem de pagamento, de forma que o <b style="color:#e2e8f4">Total faturado bate com a Receita recebida</b> (caixa). Abaixo, o <b style="color:#e2e8f4">Fluxo de caixa</b> fecha no saldo do período. Financiamento já limpo: só o empréstimo do banco (Itaú) e o aporte do sócio; conta garantida e aplicação entram líquidas em "outras", e as transferências entre as duas empresas saem (se anulam).</p>
                 <div id="socMonthlyTable" style="overflow-x:auto;margin:6px 0 4px"></div>
 
                 <div style="font-weight:700;color:#e2e8f4;font-size:14px;margin:24px 0 4px">📈 Evolução por sócio</div>
@@ -11303,11 +11303,13 @@
                 const fatTot = colSum(gerouR, gerouJ, outras);
                 // ---- Fluxo de caixa (valores reais da planilha, as 2 empresas; atualizar a cada fechamento) ----
                 const cxReceita  = [564378, 567319, 639653, 637594, 769298, 721613];   // receita recebida
-                const cxEmpCapt  = [1009352, 501000, 418500, 617000, 661531, 256000];  // empréstimos/aportes captados
-                const cxDespesa  = [742805, 533730, 654950, 564513, 472837, 520189];   // despesa (saídas, exceto empréstimo e retirada)
-                const cxEmpPago  = [623418, 368000, 442836, 583718, 811813, 401205];   // empréstimos pagos
+                const cxBankIn   = [607000, 145000, 0, 0, 0, 0];                        // empréstimo do banco (Itaú) captado
+                const cxAporte   = [45000, 20000, 30000, 200000, 0, 0];                 // aporte do sócio Joselmo
+                const cxDespesa  = [742805, 533730, 654950, 564513, 472837, 520189];   // despesa (saídas, exceto financiamento e retirada)
+                const cxParcela  = [75118, 0, 150236, 75118, 108713, 33595];           // parcela paga ao banco (amortização)
                 const cxRetirada = [180000, 132000, 29000, 51124, 108000, 131000];     // retiradas dos sócios
-                const cxSaldo = labels.map((_, i) => cxReceita[i] + cxEmpCapt[i] - cxDespesa[i] - cxEmpPago[i] - cxRetirada[i]);
+                const cxOutras   = [-190948, -32000, 95900, -91600, -41569, -111610];  // conta garantida + aplicação + transf. internas (líquido, sem vai-e-vem)
+                const cxSaldo = labels.map((_, i) => cxReceita[i] + cxBankIn[i] + cxAporte[i] + cxOutras[i] - cxDespesa[i] - cxParcela[i] - cxRetirada[i]);
                 const money = v => (v < 0 ? '−' : '') + f0(Math.abs(v));
                 const resRow = (nome, arr) => `<tr style="border-top:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.02)">
                         <td style="padding:12px 12px;color:#fff;font-weight:800;white-space:nowrap">${nome}</td>
@@ -11323,10 +11325,12 @@
                             ${sub('Total faturado', colSum(gerouR, gerouJ, outras), '#5eead4')}
                             ${grp('💧 Fluxo de caixa do período', 'rgba(96,165,250,.12)', '#93c5fd')}
                             ${plain('(+) Receita recebida', cxReceita, '#34d399')}
-                            ${plain('(+) Empréstimos / aportes captados', cxEmpCapt, '#f59e0b')}
+                            ${plain('(+) Empréstimo do banco (Itaú)', cxBankIn, '#f59e0b')}
+                            ${plain('(+) Aporte do sócio (Joselmo)', cxAporte, '#818cf8')}
                             ${plain('(−) Despesa', cxDespesa, '#f87171')}
-                            ${plain('(−) Empréstimos pagos', cxEmpPago, '#f87171')}
+                            ${plain('(−) Parcela do empréstimo (Itaú)', cxParcela, '#f87171')}
                             ${plain('(−) Retiradas dos sócios', cxRetirada, '#f87171')}
+                            ${plain('(±) Outras mov. financeiras (conta garantida, aplicação · líquido)', cxOutras, '#94a3b8')}
                             ${resRow('= Saldo de caixa', cxSaldo)}
                         </tbody></table>`;
             }
