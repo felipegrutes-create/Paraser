@@ -11270,8 +11270,11 @@
             const gerouR = [259876, 237835, 297858, 346990, 442571, 214160];
             const gerouJ = [0, 2428, 6855, 21640, 37290, 54448];
             const outras = [193797, 163865, 223012, 274131, 569277, 430987];   // faturamento de outras fontes (outros médicos + pacotes/lab)
-            const despR  = [679550, 505382, 628191, 451610, 378269, 416127];
-            const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
+            const despR  = [674337, 499437, 619579, 437553, 368852, 414816];   // despesa coberta SEM juros (juros vão p/ "Outros custos")
+            const despJ  = [63255, 28348, 26759, 109389, 92213, 103704];
+            const emprestimo = [5213, 5945, 8612, 17572, 11771, 1639];          // outros custos: juros/multas/IOF do empréstimo
+            const retR = [180000, 132000, 29000, 51124, 108000, 91000];         // retiradas Dr. Rodolfo (inclui Alma Mater + Bianca)
+            const retJ = [0, 0, 0, 0, 0, 20000];                                // retiradas Dr. Joselmo
 
             // ---- Tabela mensal (faturamento + despesa por sócio) ----
             const tbl = document.getElementById('socMonthlyTable');
@@ -11296,6 +11299,16 @@
                         ${arr.map(v => `<td style="padding:9px 10px;text-align:right;color:#fff;font-weight:700;font-variant-numeric:tabular-nums">${f0(v)}</td>`).join('')}
                         <td style="padding:9px 12px;text-align:right;font-weight:800;color:${accent};font-variant-numeric:tabular-nums;background:rgba(255,255,255,.06)">${f0(sum(arr))}</td></tr>`;
                 const grp = (txt, bg, color) => `<tr><td colspan="8" style="padding:13px 12px 7px;background:${bg};font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:${color};font-weight:800">${txt}</td></tr>`;
+                // linha de RESULTADO (sinal e cor por valor)
+                const fatTot = colSum(gerouR, gerouJ, outras);
+                const despTot = colSum(despR, despJ);
+                const retTot = colSum(retR, retJ);
+                const resArr = labels.map((_, i) => fatTot[i] - despTot[i] - emprestimo[i] - retTot[i]);
+                const money = v => (v < 0 ? '−' : '') + f0(Math.abs(v));
+                const resRow = (nome, arr) => `<tr style="border-top:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.02)">
+                        <td style="padding:12px 12px;color:#fff;font-weight:800;white-space:nowrap">${nome}</td>
+                        ${arr.map(v => `<td style="padding:12px 10px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:${v < 0 ? '#fca5a5' : '#34d399'}">${money(v)}</td>`).join('')}
+                        <td style="padding:12px 12px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.06);color:${sum(arr) < 0 ? '#fca5a5' : '#34d399'}">${money(sum(arr))}</td></tr>`;
                 tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px">
                         <thead><tr><th style="text-align:left;padding:9px 12px"></th>${th}<th style="padding:9px 12px;text-align:right;color:#e2e8f4;font-weight:700;font-size:12px">Total</th></tr></thead>
                         <tbody>
@@ -11307,7 +11320,11 @@
                             ${grp('🧾 Despesa coberta (80/20)', 'rgba(255,255,255,.03)', '#94a3b8')}
                             ${plain('Dr. Rodolfo', despR, '#00d4aa')}
                             ${plain('Dr. Joselmo', despJ, '#818cf8')}
-                            ${sub('Total despesa', colSum(despR, despJ), '#cbd5e1')}
+                            ${sub('Total despesa', despTot, '#cbd5e1')}
+                            ${grp('🏦 Outros custos & retiradas', 'rgba(255,255,255,.03)', '#94a3b8')}
+                            ${plain('Outros custos (empréstimo · juros/IOF)', emprestimo, '#f59e0b')}
+                            ${plain('Retiradas dos sócios', retTot, '#f87171')}
+                            ${resRow('= Resultado do período', resArr)}
                         </tbody></table>`;
             }
 
