@@ -3793,7 +3793,7 @@
                     📊 Mês a mês — Faturamento e Fluxo de Caixa
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026 · valores em R$</span>
                 </h3>
-                <p style="font-size:12.5px;color:var(--muted);margin:0 0 6px;line-height:1.5"><b style="color:#e2e8f4">Faturamento</b> = o que foi faturado (Feegow, por sócio). <b style="color:#e2e8f4">Fluxo de caixa</b> = o que de fato entrou e saiu da conta no período e fecha no saldo. A receita recebida difere do faturamento porque são bases diferentes.</p>
+                <p style="font-size:12.5px;color:var(--muted);margin:0 0 6px;line-height:1.5"><b style="color:#e2e8f4">Faturamento por sócio</b> (Feegow). "Outras fontes" inclui outros médicos, medicamentos e a defasagem de pagamento, de forma que o <b style="color:#e2e8f4">Total faturado bate com a Receita recebida</b> (caixa). Abaixo, o <b style="color:#e2e8f4">Fluxo de caixa</b> fecha no saldo do período.</p>
                 <div id="socMonthlyTable" style="overflow-x:auto;margin:6px 0 4px"></div>
 
                 <div style="font-weight:700;color:#e2e8f4;font-size:14px;margin:24px 0 4px">📈 Evolução por sócio</div>
@@ -11270,7 +11270,7 @@
             const labels = ['Jan','Fev','Mar','Abr','Mai','Jun'];
             const gerouR = [259876, 237835, 297858, 346990, 442571, 214160];
             const gerouJ = [0, 2428, 6855, 21640, 37290, 54448];
-            const outras = [193797, 163865, 223012, 274131, 569277, 430987];   // faturamento de outras fontes (outros médicos + pacotes/lab)
+            const outras = [304502, 327056, 334940, 268964, 289437, 453005];   // outras fontes = receita recebida − Rodolfo − Joselmo (absorve o gap p/ bater com o caixa: outros médicos + medicamentos + defasagem de pagamento)
             const despR  = [679550, 505382, 628191, 451610, 378269, 416127];   // despesa coberta (inclui juros = despesas gerais)
             const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
             const emprestimo = [75118, 0, 150236, 75118, 108713, 33595];        // parcela/amortização do empréstimo (capital de giro Itaú 48x + 24x)
