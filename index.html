@@ -3829,13 +3829,24 @@
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">base mensal Jan–Jun/2026</span>
                 </h3>
                 <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5">Quanto cada sócio precisa gerar de faturamento próprio (FAT direto) por mês para cobrir a despesa que arca e ainda retirar o PL alvo, já considerando a receita residual que vem da clínica (80/20).</p>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-                    <label for="plAlvo" style="font-size:13px;color:#e2e8f4;font-weight:600">PL alvo (retirada mensal):</label>
-                    <span style="color:var(--muted)">R$</span>
-                    <input id="plAlvo" type="number" value="50000" step="5000" min="0" oninput="calcPL()" style="width:140px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:15px;font-weight:700">
-                    <span style="font-size:12px;color:var(--muted)">/mês por sócio</span>
+                <div style="overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:9px 12px;color:var(--muted);font-weight:600;font-size:12px;vertical-align:bottom">PL alvo (retirada/mês) →</th>
+                                <th style="padding:9px 12px;text-align:right;vertical-align:bottom">
+                                    <div style="color:#00d4aa;font-weight:700;margin-bottom:5px">Dr. Rodolfo</div>
+                                    <div style="white-space:nowrap"><span style="color:var(--muted);font-size:12px">R$ </span><input id="plAlvoR" type="number" value="50000" step="5000" min="0" oninput="calcPL()" style="width:115px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right"></div>
+                                </th>
+                                <th style="padding:9px 12px;text-align:right;vertical-align:bottom">
+                                    <div style="color:#818cf8;font-weight:700;margin-bottom:5px">Dr. Joselmo</div>
+                                    <div style="white-space:nowrap"><span style="color:var(--muted);font-size:12px">R$ </span><input id="plAlvoJ" type="number" value="50000" step="5000" min="0" oninput="calcPL()" style="width:115px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right"></div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="plResultadoBody"></tbody>
+                    </table>
                 </div>
-                <div id="plResultado"></div>
             </div>
         </section>
 
@@ -11506,36 +11517,31 @@
             calcPL();
         }
 
-        // Calculadora: quanto cada sócio precisa gerar (FAT direto) p/ retirar o PL alvo. Bases mensais do fechamento Jan-Jun/2026.
+        // Calculadora: quanto cada sócio precisa gerar (FAT direto) p/ retirar o PL alvo (independente por sócio). Bases mensais do fechamento Jan-Jun/2026.
         function calcPL() {
-            const el = document.getElementById('plAlvo');
-            if (!el) return;
-            const X = parseFloat(el.value) || 0;
+            const elR = document.getElementById('plAlvoR'), elJ = document.getElementById('plAlvoJ');
+            if (!elR || !elJ) return;
+            const XR = parseFloat(elR.value) || 0, XJ = parseFloat(elJ.value) || 0;
             const f0 = n => Math.round(n).toLocaleString('pt-BR');
             const S = {
-                R: { arca: 538999, resid: 263720, fat: 299882, c: '#00d4aa' },
-                J: { arca: 116301, resid: 65930, fat: 20444, c: '#818cf8' }
+                R: { arca: 538999, resid: 263720, fat: 299882 },
+                J: { arca: 116301, resid: 65930, fat: 20444 }
             };
-            const calc = b => { const rec = b.arca + X, fat = rec - b.resid; return { rec, fat, falta: fat - b.fat }; };
-            const cR = calc(S.R), cJ = calc(S.J);
+            const cR = { rec: S.R.arca + XR, fat: S.R.arca + XR - S.R.resid }; cR.falta = cR.fat - S.R.fat;
+            const cJ = { rec: S.J.arca + XJ, fat: S.J.arca + XJ - S.J.resid }; cJ.falta = cJ.fat - S.J.fat;
             const r2 = (lbl, rv, jv, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.12);' : ''}">
                     <td style="padding:9px 12px;color:${o.lc || '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap">${lbl}</td>
                     <td style="padding:9px 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;color:${o.cR || '#eef2f8'}">${rv}</td>
                     <td style="padding:9px 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;color:${o.cJ || '#eef2f8'}">${jv}</td></tr>`;
             const ft = c => c.falta > 0.5 ? `<span style="color:#fca5a5">falta ${f0(c.falta)}</span>` : `<span style="color:#34d399">já cobre (sobra ${f0(-c.falta)})</span>`;
-            document.getElementById('plResultado').innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px">
-                    <thead><tr><th style="text-align:left;padding:9px 12px"></th>
-                        <th style="padding:9px 12px;text-align:right;color:#00d4aa;font-weight:700">Dr. Rodolfo</th>
-                        <th style="padding:9px 12px;text-align:right;color:#818cf8;font-weight:700">Dr. Joselmo</th></tr></thead>
-                    <tbody>
+            document.getElementById('plResultadoBody').innerHTML = `
                         ${r2('Despesa que arca (mês)', f0(S.R.arca), f0(S.J.arca))}
-                        ${r2('(+) PL alvo (retirada)', f0(X), f0(X))}
+                        ${r2('(+) PL alvo (retirada)', f0(XR), f0(XJ))}
                         ${r2('= Receita necessária', f0(cR.rec), f0(cJ.rec), { top: true, b: true })}
                         ${r2('(−) Receita residual (mês)', f0(S.R.resid), f0(S.J.resid))}
                         ${r2('= FAT direto necessário', f0(cR.fat), f0(cJ.fat), { top: true, b: true, cR: '#7fffd4', cJ: '#b9c0ff' })}
                         ${r2('Gera hoje (FAT/mês)', f0(S.R.fat), f0(S.J.fat), { lc: 'var(--muted)' })}
-                        ${r2('→ Precisa', ft(cR), ft(cJ), { b: true })}
-                    </tbody></table></div>`;
+                        ${r2('→ Precisa', ft(cR), ft(cJ), { b: true })}`;
         }
 
         async function renderReceitaDespesa() {
