@@ -3832,6 +3832,12 @@
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">base mensal Jan–Jun/2026</span>
                 </h3>
                 <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5">Quanto cada sócio precisa gerar de faturamento próprio (FAT direto) por mês para cobrir a despesa que arca e ainda retirar o PL alvo, já considerando a receita residual que vem da clínica (80/20).</p>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;padding:11px 14px;background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.3);border-radius:10px">
+                    <label for="redDespesa" style="font-size:13px;color:#fbbf24;font-weight:700">✂️ Simular corte de despesa:</label>
+                    <input id="redDespesa" type="number" value="0" step="5" min="0" max="100" oninput="calcPL()" style="width:80px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right">
+                    <span style="color:#fbbf24;font-weight:700">%</span>
+                    <span style="font-size:12px;color:var(--muted)">reduz a despesa que arca e recalcula tudo abaixo</span>
+                </div>
                 <div style="overflow-x:auto">
                     <table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px">
                         <thead>
@@ -11536,8 +11542,12 @@
                 R: { arca: 538999, resid: 260361, fat: 303182 },
                 J: { arca: 116301, resid: 65090, fat: 21343 }
             };
-            const cR = { rec: S.R.arca + XR, fat: S.R.arca + XR - S.R.resid }; cR.falta = cR.fat - S.R.fat;
-            const cJ = { rec: S.J.arca + XJ, fat: S.J.arca + XJ - S.J.resid }; cJ.falta = cJ.fat - S.J.fat;
+            const red = Math.min(Math.max(parseFloat((document.getElementById('redDespesa') || {}).value) || 0, 0), 100);
+            const fator = 1 - red / 100;
+            const arcaR = S.R.arca * fator, arcaJ = S.J.arca * fator;
+            const cR = { rec: arcaR + XR, fat: arcaR + XR - S.R.resid }; cR.falta = cR.fat - S.R.fat;
+            const cJ = { rec: arcaJ + XJ, fat: arcaJ + XJ - S.J.resid }; cJ.falta = cJ.fat - S.J.fat;
+            const despLbl = red > 0 ? `Despesa que arca (mês) <span style="color:#fbbf24;font-weight:700">−${red}%</span>` : 'Despesa que arca (mês)';
             const r2 = (lbl, rv, jv, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.14);' : ''}">
                     <td style="padding:${o.big ? '13px' : '9px'} 12px;color:${o.lc || '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap;font-size:${o.big ? '14.5px' : '13.5px'}">${lbl}</td>
                     <td style="padding:${o.big ? '13px' : '9px'} 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;font-size:${o.size || '13.5px'};color:${o.cR || '#eef2f8'}">${o.bgR ? `<span style="background:${o.bgR};padding:5px 11px;border-radius:7px">${rv}</span>` : rv}</td>
@@ -11545,7 +11555,7 @@
             const ft = c => c.falta > 0.5 ? `<span style="color:#fca5a5">falta ${f0(c.falta)}/mês</span>` : `<span style="color:#34d399">já cobre (sobra ${f0(-c.falta)})</span>`;
             const bgFalta = c => c.falta > 0.5 ? 'rgba(239,68,68,.18)' : 'rgba(52,211,153,.18)';
             document.getElementById('plResultadoBody').innerHTML = `
-                        ${r2('Despesa que arca (mês)', f0(S.R.arca), f0(S.J.arca), { lc: 'var(--muted)' })}
+                        ${r2(despLbl, f0(arcaR), f0(arcaJ), { lc: 'var(--muted)' })}
                         ${r2('(+) PL alvo (retirada)', f0(XR), f0(XJ), { lc: 'var(--muted)' })}
                         ${r2('= Receita necessária', f0(cR.rec), f0(cJ.rec), { top: true, b: true })}
                         ${r2('(−) Receita residual (mês)', f0(S.R.resid), f0(S.J.resid), { lc: 'var(--muted)', cR: 'var(--muted)', cJ: 'var(--muted)' })}
