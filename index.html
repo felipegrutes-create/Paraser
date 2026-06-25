@@ -3867,6 +3867,14 @@
                     </table>
                 </div>
             </div>
+
+            <div class="chart-card" style="margin-top:20px">
+                <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    💸 Retiradas dos sócios
+                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026 · clique para detalhar</span>
+                </h3>
+                <div id="socRetiradasBox" style="margin-top:8px"></div>
+            </div>
         </section>
 
         <!-- CONTAS A RECEBER -->
@@ -11535,6 +11543,35 @@
             }
             window._socData = { labels, gerouR, gerouJ, outras, cxDespesa, cxParcela, retR, retJ };
             calcPL();
+            renderRetiradas();
+        }
+
+        // Box de retiradas detalhadas (dropdown por sócio). Detalhe do fechamento Jan-Jun/2026 (atualizar a cada fechamento).
+        function renderRetiradas() {
+            const box = document.getElementById('socRetiradasBox');
+            if (!box) return;
+            const f0 = n => Math.round(n).toLocaleString('pt-BR');
+            const retDet = {"Rodolfo":[{"d":"02/01/2026","v":50000,"dest":"Rodolfo"},{"d":"13/01/2026","v":10000,"dest":"Alma Mater"},{"d":"13/01/2026","v":50000,"dest":"Rodolfo"},{"d":"21/01/2026","v":50000,"dest":"Rodolfo"},{"d":"30/01/2026","v":20000,"dest":"Rodolfo"},{"d":"02/02/2026","v":10000,"dest":"Alma Mater"},{"d":"05/02/2026","v":50000,"dest":"Rodolfo"},{"d":"13/02/2026","v":60000,"dest":"Rodolfo"},{"d":"23/02/2026","v":7000,"dest":"Rodolfo"},{"d":"26/02/2026","v":5000,"dest":"Bianca"},{"d":"02/03/2026","v":10000,"dest":"Alma Mater"},{"d":"13/03/2026","v":15000,"dest":"Rodolfo"},{"d":"27/03/2026","v":4000,"dest":"Bianca"},{"d":"09/04/2026","v":10000,"dest":"Alma Mater"},{"d":"14/04/2026","v":624,"dest":"Bianca"},{"d":"24/04/2026","v":30000,"dest":"Rodolfo"},{"d":"27/04/2026","v":10500,"dest":"Rodolfo"},{"d":"12/05/2026","v":50000,"dest":"Rodolfo"},{"d":"22/05/2026","v":50000,"dest":"Rodolfo"},{"d":"26/05/2026","v":8000,"dest":"Rodolfo"},{"d":"01/06/2026","v":12000,"dest":"Rodolfo"},{"d":"01/06/2026","v":3000,"dest":"Rodolfo"},{"d":"09/06/2026","v":30000,"dest":"Rodolfo"},{"d":"09/06/2026","v":1000,"dest":"Rodolfo"},{"d":"15/06/2026","v":20000,"dest":"Rodolfo"},{"d":"19/06/2026","v":25000,"dest":"Rodolfo"},{"d":"24/06/2026","v":20000,"dest":"Rodolfo"}],"Joselmo":[{"d":"19/06/2026","v":20000,"dest":"Joselmo"}]};
+            const sortD = a => a.slice().sort((x, y) => { const p = s => s.split('/').reverse().join(''); return p(x.d) < p(y.d) ? -1 : 1; });
+            const block = (who, color) => {
+                const arr = sortD(retDet[who] || []);
+                const tot = arr.reduce((s, x) => s + x.v, 0);
+                const rows = arr.map(x => `<tr style="border-top:1px solid rgba(255,255,255,.05)">
+                        <td style="padding:7px 14px;color:var(--muted);white-space:nowrap">${x.d.slice(0,5)}</td>
+                        <td style="padding:7px 14px;color:#cbd5e1">${x.dest}</td>
+                        <td style="padding:7px 14px;text-align:right;font-variant-numeric:tabular-nums;color:#eef2f8">${f0(x.v)}</td></tr>`).join('');
+                return `<details style="margin-bottom:10px;border:1px solid rgba(255,255,255,.1);border-radius:10px;overflow:hidden">
+                        <summary style="cursor:pointer;padding:13px 15px;display:flex;justify-content:space-between;align-items:center;background:${color}1f">
+                            <span style="font-weight:700;color:${color}">${who} <span style="font-weight:400;color:var(--muted);font-size:12px">· ${arr.length} retirada${arr.length !== 1 ? 's' : ''}</span></span>
+                            <span style="font-weight:800;color:#fff;font-variant-numeric:tabular-nums">R$ ${f0(tot)}</span>
+                        </summary>
+                        <table style="width:100%;border-collapse:collapse;font-size:13px">
+                            <thead><tr style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px"><th style="text-align:left;padding:8px 14px">Data</th><th style="text-align:left;padding:8px 14px">Destino</th><th style="text-align:right;padding:8px 14px">Valor (R$)</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </details>`;
+            };
+            box.innerHTML = block('Rodolfo', '#00d4aa') + block('Joselmo', '#818cf8');
         }
 
         // Calculadora: quanto cada sócio precisa gerar (FAT direto) p/ retirar o PL alvo (independente por sócio). Bases mensais do fechamento Jan-Jun/2026.
@@ -11576,7 +11613,6 @@
             document.getElementById('plResultadoBody').innerHTML = `
                         ${r2(despLbl, f0(arcaR), f0(arcaJ), { lc: 'var(--muted)' })}
                         ${r2('(+) PL alvo (retirada)', f0(XR), f0(XJ), { lc: 'var(--muted)' })}
-                        ${r2('↳ já retirou neste mês', f0(avg(D.retR)), f0(avg(D.retJ)), { lc: 'var(--muted)', cR: 'var(--muted)', cJ: 'var(--muted)' })}
                         ${r2('= Receita necessária', f0(cR.rec), f0(cJ.rec), { top: true, b: true })}
                         ${r2('(−) Receita residual (mês)', f0(S.R.resid), f0(S.J.resid), { lc: 'var(--muted)', cR: 'var(--muted)', cJ: 'var(--muted)' })}
                         ${r2('🎯 FAT direto necessário', f0(cR.fat), f0(cJ.fat), { top: true, b: true, big: true, size: '19px', cR: '#0a0f1e', cJ: '#0a0f1e', bgR: '#00d4aa', bgJ: '#818cf8' })}
