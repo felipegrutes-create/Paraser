@@ -2666,6 +2666,9 @@
         #socCCmensal tbody td, #socContaCorrente tbody td { border-bottom: 1px solid rgba(255,255,255,.07); }
         #socCCmensal tbody tr, #socContaCorrente tbody tr { transition: background .12s ease; }
         #socCCmensal tbody tr:hover, #socContaCorrente tbody tr:hover { background: rgba(96,165,250,.16); }
+        #plResultadoBody td { border-bottom: 1px solid rgba(255,255,255,.07); }
+        #plResultadoBody tr { transition: background .12s ease; }
+        #plResultadoBody tr:hover { background: rgba(96,165,250,.10); }
     </style>
 </head>
 <body>
@@ -11535,19 +11538,20 @@
             };
             const cR = { rec: S.R.arca + XR, fat: S.R.arca + XR - S.R.resid }; cR.falta = cR.fat - S.R.fat;
             const cJ = { rec: S.J.arca + XJ, fat: S.J.arca + XJ - S.J.resid }; cJ.falta = cJ.fat - S.J.fat;
-            const r2 = (lbl, rv, jv, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.12);' : ''}">
-                    <td style="padding:9px 12px;color:${o.lc || '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap">${lbl}</td>
-                    <td style="padding:9px 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;color:${o.cR || '#eef2f8'}">${rv}</td>
-                    <td style="padding:9px 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;color:${o.cJ || '#eef2f8'}">${jv}</td></tr>`;
-            const ft = c => c.falta > 0.5 ? `<span style="color:#fca5a5">falta ${f0(c.falta)}</span>` : `<span style="color:#34d399">já cobre (sobra ${f0(-c.falta)})</span>`;
+            const r2 = (lbl, rv, jv, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.14);' : ''}">
+                    <td style="padding:${o.big ? '13px' : '9px'} 12px;color:${o.lc || '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap;font-size:${o.big ? '14.5px' : '13.5px'}">${lbl}</td>
+                    <td style="padding:${o.big ? '13px' : '9px'} 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;font-size:${o.size || '13.5px'};color:${o.cR || '#eef2f8'}">${o.bgR ? `<span style="background:${o.bgR};padding:5px 11px;border-radius:7px">${rv}</span>` : rv}</td>
+                    <td style="padding:${o.big ? '13px' : '9px'} 12px;text-align:right;font-weight:${o.b ? 800 : 600};font-variant-numeric:tabular-nums;font-size:${o.size || '13.5px'};color:${o.cJ || '#eef2f8'}">${o.bgJ ? `<span style="background:${o.bgJ};padding:5px 11px;border-radius:7px">${jv}</span>` : jv}</td></tr>`;
+            const ft = c => c.falta > 0.5 ? `<span style="color:#fca5a5">falta ${f0(c.falta)}/mês</span>` : `<span style="color:#34d399">já cobre (sobra ${f0(-c.falta)})</span>`;
+            const bgFalta = c => c.falta > 0.5 ? 'rgba(239,68,68,.18)' : 'rgba(52,211,153,.18)';
             document.getElementById('plResultadoBody').innerHTML = `
-                        ${r2('Despesa que arca (mês)', f0(S.R.arca), f0(S.J.arca))}
-                        ${r2('(+) PL alvo (retirada)', f0(XR), f0(XJ))}
+                        ${r2('Despesa que arca (mês)', f0(S.R.arca), f0(S.J.arca), { lc: 'var(--muted)' })}
+                        ${r2('(+) PL alvo (retirada)', f0(XR), f0(XJ), { lc: 'var(--muted)' })}
                         ${r2('= Receita necessária', f0(cR.rec), f0(cJ.rec), { top: true, b: true })}
-                        ${r2('(−) Receita residual (mês)', f0(S.R.resid), f0(S.J.resid))}
-                        ${r2('= FAT direto necessário', f0(cR.fat), f0(cJ.fat), { top: true, b: true, cR: '#7fffd4', cJ: '#b9c0ff' })}
-                        ${r2('Gera hoje (FAT/mês)', f0(S.R.fat), f0(S.J.fat), { lc: 'var(--muted)' })}
-                        ${r2('→ Precisa', ft(cR), ft(cJ), { b: true })}`;
+                        ${r2('(−) Receita residual (mês)', f0(S.R.resid), f0(S.J.resid), { lc: 'var(--muted)', cR: 'var(--muted)', cJ: 'var(--muted)' })}
+                        ${r2('🎯 FAT direto necessário', f0(cR.fat), f0(cJ.fat), { top: true, b: true, big: true, size: '19px', cR: '#0a0f1e', cJ: '#0a0f1e', bgR: '#00d4aa', bgJ: '#818cf8' })}
+                        ${r2('Gera hoje (FAT/mês)', f0(S.R.fat), f0(S.J.fat), { lc: 'var(--muted)', cR: 'var(--muted)', cJ: 'var(--muted)' })}
+                        ${r2('→ Precisa gerar a mais', ft(cR), ft(cJ), { top: true, b: true, big: true, size: '15px', bgR: bgFalta(cR), bgJ: bgFalta(cJ) })}`;
         }
 
         async function renderReceitaDespesa() {
