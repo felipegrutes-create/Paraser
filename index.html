@@ -3829,9 +3829,19 @@
             <div class="chart-card" style="margin-top:20px;border:1.5px solid rgba(0,212,170,.45);box-shadow:0 0 0 1px rgba(0,212,170,.1) inset">
                 <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                     🧮 Calculadora — Faturamento necessário para o PL alvo
-                    <span style="font-size:12px;font-weight:600;color:var(--muted)">base mensal Jan–Jun/2026</span>
+                    <span id="calcBaseLabel" style="font-size:12px;font-weight:600;color:var(--muted)">base: média Jan–Jun</span>
                 </h3>
                 <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5">Quanto cada sócio precisa gerar de faturamento próprio (FAT direto) por mês para cobrir a despesa que arca e ainda retirar o PL alvo, já considerando a receita residual que vem da clínica (80/20).</p>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                    <label for="basePeriodo" style="font-size:13px;color:#e2e8f4;font-weight:600">📅 Base de cálculo:</label>
+                    <select id="basePeriodo" onchange="calcPL()" style="padding:8px 11px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:13px;font-weight:600">
+                        <option value="sem">Média Jan–Jun (semestre)</option>
+                        <option value="3m">Média Abr–Jun (últ. 3 meses)</option>
+                        <option value="2m">Média Mai–Jun (últ. 2 meses)</option>
+                        <option value="1m">Jun (último mês)</option>
+                    </select>
+                    <span style="font-size:12px;color:var(--muted)">meses mais recentes refletem melhor a rampa</span>
+                </div>
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;padding:11px 14px;background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.3);border-radius:10px">
                     <label for="redDespesa" style="font-size:13px;color:#fbbf24;font-weight:700">✂️ Simular corte de despesa:</label>
                     <input id="redDespesa" type="number" value="0" step="5" min="0" max="100" oninput="calcPL()" style="width:80px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:#fff;font-size:14px;font-weight:700;text-align:right">
@@ -11523,6 +11533,7 @@
                             ${rr('= Saldo do sócio', sldJm, { b: true, s: true, col: true, top: true })}
                         </tbody></table></div>`;
             }
+            window._socData = { labels, gerouR, gerouJ, outras, cxDespesa, cxParcela };
             calcPL();
         }
 
@@ -11535,13 +11546,21 @@
         }
         function calcPL() {
             const elR = document.getElementById('plAlvoR'), elJ = document.getElementById('plAlvoJ');
-            if (!elR || !elJ) return;
+            if (!elR || !elJ || !window._socData) return;
+            const D = window._socData;
             const XR = parseInt((elR.value || '').replace(/\D/g, ''), 10) || 0, XJ = parseInt((elJ.value || '').replace(/\D/g, ''), 10) || 0;
             const f0 = n => Math.round(n).toLocaleString('pt-BR');
+            // base flexível: média dos meses selecionados
+            const periodMap = { sem: [0,1,2,3,4,5], '3m': [3,4,5], '2m': [4,5], '1m': [5] };
+            const sel = (document.getElementById('basePeriodo') || {}).value || 'sem';
+            const idx = periodMap[sel] || periodMap.sem;
+            const avg = arr => idx.reduce((s, i) => s + arr[i], 0) / idx.length;
             const S = {
-                R: { arca: 538999, resid: 260361, fat: 303182 },
-                J: { arca: 116301, resid: 65090, fat: 21343 }
+                R: { arca: avg(D.labels.map((_, i) => 0.8 * D.cxDespesa[i] + D.cxParcela[i])), resid: avg(D.outras.map(o => 0.8 * o)), fat: avg(D.gerouR) },
+                J: { arca: avg(D.cxDespesa.map(d => 0.2 * d)), resid: avg(D.outras.map(o => 0.2 * o)), fat: avg(D.gerouJ) }
             };
+            const baseLbls = { sem: 'média Jan–Jun', '3m': 'média Abr–Jun', '2m': 'média Mai–Jun', '1m': 'Jun (último mês)' };
+            const bl = document.getElementById('calcBaseLabel'); if (bl) bl.textContent = 'base: ' + (baseLbls[sel] || '');
             const red = Math.min(Math.max(parseFloat((document.getElementById('redDespesa') || {}).value) || 0, 0), 100);
             const fator = 1 - red / 100;
             const arcaR = S.R.arca * fator, arcaJ = S.J.arca * fator;
