@@ -11431,21 +11431,27 @@
                 const arcJ = labels.map((_, i) => 0.2 * cxDespesa[i]);
                 const resR = labels.map((_, i) => recR[i] - arcR[i]);
                 const resJ = labels.map((_, i) => recJ[i] - arcJ[i]);
+                const residR = labels.map((_, i) => 0.8 * outras[i]);
+                const residJ = labels.map((_, i) => 0.2 * outras[i]);
                 const th = labels.map(l => `<th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600;font-size:12px">${l}</th>`).join('');
                 const rr = (lbl, arr, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.1);' : ''}">
-                        <td style="padding:8px 12px;color:#cbd5e1;font-weight:${o.b ? 700 : 500};white-space:nowrap">${lbl}</td>
-                        ${arr.map(v => `<td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:${o.b ? 700 : 500};color:${o.col ? (v < 0 ? '#fca5a5' : '#34d399') : '#eef2f8'}">${o.s ? sig(v) : f0(v)}</td>`).join('')}
-                        <td style="padding:8px 12px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.04);color:${o.col ? (sumA(arr) < 0 ? '#fca5a5' : '#34d399') : '#fff'}">${o.s ? sig(sumA(arr)) : f0(sumA(arr))}</td></tr>`;
+                        <td style="padding:${o.sub ? '6px' : '8px'} 12px;color:${o.sub ? 'var(--muted)' : '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap;font-size:${o.sub ? '12px' : '13px'}">${lbl}</td>
+                        ${arr.map(v => `<td style="padding:${o.sub ? '6px' : '8px'} 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:${o.b ? 700 : 500};font-size:${o.sub ? '12px' : '13px'};color:${o.col ? (v < 0 ? '#fca5a5' : '#34d399') : (o.sub ? '#9fb0c4' : '#eef2f8')}">${o.s ? sig(v) : f0(v)}</td>`).join('')}
+                        <td style="padding:${o.sub ? '6px' : '8px'} 12px;text-align:right;font-weight:${o.sub ? 600 : 800};font-variant-numeric:tabular-nums;font-size:${o.sub ? '12px' : '13px'};background:rgba(255,255,255,.04);color:${o.col ? (sumA(arr) < 0 ? '#fca5a5' : '#34d399') : (o.sub ? '#9fb0c4' : '#fff')}">${o.s ? sig(sumA(arr)) : f0(sumA(arr))}</td></tr>`;
                 const ghdr = (txt, color) => `<tr><td colspan="8" style="padding:13px 12px 5px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:${color};font-weight:800">${txt}</td></tr>`;
                 ccm.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px">
                         <thead><tr><th style="text-align:left;padding:8px 12px"></th>${th}<th style="padding:8px 12px;text-align:right;color:#e2e8f4;font-weight:700;font-size:12px">Total</th></tr></thead>
                         <tbody>
                             ${ghdr('🟢 Dr. Rodolfo (80%)', '#00d4aa')}
-                            ${rr('Receita gerada', recR)}
+                            ${rr('Receita gerada', recR, { b: true })}
+                            ${rr('&nbsp;&nbsp;&nbsp;↳ FAT direto', gerouR, { sub: true })}
+                            ${rr('&nbsp;&nbsp;&nbsp;↳ Receita residual (80%)', residR, { sub: true })}
                             ${rr('Despesa que arca', arcR)}
                             ${rr('= Resultado', resR, { b: true, s: true, col: true, top: true })}
                             ${ghdr('🟣 Dr. Joselmo (20%)', '#818cf8')}
-                            ${rr('Receita gerada', recJ)}
+                            ${rr('Receita gerada', recJ, { b: true })}
+                            ${rr('&nbsp;&nbsp;&nbsp;↳ FAT direto', gerouJ, { sub: true })}
+                            ${rr('&nbsp;&nbsp;&nbsp;↳ Receita residual (20%)', residJ, { sub: true })}
                             ${rr('Despesa que arca', arcJ)}
                             ${rr('= Resultado', resJ, { b: true, s: true, col: true, top: true })}
                         </tbody></table></div>`;
