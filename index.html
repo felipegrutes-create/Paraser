@@ -3809,6 +3809,14 @@
                 <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5">O que cada sócio gera (faturamento direto + a fatia 80/20 das outras fontes, que são proporcionais ao resultado deles) contra a despesa que ele arca. O que sobra é o lucro dele pra retirar.</p>
                 <div id="socContaCorrente"></div>
             </div>
+
+            <div class="chart-card" style="margin-top:20px;border:1.5px solid rgba(96,165,250,.45);box-shadow:0 0 0 1px rgba(96,165,250,.12) inset">
+                <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    🏦 Conta Corrente dos Sócios — Mensal
+                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026 · valores em R$</span>
+                </h3>
+                <div id="socCCmensal" style="margin-top:6px"></div>
+            </div>
         </section>
 
         <!-- CONTAS A RECEBER -->
@@ -11409,6 +11417,38 @@
                         <b style="color:#00d4aa">Rodolfo</b> · equilíbrio <b>R$ ${f0(beR)}/mês</b> (~R$ ${f0(beR / 4.33)}/sem). Gera R$ ${f0(geraR)}/mês → ${resR >= 0 ? `<span style="color:#34d399">sobra R$ ${f0(resR / 6)}/mês de lucro</span>` : `<span style="color:#fca5a5">falta R$ ${f0(-resR / 6)}/mês</span>`}.<br>
                         <b style="color:#818cf8">Joselmo</b> · equilíbrio <b>R$ ${f0(beJ)}/mês</b> (~R$ ${f0(beJ / 4.33)}/sem). Gera R$ ${f0(geraJ)}/mês → ${resJ >= 0 ? `<span style="color:#34d399">sobra R$ ${f0(resJ / 6)}/mês de lucro</span>` : `<span style="color:#fca5a5">falta R$ ${f0(-resJ / 6)}/mês pra cobrir</span>`}.
                     </div>`;
+            }
+
+            // ===== Conta Corrente dos Sócios — MENSAL =====
+            const ccm = document.getElementById('socCCmensal');
+            if (ccm) {
+                const f0 = n => Math.round(n).toLocaleString('pt-BR');
+                const sig = n => (n < 0 ? '−' : '+') + f0(Math.abs(n));
+                const sumA = a => a.reduce((s, v) => s + v, 0);
+                const recR = labels.map((_, i) => gerouR[i] + 0.8 * outras[i]);
+                const recJ = labels.map((_, i) => gerouJ[i] + 0.2 * outras[i]);
+                const arcR = labels.map((_, i) => 0.8 * cxDespesa[i] + cxParcela[i]);
+                const arcJ = labels.map((_, i) => 0.2 * cxDespesa[i]);
+                const resR = labels.map((_, i) => recR[i] - arcR[i]);
+                const resJ = labels.map((_, i) => recJ[i] - arcJ[i]);
+                const th = labels.map(l => `<th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600;font-size:12px">${l}</th>`).join('');
+                const rr = (lbl, arr, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.1);' : ''}">
+                        <td style="padding:8px 12px;color:#cbd5e1;font-weight:${o.b ? 700 : 500};white-space:nowrap">${lbl}</td>
+                        ${arr.map(v => `<td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:${o.b ? 700 : 500};color:${o.col ? (v < 0 ? '#fca5a5' : '#34d399') : '#eef2f8'}">${o.s ? sig(v) : f0(v)}</td>`).join('')}
+                        <td style="padding:8px 12px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.04);color:${o.col ? (sumA(arr) < 0 ? '#fca5a5' : '#34d399') : '#fff'}">${o.s ? sig(sumA(arr)) : f0(sumA(arr))}</td></tr>`;
+                const ghdr = (txt, color) => `<tr><td colspan="8" style="padding:13px 12px 5px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:${color};font-weight:800">${txt}</td></tr>`;
+                ccm.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px">
+                        <thead><tr><th style="text-align:left;padding:8px 12px"></th>${th}<th style="padding:8px 12px;text-align:right;color:#e2e8f4;font-weight:700;font-size:12px">Total</th></tr></thead>
+                        <tbody>
+                            ${ghdr('🟢 Dr. Rodolfo (80%)', '#00d4aa')}
+                            ${rr('Receita gerada', recR)}
+                            ${rr('Despesa que arca', arcR)}
+                            ${rr('= Resultado', resR, { b: true, s: true, col: true, top: true })}
+                            ${ghdr('🟣 Dr. Joselmo (20%)', '#818cf8')}
+                            ${rr('Receita gerada', recJ)}
+                            ${rr('Despesa que arca', arcJ)}
+                            ${rr('= Resultado', resJ, { b: true, s: true, col: true, top: true })}
+                        </tbody></table></div>`;
             }
         }
 
