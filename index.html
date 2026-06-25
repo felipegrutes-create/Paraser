@@ -11413,6 +11413,8 @@
                             ${row('= Resultado operacional', resR, resJ, { top: true, b: true, s: true, cR: resR < 0 ? '#fca5a5' : '#34d399', cJ: resJ < 0 ? '#fca5a5' : '#34d399' })}
                             ${row('(+) Aporte do sócio', apoR, apoJ)}
                             ${row('= Posição total', posR, posJ, { top: true, b: true, s: true, cR: posR < 0 ? '#fca5a5' : '#34d399', cJ: posJ < 0 ? '#fca5a5' : '#34d399' })}
+                            ${row('(−) Retiradas', sm(retR), sm(retJ))}
+                            ${row('= Saldo do sócio', posR - sm(retR), posJ - sm(retJ), { top: true, b: true, s: true, cR: (posR - sm(retR)) < 0 ? '#fca5a5' : '#34d399', cJ: (posJ - sm(retJ)) < 0 ? '#fca5a5' : '#34d399' })}
                         </tbody></table></div>
                     <div style="font-size:11.5px;color:var(--muted);margin-top:6px">* Rodolfo = 80% da despesa + parcela do empréstimo · Joselmo = 20% da despesa. FAT total dos sócios: R$ ${f0(fatRT + fatJT)}.</div>
                     <div style="margin-top:14px;padding:13px 15px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.28);border-radius:10px;font-size:12.5px;color:#cbd5e1;line-height:1.65">
@@ -11440,6 +11442,8 @@
                 const apoJm = labels.map((_, i) => cxAporte[i]);
                 const posRm = labels.map((_, i) => resR[i] + apoRm[i]);
                 const posJm = labels.map((_, i) => resJ[i] + apoJm[i]);
+                const sldRm = labels.map((_, i) => posRm[i] - retR[i]);
+                const sldJm = labels.map((_, i) => posJm[i] - retJ[i]);
                 const th = labels.map(l => `<th style="padding:8px 10px;text-align:right;color:var(--muted);font-weight:600;font-size:12px">${l}</th>`).join('');
                 const rr = (lbl, arr, o = {}) => `<tr style="${o.top ? 'border-top:1px solid rgba(255,255,255,.1);' : ''}">
                         <td style="padding:${o.sub ? '6px' : '8px'} 12px;color:${o.sub ? 'var(--muted)' : '#cbd5e1'};font-weight:${o.b ? 700 : 500};white-space:nowrap;font-size:${o.sub ? '12px' : '13px'}">${lbl}</td>
@@ -11457,6 +11461,8 @@
                             ${rr('= Resultado operacional', resR, { b: true, s: true, col: true, top: true })}
                             ${rr('(+) Aporte do sócio', apoRm, { sub: true })}
                             ${rr('= Posição total', posRm, { b: true, s: true, col: true })}
+                            ${rr('(−) Retiradas', retR)}
+                            ${rr('= Saldo do sócio', sldRm, { b: true, s: true, col: true, top: true })}
                             ${ghdr('🟣 Dr. Joselmo (20%)', '#818cf8')}
                             ${rr('Receita gerada', recJ, { b: true })}
                             ${rr('&nbsp;&nbsp;&nbsp;↳ FAT direto', gerouJ, { sub: true })}
@@ -11465,6 +11471,8 @@
                             ${rr('= Resultado operacional', resJ, { b: true, s: true, col: true, top: true })}
                             ${rr('(+) Aporte do sócio', apoJm, { sub: true })}
                             ${rr('= Posição total', posJm, { b: true, s: true, col: true })}
+                            ${rr('(−) Retiradas', retJ)}
+                            ${rr('= Saldo do sócio', sldJm, { b: true, s: true, col: true, top: true })}
                         </tbody></table></div>`;
             }
         }
