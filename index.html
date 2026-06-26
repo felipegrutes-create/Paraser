@@ -3741,59 +3741,11 @@
             <div class="chart-card">
                 <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                     🤝 Sócios — Geração × Retirada
-                    <span style="font-size:12px;font-weight:600;color:var(--muted)">Fechamento Jan–Jun/2026</span>
+                    <span id="socLiveStatus" style="font-size:12px;font-weight:600;color:var(--muted)">carregando…</span>
                 </h3>
                 <p style="font-size:13px;color:var(--muted);margin:0 0 18px;line-height:1.5">Dois números propositalmente <b>desacoplados</b>: o que cada sócio <b>gera</b> de faturamento, e quanto cada um pode <b>retirar</b> (pela participação societária, não por quem gera mais).</p>
 
-                <div style="font-weight:700;color:#e2e8f4;margin-bottom:10px;font-size:14px">1 · Quanto cada sócio gera <span style="font-weight:400;color:var(--muted);font-size:12px">· faturamento bruto no Feegow</span></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
-                    <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.25);border-radius:12px;padding:14px 16px">
-                        <div style="font-size:13px;color:var(--muted)">Dr. Rodolfo <span style="color:#00d4aa">· 80% da sociedade</span></div>
-                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 1.819.090</div>
-                        <div style="font-size:12px;color:var(--muted)">93% de tudo que os sócios geram</div>
-                    </div>
-                    <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:12px;padding:14px 16px">
-                        <div style="font-size:13px;color:var(--muted)">Dr. Joselmo <span style="color:#818cf8">· 20% da sociedade</span></div>
-                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ 128.060</div>
-                        <div style="font-size:12px;color:var(--muted)">7% · entrou em abril, em rampa (0 → 60k/mês)</div>
-                    </div>
-                </div>
-
-                <div style="font-weight:700;color:#e2e8f4;margin-bottom:4px;font-size:14px">2 · Quanto cada sócio pode retirar <span style="font-weight:400;color:var(--muted);font-size:12px">· pela participação 80/20, em caixa</span></div>
-                <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Disponível para os sócios no período: <b style="color:#e2e8f4">R$ 643.226</b></div>
-                <div style="overflow-x:auto">
-                    <table style="width:100%;border-collapse:collapse;font-size:14px">
-                        <thead>
-                            <tr style="color:var(--muted);font-size:12px;text-align:right">
-                                <th style="text-align:left;padding:8px 6px">Sócio</th>
-                                <th style="padding:8px 6px">Participação</th>
-                                <th style="padding:8px 6px">Pode retirar</th>
-                                <th style="padding:8px 6px">Já retirou</th>
-                                <th style="padding:8px 6px">Saldo</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
-                                <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Rodolfo</td>
-                                <td style="padding:11px 6px;color:var(--muted)">80%</td>
-                                <td style="padding:11px 6px">R$ 581.473</td>
-                                <td style="padding:11px 6px">R$ 611.124</td>
-                                <td style="padding:11px 6px;font-weight:700;color:#fca5a5">−R$ 29.651 <span style="font-size:11px;font-weight:400;color:var(--muted)">acima do limite</span></td>
-                            </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
-                                <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Joselmo</td>
-                                <td style="padding:11px 6px;color:var(--muted)">20%</td>
-                                <td style="padding:11px 6px">R$ 61.753</td>
-                                <td style="padding:11px 6px">R$ 20.000</td>
-                                <td style="padding:11px 6px;font-weight:700;color:#34d399">+R$ 41.753 <span style="font-size:11px;font-weight:400;color:var(--muted)">a receber</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style="margin-top:16px;padding:12px 14px;background:rgba(255,255,255,.03);border-radius:10px;font-size:12.5px;color:var(--muted);line-height:1.55">
-                    <b style="color:#e2e8f4">Como ler:</b> a <b>geração</b> mostra quem traz faturamento; a <b>retirada</b> é dividida pela participação (Rodolfo 80% / Joselmo 20%), não por quem gera. Como o Dr. Joselmo passou a atender em abril, o período jan–mar conta 100% para o Dr. Rodolfo. O caixa do semestre fechou perto de zero (+R$ 49 mil), sustentado por empréstimo da obra, então as retiradas saíram quase no limite do que a operação gerou.
-                </div>
+                <div id="socBlocoAB"></div>
             </div>
 
             <div class="chart-card" style="margin-top:20px">
@@ -6153,7 +6105,7 @@
             if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
-            if (id === 'sec-socios') renderSociosChart();
+            if (id === 'sec-socios') loadSociosLive();
             if (id === 'sec-caixa') loadAndRenderMedicos();
             if (id === 'sec-exec')    loadAndRenderExec();
             if (id === 'sec-estoque') loadAndRenderEstoque();
@@ -11341,24 +11293,143 @@
         }
 
         // ===== Sócios — gráfico de evolução mensal (fechamento manual Jan–Jun/2026; atualizar junto com o painel, ver memória decisao_2026-06-23_socios_geracao_retirada) =====
+        // ============ SÓCIOS: CÁLCULO AO VIVO (Feegow faturamento + planilha FLUXO 2 empresas) ============
+        // Fallback = fechamento validado 25/06 (usado se a carga ao vivo falhar).
+        const _socFallback = {
+            gerouR:[259876,237835,297858,346990,442571,233960], gerouJ:[0,2428,6855,21640,37290,59848],
+            outras:[304502,327056,334940,268964,289437,427806],
+            despR:[669362,426984,674196,526728,486983,449746], despJ:[148561,106746,130990,112903,94567,104038],
+            cxReceita:[564378,567319,639653,637594,769298,721613], cxBankIn:[607000,145000,0,0,0,0],
+            cxAporte:[45000,20000,30000,200000,0,0], cxDespesa:[742805,533730,654950,564513,472837,520189],
+            cxParcela:[75118,0,150236,75118,108713,33595], cxRetirada:[180000,132000,29000,51124,108000,131000],
+            cxOutras:[-190948,-32000,95900,-91600,-41569,-111610], retR:[180000,132000,29000,51124,108000,111000],
+            retJ:[0,0,0,0,0,20000], d1:334463, d2:308763, _stale:true,
+            retDet:{"Rodolfo":[{"d":"02/01/2026","v":50000,"dest":"Rodolfo"},{"d":"13/01/2026","v":10000,"dest":"Alma Mater"},{"d":"13/01/2026","v":50000,"dest":"Rodolfo"},{"d":"21/01/2026","v":50000,"dest":"Rodolfo"},{"d":"30/01/2026","v":20000,"dest":"Rodolfo"},{"d":"02/02/2026","v":10000,"dest":"Alma Mater"},{"d":"05/02/2026","v":50000,"dest":"Rodolfo"},{"d":"13/02/2026","v":60000,"dest":"Rodolfo"},{"d":"23/02/2026","v":7000,"dest":"Rodolfo"},{"d":"26/02/2026","v":5000,"dest":"Bianca"},{"d":"02/03/2026","v":10000,"dest":"Alma Mater"},{"d":"13/03/2026","v":15000,"dest":"Rodolfo"},{"d":"27/03/2026","v":4000,"dest":"Bianca"},{"d":"09/04/2026","v":10000,"dest":"Alma Mater"},{"d":"14/04/2026","v":624,"dest":"Bianca"},{"d":"24/04/2026","v":30000,"dest":"Rodolfo"},{"d":"27/04/2026","v":10500,"dest":"Rodolfo"},{"d":"12/05/2026","v":50000,"dest":"Rodolfo"},{"d":"22/05/2026","v":50000,"dest":"Rodolfo"},{"d":"26/05/2026","v":8000,"dest":"Rodolfo"},{"d":"01/06/2026","v":12000,"dest":"Rodolfo"},{"d":"01/06/2026","v":3000,"dest":"Rodolfo"},{"d":"09/06/2026","v":30000,"dest":"Rodolfo"},{"d":"09/06/2026","v":1000,"dest":"Rodolfo"},{"d":"15/06/2026","v":20000,"dest":"Rodolfo"},{"d":"19/06/2026","v":25000,"dest":"Rodolfo"},{"d":"24/06/2026","v":20000,"dest":"Rodolfo"}],"Joselmo":[{"d":"19/06/2026","v":20000,"dest":"Joselmo"}]}
+        };
+        function _socNum(str){ let vs=(str==null?'':str).toString().replace(/[^\d,\.\-]/g,''); if(vs.includes(',')) vs=vs.replace(/\./g,'').replace(',','.'); const v=parseFloat(vs); return isNaN(v)?0:v; }
+        function computeSocios(fluxoRows, feegow){
+            const meses=['jan','fev','mar','abr','mai','jun'], mnum={'01':'jan','02':'fev','03':'mar','04':'abr','05':'mai','06':'jun'}, idxOf={jan:0,fev:1,mar:2,abr:3,mai:4,jun:5};
+            const z=()=>[0,0,0,0,0,0], up=s=>(s==null?'':s).toString().toUpperCase(), num=_socNum;
+            const cxReceita=z(),cxDespesa=z(),retR=z(),retJ=z(),bankIn=z(),parcela=z(),aporte=z(),finOth=z(),allIn=z(),allOut=z();
+            const retDet={Rodolfo:[],Joselmo:[]};
+            const FIN=['EMPRÉSTIMO','EMPRÉSTMO','ACERTO EMPR','PARTE RELACIONADA','LIMITE CONTA','APLICAÇÃO','APORTE','RESGATE','DEPÓSITO'];
+            fluxoRows.forEach(r=>{
+                if(!r) return;
+                const m=/^(\d{2})\/(\d{2})\/(2026)$/.exec((r[0]||'').toString().trim()); if(!m||!mnum[m[2]]) return;
+                const i=idxOf[mnum[m[2]]];
+                const tipo=(r[9]||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+                const planoU=up(r[13]), forn=up(r[12]), e=num(r[5]), s=num(r[6]);
+                if(tipo==='entrada') allIn[i]+=e; else allOut[i]+=s;
+                const isfin=FIN.some(f=>planoU.includes(f));
+                if(planoU.includes('RETIRADA DOS S') && tipo!=='entrada'){
+                    const dest=forn.includes('RODOLFO')?'Rodolfo':forn.includes('JOSELMO')?'Joselmo':forn.includes('ALMA')?'Alma Mater':forn.includes('BIANCA')?'Bianca':(r[12]||'').toString().slice(0,18);
+                    if(forn.includes('JOSELMO')){ retJ[i]+=s; retDet.Joselmo.push({d:(r[0]||'').toString().trim(),v:Math.round(s),dest}); }
+                    else { retR[i]+=s; retDet.Rodolfo.push({d:(r[0]||'').toString().trim(),v:Math.round(s),dest}); }
+                    return;
+                }
+                if(!isfin){ if(tipo==='entrada'){ if(planoU.includes('RECEITA')) cxReceita[i]+=e; } else cxDespesa[i]+=s; return; }
+                const L=up((r[1]||'')+' '+(r[12]||''));
+                const c=(L.includes('PARCELA GIRO')||L.includes('CAPITAL DE GIRO')||planoU.includes('EMPRÉSTMO ITA'))?'banco':(L.includes('JOSELMO')?'aporte':'outras');
+                if(c==='banco'){ if(tipo==='entrada') bankIn[i]+=e; else parcela[i]+=s; }
+                else if(c==='aporte'){ if(tipo==='entrada') aporte[i]+=e; else finOth[i]-=s; }
+                else { if(tipo==='entrada') finOth[i]+=e; else finOth[i]-=s; }
+            });
+            const gerouR=z(),gerouJ=z(), cents=x=>{const n=parseInt((x==null?'':x).toString().trim()||'0',10);return isNaN(n)?0:n;};
+            meses.forEach(mes=>{ const data=(feegow[mes]&&feegow[mes].data)||[]; const i=idxOf[mes];
+                data.forEach(inv=>{ (inv.itens||[]).forEach(it=>{
+                    if(String(it.is_cancelado)==='True'||it.tipo!=='S') return;
+                    const liq=(cents(it.valor)-cents(it.desconto)+cents(it.acrescimo))/100; if(liq===0) return;
+                    const eid=String(it.executante_id),nome=up(it.nomeResolvido),ex=up(it.executanteNome);
+                    if(eid==='3'||ex.includes('RODOLFO')||(nome.includes('RODOLFO')&&eid==='0')) gerouR[i]+=liq;
+                    else if(eid==='15'||ex.includes('JOSELMO')||(nome.includes('JOSELMO')&&eid==='0')) gerouJ[i]+=liq;
+                }); });
+            });
+            const R=a=>a.map(x=>Math.round(x));
+            const outras=meses.map((_,i)=>Math.round(cxReceita[i]-gerouR[i]-gerouJ[i]));
+            const cxRetirada=meses.map((_,i)=>Math.round(retR[i]+retJ[i]));
+            const saldoReal=meses.map((_,i)=>allIn[i]-allOut[i]);
+            const cxOutras=meses.map((_,i)=>Math.round(saldoReal[i]-(cxReceita[i]+bankIn[i]+aporte[i]-cxDespesa[i]-parcela[i]-(retR[i]+retJ[i]))));
+            const despR=meses.map((_,i)=>Math.round(0.8*cxDespesa[i]+parcela[i]));
+            const despJ=meses.map((_,i)=>Math.round(0.2*cxDespesa[i]));
+            const disp=p=>p.reduce((a,i)=>a+(saldoReal[i]+retR[i]+retJ[i]),0);
+            return { gerouR:R(gerouR), gerouJ:R(gerouJ), outras, despR, despJ,
+                cxReceita:R(cxReceita), cxBankIn:R(bankIn), cxAporte:R(aporte), cxDespesa:R(cxDespesa), cxParcela:R(parcela),
+                cxRetirada, cxOutras, cxSaldo:saldoReal.map(Math.round), retR:R(retR), retJ:R(retJ), retDet,
+                d1:Math.round(disp([0,1,2])), d2:Math.round(disp([3,4,5])) };
+        }
+        async function fetchFeegowSocios(){
+            const ranges=[['01/01/2026','31/01/2026','jan'],['01/02/2026','28/02/2026','fev'],['01/03/2026','31/03/2026','mar'],['01/04/2026','30/04/2026','abr'],['01/05/2026','31/05/2026','mai'],['01/06/2026','30/06/2026','jun']];
+            const out={};
+            await Promise.all(ranges.map(async ([ds,de,mes])=>{ try{ const r=await fetch(`${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`); out[mes]=await r.json(); }catch(e){ out[mes]={data:[]}; } }));
+            return out;
+        }
+        let _socLoading=false, _socLoaded=false;
+        function _socStatus(txt){ const el=document.getElementById('socLiveStatus'); if(el) el.textContent=txt; }
+        async function loadSociosLive(force){
+            if(_socLoading) return;
+            if(_socLoaded && !force){ renderSociosAll(); return; }
+            _socLoading=true; _socStatus('⏳ carregando dados ao vivo…');
+            try{
+                const [fluxo, feegow] = await Promise.all([loadFinanceData(), fetchFeegowSocios()]);
+                window._soc = computeSocios(fluxo.slice(1), feegow);
+                _socLoaded=true; _socStatus('🟢 ao vivo · ' + new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}));
+            }catch(e){ console.warn('Sócios live falhou, usando fechamento salvo:', e); window._soc = _socFallback; _socStatus('🟡 fechamento salvo (carga ao vivo indisponível)'); }
+            finally{ _socLoading=false; renderSociosAll(); }
+        }
+        function renderSociosAll(){ renderSociosPanel(); renderSociosChart(); }
+        function renderSociosPanel(){
+            const box=document.getElementById('socBlocoAB'); if(!box) return;
+            const S=window._soc||_socFallback; const f0=n=>Math.round(n).toLocaleString('pt-BR'); const T=a=>a.reduce((x,y)=>x+y,0);
+            const fatR=T(S.gerouR), fatJ=T(S.gerouJ), totS=fatR+fatJ, pctR=totS?Math.round(fatR/totS*100):0;
+            const jrJun=S.gerouJ[5];
+            const disp=S.d1+S.d2, podeR=S.d1+0.8*S.d2, podeJ=0.2*S.d2, jaR=T(S.retR), jaJ=T(S.retJ), sldR=podeR-jaR, sldJ=podeJ-jaJ;
+            const caixa=T(S.cxSaldo);
+            const sgn=n=>(n<0?'−':'+')+f0(Math.abs(n));
+            box.innerHTML = `
+                <div style="font-weight:700;color:#e2e8f4;margin-bottom:10px;font-size:14px">1 · Quanto cada sócio gera <span style="font-weight:400;color:var(--muted);font-size:12px">· faturamento bruto no Feegow</span></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+                    <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.25);border-radius:12px;padding:14px 16px">
+                        <div style="font-size:13px;color:var(--muted)">Dr. Rodolfo <span style="color:#00d4aa">· 80% da sociedade</span></div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ ${f0(fatR)}</div>
+                        <div style="font-size:12px;color:var(--muted)">${pctR}% de tudo que os sócios geram</div>
+                    </div>
+                    <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:12px;padding:14px 16px">
+                        <div style="font-size:13px;color:var(--muted)">Dr. Joselmo <span style="color:#818cf8">· 20% da sociedade</span></div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;margin:4px 0">R$ ${f0(fatJ)}</div>
+                        <div style="font-size:12px;color:var(--muted)">${100-pctR}% · entrou em abril, em rampa (último mês ~R$ ${f0(jrJun)})</div>
+                    </div>
+                </div>
+                <div style="font-weight:700;color:#e2e8f4;margin-bottom:4px;font-size:14px">2 · Quanto cada sócio pode retirar <span style="font-weight:400;color:var(--muted);font-size:12px">· pela participação 80/20, em caixa</span></div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Disponível para os sócios no período: <b style="color:#e2e8f4">R$ ${f0(disp)}</b></div>
+                <div style="overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse;font-size:14px">
+                        <thead><tr style="color:var(--muted);font-size:12px;text-align:right">
+                            <th style="text-align:left;padding:8px 6px">Sócio</th><th style="padding:8px 6px">Participação</th><th style="padding:8px 6px">Pode retirar</th><th style="padding:8px 6px">Já retirou</th><th style="padding:8px 6px">Saldo</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
+                                <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Rodolfo</td><td style="padding:11px 6px;color:var(--muted)">80%</td>
+                                <td style="padding:11px 6px">R$ ${f0(podeR)}</td><td style="padding:11px 6px">R$ ${f0(jaR)}</td>
+                                <td style="padding:11px 6px;font-weight:700;color:${sldR<0?'#fca5a5':'#34d399'}">${sgn(sldR)}</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,.08);text-align:right">
+                                <td style="text-align:left;padding:11px 6px;font-weight:600;color:#fff">Dr. Joselmo</td><td style="padding:11px 6px;color:var(--muted)">20%</td>
+                                <td style="padding:11px 6px">R$ ${f0(podeJ)}</td><td style="padding:11px 6px">R$ ${f0(jaJ)}</td>
+                                <td style="padding:11px 6px;font-weight:700;color:${sldJ<0?'#fca5a5':'#34d399'}">${sgn(sldJ)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top:16px;padding:12px 14px;background:rgba(255,255,255,.03);border-radius:10px;font-size:12.5px;color:var(--muted);line-height:1.55">
+                    <b style="color:#e2e8f4">Como ler:</b> a <b>geração</b> mostra quem traz faturamento; a <b>retirada</b> é dividida pela participação (Rodolfo 80% / Joselmo 20%), não por quem gera. Como o Dr. Joselmo passou a atender em abril, jan–mar conta 100% para o Dr. Rodolfo. O caixa do semestre fechou em <b style="color:${caixa<0?'#fca5a5':'#e2e8f4'}">${sgn(caixa)}</b>, sustentado por empréstimo da obra.
+                </div>`;
+        }
+
+
         function renderSociosChart() {
             const labels = ['Jan','Fev','Mar','Abr','Mai','Jun'];
-            const gerouR = [259876, 237835, 297858, 346990, 442571, 233960];
-            const gerouJ = [0, 2428, 6855, 21640, 37290, 59848];
-            const outras = [304502, 327056, 334940, 268964, 289437, 427806];   // outras fontes = receita recebida − Rodolfo − Joselmo (absorve o gap p/ bater com o caixa: outros médicos + medicamentos + defasagem de pagamento)
-            const despR  = [679550, 505382, 628191, 451610, 378269, 416127];   // despesa coberta (inclui juros = despesas gerais)
-            const despJ  = [63255, 28348, 26759, 112903, 94567, 104032];
-            const emprestimo = [75118, 0, 150236, 75118, 108713, 33595];        // parcela/amortização do empréstimo (capital de giro Itaú 48x + 24x)
-            const retR = [180000, 132000, 29000, 51124, 108000, 111000];         // retiradas Dr. Rodolfo (inclui Alma Mater + Bianca)
-            const retJ = [0, 0, 0, 0, 0, 20000];                                // retiradas Dr. Joselmo
-            // ---- Fluxo de caixa (valores reais da planilha, as 2 empresas; atualizar a cada fechamento) ----
-            const cxReceita  = [564378, 567319, 639653, 637594, 769298, 721613];   // receita recebida
-            const cxBankIn   = [607000, 145000, 0, 0, 0, 0];                        // empréstimo do banco (Itaú) captado
-            const cxAporte   = [45000, 20000, 30000, 200000, 0, 0];                 // aporte do sócio Joselmo
-            const cxDespesa  = [742805, 533730, 654950, 564513, 472837, 520189];   // despesa (saídas, exceto financiamento e retirada)
-            const cxParcela  = [75118, 0, 150236, 75118, 108713, 33595];           // parcela paga ao banco (amortização)
-            const cxRetirada = [180000, 132000, 29000, 51124, 108000, 131000];     // retiradas dos sócios
-            const cxOutras   = [-190948, -32000, 95900, -91600, -41569, -111610];  // conta garantida + aplicação + transf. internas (líquido, sem vai-e-vem)
+            const S = window._soc || _socFallback;
+            const { gerouR, gerouJ, outras, despR, despJ, retR, retJ, cxReceita, cxBankIn, cxAporte, cxDespesa, cxParcela, cxRetirada, cxOutras } = S;
             const cxSaldo = labels.map((_, i) => cxReceita[i] + cxBankIn[i] + cxAporte[i] + cxOutras[i] - cxDespesa[i] - cxParcela[i] - cxRetirada[i]);
 
             // ---- Tabela mensal (faturamento + despesa por sócio) ----
@@ -11551,7 +11622,7 @@
             const box = document.getElementById('socRetiradasBox');
             if (!box) return;
             const f0 = n => Math.round(n).toLocaleString('pt-BR');
-            const retDet = {"Rodolfo":[{"d":"02/01/2026","v":50000,"dest":"Rodolfo"},{"d":"13/01/2026","v":10000,"dest":"Alma Mater"},{"d":"13/01/2026","v":50000,"dest":"Rodolfo"},{"d":"21/01/2026","v":50000,"dest":"Rodolfo"},{"d":"30/01/2026","v":20000,"dest":"Rodolfo"},{"d":"02/02/2026","v":10000,"dest":"Alma Mater"},{"d":"05/02/2026","v":50000,"dest":"Rodolfo"},{"d":"13/02/2026","v":60000,"dest":"Rodolfo"},{"d":"23/02/2026","v":7000,"dest":"Rodolfo"},{"d":"26/02/2026","v":5000,"dest":"Bianca"},{"d":"02/03/2026","v":10000,"dest":"Alma Mater"},{"d":"13/03/2026","v":15000,"dest":"Rodolfo"},{"d":"27/03/2026","v":4000,"dest":"Bianca"},{"d":"09/04/2026","v":10000,"dest":"Alma Mater"},{"d":"14/04/2026","v":624,"dest":"Bianca"},{"d":"24/04/2026","v":30000,"dest":"Rodolfo"},{"d":"27/04/2026","v":10500,"dest":"Rodolfo"},{"d":"12/05/2026","v":50000,"dest":"Rodolfo"},{"d":"22/05/2026","v":50000,"dest":"Rodolfo"},{"d":"26/05/2026","v":8000,"dest":"Rodolfo"},{"d":"01/06/2026","v":12000,"dest":"Rodolfo"},{"d":"01/06/2026","v":3000,"dest":"Rodolfo"},{"d":"09/06/2026","v":30000,"dest":"Rodolfo"},{"d":"09/06/2026","v":1000,"dest":"Rodolfo"},{"d":"15/06/2026","v":20000,"dest":"Rodolfo"},{"d":"19/06/2026","v":25000,"dest":"Rodolfo"},{"d":"24/06/2026","v":20000,"dest":"Rodolfo"}],"Joselmo":[{"d":"19/06/2026","v":20000,"dest":"Joselmo"}]};
+            const retDet = (window._soc||_socFallback).retDet;
             const sortD = a => a.slice().sort((x, y) => { const p = s => s.split('/').reverse().join(''); return p(x.d) < p(y.d) ? -1 : 1; });
             const block = (who, color) => {
                 const arr = sortD(retDet[who] || []);
