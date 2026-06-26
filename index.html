@@ -2742,6 +2742,7 @@
                 <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-socios',null)">🤝 Sócios</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-medicamentos',null)">💊 Medicamentos</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-exec',null)">🧠 Análise Executiva</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-estoque',null)">💊 Estoque Medicamentos</button>
             </div>
@@ -3826,6 +3827,22 @@
                     <span style="font-size:12px;font-weight:600;color:var(--muted)">Jan–Jun/2026 · clique para detalhar</span>
                 </h3>
                 <div id="socRetiradasBox" style="margin-top:8px"></div>
+            </div>
+        </section>
+
+        <!-- MEDICAMENTOS -->
+        <section id="sec-medicamentos" class="section">
+            <div class="chart-card">
+                <h3 style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    💊 Medicamentos — Receita
+                    <span id="medStatus" style="font-size:12px;font-weight:600;color:var(--muted)">carregando…</span>
+                </h3>
+                <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;line-height:1.5">Receita de medicamento no Feegow (Jan–Jun/2026). Inclui medicamento puro (tipo M) <b style="color:#e2e8f4">e</b> medicação lançada como serviço (nome com \"medicação/medicamento\"): Medicação e preparo (doadora), pacotes FIV, etc.</p>
+                <div id="medKpis" class="kpi-grid" style="margin-bottom:24px"></div>
+                <h3 style="font-size:14px;margin-top:20px">📊 Evolução mensal · recebido vs pendente</h3>
+                <canvas id="medChart" height="100"></canvas>
+                <h3 style="font-size:14px;margin-top:26px">🏆 Top medicamentos (faturado no semestre)</h3>
+                <div id="medTopItens" style="margin-top:12px"></div>
             </div>
         </section>
 
@@ -6056,6 +6073,7 @@
             'sec-cr':            'group-fin',
             'sec-caixa':         'group-fin',
             'sec-socios':        'group-fin',
+            'sec-medicamentos': 'group-fin',
             'sec-exec':          'group-fin',
             'sec-estoque':       'group-fin',
         };
@@ -6106,6 +6124,7 @@
             if (id === 'sec-embriao') ebTab.renderPending();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             if (id === 'sec-socios') loadSociosLive();
+            if (id === 'sec-medicamentos') loadMedicamentosLive();
             if (id === 'sec-caixa') loadAndRenderMedicos();
             if (id === 'sec-exec')    loadAndRenderExec();
             if (id === 'sec-estoque') loadAndRenderEstoque();
@@ -11307,6 +11326,7 @@
             retDet:{"Rodolfo":[{"d":"02/01/2026","v":50000,"dest":"Rodolfo"},{"d":"13/01/2026","v":10000,"dest":"Alma Mater"},{"d":"13/01/2026","v":50000,"dest":"Rodolfo"},{"d":"21/01/2026","v":50000,"dest":"Rodolfo"},{"d":"30/01/2026","v":20000,"dest":"Rodolfo"},{"d":"02/02/2026","v":10000,"dest":"Alma Mater"},{"d":"05/02/2026","v":50000,"dest":"Rodolfo"},{"d":"13/02/2026","v":60000,"dest":"Rodolfo"},{"d":"23/02/2026","v":7000,"dest":"Rodolfo"},{"d":"26/02/2026","v":5000,"dest":"Bianca"},{"d":"02/03/2026","v":10000,"dest":"Alma Mater"},{"d":"13/03/2026","v":15000,"dest":"Rodolfo"},{"d":"27/03/2026","v":4000,"dest":"Bianca"},{"d":"09/04/2026","v":10000,"dest":"Alma Mater"},{"d":"14/04/2026","v":624,"dest":"Bianca"},{"d":"24/04/2026","v":30000,"dest":"Rodolfo"},{"d":"27/04/2026","v":10500,"dest":"Rodolfo"},{"d":"12/05/2026","v":50000,"dest":"Rodolfo"},{"d":"22/05/2026","v":50000,"dest":"Rodolfo"},{"d":"26/05/2026","v":8000,"dest":"Rodolfo"},{"d":"01/06/2026","v":12000,"dest":"Rodolfo"},{"d":"01/06/2026","v":3000,"dest":"Rodolfo"},{"d":"09/06/2026","v":30000,"dest":"Rodolfo"},{"d":"09/06/2026","v":1000,"dest":"Rodolfo"},{"d":"15/06/2026","v":20000,"dest":"Rodolfo"},{"d":"19/06/2026","v":25000,"dest":"Rodolfo"},{"d":"24/06/2026","v":20000,"dest":"Rodolfo"}],"Joselmo":[{"d":"19/06/2026","v":20000,"dest":"Joselmo"}]}
         };
         function _socNum(str){ let vs=(str==null?'':str).toString().replace(/[^\d,\.\-]/g,''); if(vs.includes(',')) vs=vs.replace(/\./g,'').replace(',','.'); const v=parseFloat(vs); return isNaN(v)?0:v; }
+        function _isCanc(it){ return it.is_cancelado===true || String(it.is_cancelado).toLowerCase()==='true'; }
         function computeSocios(fluxoRows, feegow){
             const meses=['jan','fev','mar','abr','mai','jun'], mnum={'01':'jan','02':'fev','03':'mar','04':'abr','05':'mai','06':'jun'}, idxOf={jan:0,fev:1,mar:2,abr:3,mai:4,jun:5};
             const z=()=>[0,0,0,0,0,0], up=s=>(s==null?'':s).toString().toUpperCase(), num=_socNum;
@@ -11337,7 +11357,7 @@
             const gerouR=z(),gerouJ=z(), cents=x=>{const n=parseInt((x==null?'':x).toString().trim()||'0',10);return isNaN(n)?0:n;};
             meses.forEach(mes=>{ const data=(feegow[mes]&&feegow[mes].data)||[]; const i=idxOf[mes];
                 data.forEach(inv=>{ (inv.itens||[]).forEach(it=>{
-                    if(String(it.is_cancelado)==='True'||it.tipo!=='S') return;
+                    if(_isCanc(it)||it.tipo!=='S') return;
                     const liq=(cents(it.valor)-cents(it.desconto)+cents(it.acrescimo))/100; if(liq===0) return;
                     const eid=String(it.executante_id),nome=up(it.nomeResolvido),ex=up(it.executanteNome);
                     if(eid==='3'||ex.includes('RODOLFO')||(nome.includes('RODOLFO')&&eid==='0')) gerouR[i]+=liq;
@@ -11358,9 +11378,11 @@
                 d1:Math.round(disp([0,1,2])), d2:Math.round(disp([3,4,5])) };
         }
         async function fetchFeegowSocios(){
+            if(window._feegowCache) return window._feegowCache;
             const ranges=[['01/01/2026','31/01/2026','jan'],['01/02/2026','28/02/2026','fev'],['01/03/2026','31/03/2026','mar'],['01/04/2026','30/04/2026','abr'],['01/05/2026','31/05/2026','mai'],['01/06/2026','30/06/2026','jun']];
             const out={};
             await Promise.all(ranges.map(async ([ds,de,mes])=>{ try{ const r=await fetch(`${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`); out[mes]=await r.json(); }catch(e){ out[mes]={data:[]}; } }));
+            window._feegowCache=out;
             return out;
         }
         let _socLoading=false, _socLoaded=false;
@@ -11423,6 +11445,69 @@
                 <div style="margin-top:16px;padding:12px 14px;background:rgba(255,255,255,.03);border-radius:10px;font-size:12.5px;color:var(--muted);line-height:1.55">
                     <b style="color:#e2e8f4">Como ler:</b> a <b>geração</b> mostra quem traz faturamento; a <b>retirada</b> é dividida pela participação (Rodolfo 80% / Joselmo 20%), não por quem gera. Como o Dr. Joselmo passou a atender em abril, jan–mar conta 100% para o Dr. Rodolfo. O caixa do semestre fechou em <b style="color:${caixa<0?'#fca5a5':'#e2e8f4'}">${sgn(caixa)}</b>, sustentado por empréstimo da obra.
                 </div>`;
+        }
+
+
+        // ============ MEDICAMENTOS: receita ao vivo (Feegow) ============
+        function computeMed(feegow){
+            const meses=['jan','fev','mar','abr','mai','jun'], idxOf={jan:0,fev:1,mar:2,abr:3,mai:4,jun:5};
+            const cents=x=>{const n=parseInt((x==null?'':x).toString().trim()||'0',10);return isNaN(n)?0:n;};
+            const up=s=>(s==null?'':s).toString().toUpperCase();
+            const isMed=it=>{ if(it.tipo==='M') return true; const n=up(it.nomeResolvido||it.descricao); return n.includes('MEDICAMENTO')||n.includes('MEDICAÇÃO')||n.includes('MEDICACAO'); };
+            const fat=[0,0,0,0,0,0], rec=[0,0,0,0,0,0]; let count=0, tipoMpure=0; const itens={};
+            meses.forEach(mes=>{ const i=idxOf[mes]; ((feegow[mes]||{}).data||[]).forEach(inv=>{
+                const its=inv.itens||[];
+                const fatTotal=its.reduce((s,it)=>s+(!_isCanc(it)?cents(it.valor):0),0);
+                const pagTotal=(inv.pagamentos||[]).reduce((s,p)=>s+cents(p.valor),0);
+                const prop=fatTotal>0?Math.min(pagTotal/fatTotal,1):0;
+                its.forEach(it=>{ if(_isCanc(it)||!isMed(it)) return;
+                    const v=cents(it.valor)/100; fat[i]+=v; rec[i]+=v*prop; count++;
+                    const nome=(it.nomeResolvido||it.descricao||'?'); itens[nome]=(itens[nome]||0)+v;
+                    if(it.tipo==='M') tipoMpure+=v;
+                });
+            }); });
+            return { fat:fat.map(Math.round), rec:rec.map(Math.round), count, tipoMpure:Math.round(tipoMpure),
+                top:Object.entries(itens).sort((a,b)=>b[1]-a[1]).slice(0,10) };
+        }
+        let _medLoading=false, _medLoaded=false;
+        async function loadMedicamentosLive(force){
+            if(_medLoading) return;
+            if(_medLoaded && !force){ renderMedicamentos(); return; }
+            _medLoading=true; const st=document.getElementById('medStatus'); if(st) st.textContent='⏳ carregando…';
+            try{
+                const feegow = await fetchFeegowSocios();
+                window._med = computeMed(feegow);
+                _medLoaded=true; if(st) st.textContent='🟢 ao vivo · '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+            }catch(e){ console.warn('Medicamentos live falhou', e); if(st) st.textContent='🔴 erro ao carregar'; }
+            finally{ _medLoading=false; renderMedicamentos(); }
+        }
+        function renderMedicamentos(){
+            const M=window._med; const f0=n=>Math.round(n).toLocaleString('pt-BR'); const T=a=>a.reduce((x,y)=>x+y,0);
+            const kp=document.getElementById('medKpis'); if(!kp) return;
+            if(!M){ kp.innerHTML='<div style="padding:30px;color:var(--muted)">Carregando dados de medicamentos…</div>'; return; }
+            const fatT=T(M.fat), recT=T(M.rec), pend=fatT-recT;
+            kp.innerHTML = `
+                <div class="kpi-card teal"><div class="value" style="color:#00d4aa">R$ ${f0(fatT)}</div><div class="label">Faturado (Jan–Jun)</div></div>
+                <div class="kpi-card"><div class="value" style="color:#34d399">R$ ${f0(recT)}</div><div class="label">Recebido</div></div>
+                <div class="kpi-card"><div class="value" style="color:#fbbf24">R$ ${f0(pend)}</div><div class="label">Pendente</div></div>
+                <div class="kpi-card purple"><div class="value">${M.count}</div><div class="label">Itens de medicamento</div></div>
+                <div class="kpi-card"><div class="value" style="font-size:20px;color:#cbd5e1">R$ ${f0(M.tipoMpure)}</div><div class="label">Só medicamento puro (tipo M)</div></div>`;
+            mkChart('medChart', {
+                type:'bar',
+                data:{ labels:['Jan','Fev','Mar','Abr','Mai','Jun'], datasets:[
+                    { label:'Recebido', data:M.rec, backgroundColor:'#34d399', stack:'m', borderRadius:4, maxBarThickness:54 },
+                    { label:'Pendente', data:M.fat.map((f,i)=>f-M.rec[i]), backgroundColor:'rgba(245,158,11,.55)', stack:'m', borderRadius:4, maxBarThickness:54 }
+                ]},
+                options:{ responsive:true, interaction:{mode:'index',intersect:false},
+                    plugins:{ legend:{position:'top',labels:{color:'#cbd5e1',usePointStyle:true,padding:14,font:{size:12}}}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: R$ ${f0(c.parsed.y)}`}} },
+                    scales:{ x:{stacked:true,ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}, y:{stacked:true,ticks:{color:'#94a3b8',callback:v=>'R$ '+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,.06)'}} } }
+            });
+            const maxv=M.top[0]?M.top[0][1]:1;
+            document.getElementById('medTopItens').innerHTML = M.top.map(([nome,v])=>`
+                <div style="margin-bottom:10px">
+                    <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:3px"><span style="color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</span><span style="color:#fff;font-weight:700;white-space:nowrap">R$ ${f0(v)}</span></div>
+                    <div style="height:9px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden"><div style="height:100%;width:${(v/maxv*100).toFixed(1)}%;background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div></div>
+                </div>`).join('');
         }
 
 
