@@ -139,6 +139,8 @@
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chip{font-size:12.5px;font-weight:600;padding:6px 9px;border-radius:7px;border:1px solid;min-width:60px;text-align:center;
     background:rgba(0,212,170,.1);color:var(--accent);border-color:rgba(0,212,170,.35)}
+  .chip.home{background:rgba(96,165,250,.12);color:#93c5fd;border-color:rgba(96,165,250,.4)}
+  .salas-half-home{color:#93c5fd;font-size:12px;font-weight:700}
   .card .nota{color:var(--muted);font-size:12.5px}
   .salaSel{margin-top:12px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
   .salaSel select{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);
@@ -241,8 +243,8 @@
       4:[{ini:'10:00',fim:'13:30',dur:30}], 5:[{ini:'08:30',fim:'12:00',dur:30}],
     }},
     3:  { nome:'Rodolfo Salvato', trat:'Dr.',  esp:'Gineco e Obstetrícia', sala:'drRodolfo', dias:{
-      1:[{ini:'09:00',fim:'18:00',dur:30}], 2:[{ini:'09:00',fim:'18:00',dur:30}], 3:[{ini:'08:30',fim:'18:00',dur:30}],
-      4:[{ini:'09:00',fim:'18:00',dur:30}], 5:[{ini:'09:00',fim:'17:59',dur:30}], 6:[{ini:'08:00',fim:'11:59',dur:30}],
+      1:[{ini:'09:00',fim:'12:00',dur:30,home:true},{ini:'12:00',fim:'18:00',dur:30}], 2:[{ini:'09:00',fim:'12:00',dur:30,home:true},{ini:'12:00',fim:'18:00',dur:30}], 3:[{ini:'08:30',fim:'18:00',dur:30}],
+      4:[{ini:'09:00',fim:'12:00',dur:30,home:true},{ini:'12:00',fim:'18:00',dur:30}], 5:[{ini:'09:00',fim:'17:59',dur:30}], 6:[{ini:'08:00',fim:'11:59',dur:30}],
     }},
     15: { nome:'Joselmo Salvato', trat:'Dr.',  esp:'Gineco e Obstetrícia', sala:'drJoselmo', dias:{
       1:[{ini:'08:20',fim:'11:20',dur:40},{ini:'14:00',fim:'17:20',dur:40}],
@@ -402,7 +404,7 @@
   // monta DISPONIBILIDADE das salas a partir da GRADE (horários que cada médico disponibiliza)
   function computeFromGrade(wd){
     const clinicalAreas = SALAS_LAYOUT.filter(s=>s.clinical).map(s=>s.area);
-    const roomSlots={}, roomDocs={}, roomDocList={};
+    const roomSlots={}, roomDocs={}, roomDocList={}, roomHomeAM={};
     clinicalAreas.forEach(a=>{ roomSlots[a]=[]; roomDocs[a]=[]; roomDocList[a]=[]; });
     Object.entries(GRADE).forEach(([id,doc])=>{
       const blocos=doc.dias[wd]||[]; if(!blocos.length) return;
@@ -411,12 +413,13 @@
       roomDocs[area].push(dispName(doc));
       const mins=[];
       blocos.forEach(b=>{
+        if(b.home){ roomHomeAM[area]=true; return; }   // home office: não ocupa a sala física
         if(b.horarios){ b.horarios.forEach(h=>mins.push(hmToMin(h))); }
         else { for(let m=hmToMin(b.ini); m<hmToMin(b.fim); m+=b.dur){ mins.push(m); } }
       });
       roomSlots[area].push(...mins);
       const sh = t => String(t).replace(':00','');   // 09:00→09, 13:30 fica 13:30
-      const hours = blocos.map(b=> b.horarios ? `${sh(b.horarios[0])}–${sh(b.horarios[b.horarios.length-1])}` : `${sh(b.ini)}–${sh(b.fim)}`).join(', ');
+      const hours = blocos.filter(b=>!b.home).map(b=> b.horarios ? `${sh(b.horarios[0])}–${sh(b.horarios[b.horarios.length-1])}` : `${sh(b.ini)}–${sh(b.fim)}`).join(', ');
       roomDocList[area].push({ id, name:dispName(doc), mins:[...new Set(mins)], hours });
     });
     Object.keys(roomSlots).forEach(a=>{ roomSlots[a]=[...new Set(roomSlots[a])].sort((x,y)=>x-y); });
@@ -442,7 +445,7 @@
       Object.values(minMap).forEach(ids=>{ if(ids.length>1){ conf=true; ids.forEach(id=>conflictDocs.add(id)); } });
       roomConflict[a]=conf;
     });
-    return {roomSlots, roomDocs, roomDocList, roomConflict, conflictDocs, roomSplit};
+    return {roomSlots, roomDocs, roomDocList, roomConflict, conflictDocs, roomSplit, roomHomeAM};
   }
 
   // ===== Render =====
@@ -482,7 +485,7 @@
       const stateCls = conflito ? ' room-conflito' : (slots.length ? ' room-ativo' : '');
       return `<div class="salas-room salas-room-split${stateCls}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
         <div class="salas-room-name">${conflito?'⚠️ ':''}${s.nome}</div>${docBlock}
-        <div class="salas-room-half ${sM.length?'av':''}" style="${avBg(sM.length)}"><span class="salas-half-per">🌅</span>${half(sM)}</div>
+        <div class="salas-room-half ${sM.length||(comp.roomHomeAM&&comp.roomHomeAM[s.area])?'av':''}" style="${sM.length?avBg(sM.length):(comp.roomHomeAM&&comp.roomHomeAM[s.area]?'background:rgba(96,165,250,.16);':avBg(0))}"><span class="salas-half-per">🌅</span>${sM.length?half(sM):(comp.roomHomeAM&&comp.roomHomeAM[s.area]?'<span class=\'salas-half-home\'>🏠 home office</span>':half(sM))}</div>
         <div class="salas-room-half ${sT.length?'av':''}" style="${avBg(sT.length)}"><span class="salas-half-per">🌇</span>${half(sT)}</div>
       </div>`;
     }).join('');
@@ -505,14 +508,16 @@
         return;
       }
       nCom++;
-      let chips='',n=0;
+      let chips='',n=0,nHome=0;
       blocos.forEach(b=>{
-        if(b.horarios){ b.horarios.forEach(h=>{ n++; chips+=`<span class="chip">${h}</span>`; }); }
-        else { for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ n++; chips+=`<span class="chip">${minToHm(m)}</span>`; } }
+        const hc=b.home?' home':'';
+        if(b.horarios){ b.horarios.forEach(h=>{ if(b.home)nHome++;else n++; chips+=`<span class="chip${hc}">${h}</span>`; }); }
+        else { for(let m=hmToMin(b.ini);m<hmToMin(b.fim);m+=b.dur){ if(b.home)nHome++;else n++; chips+=`<span class="chip${hc}">${minToHm(m)}</span>`; } }
       });
       const conf=comp.conflictDocs.has(id);
-      const badge=conf?`<span class="bd conf">⚠️ conflito de sala</span>`:`<span class="bd">${n} disponíve${n!==1?'is':'l'}</span>`;
-      comCards+=`<div class="card${conf?' card-conflito':''}"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div>${badge}</div><div class="chips">${chips}</div>${sel}</div>`;
+      const homeBadge=nHome?`<span class="bd home">🏠 home office</span>`:'';
+      const badge=conf?`<span class="bd conf">⚠️ conflito de sala</span>`:`<span class="bd">${n+nHome} disponíve${(n+nHome)!==1?'is':'l'}</span>`;
+      comCards+=`<div class="card${conf?' card-conflito':''}"><div class="ch"><div class="nm">${dispName(doc)}<small>${doc.esp||''}</small></div><span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${homeBadge}${badge}</span></div><div class="chips">${chips}</div>${sel}</div>`;
     });
     let cards = '';
     if(nCom) cards += `<div class="cards-sep">✅ Atendem ${SEMANA[wd].toLowerCase()} (${nCom})</div>` + comCards;
