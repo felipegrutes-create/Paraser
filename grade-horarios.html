@@ -64,7 +64,7 @@
     line-height:1.25;display:flex;gap:5px;align-items:baseline}
   .salas-room-conf .conf-doc .cn{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .salas-room-conf .conf-doc b{flex:0 0 auto;color:#fff;font-weight:800}
-  .salas-room-half{flex:1 1 0;min-height:22px;display:flex;align-items:center;gap:5px;padding:2px 8px;font-size:13px;
+  .salas-room-half{flex:1 1 0;min-height:22px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:3px 8px;font-size:13px;
     color:var(--muted);border-top:1.5px solid rgba(255,255,255,0.12)}
   .salas-room-half .salas-half-per{opacity:.85;font-size:13px}
   .salas-room-half b{color:#fff;font-size:15px;font-weight:800}
@@ -72,6 +72,9 @@
   .salas-room-half.av{color:#d1fae5}
   .salas-room-half.av b{color:#fff;font-size:16px}
   .salas-room-half .salas-half-na{color:var(--muted);opacity:.45;font-size:13px}
+  .salas-half-line{display:flex;align-items:center;gap:5px}
+  .salas-half-doc{font-size:10.5px;font-weight:700;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;line-height:1.2}
+  .salas-room-half.homeav .salas-half-doc{color:#93c5fd}
   .salas-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
   .salas-summary b{color:var(--text)}
 
@@ -416,7 +419,7 @@
   // monta DISPONIBILIDADE das salas a partir da GRADE (horários que cada médico disponibiliza)
   function computeFromGrade(wd){
     const clinicalAreas = SALAS_LAYOUT.filter(s=>s.clinical).map(s=>s.area);
-    const roomSlots={}, roomDocs={}, roomDocList={}, roomHomeAM={}, roomHomePM={};
+    const roomSlots={}, roomDocs={}, roomDocList={}, roomHomeAM={}, roomHomePM={}, roomDocsAM={}, roomDocsPM={}, roomSlotsAM={}, roomSlotsPM={};
     clinicalAreas.forEach(a=>{ roomSlots[a]=[]; roomDocs[a]=[]; roomDocList[a]=[]; });
     const sh = t => String(t).replace(':00','');   // 09:00→09, 13:30 fica 13:30
     Object.entries(GRADE).forEach(([id,doc])=>{
@@ -439,9 +442,11 @@
         const area=getSala(id, wd, per); if(!area) return;
         if(!roomSlots[area]){ roomSlots[area]=[]; roomDocs[area]=[]; roomDocList[area]=[]; }
         if(!roomDocs[area].includes(dispName(doc))) roomDocs[area].push(dispName(doc));
+        const _tgt=isAM?roomDocsAM:roomDocsPM; if(!_tgt[area])_tgt[area]=[]; if(!_tgt[area].includes(dispName(doc)))_tgt[area].push(dispName(doc));
         if(home){ if(isAM) roomHomeAM[area]=true; else roomHomePM[area]=true; }
         if(mins.length){
           roomSlots[area].push(...mins);
+          const _ts=isAM?roomSlotsAM:roomSlotsPM; _ts[area]=[...(_ts[area]||[]), ...mins];
           const hours=hrParts.join(', ');
           const entry=roomDocList[area].find(d=>d.id===id);
           if(entry){ entry.mins=[...new Set([...entry.mins,...mins])]; entry.hours=[entry.hours,hours].filter(Boolean).join(', '); }
@@ -450,6 +455,7 @@
       });
     });
     Object.keys(roomSlots).forEach(a=>{ roomSlots[a]=[...new Set(roomSlots[a])].sort((x,y)=>x-y); });
+    [roomSlotsAM, roomSlotsPM].forEach(o=>Object.keys(o).forEach(a=>{ o[a]=[...new Set(o[a])].sort((x,y)=>x-y); }));
     // divisória manhã/tarde: meio-dia por padrão; se a sala tem 1 médico com intervalo de almoço claro, divide no almoço
     const roomSplit={};
     Object.keys(roomSlots).forEach(a=>{
@@ -472,7 +478,7 @@
       Object.values(minMap).forEach(ids=>{ if(ids.length>1){ conf=true; ids.forEach(id=>conflictDocs.add(id)); } });
       roomConflict[a]=conf;
     });
-    return {roomSlots, roomDocs, roomDocList, roomConflict, conflictDocs, roomSplit, roomHomeAM, roomHomePM};
+    return {roomSlots, roomDocs, roomDocList, roomConflict, conflictDocs, roomSplit, roomHomeAM, roomHomePM, roomDocsAM, roomDocsPM, roomSlotsAM, roomSlotsPM};
   }
 
   // ===== Render =====
@@ -492,8 +498,7 @@
       if(!s.clinical && !slots.length){
         return `<div class="salas-room salas-room-aux" style="${salasPosStyle(s.area)}" title="${escAttr(s.nome)}"><div class="salas-room-name">${s.nome}</div></div>`;
       }
-      const splitPt=(comp.roomSplit&&comp.roomSplit[s.area])||MEIODIA;
-      const sM=slots.filter(x=>x<splitPt), sT=slots.filter(x=>x>=splitPt);
+      const sM=comp.roomSlotsAM[s.area]||[], sT=comp.roomSlotsPM[s.area]||[];
       totalDisp+=slots.length;
       if(slots.length>topN){ topN=slots.length; topRoom=s.nome; }
       const half=arr=> arr.length
@@ -506,14 +511,17 @@
       const horasTxt = slots.length ? slots.map(minToHm).join(', ') : 'sem atendimento';
       const docsTip = docList.length ? '\n'+docList.map(d=>`• ${d.name}: ${d.hours}`).join('\n') : '';
       const tip=`${s.nome}${conflito?' ⚠️ CONFLITO DE SALA':''}${docsTip}\n🌅 Manhã: ${sM.length} horário(s)\n🌇 Tarde: ${sT.length} horário(s)`;
+      const namesAM=(comp.roomDocsAM&&comp.roomDocsAM[s.area])||[];
+      const namesPM=(comp.roomDocsPM&&comp.roomDocsPM[s.area])||[];
+      const halfName=arr=>arr.length?`<span class="salas-half-doc">${arr.join(' · ')}</span>`:'';
       const docBlock = conflito
         ? `<div class="salas-room-conf">${docList.map(d=>`<span class="conf-doc"><span class="cn">${d.name}</span><b>${d.hours}</b></span>`).join('')}</div>`
-        : (docs.length ? `<div class="salas-room-doc">${docs.join(' · ')}</div>` : '');
+        : '';
       const stateCls = conflito ? ' room-conflito' : (slots.length ? ' room-ativo' : '');
       return `<div class="salas-room salas-room-split${stateCls}" style="${salasPosStyle(s.area)}" title="${escAttr(tip)}">
         <div class="salas-room-name">${conflito?'⚠️ ':''}${s.nome}</div>${docBlock}
-        <div class="salas-room-half ${sM.length||(comp.roomHomeAM&&comp.roomHomeAM[s.area])?'av':''}" style="${sM.length?avBg(sM.length):(comp.roomHomeAM&&comp.roomHomeAM[s.area]?'background:rgba(96,165,250,.16);':avBg(0))}"><span class="salas-half-per">🌅</span>${sM.length?half(sM):(comp.roomHomeAM&&comp.roomHomeAM[s.area]?'<span class=\'salas-half-home\'>🏠 home office</span>':half(sM))}</div>
-        <div class="salas-room-half ${sT.length||(comp.roomHomePM&&comp.roomHomePM[s.area])?'av':''}" style="${sT.length?avBg(sT.length):(comp.roomHomePM&&comp.roomHomePM[s.area]?'background:rgba(96,165,250,.16);':avBg(0))}"><span class="salas-half-per">🌇</span>${sT.length?half(sT):(comp.roomHomePM&&comp.roomHomePM[s.area]?'<span class=\'salas-half-home\'>🏠 home office</span>':half(sT))}</div>
+        <div class="salas-room-half ${sM.length?'av':(comp.roomHomeAM&&comp.roomHomeAM[s.area]?'av homeav':'')}" style="${sM.length?avBg(sM.length):(comp.roomHomeAM&&comp.roomHomeAM[s.area]?'background:rgba(96,165,250,.16);':avBg(0))}">${halfName(namesAM)}<span class="salas-half-line"><span class="salas-half-per">🌅</span>${sM.length?half(sM):(comp.roomHomeAM&&comp.roomHomeAM[s.area]?'<span class=\'salas-half-home\'>🏠 home office</span>':half(sM))}</span></div>
+        <div class="salas-room-half ${sT.length?'av':(comp.roomHomePM&&comp.roomHomePM[s.area]?'av homeav':'')}" style="${sT.length?avBg(sT.length):(comp.roomHomePM&&comp.roomHomePM[s.area]?'background:rgba(96,165,250,.16);':avBg(0))}">${halfName(namesPM)}<span class="salas-half-line"><span class="salas-half-per">🌇</span>${sT.length?half(sT):(comp.roomHomePM&&comp.roomHomePM[s.area]?'<span class=\'salas-half-home\'>🏠 home office</span>':half(sT))}</span></div>
       </div>`;
     }).join('');
     const entrada = `<div class="entrada-marker" style="grid-column:8 / span 1;grid-row:7 / span 1"><span class="entrada-txt">Entrada</span><span class="entrada-seta">⬅</span></div>`;
