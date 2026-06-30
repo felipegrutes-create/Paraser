@@ -6659,13 +6659,19 @@
             } catch(e) { console.warn('meta bar:', e.message); }
         }
         async function editarMeta() {
-            const atual = prompt('Meta de vendas do mês (só o número, ex: 600000):', '');
+            const off = prompt('Meta de qual mês?\n0 = este mês\n1 = mês que vem\n2 = daqui 2 meses ...', '0');
+            if (off === null) return;
+            const n = parseInt(off, 10);
+            if (isNaN(n)) { alert('Digite um número (0, 1, 2...)'); return; }
+            const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + n);
+            const mes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            const atual = prompt('Meta de vendas de ' + mes.split('-').reverse().join('/') + ' (só o número, ex: 677544):', '');
             if (atual === null) return;
             const valor = Number(String(atual).replace(/[^\d]/g, ''));
             if (!valor) return;
             await fetch(CRM_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'set_meta', mes: mesAtualMeta(), valor })
+                body: JSON.stringify({ action: 'set_meta', mes, valor })
             }).catch(() => {});
             setTimeout(renderMetaBar, 900);
         }
