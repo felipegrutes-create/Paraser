@@ -184,38 +184,10 @@ function doGet(e) {
     if (action === 'get_estoque') return handleGetEstoque();
     if (action === 'parse_nfs')   return handleParseNFs();
 
-    // Meta comercial — OFX do Itaú (PIX recebido)
-    if (action === 'setup_ofx_folder') {
-      const _f = getOrCreateOfxFolder_();
-      return jsonOk({ ok: true, nome: _f.getName(), url: _f.getUrl(), id: _f.getId() });
-    }
-    if (action === 'test_ofx') {
-      const _rec = lerOfxRecebimentos_();
-      let _soma = 0; _rec.forEach(function(r){ _soma += r.valor; });
-      return jsonOk({ ok: true, total: _rec.length, soma: _soma, amostra: _rec.slice(0, 15) });
-    }
+    // Meta comercial — barra da meta lida pelo dashboard
     if (action === 'get_meta') {
       const _mes = (e.parameter.mes || Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM'));
       return jsonOk({ ok: true, mes: _mes, meta: getMetaMes_(_mes), confirmado: somaConfirmadoMes_(_mes) });
-    }
-    if (action === 'conciliar') {
-      return jsonOk(conciliarVendasFechadas_(e.parameter.slack === 'true'));
-    }
-    if (action === 'test_rede') {
-      const _t = redeToken_();
-      const _dia = new Date((e.parameter.dia || '2022-11-01') + 'T12:00:00-03:00');
-      const _v = redeVendasDia_(_t, _dia);
-      let _s = 0; _v.forEach(function(x){ _s += x.valor; });
-      return jsonOk({ ok: true, dia: e.parameter.dia || '2022-11-01', total: _v.length, soma: _s, amostra: _v.slice(0, 10) });
-    }
-    if (action === 'setup_rede_folder') {
-      const _f = getOrCreateRedeFolder_();
-      return jsonOk({ ok: true, nome: _f.getName(), url: _f.getUrl(), id: _f.getId() });
-    }
-    if (action === 'test_rede_arquivo') {
-      const _r = lerRedeRecebimentos_();
-      let _s2 = 0; _r.forEach(function(x){ _s2 += x.valor; });
-      return jsonOk({ ok: true, total: _r.length, soma: _s2, amostra: _r.slice(0, 12) });
     }
 
     // Retornar registros CRM (padrão)
@@ -277,7 +249,6 @@ function doPost(e) {
 
       if (action === 'marcar_venda_fechada') return handleMarcarVendaFechada(body);
       if (action === 'set_meta')             return handleSetMeta(body);
-      if (action === 'setup_rede')           return handleSetupRede(body);
 
       const key = (body.paciente_key || '').trim();
       if (!key) return jsonErr('paciente_key obrigatório');
@@ -1884,6 +1855,30 @@ function handleSetupRede(body) {
   if (body.pv) p.setProperty('REDE_PV', String(body.pv));
   if (body.fonte) p.setProperty('REDE_FONTE', String(body.fonte)); // 'arquivo' (CSV) ou 'api'
   return jsonOk({ ok: true, tem_id: !!p.getProperty('REDE_CLIENT_ID'), tem_secret: !!p.getProperty('REDE_CLIENT_SECRET'), pv: p.getProperty('REDE_PV') || '', fonte: p.getProperty('REDE_FONTE') || 'arquivo' });
+}
+
+// Apaga os dados de teste das abas (mantém os cabeçalhos). Usado 1x no go-live.
+function handleLimparTeste(body) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const limpas = {};
+  ['Vendas_Fechadas', 'Metas'].forEach(function(nome) {
+    const sh = ss.getSheetByName(nome);
+    if (sh && sh.getLastRow() > 1) { const n = sh.getLastRow() - 1; sh.deleteRows(2, n); limpas[nome] = n; }
+  });
+  return jsonOk({ ok: true, limpas: limpas });
+}
+
+// Conciliação automática (com aviso no Slack) — chamada pelo gatilho horário.
+function rodarConciliacaoComSlack() { return conciliarVendasFechadas_(true); }
+
+// Cria o gatilho horário. RODAR 1x NO EDITOR (precisa autorizar o escopo de triggers).
+function setupTriggerConciliacao() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'rodarConciliacaoComSlack') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('rodarConciliacaoComSlack').timeBased().everyHours(1).create();
+  Logger.log('Gatilho horário de conciliação criado.');
+  return 'ok';
 }
 
 function jsonOk(data) {
