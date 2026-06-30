@@ -184,6 +184,17 @@ function doGet(e) {
     if (action === 'get_estoque') return handleGetEstoque();
     if (action === 'parse_nfs')   return handleParseNFs();
 
+    // Meta comercial — OFX do Itaú (PIX recebido)
+    if (action === 'setup_ofx_folder') {
+      const _f = getOrCreateOfxFolder_();
+      return jsonOk({ ok: true, nome: _f.getName(), url: _f.getUrl(), id: _f.getId() });
+    }
+    if (action === 'test_ofx') {
+      const _rec = lerOfxRecebimentos_();
+      let _soma = 0; _rec.forEach(function(r){ _soma += r.valor; });
+      return jsonOk({ ok: true, total: _rec.length, soma: _soma, amostra: _rec.slice(0, 15) });
+    }
+
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
     const data  = sheet.getDataRange().getValues();

@@ -19,3 +19,10 @@ apps-script-confirmacoes/
 
 # Clone clasp local do "Meta CAPI Paraser" (lida com tokens — não versionar em repo público)
 apps-script-metacapi/
+
+# Clone clasp local do "CRM Comercial" (tem token Feegow — fonte versionada é crm-apps-script.gs)
+apps-script-crm/
+
+# Conversas de pacientes capturadas (LGPD - NAO commitar, repo publico)
+docs/ana/conversas-*.txt
+.playwright-mcp/
