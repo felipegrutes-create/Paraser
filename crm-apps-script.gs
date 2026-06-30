@@ -1591,19 +1591,26 @@ function redeToken_() {
 // Vendas APROVADAS de um dia (Date). Uma página (size 200) basta p/ volume diário de clínica.
 function redeVendasDia_(token, dia) {
   const p = PropertiesService.getScriptProperties();
-  const pv = p.getProperty('REDE_PV');
-  if (!pv) throw new Error('REDE_PV não configurado');
+  const pvRaw = p.getProperty('REDE_PV');
+  if (!pvRaw) throw new Error('REDE_PV não configurado');
   const ds = Utilities.formatDate(dia, 'America/Sao_Paulo', 'yyyy-MM-dd');
-  const url = REDE_BASE + '/merchant-statement/v1/sales?parentCompanyNumber=' + pv +
-              '&subsidiaries=' + pv + '&startDate=' + ds + '&endDate=' + ds + '&status=APPROVED&size=200';
-  const resp = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
-  if (resp.getResponseCode() !== 200) throw new Error('REDE vendas HTTP ' + resp.getResponseCode() + ': ' + resp.getContentText().slice(0, 200));
-  const j = JSON.parse(resp.getContentText());
-  const txns = (j.content && j.content.transactions) || [];
-  if (j.cursor && j.cursor.hasNextKey) Logger.log('REDE ' + ds + ': há mais de 200 vendas no dia (paginação não tratada)');
-  return txns.map(function(t) {
-    return { valor: t.amount, data: t.saleDate, modalidade: t.modality && t.modality.type, parcelas: t.installmentQuantity, nsu: t.nsu };
+  // A Paraser tem mais de um PV (PARASER SERVICOS + INSTITUTO) — REDE_PV pode ser
+  // vários separados por vírgula; consulta cada um e junta.
+  const pvs = pvRaw.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  const out = [];
+  pvs.forEach(function(pv) {
+    const url = REDE_BASE + '/merchant-statement/v1/sales?parentCompanyNumber=' + pv +
+                '&subsidiaries=' + pv + '&startDate=' + ds + '&endDate=' + ds + '&status=APPROVED&size=200';
+    const resp = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) throw new Error('REDE vendas HTTP ' + resp.getResponseCode() + ' (PV ' + pv + '): ' + resp.getContentText().slice(0, 200));
+    const j = JSON.parse(resp.getContentText());
+    const txns = (j.content && j.content.transactions) || [];
+    if (j.cursor && j.cursor.hasNextKey) Logger.log('REDE ' + ds + ' PV ' + pv + ': >200 vendas (paginação não tratada)');
+    txns.forEach(function(t) {
+      out.push({ valor: t.amount, data: t.saleDate, modalidade: t.modality && t.modality.type, parcelas: t.installmentQuantity, nsu: t.nsu, pv: pv });
+    });
   });
+  return out;
 }
 
 // =========================================================
