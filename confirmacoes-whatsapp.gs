@@ -2636,7 +2636,15 @@ function enviarAgendaMedicos() {
   while (alvo.getDay() === 0 || alvo.getDay() === 6) alvo.setDate(alvo.getDate() + 1);
 
   // Pega agenda + carrega nomes
-  var agendamentos = getAgendamentos(alvo);
+  var agendamentos;
+  try {
+    agendamentos = getAgendamentos(alvo);
+  } catch(e) {
+    // Feegow fora do ar: não dá pra montar a agenda. Avisa no Slack e aborta.
+    Logger.log('🚨 Feegow indisponível — agenda dos médicos NÃO enviada: ' + e.message);
+    if (typeof slackPost === 'function') slackPost('🚨 *Agenda médicos* — Feegow fora do ar (' + e.message + '), agendas de amanhã NÃO foram enviadas.');
+    return;
+  }
   var profMap = carregarProfissionais();
   var procMap = (typeof carregarNomesProcedimentos === 'function') ? carregarNomesProcedimentos() : {};
   agendamentos.forEach(function(ag) {
