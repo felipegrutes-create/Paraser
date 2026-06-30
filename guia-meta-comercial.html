@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia · Meta Comercial Paraser</title>
+<style>
+  :root{
+    --teal:#00b894; --teal-d:#00876a; --indigo:#6366f1; --amber:#f59e0b;
+    --green:#10b981; --ink:#1f2733; --muted:#6b7785; --line:#e7ecf1; --bg:#f5f7fa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;padding:24px 14px}
+  .wrap{max-width:860px;margin:0 auto}
+
+  header{background:linear-gradient(135deg,#00b894,#0984a8);color:#fff;border-radius:18px;padding:30px 28px;box-shadow:0 8px 24px rgba(9,132,168,.25)}
+  header .tag{display:inline-block;background:rgba(255,255,255,.2);padding:4px 12px;border-radius:30px;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px}
+  header h1{font-size:30px;line-height:1.15;margin-bottom:8px}
+  header p{font-size:16px;opacity:.95;max-width:560px}
+
+  .role{background:#fff;border-radius:18px;padding:26px 24px;margin-top:22px;box-shadow:0 2px 12px rgba(31,39,51,.06);border:1px solid var(--line)}
+  .role-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .role-ic{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex:0 0 auto}
+  .role-head h2{font-size:22px}
+  .role-head .who{font-size:13px;color:var(--muted);font-weight:600}
+  .role-sub{font-size:14px;color:var(--muted);margin:4px 0 18px 66px}
+
+  .step{display:flex;gap:16px;padding:16px 0;border-top:1px dashed var(--line)}
+  .step:first-of-type{border-top:none}
+  .num{flex:0 0 auto;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .step-body h3{font-size:16px;margin-bottom:3px}
+  .step-body p{font-size:14.5px;color:#3c4655}
+  .step-body .path{display:inline-block;background:#eef2f7;border:1px solid var(--line);border-radius:7px;padding:2px 9px;font-size:13.5px;font-weight:700;color:#334;margin:3px 4px 3px 0}
+  .step-body a{color:#0984a8;font-weight:700;word-break:break-all}
+
+  .tip{display:flex;gap:10px;align-items:flex-start;background:#fff8e9;border:1px solid #f3dca0;border-radius:12px;padding:13px 15px;margin-top:16px;font-size:14px}
+  .tip.green{background:#e9faf2;border-color:#aee9cf}
+  .tip b{display:block;margin-bottom:1px}
+
+  .flow{background:#fff;border-radius:18px;padding:24px;margin-top:22px;border:1px solid var(--line);box-shadow:0 2px 12px rgba(31,39,51,.06)}
+  .flow h2{font-size:20px;margin-bottom:16px;text-align:center}
+  .chain{display:flex;flex-wrap:wrap;align-items:stretch;justify-content:center;gap:10px}
+  .chip{flex:1 1 150px;min-width:140px;background:#f7fafc;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .chip .e{font-size:24px;display:block;margin-bottom:6px}
+  .chip h4{font-size:14px;margin-bottom:3px}
+  .chip p{font-size:12.5px;color:var(--muted)}
+  .arrow{display:flex;align-items:center;color:var(--teal);font-size:22px;font-weight:800}
+
+  footer{text-align:center;color:var(--muted);font-size:13px;margin-top:26px;padding-bottom:10px}
+
+  @media (max-width:560px){
+    header h1{font-size:24px} .role-sub{margin-left:0}
+    .arrow{transform:rotate(90deg);justify-content:center;width:100%}
+  }
+  @media print{body{background:#fff;padding:0}.role,.flow{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="tag">Guia rápido</span>
+    <h1>Meta Comercial Paraser</h1>
+    <p>Cada venda que você registra no sistema faz a meta do mês andar sozinha. Veja como é simples, do seu lado.</p>
+  </header>
+
+  <!-- VENDEDORA -->
+  <section class="role">
+    <div class="role-head">
+      <div class="role-ic" style="background:#eef0ff;color:#6366f1">🧑‍💼</div>
+      <div>
+        <h2>Registrar a venda</h2>
+        <div class="who">Para a vendedora / closer</div>
+      </div>
+    </div>
+    <p class="role-sub">Quando a paciente fechar e pagar, marque a venda. Leva 10 segundos.</p>
+
+    <div class="step">
+      <div class="num" style="background:#6366f1">1</div>
+      <div class="step-body">
+        <h3>Abra o sistema no comercial</h3>
+        <p>Entre em <a href="https://app.paraser.com.br">app.paraser.com.br</a> e vá no menu
+        <span class="path">Comercial</span> <span class="path">Cards Pacientes</span></p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num" style="background:#6366f1">2</div>
+      <div class="step-body">
+        <h3>Classifique a paciente primeiro</h3>
+        <p>Em <span class="path">Comercial</span> <span class="path">🏷️ Fluxo Pacientes</span> escolha o tipo dela
+        (FIV Normal, Receptora, Investigando, etc.). É o primeiro passo do funil.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num" style="background:#6366f1">3</div>
+      <div class="step-body">
+        <h3>Abra o card e confira o valor</h3>
+        <p>No kanban, clique no card da paciente. Confira que o campo <b>💰 Valor</b> está preenchido
+        com o valor da venda. Se estiver vazio, preencha e salve.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num" style="background:#6366f1">4</div>
+      <div class="step-body">
+        <h3>Marque "Venda fechada"</h3>
+        <p>Na caixinha verde <b>💰 Venda fechada</b>, escolha a <b>forma de pagamento</b> (PIX ou Cartão),
+        confira a <b>data</b> (já vem a de hoje) e clique em <b>Marcar venda fechada</b>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num" style="background:#10b981">✓</div>
+      <div class="step-body">
+        <h3>Pronto</h3>
+        <p>A venda fica "aguardando confirmação". Quando o dinheiro entrar (PIX ou cartão), o sistema
+        confirma sozinho e ela conta na meta. Você não precisa fazer mais nada.</p>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span>💡</span>
+      <div><b>3 lembretes de ouro</b>
+      Marque assim que a paciente pagar (não espere o dinheiro cair). Confira sempre o valor antes.
+      Marcou? A venda só conta de verdade quando o banco confirma, então o número da meta é sempre real.</div>
+    </div>
+  </section>
+
+  <!-- ANALISTA -->
+  <section class="role">
+    <div class="role-head">
+      <div class="role-ic" style="background:#e9faf2;color:#00b894">📂</div>
+      <div>
+        <h2>Alimentar o sistema</h2>
+        <div class="who">Para a analista · 1 vez por dia</div>
+      </div>
+    </div>
+    <p class="role-sub">Só baixar 2 arquivos e largar em 2 pastas. O sistema faz o resto.</p>
+
+    <div class="step">
+      <div class="num" style="background:#00b894">1</div>
+      <div class="step-body">
+        <h3>Baixe o extrato do Itaú (PIX)</h3>
+        <p>No internet banking da conta PJ, exporte o extrato no formato <b>OFX</b> (do dia ou dos últimos dias).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num" style="background:#00b894">2</div>
+      <div class="step-body">
+        <h3>Solte o OFX na pasta do Itaú</h3>
+        <p>Arraste o arquivo pra pasta do Drive:<br>
+        <a href="https://drive.google.com/drive/folders/1dGOg0_yUZp8_FFqcGgSi8f9pEph133o8">📁 Extratos Itau OFX</a></p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num" style="background:#00b894">3</div>
+      <div class="step-body">
+        <h3>Baixe as vendas da Rede (cartão)</h3>
+        <p>No portal <a href="https://www.userede.com.br">userede.com.br</a>, em Vendas, exporte o relatório
+        em <b>CSV</b>. Se houver mais de um estabelecimento no seletor de cima, exporte <b>cada um</b>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num" style="background:#00b894">4</div>
+      <div class="step-body">
+        <h3>Solte o CSV na pasta da Rede</h3>
+        <p>Arraste o(s) arquivo(s) pra pasta do Drive:<br>
+        <a href="https://drive.google.com/drive/folders/1MhchDDHGCTrLAy4JY2QqxgkxF9lnnCyL">📁 Vendas Rede</a></p>
+      </div>
+    </div>
+
+    <div class="tip green">
+      <span>✅</span>
+      <div><b>Só isso</b>
+      De hora em hora o sistema lê as 2 pastas, confirma as vendas que as vendedoras marcaram e atualiza a meta.
+      Você não precisa conferir venda por venda nem avisar ninguém. Isso acabou.</div>
+    </div>
+  </section>
+
+  <!-- COMO FUNCIONA -->
+  <section class="flow">
+    <h2>O que acontece depois, sozinho</h2>
+    <div class="chain">
+      <div class="chip"><span class="e">🧑‍💼</span><h4>Vendedora marca</h4><p>a venda no card</p></div>
+      <div class="arrow">→</div>
+      <div class="chip"><span class="e">🏦</span><h4>Banco confirma</h4><p>PIX no extrato, cartão na Rede</p></div>
+      <div class="arrow">→</div>
+      <div class="chip"><span class="e">🎯</span><h4>Meta anda</h4><p>a barra sobe sozinha</p></div>
+      <div class="arrow">→</div>
+      <div class="chip"><span class="e">💬</span><h4>Slack avisa</h4><p>quanto falta, no #comercial</p></div>
+    </div>
+    <div class="tip" style="margin-top:18px">
+      <span>🎯</span>
+      <div><b>Onde ver a meta</b>
+      No topo do kanban (Comercial · Cards Pacientes) tem a barra da meta do mês: quanto já entrou,
+      quanto falta e a porcentagem. Pra ajustar o valor, clique no lápis, escolha o mês e digite a meta.</div>
+    </div>
+  </section>
+
+  <footer>Sistema Integrado Paraser · Meta Comercial automática</footer>
+
+</div>
+</body>
+</html>
