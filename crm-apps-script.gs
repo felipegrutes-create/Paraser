@@ -194,6 +194,20 @@ function doGet(e) {
       let _soma = 0; _rec.forEach(function(r){ _soma += r.valor; });
       return jsonOk({ ok: true, total: _rec.length, soma: _soma, amostra: _rec.slice(0, 15) });
     }
+    if (action === 'get_meta') {
+      const _mes = (e.parameter.mes || Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM'));
+      return jsonOk({ ok: true, mes: _mes, meta: getMetaMes_(_mes), confirmado: somaConfirmadoMes_(_mes) });
+    }
+    if (action === 'conciliar') {
+      return jsonOk(conciliarVendasFechadas_(e.parameter.slack === 'true'));
+    }
+    if (action === 'test_rede') {
+      const _t = redeToken_();
+      const _dia = new Date((e.parameter.dia || '2022-11-01') + 'T12:00:00-03:00');
+      const _v = redeVendasDia_(_t, _dia);
+      let _s = 0; _v.forEach(function(x){ _s += x.valor; });
+      return jsonOk({ ok: true, dia: e.parameter.dia || '2022-11-01', total: _v.length, soma: _s, amostra: _v.slice(0, 10) });
+    }
 
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
@@ -251,6 +265,10 @@ function doPost(e) {
       if (action === 'upload_photo') {
         return handleUploadPhoto(body);
       }
+
+      if (action === 'marcar_venda_fechada') return handleMarcarVendaFechada(body);
+      if (action === 'set_meta')             return handleSetMeta(body);
+      if (action === 'setup_rede')           return handleSetupRede(body);
 
       const key = (body.paciente_key || '').trim();
       if (!key) return jsonErr('paciente_key obrigatório');
@@ -1546,6 +1564,222 @@ function testarOfx() {
     Logger.log('  ' + r.data + '  R$' + r.valor.toFixed(2) + '  ' + r.pagador + '  [' + r.cpf + ']');
   });
   return recebidos.length;
+}
+
+// =========================================================
+// META COMERCIAL — conector REDE (Gestão de Vendas / cartão)
+// Cartão conta "quando a transação passa": usamos amount + saleDate
+// das vendas APPROVED. Token OAuth client_credentials (Bearer, ~24min).
+// Credenciais em Script Properties (REDE_CLIENT_ID/SECRET/PV), nunca no código.
+// =========================================================
+const REDE_BASE = 'https://rl7-sandbox-api.useredecloud.com.br'; // SANDBOX — trocar p/ produção depois
+
+function redeToken_() {
+  const p = PropertiesService.getScriptProperties();
+  const cid = p.getProperty('REDE_CLIENT_ID'), sec = p.getProperty('REDE_CLIENT_SECRET');
+  if (!cid || !sec) throw new Error('REDE_CLIENT_ID/REDE_CLIENT_SECRET não configurados');
+  const resp = UrlFetchApp.fetch(REDE_BASE + '/oauth2/token', {
+    method: 'post',
+    headers: { Authorization: 'Basic ' + Utilities.base64Encode(cid + ':' + sec) },
+    payload: { grant_type: 'client_credentials' },
+    muteHttpExceptions: true
+  });
+  if (resp.getResponseCode() !== 200) throw new Error('REDE token HTTP ' + resp.getResponseCode() + ': ' + resp.getContentText().slice(0, 200));
+  return JSON.parse(resp.getContentText()).access_token;
+}
+
+// Vendas APROVADAS de um dia (Date). Uma página (size 200) basta p/ volume diário de clínica.
+function redeVendasDia_(token, dia) {
+  const p = PropertiesService.getScriptProperties();
+  const pv = p.getProperty('REDE_PV');
+  if (!pv) throw new Error('REDE_PV não configurado');
+  const ds = Utilities.formatDate(dia, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  const url = REDE_BASE + '/merchant-statement/v1/sales?parentCompanyNumber=' + pv +
+              '&subsidiaries=' + pv + '&startDate=' + ds + '&endDate=' + ds + '&status=APPROVED&size=200';
+  const resp = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) throw new Error('REDE vendas HTTP ' + resp.getResponseCode() + ': ' + resp.getContentText().slice(0, 200));
+  const j = JSON.parse(resp.getContentText());
+  const txns = (j.content && j.content.transactions) || [];
+  if (j.cursor && j.cursor.hasNextKey) Logger.log('REDE ' + ds + ': há mais de 200 vendas no dia (paginação não tratada)');
+  return txns.map(function(t) {
+    return { valor: t.amount, data: t.saleDate, modalidade: t.modality && t.modality.type, parcelas: t.installmentQuantity, nsu: t.nsu };
+  });
+}
+
+// =========================================================
+// META COMERCIAL — vendas fechadas + meta mensal + conciliação
+// =========================================================
+const VENDAS_FECHADAS_SHEET = 'Vendas_Fechadas';
+const VF_HEADERS = ['id','timestamp','data_venda','vendedora','paciente','valor','forma_pgto','status','confirmado_em','match_info','mes'];
+const METAS_SHEET = 'Metas';
+const METAS_HEADERS = ['mes','valor'];
+
+function getOrCreateSheetGen_(nome, headers) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(nome);
+  if (!sh) {
+    sh = ss.insertSheet(nome);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// data_venda em qualquer forma (YYYY-MM-DD ou DD/MM/YYYY) -> 'YYYY-MM-DD'
+function normData_(s) {
+  // Sheets converte "2026-06-01" em objeto Date ao gravar — tratar isso.
+  if (Object.prototype.toString.call(s) === '[object Date]') {
+    return Utilities.formatDate(s, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  }
+  s = String(s || '').trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2] + '-' + m[1];
+  return s;
+}
+function diaNum_(iso) { // 'YYYY-MM-DD' -> número de dias (p/ janela)
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return NaN;
+  return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000);
+}
+// mês 'YYYY-MM' robusto a coerção do Sheets (que vira Date)
+function normMes_(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]') return Utilities.formatDate(v, 'America/Sao_Paulo', 'yyyy-MM');
+  return String(v || '').trim().slice(0, 7);
+}
+
+// Vendedora marca a venda fechada (a transação passou). Fica AGUARDANDO confirmação.
+function handleMarcarVendaFechada(body) {
+  const sh = getOrCreateSheetGen_(VENDAS_FECHADAS_SHEET, VF_HEADERS);
+  const dataVenda = normData_(body.data_venda || new Date());
+  const valor = Number(body.valor) || 0;
+  if (!valor) return jsonErr('valor obrigatório');
+  const forma = (String(body.forma_pgto || '').toUpperCase().indexOf('PIX') >= 0) ? 'PIX' : 'CARTAO';
+  const row = {
+    id: Utilities.getUuid(), timestamp: new Date().toISOString(), data_venda: dataVenda,
+    vendedora: body.vendedora || '', paciente: body.paciente || '', valor: valor,
+    forma_pgto: forma, status: 'AGUARDANDO', confirmado_em: '', match_info: '',
+    mes: dataVenda.slice(0, 7)
+  };
+  sh.appendRow(VF_HEADERS.map(function(h){ return row[h]; }));
+  return jsonOk({ ok: true, id: row.id });
+}
+
+function getMetaMes_(mes) {
+  const sh = getOrCreateSheetGen_(METAS_SHEET, METAS_HEADERS);
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) if (normMes_(data[i][0]) === mes) return Number(data[i][1]) || 0;
+  return 0;
+}
+function handleSetMeta(body) {
+  const mes = String(body.mes || '').trim(); // 'YYYY-MM'
+  const valor = Number(body.valor) || 0;
+  if (!/^\d{4}-\d{2}$/.test(mes)) return jsonErr('mes deve ser YYYY-MM');
+  const sh = getOrCreateSheetGen_(METAS_SHEET, METAS_HEADERS);
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (normMes_(data[i][0]) === mes) { sh.getRange(i + 1, 2).setValue(valor); return jsonOk({ ok: true, mes: mes, valor: valor }); }
+  }
+  sh.appendRow(["'" + mes, valor]);
+  return jsonOk({ ok: true, mes: mes, valor: valor });
+}
+
+// Casa as vendas AGUARDANDO com PIX (OFX) e cartão (REDE). Marca CONFIRMADA.
+// postarSlack=false por padrão (modo teste). Janela de ±2 dias, valor exato.
+function conciliarVendasFechadas_(postarSlack) {
+  const sh = getOrCreateSheetGen_(VENDAS_FECHADAS_SHEET, VF_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; VF_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const pendentes = [];
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][H.status]) === 'AGUARDANDO') pendentes.push({ row: i + 1, v: data[i] });
+  }
+  if (!pendentes.length) return { confirmadas: 0, pendentes: 0, detalhes: [] };
+
+  const ofx = lerOfxRecebimentos_().map(function(r){ return { valor: r.valor, dia: diaNum_(normData_(r.data)), key: 'pix:' + r.fitid, quem: r.pagador }; });
+  const temCartao = pendentes.some(function(p){ return String(p.v[H.forma_pgto]) === 'CARTAO'; });
+  const redeCache = {}; let token = null;
+  function redeDoDia(diaIso) {
+    if (redeCache[diaIso]) return redeCache[diaIso];
+    if (!token) token = redeToken_();
+    const d = new Date(diaIso + 'T12:00:00-03:00');
+    const lst = redeVendasDia_(token, d).map(function(t){ return { valor: t.valor, dia: diaNum_(t.data), key: 'rede:' + t.nsu, quem: t.modalidade + (t.parcelas > 1 ? ' ' + t.parcelas + 'x' : '') }; });
+    redeCache[diaIso] = lst; return lst;
+  }
+
+  const usados = {};
+  const novas = [];
+  pendentes.forEach(function(p) {
+    const valor = Number(p.v[H.valor]);
+    const baseIso = normData_(p.v[H.data_venda]);
+    const diaV = diaNum_(baseIso);
+    const forma = String(p.v[H.forma_pgto]);
+    let cand = [];
+    if (forma === 'PIX') {
+      cand = ofx;
+    } else if (temCartao) {
+      // junta o dia da venda e ±1 (fuso/virada)
+      const base = baseIso;
+      [-1, 0, 1].forEach(function(off) {
+        const isoOff = isoComOffset_(base, off);
+        if (isoOff) cand = cand.concat(redeDoDia(isoOff));
+      });
+    }
+    const hit = cand.filter(function(c){ return !usados[c.key] && Math.abs(c.valor - valor) < 0.01 && Math.abs(c.dia - diaV) <= 2; })[0];
+    if (hit) {
+      usados[hit.key] = true;
+      sh.getRange(p.row, H.status + 1).setValue('CONFIRMADA');
+      sh.getRange(p.row, H.confirmado_em + 1).setValue(new Date().toISOString());
+      sh.getRange(p.row, H.match_info + 1).setValue(hit.key + ' (' + (hit.quem || '') + ')');
+      novas.push({ paciente: p.v[H.paciente], vendedora: p.v[H.vendedora], valor: valor, forma: forma, match: hit.key });
+    }
+  });
+
+  if (postarSlack && novas.length) notificarMetaSlack_(novas);
+  return { confirmadas: novas.length, pendentes: pendentes.length - novas.length, detalhes: novas };
+}
+
+function isoComOffset_(iso, offDias) {
+  const n = diaNum_(normData_(iso));
+  if (isNaN(n)) return null;
+  const d = new Date(n * 86400000 + offDias * 86400000);
+  return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
+}
+
+// Avisa no #comercial as vendas confirmadas + quanto falta pra meta do mês.
+function notificarMetaSlack_(novas) {
+  const webhookUrl = PropertiesService.getScriptProperties().getProperty('SLACK_COMERCIAL_WEBHOOK');
+  if (!webhookUrl) return;
+  const mes = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
+  const meta = getMetaMes_(mes);
+  const confirmadoMes = somaConfirmadoMes_(mes);
+  const falta = Math.max(0, meta - confirmadoMes);
+  const fmt = function(v){ return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); };
+  let txt = '';
+  novas.forEach(function(n){ txt += '✅ *' + (n.vendedora || 'Venda') + '* fechou ' + fmt(n.valor) + (n.paciente ? ' (' + n.paciente + ')' : '') + '\n'; });
+  txt += '\n💰 Meta ' + mes + ': ' + fmt(confirmadoMes) + ' de ' + fmt(meta) + (meta > 0 ? ' — faltam ' + fmt(falta) : '');
+  UrlFetchApp.fetch(webhookUrl, { method: 'post', contentType: 'application/json', payload: JSON.stringify({ text: txt }) });
+}
+
+function somaConfirmadoMes_(mes) {
+  const sh = getOrCreateSheetGen_(VENDAS_FECHADAS_SHEET, VF_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; VF_HEADERS.forEach(function(h, i){ H[h] = i; });
+  let soma = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][H.status]) === 'CONFIRMADA' && normData_(data[i][H.data_venda]).slice(0, 7) === mes) soma += Number(data[i][H.valor]) || 0;
+  }
+  return soma;
+}
+
+// Setup das credenciais REDE (rodar via curl 1x; não retorna os valores).
+function handleSetupRede(body) {
+  const p = PropertiesService.getScriptProperties();
+  if (body.client_id) p.setProperty('REDE_CLIENT_ID', String(body.client_id));
+  if (body.client_secret) p.setProperty('REDE_CLIENT_SECRET', String(body.client_secret));
+  if (body.pv) p.setProperty('REDE_PV', String(body.pv));
+  return jsonOk({ ok: true, tem_id: !!p.getProperty('REDE_CLIENT_ID'), tem_secret: !!p.getProperty('REDE_CLIENT_SECRET'), pv: p.getProperty('REDE_PV') || '' });
 }
 
 function jsonOk(data) {
