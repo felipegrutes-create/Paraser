@@ -3272,6 +3272,7 @@
                 </div>
 
                 <!-- Cabeçalhos das colunas — travados junto com o header -->
+                <div id="metaBar" style="margin-top:12px"></div>
                 <div id="kanbanColHeaders" class="kanban-col-headers-sticky"></div>
             </div><!-- /crm-sticky-header -->
 
@@ -4671,6 +4672,20 @@
                     </div>
 
                     <hr class="crm-check-separator">
+                    <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:10px;margin-top:4px">
+                        <div style="font-size:13px;font-weight:600;color:#10b981;margin-bottom:6px">💰 Venda fechada (entra na meta)</div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <select id="crmVendaForma" style="padding:6px 8px;border-radius:6px">
+                                <option value="">Forma de pagamento...</option>
+                                <option value="PIX">PIX</option>
+                                <option value="CARTAO">Cartão</option>
+                            </select>
+                            <input type="date" id="crmVendaData" style="padding:6px 8px;border-radius:6px">
+                            <button class="crm-btn crm-btn-save" onclick="marcarVendaFechada()">Marcar venda fechada</button>
+                        </div>
+                        <span class="crm-save-status" id="crmVendaStatus"></span>
+                        <div style="font-size:11px;color:var(--muted);margin-top:4px">Usa o valor preenchido acima. O sistema confirma sozinho quando o dinheiro entrar (PIX no extrato, cartão na Rede).</div>
+                    </div>
                     <div class="crm-check-row">
                         <label class="crm-check-group">
                             <input type="checkbox" id="crmEngravidou" onchange="onArquivoCheck('engravidou')">
@@ -6350,6 +6365,8 @@
             const board = document.getElementById('kanbanBoard');
             if (!board || !pendPatients.length) return;
 
+            if (!_metaFetched) { _metaFetched = true; renderMetaBar(); }
+
             const srch = norm(document.getElementById('kanbSearch')?.value || '');
             const prof = document.getElementById('kanbProf')?.value  || '';
             const ano  = document.getElementById('kanbAno')?.value   || '';
@@ -6513,6 +6530,14 @@
                 if (group) group.classList.remove('crm-check-disabled');
             });
 
+            // Venda fechada: data padrão hoje, campos limpos
+            const vData = document.getElementById('crmVendaData');
+            if (vData) vData.value = new Date().toISOString().slice(0, 10);
+            const vForma = document.getElementById('crmVendaForma');
+            if (vForma) vForma.value = '';
+            const vStatus = document.getElementById('crmVendaStatus');
+            if (vStatus) vStatus.textContent = '';
+
             document.getElementById('crmModalOverlay').classList.add('open');
         }
 
@@ -6599,6 +6624,70 @@
                 renderArquivoMorto();
                 _dirtyDoadoras = true;
             }, 400);
+        }
+
+        // ===== META COMERCIAL =====
+        function mesAtualMeta() {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        }
+        let _metaFetched = false;
+        async function renderMetaBar() {
+            const bar = document.getElementById('metaBar');
+            if (!bar || !CRM_SCRIPT_URL) return;
+            try {
+                const mes = mesAtualMeta();
+                const res = await fetch(CRM_SCRIPT_URL + '?action=get_meta&mes=' + mes);
+                const j   = await res.json();
+                const meta = Number(j.meta) || 0;
+                const conf = Number(j.confirmado) || 0;
+                const fmt  = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                if (meta <= 0) {
+                    bar.innerHTML = `<button onclick="editarMeta()" style="background:none;border:1px dashed var(--muted);color:var(--muted);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px">🎯 Definir meta do mês</button>`;
+                    return;
+                }
+                const pct   = Math.min(100, Math.round(conf / meta * 100));
+                const falta = Math.max(0, meta - conf);
+                bar.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px;color:var(--muted)">
+                        <span>🎯 Meta de ${mes.split('-').reverse().join('/')}: <b style="color:#10b981">${fmt(conf)}</b> de <b style="color:#fff">${fmt(meta)}</b> · faltam <b style="color:#f59e0b">${fmt(falta)}</b> (${pct}%)</span>
+                        <button onclick="editarMeta()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px" title="Editar meta">✏️</button>
+                    </div>
+                    <div style="height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden">
+                        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#10b981,#00d4aa)"></div>
+                    </div>`;
+            } catch(e) { console.warn('meta bar:', e.message); }
+        }
+        async function editarMeta() {
+            const atual = prompt('Meta de vendas do mês (só o número, ex: 600000):', '');
+            if (atual === null) return;
+            const valor = Number(String(atual).replace(/[^\d]/g, ''));
+            if (!valor) return;
+            await fetch(CRM_SCRIPT_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'set_meta', mes: mesAtualMeta(), valor })
+            }).catch(() => {});
+            setTimeout(renderMetaBar, 900);
+        }
+        async function marcarVendaFechada() {
+            const st    = document.getElementById('crmVendaStatus');
+            const forma = document.getElementById('crmVendaForma').value;
+            const data  = document.getElementById('crmVendaData').value;
+            const valor = parseValorFloat(document.getElementById('crmValor').value);
+            const patient = pendPatients.find(p => normalizeKey(p.pac) === crmModalKey);
+            if (!forma) { st.textContent = 'Escolha PIX ou Cartão'; st.style.color = '#ef4444'; return; }
+            if (!valor) { st.textContent = 'Preencha o valor da venda acima'; st.style.color = '#ef4444'; return; }
+            st.textContent = 'Marcando...'; st.style.color = 'var(--muted)';
+            await fetch(CRM_SCRIPT_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({
+                    action: 'marcar_venda_fechada', data_venda: data,
+                    vendedora: document.getElementById('crmVend').value,
+                    paciente: patient?.pac || '', valor, forma_pgto: forma
+                })
+            }).catch(() => {});
+            st.textContent = '✓ Venda marcada — entra na meta quando o banco confirmar';
+            st.style.color = '#10b981';
         }
 
         async function deleteCRMRecord(key) {
