@@ -272,7 +272,16 @@ function enviarConfirmacoes() {
   }
 
   var dia = getDiaAlvo();
-  var agendamentos = getAgendamentos(dia);
+  var agendamentos;
+  try {
+    agendamentos = getAgendamentos(dia);
+  } catch(e) {
+    // Feegow fora do ar / resposta inválida: não dá pra ler a agenda.
+    // Avisa no Slack (em vez de morrer em silêncio) e aborta. Reenviar quando voltar.
+    Logger.log('🚨 Feegow indisponível — confirmações de ' + fmtDataBR(dia) + ' NÃO enviadas: ' + e.message);
+    notificarFeegowFora(fmtDataBR(dia), e.message);
+    return;
+  }
 
   Logger.log('Agendamentos encontrados para ' + fmtDataBR(dia) + ': ' + agendamentos.length);
   if (!agendamentos.length) return;
@@ -453,7 +462,22 @@ function getAgendamentos(dia) {
     headers: { 'x-access-token': CF_FEEGOW_TOKEN },
     muteHttpExceptions: true
   });
-  var json  = JSON.parse(resp.getContentText());
+  // Detecta Feegow fora do ar: HTTP != 200, resposta não-JSON (página de erro/gateway)
+  // ou success=false. Lança erro pra enviarConfirmacoes avisar no Slack, em vez de
+  // confundir "Feegow caiu" com "dia sem agenda" (vazio legítimo, segue em silêncio).
+  var code = resp.getResponseCode();
+  if (code !== 200) {
+    throw new Error('Feegow fora do ar (HTTP ' + code + ')');
+  }
+  var json;
+  try {
+    json = JSON.parse(resp.getContentText());
+  } catch(e) {
+    throw new Error('Feegow devolveu resposta inválida (não-JSON)');
+  }
+  if (json && json.success === false) {
+    throw new Error('Feegow retornou erro: ' + (json.message || 'success=false'));
+  }
   var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
 
   return items.filter(function(a) {
@@ -1056,6 +1080,27 @@ function notificarZapiDesconectado(dataStr, total) {
     });
   } catch(e) {
     Logger.log('notificarZapiDesconectado erro: ' + e.message);
+  }
+}
+
+// ================================================================
+// SLACK — avisa que o Feegow está fora do ar e NADA foi enviado
+// (a agenda não pôde ser lida, então nenhuma confirmação saiu)
+// ================================================================
+function notificarFeegowFora(dataStr, motivo) {
+  try {
+    var channelId = slackGetChannelId(CF_SLACK_CHANNEL);
+    var texto = '🚨 *Feegow fora do ar — confirmações de ' + dataStr + ' NÃO foram enviadas*\n' +
+                'Não consegui ler a agenda no Feegow (' + motivo + '), então ninguém recebeu confirmação.\n' +
+                'Quando o Feegow voltar, rode a função *enviarConfirmacoes* no editor pra mandar as do dia.';
+    UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+      method:      'post',
+      contentType: 'application/json; charset=utf-8',
+      headers:     { Authorization: 'Bearer ' + CF_SLACK_TOKEN },
+      payload:     JSON.stringify({ channel: channelId, text: texto })
+    });
+  } catch(e) {
+    Logger.log('notificarFeegowFora erro: ' + e.message);
   }
 }
 
