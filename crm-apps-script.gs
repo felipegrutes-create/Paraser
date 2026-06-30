@@ -1446,6 +1446,97 @@ function handleEnviarPipelineSlack(body) {
   }
 }
 
+// =========================================================
+// META COMERCIAL — leitor de extrato OFX do Itaú (PIX recebido)
+// A analista larga o arquivo .ofx numa pasta do Drive; o sistema lê
+// e extrai os PIX recebidos (valor + data + pagador + CPF) pra casar
+// com as vendas marcadas como "Venda fechada". Cartão NÃO vem por aqui
+// (vem da API da REDE): o OFX só traz a liquidação em lote, atrasada.
+// =========================================================
+const OFX_FOLDER_PROP = 'OFX_FOLDER_ID';
+const OFX_FOLDER_NAME = 'Extratos Itau OFX';
+
+function getOrCreateOfxFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty(OFX_FOLDER_PROP);
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch(e) { /* sumiu, recria abaixo */ }
+  }
+  const folder = DriveApp.createFolder(OFX_FOLDER_NAME);
+  props.setProperty(OFX_FOLDER_PROP, folder.getId());
+  return folder;
+}
+
+// Cria a pasta (1x) e mostra o link. Rodar manual no editor.
+function setupPastaOfx() {
+  const f = getOrCreateOfxFolder_();
+  Logger.log('Pasta OFX pronta: ' + f.getName());
+  Logger.log('Link (largue os .ofx aqui): ' + f.getUrl());
+  Logger.log('ID: ' + f.getId());
+  return f.getUrl();
+}
+
+// Lê todos os .ofx da pasta e devolve os PIX recebidos.
+function lerOfxRecebimentos_(folder) {
+  folder = folder || getOrCreateOfxFolder_();
+  const files = folder.getFiles();
+  const recebidos = [];
+  while (files.hasNext()) {
+    const file = files.next();
+    if (!/\.ofx$/i.test(file.getName())) continue;
+    const texto = file.getBlob().getDataAsString('ISO-8859-1');
+    parseOfxPix_(texto, file.getName()).forEach(function(r) { recebidos.push(r); });
+  }
+  return recebidos;
+}
+
+// Extrai PIX RECEBIDO / PIX QR CODE RECEBIDO de um conteúdo OFX.
+// Tudo está no MEMO: "PIX RECEBIDO <nomecurto><dd/mm> <NOME COMPLETO> <CPF>".
+function parseOfxPix_(texto, arquivo) {
+  const out = [];
+  const blocos = texto.split('<STMTTRN>').slice(1);
+  blocos.forEach(function(b) {
+    const tag = function(t) {
+      const m = b.match(new RegExp('<' + t + '>([^\\r\\n<]*)'));
+      return m ? m[1].trim() : '';
+    };
+    const valor = parseFloat(tag('TRNAMT'));
+    const memo  = tag('MEMO');
+    const up    = memo.toUpperCase();
+    const ehPix = up.indexOf('PIX RECEBIDO') === 0 || up.indexOf('PIX QR CODE RECEBIDO') === 0;
+    if (!ehPix || !(valor > 0)) return;
+    const dt  = tag('DTPOSTED').slice(0, 8); // yyyymmdd
+    const cpf = (memo.match(/(\d{3}\.\d{3}\.\d{3}-\d{2})/) || [])[1] || '';
+    // nome do pagador: tira o prefixo, o "dd/mm" grudado e o CPF
+    let nome = memo.replace(/^PIX( QR CODE)? RECEBIDO\s*/i, '');
+    if (cpf) nome = nome.split(cpf)[0];
+    const md = nome.match(/\d{2}\/\d{2}/);
+    if (md) nome = nome.slice(nome.indexOf(md[0]) + md[0].length);
+    nome = nome.replace(/\s+/g, ' ').trim();
+    out.push({
+      data:    dt ? (dt.slice(6,8) + '/' + dt.slice(4,6) + '/' + dt.slice(0,4)) : '',
+      valor:   valor,
+      pagador: nome,
+      cpf:     cpf,
+      fitid:   tag('FITID'),
+      arquivo: arquivo
+    });
+  });
+  return out;
+}
+
+// Teste: lê a pasta e loga o resumo. Rodar manual no editor depois de largar o OFX.
+function testarOfx() {
+  const recebidos = lerOfxRecebimentos_();
+  let soma = 0;
+  recebidos.forEach(function(r) { soma += r.valor; });
+  Logger.log('PIX recebidos encontrados: ' + recebidos.length + ' = R$' + soma.toFixed(2));
+  recebidos.slice(0, 12).forEach(function(r) {
+    Logger.log('  ' + r.data + '  R$' + r.valor.toFixed(2) + '  ' + r.pagador + '  [' + r.cpf + ']');
+  });
+  return recebidos.length;
+}
+
 function jsonOk(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
