@@ -208,6 +208,15 @@ function doGet(e) {
       let _s = 0; _v.forEach(function(x){ _s += x.valor; });
       return jsonOk({ ok: true, dia: e.parameter.dia || '2022-11-01', total: _v.length, soma: _s, amostra: _v.slice(0, 10) });
     }
+    if (action === 'setup_rede_folder') {
+      const _f = getOrCreateRedeFolder_();
+      return jsonOk({ ok: true, nome: _f.getName(), url: _f.getUrl(), id: _f.getId() });
+    }
+    if (action === 'test_rede_arquivo') {
+      const _r = lerRedeRecebimentos_();
+      let _s2 = 0; _r.forEach(function(x){ _s2 += x.valor; });
+      return jsonOk({ ok: true, total: _r.length, soma: _s2, amostra: _r.slice(0, 12) });
+    }
 
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
@@ -1574,6 +1583,86 @@ function testarOfx() {
 // =========================================================
 const REDE_BASE = 'https://rl7-sandbox-api.useredecloud.com.br'; // SANDBOX — trocar p/ produção depois
 
+// =========================================================
+// META COMERCIAL — leitor do CSV de vendas da Rede (cartão, PONTE)
+// A analista exporta o relatório de vendas no portal da Rede e larga o
+// CSV numa pasta do Drive. Lemos as vendas APROVADAS (valor original +
+// data) pra casar com as vendas marcadas, igual o OFX faz com o PIX.
+// Ponte enquanto a API de produção não libera (REDE_FONTE=arquivo).
+// CSV: separador ';', UTF-8, valores pt-BR (9.750,00).
+// =========================================================
+const REDE_FOLDER_PROP = 'REDE_FOLDER_ID';
+const REDE_FOLDER_NAME = 'Vendas Rede';
+
+function getOrCreateRedeFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty(REDE_FOLDER_PROP);
+  if (id) { try { return DriveApp.getFolderById(id); } catch(e) { /* recria */ } }
+  const folder = DriveApp.createFolder(REDE_FOLDER_NAME);
+  props.setProperty(REDE_FOLDER_PROP, folder.getId());
+  return folder;
+}
+function setupPastaRede() {
+  const f = getOrCreateRedeFolder_();
+  Logger.log('Pasta Vendas Rede: ' + f.getUrl());
+  return f.getUrl();
+}
+
+function parseValorBR_(s) {
+  s = String(s || '').replace(/[^\d.,-]/g, '');
+  if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+// Acha colunas pelo nome (sem acento), filtra status "aprovada" e não cancelada.
+function parseRedeCsv_(texto) {
+  const linhas = texto.split(/\r?\n/).filter(function(l){ return l.trim(); });
+  if (linhas.length < 2) return [];
+  const norm = function(s){ return String(s || '').trim().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, ""); };
+  const head = linhas[0].split(';').map(norm);
+  const idx = function(nome){ return head.indexOf(norm(nome)); };
+  const cData = idx('data da venda'), cStatus = idx('status da venda'),
+        cValor = idx('valor da venda original'), cParc = idx('numero de parcelas'),
+        cMod = idx('modalidade'), cNsu = idx('nsu/cv'),
+        cPv = idx('numero do estabelecimento'), cCanc = idx('cancelada pelo estabelecimento');
+  const out = [];
+  for (var i = 1; i < linhas.length; i++) {
+    const c = linhas[i].split(';');
+    if (norm(c[cStatus]) !== 'aprovada') continue;
+    if (cCanc >= 0 && norm(c[cCanc]) === 'sim') continue;
+    const valor = parseValorBR_(c[cValor]);
+    if (!(valor > 0)) continue;
+    out.push({
+      valor: valor, data: (c[cData] || '').trim(),
+      parcelas: cParc >= 0 ? (c[cParc] || '').trim() : '',
+      modalidade: cMod >= 0 ? (c[cMod] || '').trim() : '',
+      nsu: cNsu >= 0 ? (c[cNsu] || '').trim() : '',
+      pv: cPv >= 0 ? (c[cPv] || '').trim() : ''
+    });
+  }
+  return out;
+}
+
+// Lê todos os .csv da pasta e devolve as vendas aprovadas no formato do casamento.
+function lerRedeRecebimentos_(folder) {
+  folder = folder || getOrCreateRedeFolder_();
+  const files = folder.getFiles();
+  const out = [];
+  while (files.hasNext()) {
+    const file = files.next();
+    if (!/\.csv$/i.test(file.getName())) continue;
+    parseRedeCsv_(file.getBlob().getDataAsString('UTF-8')).forEach(function(r){
+      out.push({
+        valor: r.valor, dia: diaNum_(normData_(r.data)),
+        key: 'rede:' + r.nsu + ':' + r.pv,
+        quem: r.modalidade + (Number(r.parcelas) > 1 ? ' ' + r.parcelas + 'x' : '')
+      });
+    });
+  }
+  return out;
+}
+
 function redeToken_() {
   const p = PropertiesService.getScriptProperties();
   const cid = p.getProperty('REDE_CLIENT_ID'), sec = p.getProperty('REDE_CLIENT_SECRET');
@@ -1706,6 +1795,10 @@ function conciliarVendasFechadas_(postarSlack) {
 
   const ofx = lerOfxRecebimentos_().map(function(r){ return { valor: r.valor, dia: diaNum_(normData_(r.data)), key: 'pix:' + r.fitid, quem: r.pagador }; });
   const temCartao = pendentes.some(function(p){ return String(p.v[H.forma_pgto]) === 'CARTAO'; });
+  // Fonte do cartão: 'arquivo' = CSV da Rede no Drive (ponte enquanto a API de produção não libera);
+  // 'api' = Rede ao vivo (trocar quando vierem as credenciais de produção). Default: arquivo.
+  const fonteRede = PropertiesService.getScriptProperties().getProperty('REDE_FONTE') || 'arquivo';
+  const redeArquivo = (temCartao && fonteRede === 'arquivo') ? lerRedeRecebimentos_() : null;
   const redeCache = {}; let token = null;
   function redeDoDia(diaIso) {
     if (redeCache[diaIso]) return redeCache[diaIso];
@@ -1726,12 +1819,15 @@ function conciliarVendasFechadas_(postarSlack) {
     if (forma === 'PIX') {
       cand = ofx;
     } else if (temCartao) {
-      // junta o dia da venda e ±1 (fuso/virada)
-      const base = baseIso;
-      [-1, 0, 1].forEach(function(off) {
-        const isoOff = isoComOffset_(base, off);
-        if (isoOff) cand = cand.concat(redeDoDia(isoOff));
-      });
+      if (fonteRede === 'arquivo') {
+        cand = redeArquivo || [];
+      } else {
+        // api: junta o dia da venda e ±1 (fuso/virada)
+        [-1, 0, 1].forEach(function(off) {
+          const isoOff = isoComOffset_(baseIso, off);
+          if (isoOff) cand = cand.concat(redeDoDia(isoOff));
+        });
+      }
     }
     const hit = cand.filter(function(c){ return !usados[c.key] && Math.abs(c.valor - valor) < 0.01 && Math.abs(c.dia - diaV) <= 2; })[0];
     if (hit) {
@@ -1786,7 +1882,8 @@ function handleSetupRede(body) {
   if (body.client_id) p.setProperty('REDE_CLIENT_ID', String(body.client_id));
   if (body.client_secret) p.setProperty('REDE_CLIENT_SECRET', String(body.client_secret));
   if (body.pv) p.setProperty('REDE_PV', String(body.pv));
-  return jsonOk({ ok: true, tem_id: !!p.getProperty('REDE_CLIENT_ID'), tem_secret: !!p.getProperty('REDE_CLIENT_SECRET'), pv: p.getProperty('REDE_PV') || '' });
+  if (body.fonte) p.setProperty('REDE_FONTE', String(body.fonte)); // 'arquivo' (CSV) ou 'api'
+  return jsonOk({ ok: true, tem_id: !!p.getProperty('REDE_CLIENT_ID'), tem_secret: !!p.getProperty('REDE_CLIENT_SECRET'), pv: p.getProperty('REDE_PV') || '', fonte: p.getProperty('REDE_FONTE') || 'arquivo' });
 }
 
 function jsonOk(data) {
