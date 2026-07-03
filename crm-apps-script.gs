@@ -187,7 +187,35 @@ function doGet(e) {
     // Meta comercial — barra da meta lida pelo dashboard
     if (action === 'get_meta') {
       const _mes = (e.parameter.mes || Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM'));
-      return jsonOk({ ok: true, mes: _mes, meta: getMetaMes_(_mes), confirmado: somaConfirmadoMes_(_mes) });
+      const props = PropertiesService.getScriptProperties();
+      let c = null; try { c = JSON.parse(props.getProperty('META_CACHE') || 'null'); } catch (ce) { c = null; }
+      const agora = new Date().getTime();
+      if (!c || c.mes !== _mes || (agora - (c.ts || 0)) > 1200000 || e.parameter.fresh) {
+        const m = computarMetaMes_(_mes);
+        c = { mes: m.mes, meta: m.meta, total: m.total, comercial: m.comercial, outros: m.outros,
+              cartao: m.cartao, pixLinkado: m.pixLinkado, aConferirValor: m.aConferirValor,
+              aConferirQtd: m.aConferirQtd, porVendedora: m.porVendedora, ts: agora };
+        props.setProperty('META_CACHE', JSON.stringify(c));
+      }
+      return jsonOk({ ok: true, mes: c.mes, meta: c.meta, total: c.total, comercial: c.comercial,
+        outros: c.outros, cartao: c.cartao, pixLinkado: c.pixLinkado,
+        aConferirValor: c.aConferirValor, aConferirQtd: c.aConferirQtd,
+        porVendedora: c.porVendedora, confirmado: c.comercial });
+    }
+
+    // Lista os PIX pendentes de conferência (não linkaram por CPF).
+    if (action === 'get_aconferir') {
+      const sh = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
+      const dd = sh.getDataRange().getValues();
+      const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
+      const itens = [];
+      for (let i = 1; i < dd.length; i++) {
+        if (String(dd[i][Hc.status]) === 'PENDENTE') {
+          itens.push({ fitid: String(dd[i][Hc.fitid]), data: String(dd[i][Hc.data]), valor: Number(dd[i][Hc.valor]),
+            pagador: String(dd[i][Hc.pagador]), cpf: String(dd[i][Hc.cpf]), sugestao: String(dd[i][Hc.sugestao]) });
+        }
+      }
+      return jsonOk({ ok: true, itens: itens });
     }
 
     // Retornar registros CRM (padrão)
@@ -249,6 +277,7 @@ function doPost(e) {
 
       if (action === 'marcar_venda_fechada') return handleMarcarVendaFechada(body);
       if (action === 'set_meta')             return handleSetMeta(body);
+      if (action === 'conferir_pix')         return handleConferirPix(body);
 
       const key = (body.paciente_key || '').trim();
       if (!key) return jsonErr('paciente_key obrigatório');
@@ -1752,8 +1781,24 @@ function handleSetMeta(body) {
   return jsonOk({ ok: true, mes: mes, valor: valor });
 }
 
+// Normaliza nome pra comparação (minúsculo, sem acento, só letras).
+function normNome_(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Quantos nomes (tokens >=3 letras) do paciente aparecem no nome do pagador.
+function scoreNome_(paciente, pagador) {
+  if (!paciente || !pagador) return 0;
+  const tp = paciente.split(' ').filter(function(t){ return t.length >= 3; });
+  const tg = ' ' + pagador + ' ';
+  let n = 0;
+  tp.forEach(function(t){ if (tg.indexOf(' ' + t + ' ') >= 0) n++; });
+  return n;
+}
+
 // Casa as vendas AGUARDANDO com PIX (OFX) e cartão (REDE). Marca CONFIRMADA.
 // postarSlack=false por padrão (modo teste). Janela de ±2 dias, valor exato.
+// Desempate: se >1 candidato bate valor+data, o nome do pagador (só PIX) desempata.
 function conciliarVendasFechadas_(postarSlack) {
   const sh = getOrCreateSheetGen_(VENDAS_FECHADAS_SHEET, VF_HEADERS);
   const data = sh.getDataRange().getValues();
@@ -1800,7 +1845,14 @@ function conciliarVendasFechadas_(postarSlack) {
         });
       }
     }
-    const hit = cand.filter(function(c){ return !usados[c.key] && Math.abs(c.valor - valor) < 0.01 && Math.abs(c.dia - diaV) <= 2; })[0];
+    const elegiveis = cand.filter(function(c){ return !usados[c.key] && Math.abs(c.valor - valor) < 0.01 && Math.abs(c.dia - diaV) <= 2; });
+    let hit = elegiveis[0];
+    // desempate por nome do pagador (só o PIX traz nome; cartão não)
+    if (elegiveis.length > 1 && forma === 'PIX') {
+      const alvo = normNome_(p.v[H.paciente]);
+      let melhor = -1;
+      elegiveis.forEach(function(c){ const s = scoreNome_(alvo, normNome_(c.quem)); if (s > melhor) { melhor = s; hit = c; } });
+    }
     if (hit) {
       usados[hit.key] = true;
       sh.getRange(p.row, H.status + 1).setValue('CONFIRMADA');
@@ -1822,18 +1874,57 @@ function isoComOffset_(iso, offDias) {
 }
 
 // Avisa no #comercial as vendas confirmadas + quanto falta pra meta do mês.
+// 'yyyy-MM' -> 'Julho/2026'
+function mesPorExtenso_(mes) {
+  const M = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const p = String(mes).split('-');
+  return (M[parseInt(p[1], 10) - 1] || p[1]) + '/' + p[0];
+}
+// Barra de progresso em 20 blocos; cor muda conforme % (laranja→amarelo→verde→azul batida).
+function barraMeta_(pct) {
+  const n = 20, cheios = Math.max(0, Math.min(n, Math.round(pct / 100 * n)));
+  const cor = pct >= 100 ? '🟦' : pct >= 75 ? '🟩' : pct >= 40 ? '🟨' : '🟧';
+  return cor.repeat(cheios) + '⬜'.repeat(n - cheios);
+}
+
+// Card visual da meta no #comercial (Block Kit). Hoje mostra o confirmado do comercial;
+// quando o "outros" (cartão limpo + PIX linkado) entrar, o total passa a incluí-lo.
 function notificarMetaSlack_(novas) {
   const webhookUrl = PropertiesService.getScriptProperties().getProperty('SLACK_COMERCIAL_WEBHOOK');
   if (!webhookUrl) return;
   const mes = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
-  const meta = getMetaMes_(mes);
-  const confirmadoMes = somaConfirmadoMes_(mes);
-  const falta = Math.max(0, meta - confirmadoMes);
-  const fmt = function(v){ return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); };
-  let txt = '';
-  novas.forEach(function(n){ txt += '✅ *' + (n.vendedora || 'Venda') + '* fechou ' + fmt(n.valor) + (n.paciente ? ' (' + n.paciente + ')' : '') + '\n'; });
-  txt += '\n💰 Meta ' + mes + ': ' + fmt(confirmadoMes) + ' de ' + fmt(meta) + (meta > 0 ? ' — faltam ' + fmt(falta) : '');
-  UrlFetchApp.fetch(webhookUrl, { method: 'post', contentType: 'application/json', payload: JSON.stringify({ text: txt }) });
+  const m = computarMetaMes_(mes);
+  const pct = m.meta > 0 ? Math.round(m.total / m.meta * 100) : 0;
+  const falta = Math.max(0, m.meta - m.total);
+  const fmt = function(v){ return 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); };
+  const hora = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM HH:mm');
+
+  const blocks = [
+    { type: 'header', text: { type: 'plain_text', text: '📊 Meta · ' + mesPorExtenso_(mes), emoji: true } }
+  ];
+  if (novas && novas.length) {
+    let l = '';
+    novas.forEach(function(n){ l += '✅ *' + (n.vendedora || 'Venda') + '* fechou ' + fmt(n.valor) + (n.paciente ? ' (' + n.paciente + ')' : '') + '\n'; });
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: l.trim() } });
+  }
+  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + fmt(m.total) + '* de *' + fmt(m.meta) + '*   ·   *' + pct + '%*\n' + barraMeta_(pct) } });
+  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: falta > 0 ? '🔴 Faltam *' + fmt(falta) + '* pra bater a meta' : '🎉 *Meta batida!*' } });
+  blocks.push({ type: 'divider' });
+  let vend = '';
+  (m.porVendedora || []).forEach(function(v){ vend += '\n• ' + v.vendedora + '  ' + fmt(v.valor); });
+  blocks.push({ type: 'section', fields: [
+    { type: 'mrkdwn', text: '🏷️ *Comercial*\n' + fmt(m.comercial) + vend },
+    { type: 'mrkdwn', text: '➕ *Outros*\n' + fmt(m.outros) }
+  ] });
+  if (m.aConferirValor > 0) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '⏳ *A conferir:* ' + fmt(m.aConferirValor) + ' · ' + m.aConferirQtd + ' PIX sem link no Feegow (dar ok no painel)' } });
+  }
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '💳 cartão ' + fmt(m.cartao) + ' · 📥 PIX ' + fmt(m.pixLinkado) + ' · atualizado ' + hora } ] });
+
+  UrlFetchApp.fetch(webhookUrl, {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ blocks: blocks, text: '📊 Meta ' + mesPorExtenso_(mes) + ': ' + fmt(m.total) + ' de ' + fmt(m.meta) })
+  });
 }
 
 function somaConfirmadoMes_(mes) {
@@ -1845,6 +1936,103 @@ function somaConfirmadoMes_(mes) {
     if (String(data[i][H.status]) === 'CONFIRMADA' && normData_(data[i][H.data_venda]).slice(0, 7) === mes) soma += Number(data[i][H.valor]) || 0;
   }
   return soma;
+}
+
+// === META: total que caiu no banco (cartão limpo + PIX linkado por CPF) ===
+const PIX_CONFERIR_SHEET = 'PIX_A_Conferir';
+const PIXC_HEADERS = ['fitid', 'data', 'valor', 'pagador', 'cpf', 'sugestao', 'status', 'conferido_em'];
+
+// Pergunta ao Feegow se um CPF é de paciente (base inteira). Cache por execução.
+function feegowPacientePorCpf_(cpf, cache) {
+  cpf = String(cpf || '').replace(/\D/g, '');
+  if (cpf.length !== 11) return false;
+  if (cache && cpf in cache) return cache[cpf];
+  let ok = false;
+  try {
+    const res = UrlFetchApp.fetch(FEEGOW_API_BASE + '/patient/list?cpf=' + cpf, {
+      headers: { 'x-access-token': FEEGOW_API_TOKEN }, muteHttpExceptions: true
+    });
+    if (res.getResponseCode() === 200) {
+      const j = JSON.parse(res.getContentText());
+      ok = !!(j && j.success && j.content && j.content.length > 0);
+    }
+  } catch (e) { ok = false; }
+  if (cache) cache[cpf] = ok;
+  return ok;
+}
+
+// número de dia -> 'yyyy-mm-dd'
+function diaToIso_(dia) { return isNaN(dia) ? '' : new Date(dia * 86400000).toISOString().slice(0, 10); }
+
+// Comercial do mês agrupado por vendedora (só vendas CONFIRMADAS), maior primeiro.
+function comercialPorVendedora_(mes) {
+  const sh = getOrCreateSheetGen_(VENDAS_FECHADAS_SHEET, VF_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; VF_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const map = {};
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][H.status]) === 'CONFIRMADA' && normData_(data[i][H.data_venda]).slice(0, 7) === mes) {
+      const v = String(data[i][H.vendedora] || '').trim() || 'Sem nome';
+      map[v] = (map[v] || 0) + (Number(data[i][H.valor]) || 0);
+    }
+  }
+  return Object.keys(map).map(function(k){ return { vendedora: k, valor: map[k] }; })
+    .sort(function(a, b){ return b.valor - a.valor; });
+}
+
+// Computa a meta do mês pelo TOTAL: cartão aprovado no mês + PIX recebido no mês
+// linkado a paciente por CPF. PIX não linkado vai pra fila PIX_A_Conferir (não conta
+// até aprovarem). comercial = vendas marcadas confirmadas. outros = total - comercial.
+function computarMetaMes_(mes) {
+  const mesRe = String(mes).slice(0, 7);
+  const noMes = function(iso){ return String(iso).slice(0, 7) === mesRe; };
+
+  let cartao = 0;
+  lerRedeRecebimentos_().forEach(function(t){ if (noMes(diaToIso_(t.dia))) cartao += t.valor; });
+
+  const shC = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
+  const dd = shC.getDataRange().getValues();
+  const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
+  const jaTem = {}; for (let i = 1; i < dd.length; i++) jaTem[String(dd[i][Hc.fitid])] = dd[i];
+  const cache = {};
+  let pixLinkado = 0, aConfValor = 0, aConfQtd = 0;
+  lerOfxRecebimentos_().forEach(function(r){
+    if (!noMes(normData_(r.data))) return;
+    if (feegowPacientePorCpf_(r.cpf, cache)) { pixLinkado += r.valor; return; }
+    const ex = jaTem[String(r.fitid)];
+    const status = ex ? String(ex[Hc.status]) : 'PENDENTE';
+    if (!ex) shC.appendRow([r.fitid, r.data, r.valor, r.pagador, r.cpf, '', 'PENDENTE', '']);
+    if (status === 'OK') pixLinkado += r.valor;
+    else if (status !== 'DESCARTADO') { aConfValor += r.valor; aConfQtd++; }
+  });
+
+  const porVendedora = comercialPorVendedora_(mes);
+  let comercial = 0; porVendedora.forEach(function(x){ comercial += x.valor; });
+  const total = cartao + pixLinkado;
+  return {
+    mes: mesRe, meta: getMetaMes_(mes), total: total, comercial: comercial,
+    outros: Math.max(0, total - comercial), cartao: cartao, pixLinkado: pixLinkado,
+    aConferirValor: aConfValor, aConferirQtd: aConfQtd, porVendedora: porVendedora
+  };
+}
+
+// Aprova (OK) ou descarta (DESCARTADO) um PIX da fila. Invalida o cache da meta.
+function handleConferirPix(body) {
+  const fitid = String(body.fitid || '');
+  const decisao = String(body.decisao || '').toUpperCase();
+  if (!fitid || (decisao !== 'OK' && decisao !== 'DESCARTADO')) return jsonErr('fitid/decisao inválidos');
+  const sh = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
+  const dd = sh.getDataRange().getValues();
+  const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
+  for (let i = 1; i < dd.length; i++) {
+    if (String(dd[i][Hc.fitid]) === fitid) {
+      sh.getRange(i + 1, Hc.status + 1).setValue(decisao);
+      sh.getRange(i + 1, Hc.conferido_em + 1).setValue(new Date().toISOString());
+      PropertiesService.getScriptProperties().deleteProperty('META_CACHE');
+      return jsonOk({ ok: true, fitid: fitid, decisao: decisao });
+    }
+  }
+  return jsonErr('fitid não encontrado');
 }
 
 // Setup das credenciais REDE (rodar via curl 1x; não retorna os valores).

@@ -6640,23 +6640,61 @@
                 const res = await fetch(CRM_SCRIPT_URL + '?action=get_meta&mes=' + mes);
                 const j   = await res.json();
                 const meta = Number(j.meta) || 0;
-                const conf = Number(j.confirmado) || 0;
-                const fmt  = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                const total = Number(j.total != null ? j.total : j.confirmado) || 0;
+                const fmt  = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
                 if (meta <= 0) {
                     bar.innerHTML = `<button onclick="editarMeta()" style="background:none;border:1px dashed var(--muted);color:var(--muted);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px">🎯 Definir meta do mês</button>`;
+                    renderAConferir();
                     return;
                 }
-                const pct   = Math.min(100, Math.round(conf / meta * 100));
-                const falta = Math.max(0, meta - conf);
+                const pct   = Math.min(100, Math.round(total / meta * 100));
+                const falta = Math.max(0, meta - total);
+                const vend  = (j.porVendedora || []).map(v => `${v.vendedora} ${fmt(v.valor)}`).join(' · ');
                 bar.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px;color:var(--muted)">
-                        <span>🎯 Meta de ${mes.split('-').reverse().join('/')}: <b style="color:#10b981">${fmt(conf)}</b> de <b style="color:#fff">${fmt(meta)}</b> · faltam <b style="color:#f59e0b">${fmt(falta)}</b> (${pct}%)</span>
+                        <span>🎯 Meta de ${mes.split('-').reverse().join('/')}: <b style="color:#10b981">${fmt(total)}</b> de <b style="color:#fff">${fmt(meta)}</b> · faltam <b style="color:#f59e0b">${fmt(falta)}</b> (${pct}%)</span>
                         <button onclick="editarMeta()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px" title="Editar meta">✏️</button>
                     </div>
                     <div style="height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden">
                         <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#10b981,#00d4aa)"></div>
+                    </div>
+                    <div style="margin-top:6px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px">
+                        <span>🏷️ Comercial <b style="color:#e5e7eb">${fmt(j.comercial||0)}</b>${vend ? ` <span style="opacity:.65">(${vend})</span>` : ''}</span>
+                        <span>➕ Outros <b style="color:#e5e7eb">${fmt(j.outros||0)}</b></span>
+                        <span style="opacity:.7">💳 ${fmt(j.cartao||0)} · 📥 ${fmt(j.pixLinkado||0)}</span>
                     </div>`;
+                renderAConferir();
             } catch(e) { console.warn('meta bar:', e.message); }
+        }
+        async function renderAConferir() {
+            const bar = document.getElementById('metaBar');
+            if (!bar || !CRM_SCRIPT_URL) return;
+            let box = document.getElementById('aConferirBox');
+            if (!box) { box = document.createElement('div'); box.id = 'aConferirBox'; box.style.marginTop = '10px'; bar.after(box); }
+            try {
+                const res = await fetch(CRM_SCRIPT_URL + '?action=get_aconferir');
+                const j = await res.json();
+                const itens = (j && j.itens) || [];
+                if (!itens.length) { box.innerHTML = ''; return; }
+                const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const fdata = d => { const m = String(d).match(/(\d{2}\/\d{2}\/\d{4})/); if (m) return m[1]; const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString('pt-BR'); };
+                box.innerHTML = `
+                    <div style="font-size:12px;color:#f59e0b;margin-bottom:6px">⏳ A conferir (${itens.length}) — PIX que não linkou com paciente no Feegow</div>
+                    ${itens.map(it => `
+                        <div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.22);border-radius:6px;margin-bottom:4px">
+                            <span style="flex:1;min-width:0"><b>${it.pagador}</b> · ${fmt(it.valor)} · ${fdata(it.data)}</span>
+                            <button onclick="conferirPix('${it.fitid}','OK',this)" style="background:#10b981;border:none;color:#fff;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px">Contar</button>
+                            <button onclick="conferirPix('${it.fitid}','DESCARTADO',this)" style="background:none;border:1px solid var(--muted);color:var(--muted);border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px">Não é receita</button>
+                        </div>`).join('')}`;
+            } catch(e) { console.warn('a conferir:', e.message); }
+        }
+        async function conferirPix(fitid, decisao, btn) {
+            if (btn && btn.parentElement) { btn.parentElement.style.opacity = '0.4'; btn.parentElement.querySelectorAll('button').forEach(b => b.disabled = true); }
+            await fetch(CRM_SCRIPT_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'conferir_pix', fitid, decisao })
+            }).catch(() => {});
+            setTimeout(() => { renderMetaBar(); }, 1400);
         }
         async function editarMeta() {
             const off = prompt('Meta de qual mês?\n0 = este mês\n1 = mês que vem\n2 = daqui 2 meses ...', '0');
