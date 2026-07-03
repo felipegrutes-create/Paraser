@@ -2057,7 +2057,13 @@ function handleLimparTeste(body) {
 }
 
 // Conciliação automática (com aviso no Slack) — chamada pelo gatilho horário.
-function rodarConciliacaoComSlack() { return conciliarVendasFechadas_(true); }
+function rodarConciliacaoComSlack() {
+  const r = conciliarVendasFechadas_(true); // posta o card quando uma venda é confirmada
+  // Resumo do total 2x/dia (12h e 18h), se não postou por venda naquela rodada.
+  const h = Number(Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'HH'));
+  if ((h === 12 || h === 18) && (!r || !r.confirmadas)) notificarMetaSlack_([]);
+  return r;
+}
 
 // Cria o gatilho horário. RODAR 1x NO EDITOR (precisa autorizar o escopo de triggers).
 function setupTriggerConciliacao() {
