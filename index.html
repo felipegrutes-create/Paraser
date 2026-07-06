@@ -3269,6 +3269,28 @@
                         <option value="Letícia Sampaio">Letícia Sampaio</option>
                         <option value="Rayssa Guedes">Rayssa Guedes</option>
                     </select>
+                    <button id="btnEntradaManual" onclick="openEntradaManual()" style="display:none;background:#8b5cf6;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap" title="Trazer pro kanban uma paciente sem agenda">➕ Entrada manual</button>
+                </div>
+
+                <!-- Modal: solicitar entrada manual de paciente no kanban -->
+                <div id="entradaManualOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)closeEntradaManual()">
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;width:min(440px,92vw);max-height:90vh;overflow:auto">
+                        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">📌 Entrada manual de paciente</div>
+                        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Pra trazer pro kanban quem não tem agenda (ex: venda/pacote fechado). Entra na hora, com a justificativa e quem pediu registrados.</div>
+                        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Nome da paciente *</label>
+                        <input id="emNome" type="text" style="width:100%;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:13px;margin-bottom:12px">
+                        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Justificativa *</label>
+                        <textarea id="emJust" rows="2" style="width:100%;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:13px;margin-bottom:12px;resize:vertical"></textarea>
+                        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Quem está pedindo *</label>
+                        <input id="emQuem" type="text" style="width:100%;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:13px;margin-bottom:12px">
+                        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Telefone (opcional)</label>
+                        <input id="emTel" type="text" style="width:100%;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:13px;margin-bottom:16px">
+                        <div id="emStatus" style="font-size:12px;color:var(--muted);min-height:16px;margin-bottom:10px"></div>
+                        <div style="display:flex;gap:10px;justify-content:flex-end">
+                            <button onclick="closeEntradaManual()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-family:inherit;font-size:13px;cursor:pointer">Cancelar</button>
+                            <button onclick="submitEntradaManual()" style="background:#8b5cf6;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Solicitar entrada</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Cabeçalhos das colunas — travados junto com o header -->
@@ -4732,6 +4754,8 @@
         // ===== CRM KANBAN GLOBALS =====
         let crmMap     = {};   // paciente_key → registro CRM
         let pendPatients = []; // retDetails filtrados (não retornaram)
+        let manualEntries = [];    // entradas manuais (paciente sem agenda, pedida pela recepção)
+        let manualEndpointLive = false; // só mostra o botão quando o endpoint do CRM existir (pós-redeploy)
         let doaPatients  = []; // pacientes para aba Doadoras/Receptoras
         let crmModalKey = '';  // key do paciente aberto no modal
         let pacFirstVezMap  = {}; // normalizedKey → { id:agendId, dataAp }
@@ -4741,6 +4765,7 @@
         let pacAvalDoadMap   = {}; // normalizedKey → { id:agendId, dataAp } for dvTab auto-fill
 
         const KANBAN_COLS = [
+            { id:'entrada-manual',     label:'📌 Entrada Manual',     color:'#8b5cf6', showTotal:false },
             { id:'retornos-pendentes', label:'📋 Retornos Pendentes', color:'#ef4444', showTotal:false },
             { id:'historico-contato',  label:'📞 Histórico Contato',  color:'#f59e0b', showTotal:false },
             { id:'retorno-marcado',    label:'📅 Retorno Marcado',    color:'#00d4aa', showTotal:false },
@@ -6183,6 +6208,15 @@
             const bool = v => v === true || v === 'TRUE';
             const hasReturn = patient && patient.returned;
 
+            // Card manual (sem agenda): começa em 'entrada-manual' e avança pelo estágio do CRM,
+            // já que não tem "retorno" do Feegow pra gatilhar as colunas.
+            if (patient && patient.manual) {
+                if (rec && bool(rec.quitado))                        return 'quitado';
+                if (rec && rec.proposta_feita === 'Sim')             return 'proposta-feita';
+                if (rec && (rec.contato1_data || rec.contato2_data)) return 'historico-contato';
+                return 'entrada-manual';
+            }
+
             // Proposta e Quitado só se o Feegow confirmou retorno
             if (hasReturn && rec && bool(rec.quitado))            return 'quitado';
             if (hasReturn && rec && rec.proposta_feita === 'Sim') return 'proposta-feita';
@@ -6277,6 +6311,81 @@
             }
         }
 
+        // ===== ENTRADA MANUAL (paciente sem agenda, pedida pela recepção) =====
+        // O botão só aparece quando o endpoint 'get_entradas_manuais' existir no CRM.
+        // Enquanto o CRM não for redeployado (Mac), a resposta cai no default {records:[]},
+        // então manualEndpointLive fica false e o recurso some sem quebrar nada.
+        async function loadManualEntries() {
+            manualEntries = [];
+            try {
+                const res  = await fetch(CRM_SCRIPT_URL + '?action=get_entradas_manuais');
+                const json = await res.json();
+                if (json && Array.isArray(json.itens)) {
+                    manualEndpointLive = true;
+                    manualEntries = json.itens;
+                }
+            } catch(e) { console.warn('Entradas manuais load falhou:', e.message); }
+            const btn = document.getElementById('btnEntradaManual');
+            if (btn) btn.style.display = manualEndpointLive ? '' : 'none';
+        }
+
+        // Transforma uma entrada manual num "paciente" sintético compatível com o kanban.
+        function synthManualPatient(m) {
+            return {
+                pac: m.nome || '(sem nome)', prof: 'Entrada manual', dataAp: '',
+                daysSince: 0, returned: false, retDate: null, retRealized: false, retDateObj: null,
+                cel: m.telefone || '', email: '', yearDcri: String(new Date().getFullYear()),
+                manual: true, manualId: m.id, justificativa: m.justificativa || '', solicitante: m.solicitante || ''
+            };
+        }
+
+        // Garante que pendPatients contém exatamente os cards manuais atuais (idempotente).
+        function syncManualIntoPend() {
+            pendPatients = pendPatients.filter(p => !p.manual);
+            manualEntries.forEach(m => pendPatients.push(synthManualPatient(m)));
+        }
+
+        function openEntradaManual() {
+            ['emNome','emJust','emQuem','emTel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            document.getElementById('emStatus').textContent = '';
+            document.getElementById('entradaManualOverlay').style.display = 'flex';
+        }
+        function closeEntradaManual() {
+            document.getElementById('entradaManualOverlay').style.display = 'none';
+        }
+        async function submitEntradaManual() {
+            const nome = document.getElementById('emNome').value.trim();
+            const just = document.getElementById('emJust').value.trim();
+            const quem = document.getElementById('emQuem').value.trim();
+            const tel  = document.getElementById('emTel').value.trim();
+            const st   = document.getElementById('emStatus');
+            if (!nome || !just || !quem) { st.style.color = '#ef4444'; st.textContent = 'Preencha nome, justificativa e quem está pedindo.'; return; }
+            st.style.color = 'var(--muted)'; st.textContent = 'Enviando...';
+            try {
+                await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'add_entrada_manual', nome, justificativa: just, solicitante: quem, telefone: tel })
+                });
+                // no-cors não devolve corpo; espera o append e recarrega a lista
+                await new Promise(r => setTimeout(r, 1200));
+                await loadManualEntries();
+                renderKanban();
+                closeEntradaManual();
+            } catch(e) { st.style.color = '#ef4444'; st.textContent = 'Erro ao enviar: ' + e.message; }
+        }
+        async function removeEntradaManual(id) {
+            if (!confirm('Remover esta entrada manual do kanban?')) return;
+            try {
+                await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'remove_entrada_manual', id: id })
+                });
+                await new Promise(r => setTimeout(r, 1200));
+                await loadManualEntries();
+                renderKanban();
+            } catch(e) { alert('Erro ao remover: ' + e.message); }
+        }
+
         // ===== KANBAN RENDERING =====
 
         function renderCRMCard(patient, crmRec, colColor, ghost = false, deletable = false, clone = false) {
@@ -6315,7 +6424,9 @@
             const email    = patient.email || '';
             const ghostCls = ghost ? ' crm-card-ghost' : (clone ? ' crm-card-clone' : '');
             const clickAttr = ghost ? '' : `onclick="openCRMModal('${safeKey}')"`;
-            const deleteBtn = (deletable && !ghost && !clone)
+            const deleteBtn = patient.manual
+                ? `<button class="crm-delete-btn" onclick="event.stopPropagation();removeEntradaManual('${patient.manualId}')" title="Remover entrada manual">🗑️</button>`
+                : (deletable && !ghost && !clone)
                 ? `<button class="crm-delete-btn" onclick="event.stopPropagation();deleteCRMRecord('${safeKey}')" title="Apagar e voltar à origem">🗑️</button>`
                 : '';
             const retDateLine = (patient.retDate)
@@ -6328,7 +6439,10 @@
                         <div class="crm-card-name">${patient.pac}</div>
                         <div class="crm-urgency-dot" style="background:${uColor}"></div>
                     </div>
-                    <div class="crm-card-prof">${patient.prof} · 1ª vez: ${patient.dataAp || '—'}</div>
+                    ${patient.manual
+                        ? `<div class="crm-card-prof"><span class="crm-badge" style="background:#8b5cf6;color:#fff">📌 Manual</span>${patient.solicitante ? ' · pedido por <b>' + patient.solicitante + '</b>' : ''}</div>
+                           ${patient.justificativa ? `<div class="crm-card-obs">📝 ${patient.justificativa}</div>` : ''}`
+                        : `<div class="crm-card-prof">${patient.prof} · 1ª vez: ${patient.dataAp || '—'}</div>`}
                     ${retDateLine}
                     <div class="crm-card-fields">
                         <span>📞 C1: <b class="crm-val ${c1?'yellow':''}">${c1 || '—'}</b></span>
@@ -6363,6 +6477,7 @@
 
         function renderKanban() {
             const board = document.getElementById('kanbanBoard');
+            syncManualIntoPend();
             if (!board || !pendPatients.length) return;
 
             if (!_metaFetched) { _metaFetched = true; renderMetaBar(); }
@@ -6384,9 +6499,10 @@
                 return true;
             });
 
-            // Agrupar por coluna
+            // Agrupar por coluna (esconde a coluna Entrada Manual até o endpoint do CRM existir)
+            const cols = KANBAN_COLS.filter(c => c.id !== 'entrada-manual' || manualEndpointLive);
             const groups = {};
-            KANBAN_COLS.forEach(c => { groups[c.id] = []; });
+            cols.forEach(c => { groups[c.id] = []; });
             filtered.forEach(p => {
                 const crm = crmMap[normalizeKey(p.pac)] || null;
                 const col = getCRMColumn(crm, p);
@@ -6419,7 +6535,7 @@
             // Renderizar cabeçalhos sticky + colunas sem header
             const headersEl = document.getElementById('kanbanColHeaders');
             let stickyHeaders = '';
-            board.innerHTML = KANBAN_COLS.map(col => {
+            board.innerHTML = cols.map(col => {
                 const cards = groups[col.id];
                 const realCards = cards.filter(c => !c.ghost);
                 const count = realCards.length;
@@ -14321,6 +14437,7 @@ GONAPEPTYL,56`;
                 } catch(e) { console.warn('CRM load failed, using local:', e); }
                 crmMap = crmMergeLocal(crmData);
                 crmSaveLocal(); // backup local sempre atualizado
+                await loadManualEntries(); // entradas manuais + mostra/esconde o botão (só aparece se o endpoint existir)
 
                 // Agendamentos — pode falhar, usa cache
                 const rows = await loadData();
