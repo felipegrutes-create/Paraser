@@ -2006,7 +2006,7 @@ function barraMeta_(pct) {
 
 // Card visual da meta no #comercial (Block Kit). Hoje mostra o confirmado do comercial;
 // quando o "outros" (cartão limpo + PIX linkado) entrar, o total passa a incluí-lo.
-function notificarMetaSlack_(novas) {
+function notificarMetaSlack_(novas, fechamento) {
   const webhookUrl = PropertiesService.getScriptProperties().getProperty('SLACK_COMERCIAL_WEBHOOK');
   if (!webhookUrl) return;
   const mes = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
@@ -2017,7 +2017,7 @@ function notificarMetaSlack_(novas) {
   const hora = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM HH:mm');
 
   const blocks = [
-    { type: 'header', text: { type: 'plain_text', text: '📊 Meta · ' + mesPorExtenso_(mes), emoji: true } }
+    { type: 'header', text: { type: 'plain_text', text: (fechamento ? '🌙 Fechamento do dia · ' : '📊 Meta · ') + mesPorExtenso_(mes), emoji: true } }
   ];
   if (novas && novas.length) {
     let l = '';
@@ -2231,6 +2231,24 @@ function setupTriggerConciliacao() {
   });
   ScriptApp.newTrigger('rodarConciliacaoComSlack').timeBased().everyHours(1).create();
   Logger.log('Gatilho horário de conciliação criado.');
+  return 'ok';
+}
+
+// Fechamento do dia: além do gatilho horário, roda 1x às 19h. Concilia e posta
+// um card marcado como "🌙 Fechamento do dia" com o total consolidado.
+function rodarFechamentoDia() {
+  const r = conciliarVendasFechadas_(false); // concilia sem postar; posto 1 card só, abaixo
+  notificarMetaSlack_(r ? r.detalhes : [], true);
+  return r;
+}
+
+// Cria o gatilho diário das 19h (NÃO remove o gatilho horário). RODAR 1x NO EDITOR.
+function setupTriggerFechamento() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'rodarFechamentoDia') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('rodarFechamentoDia').timeBased().everyDays(1).atHour(19).create();
+  Logger.log('Gatilho de fechamento das 19h criado.');
   return 'ok';
 }
 
