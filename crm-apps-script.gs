@@ -218,6 +218,9 @@ function doGet(e) {
       return jsonOk({ ok: true, itens: itens });
     }
 
+    // Entradas manuais de card (paciente sem agenda, pedido pela recepção).
+    if (action === 'get_entradas_manuais') return handleGetEntradasManuais();
+
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
     const data  = sheet.getDataRange().getValues();
@@ -278,6 +281,8 @@ function doPost(e) {
       if (action === 'marcar_venda_fechada') return handleMarcarVendaFechada(body);
       if (action === 'set_meta')             return handleSetMeta(body);
       if (action === 'conferir_pix')         return handleConferirPix(body);
+      if (action === 'add_entrada_manual')    return handleAddEntradaManual(body);
+      if (action === 'remove_entrada_manual') return handleRemoveEntradaManual(body);
 
       const key = (body.paciente_key || '').trim();
       if (!key) return jsonErr('paciente_key obrigatório');
@@ -1576,6 +1581,117 @@ function testarOfx() {
 }
 
 // =========================================================
+// PIX via API do Itaú (lido do BigQuery abastecido pelo coletor Cloud Run).
+// O coletor puxa o extrato das contas de hora em hora e grava em
+// paraser-extrato-itau.extrato.lancamentos. Aqui lemos SÓ os PIX recebidos
+// (crédito via PIX_RECEPCAO) no MESMO formato do parser OFX, então o motor de
+// conciliação não muda. Toggle Script Property PIX_FONTE: 'bigquery' | 'ofx'.
+// =========================================================
+const BQ_PROJECT = 'paraser-extrato-itau';
+const BQ_PIX_TABLE = '`paraser-extrato-itau.extrato.lancamentos`';
+
+// Fonte do PIX: 'bigquery' = API Itaú via BigQuery; qualquer outro = OFX (pasta Drive).
+function lerPixRecebimentos_(startIso, endIso) {
+  const fonte = PropertiesService.getScriptProperties().getProperty('PIX_FONTE') || 'ofx';
+  if (fonte === 'bigquery') return lerPixBigQuery_(startIso, endIso);
+  return lerOfxRecebimentos_(); // OFX lê a pasta inteira (ignora as datas), comportamento antigo
+}
+
+// Consulta o BigQuery e devolve os PIX recebidos no shape do OFX:
+// { data:'dd/mm/yyyy', valor:Number, pagador, cpf, fitid }.
+function lerPixBigQuery_(startIso, endIso) {
+  const sql =
+    "SELECT FORMAT_DATE('%d/%m/%Y', data_contabil) AS data, valor, " +
+    "contraparte_nome AS pagador, " +
+    "IF(REGEXP_CONTAINS(contraparte_documento, r'^[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2}$'), contraparte_documento, '') AS cpf, " +
+    "id AS fitid FROM " + BQ_PIX_TABLE + " " +
+    "WHERE operation = 'C' AND origem_operacao = 'PIX_RECEPCAO' " +
+    "AND data_contabil BETWEEN @start AND @end";
+  const req = {
+    query: sql,
+    useLegacySql: false,
+    parameterMode: 'NAMED',
+    timeoutMs: 30000,
+    queryParameters: [
+      { name: 'start', parameterType: { type: 'DATE' }, parameterValue: { value: startIso } },
+      { name: 'end',   parameterType: { type: 'DATE' }, parameterValue: { value: endIso } }
+    ]
+  };
+  let res = BigQuery.Jobs.query(req, BQ_PROJECT);
+  const jobId = res.jobReference.jobId;
+  const loc = res.jobReference.location;
+  // A query pode não terminar dentro do timeout: nesse caso jobComplete=false e
+  // rows vem vazio. Esperar terminar (senão a meta viria subestimada e silenciosa).
+  let tentativas = 0;
+  while (!res.jobComplete) {
+    if (++tentativas > 30) throw new Error('BigQuery: consulta do PIX não completou a tempo');
+    Utilities.sleep(1000);
+    res = BigQuery.Jobs.getQueryResults(BQ_PROJECT, jobId, { location: loc, timeoutMs: 30000 });
+  }
+  // Concatena todas as páginas (pageToken) — não perder lançamento em silêncio.
+  let rows = res.rows || [];
+  let pageToken = res.pageToken;
+  while (pageToken) {
+    res = BigQuery.Jobs.getQueryResults(BQ_PROJECT, jobId, { location: loc, pageToken: pageToken });
+    rows = rows.concat(res.rows || []);
+    pageToken = res.pageToken;
+  }
+  const out = [];
+  rows.forEach(function(row) {
+    const f = row.f;
+    out.push({
+      data:    f[0].v,
+      valor:   Number(f[1].v),
+      pagador: f[2].v || '',
+      cpf:     f[3].v || '',
+      fitid:   f[4].v
+    });
+  });
+  return out;
+}
+
+// Janela de datas pra buscar o PIX das vendas PIX ainda AGUARDANDO (menor data -3d .. hoje).
+function janelaPixPendentes_(pendentes, H) {
+  const hojeIso = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  const hoje = diaNum_(hojeIso);
+  const dias = pendentes
+    .filter(function(p) { return String(p.v[H.forma_pgto]) === 'PIX'; })
+    .map(function(p) { return diaNum_(normData_(p.v[H.data_venda])); })
+    .filter(function(n) { return !isNaN(n); });
+  if (!dias.length) return { start: diaToIso_(hoje - 2), end: hojeIso };
+  return { start: diaToIso_(Math.min.apply(null, dias) - 3), end: hojeIso };
+}
+
+// Primeiro e último dia de um mês 'yyyy-MM'.
+function inicioDoMesIso_(mesRe) { return String(mesRe).slice(0, 7) + '-01'; }
+function fimDoMesIso_(mesRe) {
+  const p = String(mesRe).slice(0, 7).split('-');
+  const d = new Date(Number(p[0]), Number(p[1]), 0); // dia 0 do mês seguinte = último dia deste
+  return Utilities.formatDate(d, 'America/Sao_Paulo', 'yyyy-MM-dd');
+}
+
+// Liga/desliga a fonte BigQuery. Rodar no editor 1x (também dispara a autorização do BigQuery).
+function ativarPixBigQuery() {
+  PropertiesService.getScriptProperties().setProperty('PIX_FONTE', 'bigquery');
+  return 'PIX_FONTE = bigquery (API Itaú)';
+}
+function desativarPixBigQuery() {
+  PropertiesService.getScriptProperties().setProperty('PIX_FONTE', 'ofx');
+  return 'PIX_FONTE = ofx (fallback pasta Drive)';
+}
+// Teste manual no editor: lê o PIX do mês atual do BigQuery e loga o resumo.
+function testarPixBigQuery() {
+  const mes = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
+  const r = lerPixBigQuery_(inicioDoMesIso_(mes), fimDoMesIso_(mes));
+  let soma = 0; r.forEach(function(x) { soma += x.valor; });
+  Logger.log('PIX (BigQuery) em ' + mes + ': ' + r.length + ' = R$' + soma.toFixed(2));
+  r.slice(0, 12).forEach(function(x) {
+    Logger.log('  ' + x.data + '  R$' + Number(x.valor).toFixed(2) + '  ' + x.pagador + '  [' + x.cpf + ']');
+  });
+  return r.length;
+}
+
+// =========================================================
 // META COMERCIAL — conector REDE (Gestão de Vendas / cartão)
 // Cartão conta "quando a transação passa": usamos amount + saleDate
 // das vendas APPROVED. Token OAuth client_credentials (Bearer, ~24min).
@@ -1809,7 +1925,8 @@ function conciliarVendasFechadas_(postarSlack) {
   }
   if (!pendentes.length) return { confirmadas: 0, pendentes: 0, detalhes: [] };
 
-  const ofx = lerOfxRecebimentos_().map(function(r){ return { valor: r.valor, dia: diaNum_(normData_(r.data)), key: 'pix:' + r.fitid, quem: r.pagador }; });
+  const janelaPix = janelaPixPendentes_(pendentes, H);
+  const ofx = lerPixRecebimentos_(janelaPix.start, janelaPix.end).map(function(r){ return { valor: r.valor, dia: diaNum_(normData_(r.data)), key: 'pix:' + r.fitid, quem: r.pagador }; });
   const temCartao = pendentes.some(function(p){ return String(p.v[H.forma_pgto]) === 'CARTAO'; });
   // Fonte do cartão: 'arquivo' = CSV da Rede no Drive (ponte enquanto a API de produção não libera);
   // 'api' = Rede ao vivo (trocar quando vierem as credenciais de produção). Default: arquivo.
@@ -1996,7 +2113,7 @@ function computarMetaMes_(mes) {
   const jaTem = {}; for (let i = 1; i < dd.length; i++) jaTem[String(dd[i][Hc.fitid])] = dd[i];
   const cache = {};
   let pixLinkado = 0, aConfValor = 0, aConfQtd = 0;
-  lerOfxRecebimentos_().forEach(function(r){
+  lerPixRecebimentos_(inicioDoMesIso_(mesRe), fimDoMesIso_(mesRe)).forEach(function(r){
     if (!noMes(normData_(r.data))) return;
     if (feegowPacientePorCpf_(r.cpf, cache)) { pixLinkado += r.valor; return; }
     const ex = jaTem[String(r.fitid)];
@@ -2014,6 +2131,48 @@ function computarMetaMes_(mes) {
     outros: Math.max(0, total - comercial), cartao: cartao, pixLinkado: pixLinkado,
     aConferirValor: aConfValor, aConferirQtd: aConfQtd, porVendedora: porVendedora
   };
+}
+
+// =========================================================
+// ENTRADA MANUAL DE CARD — paciente sem agenda (recepção pede com justificativa)
+// O index.html chama get_entradas_manuais / add_entrada_manual / remove_entrada_manual.
+// =========================================================
+const ENTRADAS_MANUAIS_SHEET = 'Entradas_Manuais';
+const EM_HEADERS = ['id','timestamp','nome','justificativa','solicitante','telefone','ativo'];
+
+function handleAddEntradaManual(body) {
+  const nome = String(body.nome || '').trim();
+  const just = String(body.justificativa || '').trim();
+  const quem = String(body.solicitante || '').trim();
+  if (!nome || !just || !quem) return jsonErr('nome, justificativa e solicitante são obrigatórios');
+  const sh = getOrCreateSheetGen_(ENTRADAS_MANUAIS_SHEET, EM_HEADERS);
+  const id = Utilities.getUuid();
+  sh.appendRow([id, new Date().toISOString(), nome, just, quem, String(body.telefone || ''), true]);
+  return jsonOk({ ok: true, id: id });
+}
+function handleGetEntradasManuais() {
+  const sh = getOrCreateSheetGen_(ENTRADAS_MANUAIS_SHEET, EM_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; EM_HEADERS.forEach(function(h,i){ H[h]=i; });
+  const itens = [];
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][H.ativo] === true || String(data[i][H.ativo]).toUpperCase() === 'TRUE') {
+      itens.push({ id:String(data[i][H.id]), nome:String(data[i][H.nome]), justificativa:String(data[i][H.justificativa]),
+                   solicitante:String(data[i][H.solicitante]), telefone:String(data[i][H.telefone]) });
+    }
+  }
+  return jsonOk({ ok: true, itens: itens });
+}
+function handleRemoveEntradaManual(body) {
+  const id = String(body.id || '');
+  if (!id) return jsonErr('id obrigatório');
+  const sh = getOrCreateSheetGen_(ENTRADAS_MANUAIS_SHEET, EM_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; EM_HEADERS.forEach(function(h,i){ H[h]=i; });
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][H.id]) === id) { sh.getRange(i+1, H.ativo+1).setValue(false); return jsonOk({ ok: true }); }
+  }
+  return jsonErr('id não encontrado');
 }
 
 // Aprova (OK) ou descarta (DESCARTADO) um PIX da fila. Invalida o cache da meta.
