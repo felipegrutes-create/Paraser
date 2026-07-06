@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia · Entrada Manual de Card</title>
+<style>
+  :root{
+    --roxo:#8b5cf6; --roxo-d:#7c3aed; --ink:#1f2733; --muted:#6b7785;
+    --line:#e7ecf1; --bg:#f5f7fa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;padding:24px 14px}
+  .wrap{max-width:820px;margin:0 auto}
+
+  header{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border-radius:18px;padding:30px 28px;box-shadow:0 8px 24px rgba(124,58,237,.25)}
+  header .tag{display:inline-block;background:rgba(255,255,255,.2);padding:4px 12px;border-radius:30px;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px}
+  header h1{font-size:29px;line-height:1.15;margin-bottom:8px}
+  header p{font-size:16px;opacity:.96;max-width:580px}
+
+  .card{background:#fff;border-radius:18px;padding:26px 24px;margin-top:22px;box-shadow:0 2px 12px rgba(31,39,51,.06);border:1px solid var(--line)}
+  .card h2{font-size:20px;margin-bottom:6px}
+  .card .lead{font-size:14.5px;color:var(--muted);margin-bottom:18px}
+
+  .step{display:flex;gap:16px;padding:16px 0;border-top:1px dashed var(--line)}
+  .step:first-of-type{border-top:none}
+  .num{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--roxo);color:#fff;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .step-body h3{font-size:16px;margin-bottom:3px}
+  .step-body p{font-size:14.5px;color:#3c4655}
+  .step-body .path{display:inline-block;background:#f2edff;border:1px solid #e0d4ff;border-radius:7px;padding:2px 9px;font-size:13.5px;font-weight:700;color:#6d28d9;margin:4px 4px 0 0}
+  .field{font-size:14px;color:#3c4655;margin:7px 0 0 0;padding-left:2px}
+  .field b{color:var(--ink)}
+  .req{color:var(--roxo-d);font-weight:700}
+  .opt{color:var(--muted);font-weight:600}
+
+  .tip{display:flex;gap:10px;align-items:flex-start;background:#fff8e9;border:1px solid #f3dca0;border-radius:12px;padding:13px 15px;margin-top:16px;font-size:14px}
+  .tip.green{background:#e9faf2;border-color:#aee9cf}
+  .tip.roxo{background:#f5f0ff;border-color:#ddd0fb}
+  .tip b{display:block;margin-bottom:1px}
+
+  .flow{background:#fff;border-radius:18px;padding:24px;margin-top:22px;border:1px solid var(--line);box-shadow:0 2px 12px rgba(31,39,51,.06)}
+  .flow h2{font-size:19px;margin-bottom:16px;text-align:center}
+  .chain{display:flex;flex-wrap:wrap;align-items:stretch;justify-content:center;gap:10px}
+  .chip{flex:1 1 140px;min-width:130px;background:#faf8ff;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .chip .e{font-size:24px;display:block;margin-bottom:6px}
+  .chip h4{font-size:13.5px;margin-bottom:3px}
+  .chip p{font-size:12.5px;color:var(--muted)}
+  .arrow{display:flex;align-items:center;color:var(--roxo);font-size:22px;font-weight:800}
+
+  footer{text-align:center;color:var(--muted);font-size:13px;margin-top:26px;padding-bottom:10px}
+
+  @media (max-width:560px){
+    header h1{font-size:23px}
+    .arrow{transform:rotate(90deg);justify-content:center;width:100%}
+  }
+  @media print{body{background:#fff;padding:0}.card,.flow{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="tag">Comercial · Kanban</span>
+    <h1>📌 Entrada manual de paciente</h1>
+    <p>Como trazer uma paciente pro seu kanban quando ela ainda não tem consulta agendada.</p>
+  </header>
+
+  <div class="card">
+    <h2>Pra que serve</h2>
+    <p class="lead">O seu kanban (Cards Pacientes) se monta sozinho a partir da agenda: aparece quem já teve a primeira consulta. Só que, quando a paciente fecha uma venda ou pacote e ainda não tem consulta marcada, ela não aparece sozinha e some do seu radar. A Entrada manual resolve isso: você traz a paciente pro kanban na hora, do seu jeito, sem depender da agenda.</p>
+
+    <div class="tip roxo">
+      <span>💡</span>
+      <div><b>Exemplo</b>Uma paciente fechou o pacote de FIV mas a consulta ainda não foi marcada. Você adiciona ela pela Entrada manual pra continuar trabalhando a venda sem perder ela de vista.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Passo a passo</h2>
+    <p class="lead">Leva menos de um minuto.</p>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <h3>Abra o kanban</h3>
+        <p>No painel de sempre, vá no menu <span class="path">Comercial</span> e depois <span class="path">Cards Pacientes</span>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <h3>Clique no botão roxo</h3>
+        <p>Na barra de cima do kanban, ao lado da busca, clique em <span class="path">➕ Entrada manual</span>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <h3>Preencha os dados da paciente</h3>
+        <p>Vai abrir uma janelinha. Preencha:</p>
+        <div class="field"><b>Nome da paciente</b> <span class="req">obrigatório</span></div>
+        <div class="field"><b>Justificativa</b> <span class="req">obrigatório</span> · por que ela está entrando sem agenda. Ex: "fechou pacote de FIV, consulta ainda não marcada".</div>
+        <div class="field"><b>Quem está pedindo</b> <span class="req">obrigatório</span> · o seu nome.</div>
+        <div class="field"><b>Telefone</b> <span class="opt">opcional</span> · o contato da paciente, se tiver.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <h3>Clique em "Solicitar entrada"</h3>
+        <p>É o botão roxo no rodapé da janelinha. Pronto, está feito.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">5</div>
+      <div class="step-body">
+        <h3>A paciente aparece na hora</h3>
+        <p>Ela entra na primeira coluna, a <span class="path">📌 Entrada Manual</span>, com um selo <b>📌 Manual</b>, o seu nome como quem pediu e a justificativa que você escreveu.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Depois que ela entrou</h2>
+    <p class="lead">Daí pra frente é igual a qualquer outra paciente do kanban.</p>
+
+    <div class="step">
+      <div class="num">→</div>
+      <div class="step-body">
+        <h3>Trabalhe o card normalmente</h3>
+        <p>Arraste ela pras próximas colunas conforme avança, e preencha vendedora, valor e anotações no card, do mesmo jeito que você já faz.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">🗑️</div>
+      <div class="step-body">
+        <h3>Adicionou por engano?</h3>
+        <p>No card manual tem uma lixeira 🗑️. Clicou, some do kanban. Sem drama.</p>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span>✍️</span>
+      <div><b>Capriche na justificativa</b>Ela fica registrada e é o motivo de a paciente estar ali sem agenda. Quanto mais clara, melhor pra todo mundo entender depois.</div>
+    </div>
+
+    <div class="tip green">
+      <span>✅</span>
+      <div><b>Uma coisa não substitui a outra</b>A Entrada manual é só pra a paciente não sumir do seu kanban. Ela não marca consulta no sistema. Se a paciente precisa de agendamento, isso continua sendo feito do jeito de sempre.</div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <h2>O caminho, resumido</h2>
+    <div class="chain">
+      <div class="chip"><span class="e">🛒</span><h4>Paciente fecha</h4><p>Venda ou pacote, sem consulta marcada</p></div>
+      <div class="arrow">→</div>
+      <div class="chip"><span class="e">➕</span><h4>Entrada manual</h4><p>Você adiciona com nome e justificativa</p></div>
+      <div class="arrow">→</div>
+      <div class="chip"><span class="e">📌</span><h4>Entra no kanban</h4><p>Na hora, na coluna Entrada Manual</p></div>
+      <div class="arrow">→</div>
+      <div class="chip"><span class="e">💜</span><h4>Você trabalha</h4><p>Arrasta, preenche e fecha a venda</p></div>
+    </div>
+  </div>
+
+  <footer>
+    Paraser · Guia da equipe comercial · dúvidas, fala com o Felipe
+  </footer>
+
+</div>
+</body>
+</html>
