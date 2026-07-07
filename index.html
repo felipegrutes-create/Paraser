@@ -5725,6 +5725,35 @@
                     daysSince, yearDcri: latest[C.dcri] ? latest[C.dcri].split('/')[2] : '?'
                 });
             });
+
+            // Paciente com USG FIV 1º também entra no kanban: quem já está em ciclo
+            // mas entrou fora do padrão de consulta "1ª vez" (ex: consulta
+            // ginecologista do Dr. Joselmo) ficava invisível pro comercial.
+            // Janela de 90 dias pra não trazer ciclos antigos como card (testado
+            // 07/07: sem janela seriam 97 pacientes históricas; com ela, 8 atuais).
+            raw.forEach(r0 => {
+                const proc0 = (r0[C.proc]||'').trim().toLowerCase().replace(/\s+/g, ' ');
+                if (!proc0.startsWith('usg fiv 1')) return;
+                const s0 = (r0[C.sta]||'').toLowerCase().trim();
+                if (doaExcludeStatus.includes(s0) || s0.includes('não compareceu') || s0.includes('nao compareceu')) return;
+                const d0 = parseDate(r0[C.data]);
+                if (!d0 || daysBetween(d0, today) > 90) return;
+                const key = normalizeKey(r0[C.pac]);
+                if (!key || pendKeys.has(key)) return;
+                pendKeys.add(key);
+                const patRows = raw.filter(r => normalizeKey(r[C.pac]) === key);
+                if (!patRows.length) return;
+                const patSorted = patRows.map(r => ({ r, d: parseDate(r[C.data]) })).filter(x => x.d).sort((a,b) => b.d - a.d);
+                if (!patSorted.length) return;
+                const latest = patSorted[0].r;
+                const daysSince = daysBetween(patSorted[0].d, today);
+                retDetails.push({
+                    pac: (latest[C.pac]||'').trim(), prof: latest[C.prof]||'', cel: latest[C.cel]||'',
+                    email: latest[C.email]||'', dcri: latest[C.dcri]||'', dataAp: latest[C.data]||'',
+                    returned: patSorted.length > 1, retDateObj: null, retDate: null, retRealized: false, daysToRet: null,
+                    daysSince, yearDcri: latest[C.dcri] ? latest[C.dcri].split('/')[2] : '?'
+                });
+            });
             pendPatients = retDetails.sort((a, b) => b.daysSince - a.daysSince);
             renderKanban();
 
