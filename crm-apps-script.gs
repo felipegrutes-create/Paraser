@@ -221,6 +221,8 @@ function doGet(e) {
     // Entradas manuais de card (paciente sem agenda, pedido pela recepção).
     if (action === 'get_entradas_manuais') return handleGetEntradasManuais();
 
+    if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
+
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
     const data  = sheet.getDataRange().getValues();
@@ -242,6 +244,12 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
     const action = body.action || 'save';
+
+    // Webhook do Z-API (WhatsApp comercial): roteado por query param porque o
+    // payload deles não tem 'action'. Fora do lock — não disputa com o dashboard.
+    if (e && e.parameter && e.parameter.action === 'zapi_webhook') {
+      return handleZapiWebhook(body, e.parameter);
+    }
 
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
@@ -2262,4 +2270,416 @@ function jsonErr(msg) {
   return ContentService
     .createTextOutput(JSON.stringify({ error: msg }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// =========================================================
+// WHATSAPP COMERCIAL — monitor de produção das vendedoras
+// A instância Z-API do número comercial manda cada mensagem (recebida e
+// enviada, com "notificar enviadas por mim" ligado) pro webhook
+// ?action=zapi_webhook&wk=..., que grava em
+// paraser-extrato-itau.whatsapp.mensagens (BigQuery). Relatório diário às
+// 19h no Slack #comercial. Credenciais em Script Properties, nunca no código.
+// Atribuição de quem enviou: pelo padrão do messageId (WhatsApp Web começa
+// com 3EB0; app do celular não) — validar com mensagens de teste.
+// =========================================================
+const WPP_BQ_DATASET = 'whatsapp';
+const WPP_BQ_TABLE = 'mensagens';
+const WPP_BQ_REF = '`' + BQ_PROJECT + '.' + WPP_BQ_DATASET + '.' + WPP_BQ_TABLE + '`';
+const WPP_FALHAS_SHEET = 'WhatsApp_Falhas';
+
+function wppProps_() { return PropertiesService.getScriptProperties(); }
+
+// Dispositivo de origem de mensagem enviada pelo número da clínica.
+function wppDevice_(messageId, fromMe) {
+  if (!fromMe) return '';
+  return /^3EB0/i.test(String(messageId || '')) ? 'web' : 'celular';
+}
+
+// Recebe o POST do Z-API e grava a mensagem no BigQuery. Responde ok mesmo em
+// falha (pro Z-API não desistir do webhook); o erro fica na aba WhatsApp_Falhas.
+function handleZapiWebhook(body, params) {
+  try {
+    const wk = wppProps_().getProperty('WPP_WEBHOOK_KEY') || '';
+    if (!wk || String(params.wk || '') !== wk) return jsonErr('wk inválida');
+    if (!body || !body.messageId || !body.phone) return jsonOk({ ok: true, skip: 'sem messageId/phone' });
+    if (body.isGroup || body.broadcast || body.isStatusReply || body.isNewsletter || body.isEdit) {
+      return jsonOk({ ok: true, skip: 'fora do escopo' });
+    }
+    // Reação/enquete não é mensagem (entortaria "sem resposta" e a 1ª resposta);
+    // waitingMessage é placeholder sem conteúdo (o reenvio com conteúdo viria com
+    // o MESMO messageId e o dedupe por insertId descartaria a versão boa).
+    if (body.reaction || body.pollVote || body.waitingMessage) {
+      return jsonOk({ ok: true, skip: 'sem conteúdo de mensagem' });
+    }
+    const tipo = body.text ? 'texto' : body.audio ? 'audio' : body.image ? 'imagem' :
+                 body.video ? 'video' : body.document ? 'documento' : body.sticker ? 'figurinha' : 'outro';
+    const texto = body.text ? String(body.text.message || '') :
+                  body.image ? String(body.image.caption || '') :
+                  body.video ? String(body.video.caption || '') : '';
+    const fromMe = body.fromMe === true;
+    const row = {
+      message_id: String(body.messageId),
+      chat_phone: String(body.phone),
+      chat_name: String(body.chatName || ''),
+      sender_name: String(body.senderName || ''),
+      from_me: fromMe,
+      momento: new Date(Number(body.momment) || Date.now()).toISOString(),
+      tipo: tipo,
+      texto: texto,
+      device: wppDevice_(body.messageId, fromMe),
+      status: String(body.status || ''),
+      instance_id: String(body.instanceId || ''),
+      raw: JSON.stringify(body),
+      ingerido_em: new Date().toISOString()
+    };
+    const res = BigQuery.Tabledata.insertAll({
+      rows: [{ insertId: row.message_id, json: row }]
+    }, BQ_PROJECT, WPP_BQ_DATASET, WPP_BQ_TABLE);
+    if (res.insertErrors && res.insertErrors.length) throw new Error(JSON.stringify(res.insertErrors));
+    return jsonOk({ ok: true });
+  } catch (err) {
+    try {
+      const sh = getOrCreateSheetGen_(WPP_FALHAS_SHEET, ['timestamp', 'erro', 'payload']);
+      sh.appendRow([new Date().toISOString(), String(err), JSON.stringify(body).slice(0, 45000)]);
+    } catch (e2) { /* sem onde registrar */ }
+    return jsonOk({ ok: false });
+  }
+}
+
+// Chamada à API do Z-API da instância COMERCIAL (credenciais em Script Properties).
+function zapiComFetch_(path, method, payload) {
+  const p = wppProps_();
+  const inst = p.getProperty('ZAPI_COM_INSTANCE'), tok = p.getProperty('ZAPI_COM_TOKEN');
+  const ctok = p.getProperty('ZAPI_CLIENT_TOKEN');
+  if (!inst || !tok || !ctok) throw new Error('Credenciais Z-API não configuradas (op=set_zapi)');
+  const opt = { method: method || 'get', headers: { 'Client-Token': ctok }, muteHttpExceptions: true };
+  if (payload) { opt.contentType = 'application/json'; opt.payload = JSON.stringify(payload); }
+  const res = UrlFetchApp.fetch('https://api.z-api.io/instances/' + inst + '/token/' + tok + path, opt);
+  return { code: res.getResponseCode(), body: res.getContentText() };
+}
+
+// Hash SHA-256 da chave admin (a chave em si NUNCA entra no repo, que é público;
+// o hash pode: não dá pra reverter uma chave aleatória de 48 hex).
+const WPP_ADMIN_KEY_SHA256 = '08172e881cab549931a1e0507f3a8f6ec8aa248267ee2875e3c440fe05d07c42';
+
+function wppHash_(s) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)
+    .map(function(b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+}
+
+// Rotas administrativas do monitor. Autenticação por hash fixo no código
+// (sem first-call-wins: não existe janela de captura pós-deploy).
+function handleWppAdmin(params) {
+  const p = wppProps_();
+  const op = String(params.op || '');
+  if (wppHash_(String(params.key || '')) !== WPP_ADMIN_KEY_SHA256) return jsonErr('key inválida');
+  try {
+    if (op === 'init') {
+      if (!p.getProperty('WPP_WEBHOOK_KEY')) {
+        p.setProperty('WPP_WEBHOOK_KEY', Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, ''));
+      }
+      return jsonOk({ ok: true, init: true });
+    }
+    if (op === 'set_zapi') {
+      if (params.instance) p.setProperty('ZAPI_COM_INSTANCE', String(params.instance));
+      if (params.token)    p.setProperty('ZAPI_COM_TOKEN', String(params.token));
+      if (params.ctoken)   p.setProperty('ZAPI_CLIENT_TOKEN', String(params.ctoken));
+      return jsonOk({ ok: true });
+    }
+    if (op === 'setup_bq') return jsonOk(wppSetupBigQuery_());
+    if (op === 'setup_webhook') {
+      const wk = p.getProperty('WPP_WEBHOOK_KEY');
+      if (!wk) return jsonErr('rode op=init antes');
+      // Não apontar o Z-API pra cá sem a tabela existir: o insert falharia em
+      // silêncio (aba de falhas) e o período sumiria das métricas.
+      try { BigQuery.Tables.get(BQ_PROJECT, WPP_BQ_DATASET, WPP_BQ_TABLE); }
+      catch (e) { return jsonErr('rode op=setup_bq antes (tabela não existe): ' + e); }
+      const url = ScriptApp.getService().getUrl() + '?action=zapi_webhook&wk=' + wk;
+      const r1 = zapiComFetch_('/update-webhook-received', 'put', { value: url });
+      const r2 = zapiComFetch_('/update-notify-sent-by-me', 'put', { notifySentByMe: true });
+      return jsonOk({ webhook: r1, notifySentByMe: r2 });
+    }
+    if (op === 'qr')     return jsonOk(zapiComFetch_('/qr-code/image', 'get'));
+    if (op === 'status') return jsonOk(zapiComFetch_('/status', 'get'));
+    if (op === 'setup_trigger') return jsonOk({ ok: setupTriggerRelatorioWhatsApp() });
+    if (op === 'test_report') { rodarRelatorioWhatsApp(); return jsonOk({ ok: true }); }
+    if (op === 'diag')    return jsonOk(wppDiag_());
+    if (op === 'ultimas') return jsonOk({ itens: wppUltimas_(Number(params.n) || 10) });
+    return jsonErr('op desconhecida');
+  } catch (err) {
+    return jsonErr(String(err));
+  }
+}
+
+// Cria dataset e tabela (particionada por dia) se não existirem. Mesma
+// localização do dataset do extrato, pra permitir join futuro (funil completo).
+function wppSetupBigQuery_() {
+  let loc = 'US';
+  try { loc = BigQuery.Datasets.get(BQ_PROJECT, 'extrato').location || 'US'; } catch (e) {}
+  try {
+    BigQuery.Datasets.get(BQ_PROJECT, WPP_BQ_DATASET);
+  } catch (e) {
+    BigQuery.Datasets.insert({
+      datasetReference: { projectId: BQ_PROJECT, datasetId: WPP_BQ_DATASET }, location: loc
+    }, BQ_PROJECT);
+  }
+  try {
+    BigQuery.Tables.get(BQ_PROJECT, WPP_BQ_DATASET, WPP_BQ_TABLE);
+    return { ok: true, existed: true, location: loc };
+  } catch (e) {
+    BigQuery.Tables.insert({
+      tableReference: { projectId: BQ_PROJECT, datasetId: WPP_BQ_DATASET, tableId: WPP_BQ_TABLE },
+      timePartitioning: { type: 'DAY', field: 'momento' },
+      schema: { fields: [
+        { name: 'message_id',  type: 'STRING' },
+        { name: 'chat_phone',  type: 'STRING' },
+        { name: 'chat_name',   type: 'STRING' },
+        { name: 'sender_name', type: 'STRING' },
+        { name: 'from_me',     type: 'BOOLEAN' },
+        { name: 'momento',     type: 'TIMESTAMP' },
+        { name: 'tipo',        type: 'STRING' },
+        { name: 'texto',       type: 'STRING' },
+        { name: 'device',      type: 'STRING' },
+        { name: 'status',      type: 'STRING' },
+        { name: 'instance_id', type: 'STRING' },
+        { name: 'raw',         type: 'STRING' },
+        { name: 'ingerido_em', type: 'TIMESTAMP' }
+      ] }
+    }, BQ_PROJECT);
+    return { ok: true, created: true, location: loc };
+  }
+}
+
+// Roda uma query e devolve as linhas (espera terminar + junta as páginas,
+// mesmo tratamento do leitor de PIX).
+function wppQuery_(sql, queryParameters) {
+  const req = { query: sql, useLegacySql: false, timeoutMs: 30000 };
+  if (queryParameters) { req.parameterMode = 'NAMED'; req.queryParameters = queryParameters; }
+  let res = BigQuery.Jobs.query(req, BQ_PROJECT);
+  const jobId = res.jobReference.jobId, loc = res.jobReference.location;
+  let tentativas = 0;
+  while (!res.jobComplete) {
+    if (++tentativas > 30) throw new Error('BigQuery: consulta WhatsApp não completou a tempo');
+    Utilities.sleep(1000);
+    res = BigQuery.Jobs.getQueryResults(BQ_PROJECT, jobId, { location: loc, timeoutMs: 30000 });
+  }
+  let rows = res.rows || [];
+  let pageToken = res.pageToken;
+  while (pageToken) {
+    res = BigQuery.Jobs.getQueryResults(BQ_PROJECT, jobId, { location: loc, pageToken: pageToken });
+    rows = rows.concat(res.rows || []);
+    pageToken = res.pageToken;
+  }
+  return rows;
+}
+
+// Janela do "dia comercial": das 19h de ontem às 19h de hoje (fuso SP, sem DST).
+// Fixa nas 19h em ponto (o gatilho dispara em minuto aleatório dentro da hora):
+// nada se perde nem conta duas vezes entre um relatório e o seguinte.
+function wppJanelaRelatorio_() {
+  const hojeIso = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  const fim = new Date(hojeIso + 'T19:00:00-03:00');
+  const ini = new Date(fim.getTime() - 24 * 3600 * 1000);
+  return { ini: ini.toISOString(), fim: fim.toISOString() };
+}
+
+const WPP_TS_PARAM_ = function(nome, iso) {
+  return { name: nome, parameterType: { type: 'TIMESTAMP' }, parameterValue: { value: iso } };
+};
+
+// Mensagens da janela, deduplicadas por message_id, em ordem cronológica (ms).
+function wppMensagensJanela_(iniIso, fimIso) {
+  const rows = wppQuery_(
+    "SELECT ANY_VALUE(chat_phone) chat_phone, ANY_VALUE(chat_name) chat_name, " +
+    "ANY_VALUE(from_me) from_me, ANY_VALUE(device) device, UNIX_MILLIS(ANY_VALUE(momento)) ts " +
+    "FROM " + WPP_BQ_REF + " WHERE momento >= @ini AND momento < @fim " +
+    "GROUP BY message_id ORDER BY ts",
+    [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
+  return rows.map(function(r) {
+    return {
+      chat_phone: r.f[0].v, chat_name: r.f[1].v || '',
+      from_me: String(r.f[2].v) === 'true', device: r.f[3].v || '', ts: Number(r.f[4].v)
+    };
+  });
+}
+
+// Quantos números escreveram pela PRIMEIRA vez dentro da janela (novo contato).
+// Obs: nas primeiras semanas infla (a tabela nasce vazia, então paciente antiga
+// que escreve parece "nova"); se corrige sozinho com o histórico acumulando.
+function wppNovosContatosJanela_(iniIso, fimIso) {
+  const rows = wppQuery_(
+    "SELECT COUNT(*) FROM (SELECT chat_phone, MIN(momento) primeiro " +
+    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE GROUP BY chat_phone) " +
+    "WHERE primeiro >= @ini AND primeiro < @fim",
+    [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
+  return rows.length ? Number(rows[0].f[0].v) : 0;
+}
+
+// Quantas mensagens caíram na aba de falhas dentro da janela (ingestão quebrada
+// não pode ser invisível: o relatório avisa que está subcontando).
+function wppFalhasJanela_(iniIso, fimIso) {
+  const sh = getOrCreateSheetGen_(WPP_FALHAS_SHEET, ['timestamp', 'erro', 'payload']);
+  const data = sh.getDataRange().getValues();
+  let n = 0;
+  for (let i = 1; i < data.length; i++) {
+    const ts = String(data[i][0]);
+    if (ts >= iniIso && ts < fimIso) n++;
+  }
+  return n;
+}
+
+// Duração legível: '18 min', '3h40' (com carry: 3h59m50s vira 4h00, nunca 3h60).
+function wppFmtDur_(seg) {
+  const min = Math.round(seg / 60);
+  if (min < 60) return Math.max(1, min) + ' min';
+  return Math.floor(min / 60) + 'h' + ('0' + (min % 60)).slice(-2);
+}
+
+// Métricas do dia a partir das mensagens: volumes, 1ª resposta e vácuos.
+function wppMetricasDia_(msgs) {
+  const chats = {};
+  let enviadas = 0, recebidas = 0, web = 0, celular = 0;
+  msgs.forEach(function(m) {
+    if (m.from_me) { enviadas++; if (m.device === 'web') web++; else if (m.device === 'celular') celular++; }
+    else recebidas++;
+    (chats[m.chat_phone] = chats[m.chat_phone] || { nome: '', itens: [] }).itens.push(m);
+    if (m.chat_name) chats[m.chat_phone].nome = m.chat_name;
+  });
+  const semResposta = [], esperas = [];
+  Object.keys(chats).forEach(function(tel) {
+    const c = chats[tel], itens = c.itens;
+    const ultima = itens[itens.length - 1];
+    if (!ultima.from_me) semResposta.push(c.nome || tel);
+    // 1ª resposta: se a conversa do dia abriu com a paciente -> tempo até a 1ª enviada
+    const idxIn = itens[0].from_me ? -1 : 0;
+    if (idxIn >= 0) {
+      for (let j = idxIn + 1; j < itens.length; j++) {
+        if (itens[j].from_me) { esperas.push({ seg: (itens[j].ts - itens[idxIn].ts) / 1000, nome: c.nome || tel }); break; }
+      }
+    }
+  });
+  esperas.sort(function(a, b) { return a.seg - b.seg; });
+  const nE = esperas.length;
+  const mediana = !nE ? 0 :
+    (nE % 2 ? esperas[(nE - 1) / 2].seg : (esperas[nE / 2 - 1].seg + esperas[nE / 2].seg) / 2);
+  const pior = nE ? esperas[nE - 1] : null;
+  return {
+    totalMsgs: msgs.length, conversas: Object.keys(chats).length,
+    enviadas: enviadas, recebidas: recebidas, web: web, celular: celular,
+    semResposta: semResposta, mediana: mediana, pior: pior, respostas: esperas.length
+  };
+}
+
+// Relatório diário no Slack #comercial (gatilho das 19h; também via op=test_report).
+// Janela: 19h de ontem às 19h de hoje. Só a query principal é fatal; o resto
+// degrada (métrica some do card em vez de derrubar o relatório inteiro).
+function rodarRelatorioWhatsApp() {
+  const webhookUrl = wppProps_().getProperty('SLACK_COMERCIAL_WEBHOOK');
+  if (!webhookUrl) return 'sem SLACK_COMERCIAL_WEBHOOK';
+
+  const j = wppJanelaRelatorio_();
+  let msgs;
+  try { msgs = wppMensagensJanela_(j.ini, j.fim); }
+  catch (e) { return 'BigQuery indisponível (setup pendente?): ' + e; }
+
+  // Status da instância: SEMPRE checar. Desconexão no meio do dia derruba a
+  // coleta e, sem isso, o card sairia "normal" com números pela metade.
+  let conectado = null;
+  try { conectado = /"connected"\s*:\s*true/.test(zapiComFetch_('/status', 'get').body); } catch (e) {}
+
+  if (!msgs.length && conectado === null) return 'Z-API não configurado; nada a reportar';
+
+  const post = function(blocks, resumo) {
+    UrlFetchApp.fetch(webhookUrl, {
+      method: 'post', contentType: 'application/json',
+      payload: JSON.stringify({ blocks: blocks, text: resumo })
+    });
+  };
+  const blocks = [{ type: 'header', text: { type: 'plain_text',
+    text: '💬 WhatsApp Comercial · ' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM'), emoji: true } }];
+
+  if (conectado === false) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn',
+      text: '🔴 *WhatsApp desconectado do monitor!* Os números abaixo podem estar incompletos. Precisa escanear o QR de novo (Felipe sabe como).' } });
+  }
+
+  let falhas = 0;
+  try { falhas = wppFalhasJanela_(j.ini, j.fim); } catch (e) {}
+  if (falhas > 0) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn',
+      text: '🛠️ *' + falhas + ' mensagens falharam ao gravar* (aba WhatsApp_Falhas): números subcontados.' } });
+  }
+
+  if (!msgs.length) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: 'Nenhuma mensagem registrada na janela (ontem 19h → hoje 19h).' } });
+    post(blocks, conectado === false ? '🔴 WhatsApp comercial desconectado' : 'WhatsApp comercial: 0 mensagens');
+    return conectado === false ? 'desconectado' : 'zero mensagens';
+  }
+
+  const m = wppMetricasDia_(msgs);
+  let novos = null;
+  try { novos = wppNovosContatosJanela_(j.ini, j.fim); } catch (e) {}
+  blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
+    '*' + m.conversas + '* conversas' + (novos === null ? '' : ' · *' + novos + '* contatos novos') + '\n' +
+    '📤 ' + m.enviadas + ' enviadas · 📥 ' + m.recebidas + ' recebidas\n' +
+    '📱 celular ' + m.celular + ' · 💻 web ' + m.web } });
+  if (m.respostas) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
+      '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
+      (m.pior && m.pior.seg > m.mediana ? ' · pior ' + wppFmtDur_(m.pior.seg) + ' (' + m.pior.nome + ')' : '') } });
+  }
+  if (m.semResposta.length) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
+      '⚠️ *' + m.semResposta.length + ' sem resposta:* ' +
+      m.semResposta.slice(0, 6).join(', ') + (m.semResposta.length > 6 ? '…' : '') } });
+  } else {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '✅ Nenhuma conversa no vácuo.' } });
+  }
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn',
+    text: 'dia comercial: ontem 19h → hoje 19h · atualizado ' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'HH:mm') }] });
+  post(blocks, '💬 WhatsApp: ' + m.conversas + ' conversas, ' + m.semResposta.length + ' sem resposta');
+  return 'ok: ' + m.totalMsgs + ' mensagens';
+}
+
+// Últimas N mensagens (pra validar a atribuição celular/web com testes reais).
+function wppUltimas_(n) {
+  const rows = wppQuery_(
+    "SELECT FORMAT_TIMESTAMP('%d/%m %H:%M', momento, 'America/Sao_Paulo') hora, from_me, device, tipo, " +
+    "SUBSTR(texto, 1, 60) texto, chat_name, SUBSTR(message_id, 1, 8) id_prefixo " +
+    "FROM " + WPP_BQ_REF + " ORDER BY momento DESC LIMIT " + Math.min(50, Math.max(1, n)));
+  return rows.map(function(r) {
+    return { hora: r.f[0].v, from_me: String(r.f[1].v) === 'true', device: r.f[2].v || '',
+             tipo: r.f[3].v, texto: r.f[4].v || '', chat: r.f[5].v || '', id_prefixo: r.f[6].v };
+  });
+}
+
+// Diagnóstico: propriedades configuradas + últimos 7 dias + status da instância.
+function wppDiag_() {
+  const p = wppProps_();
+  const out = { props: {
+    zapi: !!(p.getProperty('ZAPI_COM_INSTANCE') && p.getProperty('ZAPI_COM_TOKEN') && p.getProperty('ZAPI_CLIENT_TOKEN')),
+    webhook_key: !!p.getProperty('WPP_WEBHOOK_KEY')
+  } };
+  try {
+    const rows = wppQuery_(
+      "SELECT CAST(DATE(momento, 'America/Sao_Paulo') AS STRING) dia, " +
+      "COUNTIF(from_me) enviadas, COUNTIF(NOT from_me) recebidas, " +
+      "COUNTIF(from_me AND device='web') web, COUNTIF(from_me AND device='celular') celular, " +
+      "COUNT(DISTINCT chat_phone) chats FROM " + WPP_BQ_REF + " GROUP BY dia ORDER BY dia DESC LIMIT 7");
+    out.dias = rows.map(function(r) {
+      return { dia: r.f[0].v, enviadas: Number(r.f[1].v), recebidas: Number(r.f[2].v),
+               web: Number(r.f[3].v), celular: Number(r.f[4].v), chats: Number(r.f[5].v) };
+    });
+  } catch (e) { out.bq = String(e); }
+  try { out.zapi_status = zapiComFetch_('/status', 'get'); } catch (e) { out.zapi_status = String(e); }
+  return out;
+}
+
+// Cria o gatilho diário das 19h do relatório WhatsApp (não mexe nos outros).
+function setupTriggerRelatorioWhatsApp() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'rodarRelatorioWhatsApp') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('rodarRelatorioWhatsApp').timeBased().everyDays(1).atHour(19).create();
+  return 'gatilho 19h do relatório WhatsApp criado';
 }
