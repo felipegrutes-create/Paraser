@@ -2418,6 +2418,35 @@ function handleWppAdmin(params) {
     }
     if (op === 'diag')    return jsonOk(wppDiag_());
     if (op === 'ultimas') return jsonOk({ itens: wppUltimas_(Number(params.n) || 10) });
+    if (op === 'sem_resposta') {
+      // Detalhe dos "sem resposta" da janela atual (o card só mostra 6 nomes):
+      // quem é, última mensagem recebida (hora + prévia) e volume da conversa.
+      const j3 = wppJanelaRelatorio_();
+      const msgs3 = wppMensagensJanela_(j3.ini, j3.fim);
+      const chats3 = {};
+      msgs3.forEach(function(m) {
+        const c = chats3[m.chat_phone] = chats3[m.chat_phone] || { nome: '', itens: [] };
+        c.itens.push(m);
+        const legivel = function(s) { return s && s.indexOf('@lid') === -1; };
+        if (legivel(m.chat_name)) c.nome = m.chat_name;
+        else if (!c.nome && !m.from_me && legivel(m.sender_name)) c.nome = m.sender_name;
+      });
+      const itens = [];
+      Object.keys(chats3).forEach(function(tel) {
+        const c = chats3[tel], ult = c.itens[c.itens.length - 1];
+        if (ult.from_me) return;
+        itens.push({
+          nome: c.nome || tel,
+          ultima: Utilities.formatDate(new Date(ult.ts), 'America/Sao_Paulo', 'dd/MM HH:mm'),
+          previa: String(ult.texto || ('[' + ult.tipo + ']')).slice(0, 80),
+          recebidas: c.itens.filter(function(m) { return !m.from_me; }).length,
+          enviadas: c.itens.filter(function(m) { return m.from_me; }).length,
+          interno: wppEhInterno_(c.nome),
+          cortesia: wppEhCortesia_(ult.texto)
+        });
+      });
+      return jsonOk({ janela: j3, itens: itens });
+    }
     if (op === 'raw') {
       // Payload cru das últimas N enviadas (investigar campos que distingam sessões web)
       const rows = wppQuery_(
@@ -2590,6 +2619,20 @@ function wppFmtDur_(seg) {
   return Math.floor(min / 60) + 'h' + ('0' + (min % 60)).slice(-2);
 }
 
+// Conversa interna da equipe não é métrica comercial (lista configurável na
+// property WPP_IGNORAR, por trecho do nome do contato; default 'paraser').
+function wppEhInterno_(nome) {
+  const lista = (wppProps_().getProperty('WPP_IGNORAR') || 'paraser').toLowerCase().split(',');
+  const n = String(nome || '').toLowerCase();
+  return lista.some(function(t) { return t.trim() && n.indexOf(t.trim()) !== -1; });
+}
+// Encerramento de cortesia ("obrigada", "ok", emoji) não é vácuo de verdade.
+function wppEhCortesia_(texto) {
+  const t = String(texto || '').trim().toLowerCase();
+  if (!t || t.length > 30) return false;
+  return /^(muito\s+)?(obrigad[ao]s?|obg\w*|ok(ay)?|blz|beleza|de nada|nada|perfeito|combinado|maravilha|am[eé]m|valeu|👍|❤️|🥰|😊|🙏|✅)[\s!.,🙏👍✅❤️🥰😊🍃🦋☘️]*$/.test(t);
+}
+
 // Métricas do dia a partir das mensagens: volumes, 1ª resposta, vácuos e
 // atribuição por vendedora (via timeline de assinaturas).
 function wppMetricasDia_(msgs, assinaturas) {
@@ -2599,18 +2642,8 @@ function wppMetricasDia_(msgs, assinaturas) {
     for (let i = 0; i < lista.length; i++) { if (lista[i].ts <= ts) dono = lista[i].nome; else break; }
     return dono;
   };
-  const chats = {}, porVend = {};
-  let enviadas = 0, recebidas = 0, web = 0, celular = 0, semDona = 0;
+  const chats = {};
   msgs.forEach(function(m) {
-    if (m.from_me) {
-      enviadas++; if (m.device === 'web') web++; else if (m.device === 'celular') celular++;
-      const dono = donoDe(m.chat_phone, m.ts);
-      if (dono) {
-        const v = porVend[dono] = porVend[dono] || { msgs: 0, chats: {} };
-        v.msgs++; v.chats[m.chat_phone] = true;
-      } else semDona++;
-    }
-    else recebidas++;
     const c = chats[m.chat_phone] = chats[m.chat_phone] || { nome: '', itens: [] };
     c.itens.push(m);
     // Nome legível: chatName serve, exceto quando é identificador @lid (contato
@@ -2619,11 +2652,27 @@ function wppMetricasDia_(msgs, assinaturas) {
     if (legivel(m.chat_name)) c.nome = m.chat_name;
     else if (!c.nome && !m.from_me && legivel(m.sender_name)) c.nome = m.sender_name;
   });
+  const porVend = {};
+  let enviadas = 0, recebidas = 0, web = 0, celular = 0, semDona = 0, totalMsgs = 0, conversas = 0;
   const semResposta = [], esperas = [];
   Object.keys(chats).forEach(function(tel) {
     const c = chats[tel], itens = c.itens;
+    if (wppEhInterno_(c.nome)) return;
+    conversas++;
+    itens.forEach(function(m) {
+      totalMsgs++;
+      if (m.from_me) {
+        enviadas++; if (m.device === 'web') web++; else if (m.device === 'celular') celular++;
+        const dono = donoDe(m.chat_phone, m.ts);
+        if (dono) {
+          const v = porVend[dono] = porVend[dono] || { msgs: 0, chats: {} };
+          v.msgs++; v.chats[m.chat_phone] = true;
+        } else semDona++;
+      }
+      else recebidas++;
+    });
     const ultima = itens[itens.length - 1];
-    if (!ultima.from_me) semResposta.push(c.nome || tel);
+    if (!ultima.from_me && !wppEhCortesia_(ultima.texto)) semResposta.push(c.nome || tel);
     // 1ª resposta: se a conversa do dia abriu com a paciente -> tempo até a 1ª enviada
     const idxIn = itens[0].from_me ? -1 : 0;
     if (idxIn >= 0) {
@@ -2641,7 +2690,7 @@ function wppMetricasDia_(msgs, assinaturas) {
     return { nome: n, msgs: porVend[n].msgs, conversas: Object.keys(porVend[n].chats).length };
   }).sort(function(a, b) { return b.msgs - a.msgs; });
   return {
-    totalMsgs: msgs.length, conversas: Object.keys(chats).length,
+    totalMsgs: totalMsgs, conversas: conversas,
     enviadas: enviadas, recebidas: recebidas, web: web, celular: celular,
     semResposta: semResposta, mediana: mediana, pior: pior, respostas: esperas.length,
     porVendedora: porVendedora, semDona: semDona
