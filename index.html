@@ -199,7 +199,7 @@
             margin-top: 14px;
         }
         .kanban-col-header-sticky {
-            flex: 0 0 max(210px, calc((100% - 56px) / 5));
+            flex: 0 0 max(210px, calc((100% - (14px * (var(--kcols, 5) - 1))) / var(--kcols, 5)));
             min-width: 210px;
             background: var(--surface);
             border: 1px solid var(--border);
@@ -786,7 +786,7 @@
         }
 
         .kanban-col {
-            flex: 0 0 max(210px, calc((100% - 56px) / 5));
+            flex: 0 0 max(210px, calc((100% - (14px * (var(--kcols, 5) - 1))) / var(--kcols, 5)));
             min-width: 210px;
             background: var(--surface);
             border: 1px solid var(--border);
@@ -6536,6 +6536,11 @@
 
             // Agrupar por coluna (esconde a coluna Entrada Manual até o endpoint do CRM existir)
             const cols = KANBAN_COLS.filter(c => c.id !== 'entrada-manual' || manualEndpointLive);
+            // Largura das colunas se adapta à quantidade (senão 6 colunas estouram
+            // o cálculo fixo de 5 e o board exige scroll lateral inalcançável)
+            board.style.setProperty('--kcols', cols.length);
+            const headersVarEl = document.getElementById('kanbanColHeaders');
+            if (headersVarEl) headersVarEl.style.setProperty('--kcols', cols.length);
             const groups = {};
             cols.forEach(c => { groups[c.id] = []; });
             filtered.forEach(p => {
