@@ -2413,21 +2413,32 @@ function handleWppAdmin(params) {
 
 // Cria dataset e tabela (particionada por dia) se não existirem. Mesma
 // localização do dataset do extrato, pra permitir join futuro (funil completo).
+// Cada passo é nomeado no erro (diagnóstico via rota admin, sem editor).
 function wppSetupBigQuery_() {
+  const passo = function(nome, fn) {
+    try { return fn(); } catch (e) { throw new Error('[' + nome + '] ' + e); }
+  };
   let loc = 'US';
   try { loc = BigQuery.Datasets.get(BQ_PROJECT, 'extrato').location || 'US'; } catch (e) {}
+  let temDataset = true;
   try {
     BigQuery.Datasets.get(BQ_PROJECT, WPP_BQ_DATASET);
   } catch (e) {
-    BigQuery.Datasets.insert({
-      datasetReference: { projectId: BQ_PROJECT, datasetId: WPP_BQ_DATASET }, location: loc
-    }, BQ_PROJECT);
+    temDataset = false;
+  }
+  if (!temDataset) {
+    passo('datasets.insert', function() {
+      return BigQuery.Datasets.insert({
+        datasetReference: { projectId: BQ_PROJECT, datasetId: WPP_BQ_DATASET }, location: loc
+      }, BQ_PROJECT);
+    });
   }
   try {
     BigQuery.Tables.get(BQ_PROJECT, WPP_BQ_DATASET, WPP_BQ_TABLE);
     return { ok: true, existed: true, location: loc };
   } catch (e) {
-    BigQuery.Tables.insert({
+    passo('tables.insert', function() {
+      return BigQuery.Tables.insert({
       tableReference: { projectId: BQ_PROJECT, datasetId: WPP_BQ_DATASET, tableId: WPP_BQ_TABLE },
       timePartitioning: { type: 'DAY', field: 'momento' },
       schema: { fields: [
@@ -2445,7 +2456,8 @@ function wppSetupBigQuery_() {
         { name: 'raw',         type: 'STRING' },
         { name: 'ingerido_em', type: 'TIMESTAMP' }
       ] }
-    }, BQ_PROJECT);
+      }, BQ_PROJECT, WPP_BQ_DATASET);
+    });
     return { ok: true, created: true, location: loc };
   }
 }
