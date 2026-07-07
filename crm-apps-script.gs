@@ -2503,14 +2503,16 @@ const WPP_TS_PARAM_ = function(nome, iso) {
 function wppMensagensJanela_(iniIso, fimIso) {
   const rows = wppQuery_(
     "SELECT ANY_VALUE(chat_phone) chat_phone, ANY_VALUE(chat_name) chat_name, " +
-    "ANY_VALUE(from_me) from_me, ANY_VALUE(device) device, UNIX_MILLIS(ANY_VALUE(momento)) ts " +
+    "ANY_VALUE(from_me) from_me, ANY_VALUE(device) device, UNIX_MILLIS(ANY_VALUE(momento)) ts, " +
+    "ANY_VALUE(sender_name) sender_name " +
     "FROM " + WPP_BQ_REF + " WHERE momento >= @ini AND momento < @fim " +
     "GROUP BY message_id ORDER BY ts",
     [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
   return rows.map(function(r) {
     return {
       chat_phone: r.f[0].v, chat_name: r.f[1].v || '',
-      from_me: String(r.f[2].v) === 'true', device: r.f[3].v || '', ts: Number(r.f[4].v)
+      from_me: String(r.f[2].v) === 'true', device: r.f[3].v || '', ts: Number(r.f[4].v),
+      sender_name: r.f[5].v || ''
     };
   });
 }
@@ -2554,8 +2556,13 @@ function wppMetricasDia_(msgs) {
   msgs.forEach(function(m) {
     if (m.from_me) { enviadas++; if (m.device === 'web') web++; else if (m.device === 'celular') celular++; }
     else recebidas++;
-    (chats[m.chat_phone] = chats[m.chat_phone] || { nome: '', itens: [] }).itens.push(m);
-    if (m.chat_name) chats[m.chat_phone].nome = m.chat_name;
+    const c = chats[m.chat_phone] = chats[m.chat_phone] || { nome: '', itens: [] };
+    c.itens.push(m);
+    // Nome legível: chatName serve, exceto quando é identificador @lid (contato
+    // não salvo na agenda); aí vale o nome de perfil de quem escreveu.
+    const legivel = function(s) { return s && s.indexOf('@lid') === -1; };
+    if (legivel(m.chat_name)) c.nome = m.chat_name;
+    else if (!c.nome && !m.from_me && legivel(m.sender_name)) c.nome = m.sender_name;
   });
   const semResposta = [], esperas = [];
   Object.keys(chats).forEach(function(tel) {
