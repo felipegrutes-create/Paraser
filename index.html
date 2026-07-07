@@ -6369,9 +6369,15 @@
         }
 
         // Garante que pendPatients contém exatamente os cards manuais atuais (idempotente).
+        // Se a paciente já tem card real vindo da agenda (ex: regra da USG FIV),
+        // o manual é suprimido pra não duplicar no board (a entrada segue registrada).
         function syncManualIntoPend() {
             pendPatients = pendPatients.filter(p => !p.manual);
-            manualEntries.forEach(m => pendPatients.push(synthManualPatient(m)));
+            const reais = new Set(pendPatients.map(p => normalizeKey(p.pac)));
+            manualEntries.forEach(m => {
+                if (reais.has(normalizeKey(m.nome || ''))) return;
+                pendPatients.push(synthManualPatient(m));
+            });
         }
 
         function openEntradaManual() {
