@@ -2405,6 +2405,13 @@ function handleWppAdmin(params) {
     if (op === 'test_report') { rodarRelatorioWhatsApp(); return jsonOk({ ok: true }); }
     if (op === 'diag')    return jsonOk(wppDiag_());
     if (op === 'ultimas') return jsonOk({ itens: wppUltimas_(Number(params.n) || 10) });
+    if (op === 'raw') {
+      // Payload cru das últimas N enviadas (investigar campos que distingam sessões web)
+      const rows = wppQuery_(
+        "SELECT raw FROM " + WPP_BQ_REF + " WHERE from_me = TRUE " +
+        "ORDER BY momento DESC LIMIT " + Math.min(10, Math.max(1, Number(params.n) || 3)));
+      return jsonOk({ itens: rows.map(function(r) { return JSON.parse(r.f[0].v); }) });
+    }
     return jsonErr('op desconhecida');
   } catch (err) {
     return jsonErr(String(err));
@@ -2529,6 +2536,27 @@ function wppNovosContatosJanela_(iniIso, fimIso) {
   return rows.length ? Number(rows[0].f[0].v) : 0;
 }
 
+// Assinaturas "aqui é a <Nome>" nas enviadas dos últimos 30 dias até o fim da
+// janela: vira uma timeline por conversa, e cada mensagem enviada é atribuída
+// à última vendedora que assinou antes dela (as duas atendem via web, então o
+// dispositivo não separa; ver decisão 07/07).
+function wppAssinaturas_(fimIso) {
+  const rows = wppQuery_(
+    "SELECT chat_phone, texto, UNIX_MILLIS(momento) ts FROM " + WPP_BQ_REF + " " +
+    "WHERE from_me = TRUE AND momento < @fim " +
+    "AND momento >= TIMESTAMP_SUB(@fim, INTERVAL 30 DAY) " +
+    "AND REGEXP_CONTAINS(texto, r'(?i)aqui [ée] [ao] [A-Za-zÀ-ú]') ORDER BY ts",
+    [WPP_TS_PARAM_('fim', fimIso)]);
+  const porChat = {};
+  rows.forEach(function(r) {
+    const m = String(r.f[1].v || '').match(/aqui\s+[ée]\s+[ao]\s+([\wÀ-ú]+)/i);
+    if (!m) return;
+    const nome = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    (porChat[r.f[0].v] = porChat[r.f[0].v] || []).push({ ts: Number(r.f[2].v), nome: nome });
+  });
+  return porChat;
+}
+
 // Quantas mensagens caíram na aba de falhas dentro da janela (ingestão quebrada
 // não pode ser invisível: o relatório avisa que está subcontando).
 function wppFalhasJanela_(iniIso, fimIso) {
@@ -2549,12 +2577,26 @@ function wppFmtDur_(seg) {
   return Math.floor(min / 60) + 'h' + ('0' + (min % 60)).slice(-2);
 }
 
-// Métricas do dia a partir das mensagens: volumes, 1ª resposta e vácuos.
-function wppMetricasDia_(msgs) {
-  const chats = {};
-  let enviadas = 0, recebidas = 0, web = 0, celular = 0;
+// Métricas do dia a partir das mensagens: volumes, 1ª resposta, vácuos e
+// atribuição por vendedora (via timeline de assinaturas).
+function wppMetricasDia_(msgs, assinaturas) {
+  const donoDe = function(chat, ts) {
+    const lista = (assinaturas && assinaturas[chat]) || [];
+    let dono = '';
+    for (let i = 0; i < lista.length; i++) { if (lista[i].ts <= ts) dono = lista[i].nome; else break; }
+    return dono;
+  };
+  const chats = {}, porVend = {};
+  let enviadas = 0, recebidas = 0, web = 0, celular = 0, semDona = 0;
   msgs.forEach(function(m) {
-    if (m.from_me) { enviadas++; if (m.device === 'web') web++; else if (m.device === 'celular') celular++; }
+    if (m.from_me) {
+      enviadas++; if (m.device === 'web') web++; else if (m.device === 'celular') celular++;
+      const dono = donoDe(m.chat_phone, m.ts);
+      if (dono) {
+        const v = porVend[dono] = porVend[dono] || { msgs: 0, chats: {} };
+        v.msgs++; v.chats[m.chat_phone] = true;
+      } else semDona++;
+    }
     else recebidas++;
     const c = chats[m.chat_phone] = chats[m.chat_phone] || { nome: '', itens: [] };
     c.itens.push(m);
@@ -2582,10 +2624,14 @@ function wppMetricasDia_(msgs) {
   const mediana = !nE ? 0 :
     (nE % 2 ? esperas[(nE - 1) / 2].seg : (esperas[nE / 2 - 1].seg + esperas[nE / 2].seg) / 2);
   const pior = nE ? esperas[nE - 1] : null;
+  const porVendedora = Object.keys(porVend).map(function(n) {
+    return { nome: n, msgs: porVend[n].msgs, conversas: Object.keys(porVend[n].chats).length };
+  }).sort(function(a, b) { return b.msgs - a.msgs; });
   return {
     totalMsgs: msgs.length, conversas: Object.keys(chats).length,
     enviadas: enviadas, recebidas: recebidas, web: web, celular: celular,
-    semResposta: semResposta, mediana: mediana, pior: pior, respostas: esperas.length
+    semResposta: semResposta, mediana: mediana, pior: pior, respostas: esperas.length,
+    porVendedora: porVendedora, semDona: semDona
   };
 }
 
@@ -2635,13 +2681,22 @@ function rodarRelatorioWhatsApp() {
     return conectado === false ? 'desconectado' : 'zero mensagens';
   }
 
-  const m = wppMetricasDia_(msgs);
+  let assin = null;
+  try { assin = wppAssinaturas_(j.fim); } catch (e) {}
+  const m = wppMetricasDia_(msgs, assin);
   let novos = null;
   try { novos = wppNovosContatosJanela_(j.ini, j.fim); } catch (e) {}
   blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
     '*' + m.conversas + '* conversas' + (novos === null ? '' : ' · *' + novos + '* contatos novos') + '\n' +
     '📤 ' + m.enviadas + ' enviadas · 📥 ' + m.recebidas + ' recebidas\n' +
     '📱 celular ' + m.celular + ' · 💻 web ' + m.web } });
+  if (m.porVendedora.length) {
+    let linha = m.porVendedora.map(function(v) {
+      return '*' + v.nome + '* ' + v.msgs + ' msgs em ' + v.conversas + ' conversas';
+    }).join(' · ');
+    if (m.semDona) linha += ' · sem dona ' + m.semDona + ' (' + Math.round(m.semDona / m.enviadas * 100) + '%)';
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '👤 ' + linha } });
+  }
   if (m.respostas) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
       '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
