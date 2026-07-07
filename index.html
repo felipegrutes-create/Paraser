@@ -12543,6 +12543,7 @@
         function repCalcTurno_(linhas) {
             const C = _repCols, dias = {};
             let complexasValor = 0, nTrat = 0, nCompl = 0, tratZero = 0;
+            const complexas = [];
             linhas.forEach(r => {
                 const proc = repNorm_(r[C.proc]);
                 if (!proc.includes('usg') || proc.includes('pacote')) return;
@@ -12551,36 +12552,130 @@
                 const h = parseInt(String(r[C.hora] || '').split(':')[0], 10);
                 if (!isNaN(h)) { if (h < 13) d.manha = true; else d.tarde = true; }
                 if (repEhTratamento_(proc)) { nTrat++; if (!parseValorFloat(r[C.val])) tratZero++; }
-                else { d.compl++; nCompl++; complexasValor += parseValorFloat(r[C.val]); }
+                else {
+                    d.compl++; nCompl++;
+                    const v = parseValorFloat(r[C.val]);
+                    complexasValor += v;
+                    complexas.push({ data: r[C.data], proc: r[C.proc], v: v });
+                }
             });
             let blocoA = 0, nDias = 0, nTurnos = 0;
-            Object.keys(dias).forEach(k => {
+            const diasDet = [];
+            Object.keys(dias).sort((a, b) => (parseDate(a) || 0) - (parseDate(b) || 0)).forEach(k => {
                 const d = dias[k], dois = d.manha && d.tarde;
-                blocoA += repGDia_(dois, d.usgs, d.compl);
+                const g = repGDia_(dois, d.usgs, d.compl);
+                blocoA += g;
                 nDias++; nTurnos += dois ? 2 : 1;
+                diasDet.push({ data: k, dois: !!dois, usgs: d.usgs, compl: d.compl, g: g });
             });
+            complexas.sort((a, b) => (parseDate(a.data) || 0) - (parseDate(b.data) || 0));
             return { total: blocoA + complexasValor * 0.4, blocoA, blocoB: complexasValor * 0.4,
-                     nDias, nTurnos, nTrat, nCompl, tratZero };
+                     nDias, nTurnos, nTrat, nCompl, tratZero, diasDet, complexas, complexasValor };
         }
         function repCalcItem_(linhas, modelo) {
             const C = _repCols;
             let total = 0, nCons = 0, nProc = 0;
+            const itens = [];
             linhas.forEach(r => {
                 const proc = repNorm_(r[C.proc]);
                 if (proc.includes('pacote')) return;
                 const v = parseValorFloat(r[C.val]);
-                if (proc.includes('consulta')) { total += v * 0.5; nCons++; }
+                let pct;
+                if (proc.includes('consulta')) { pct = 0.5; nCons++; }
                 else if (modelo === 'consulta') return;
-                else if (modelo === 'socio') { total += v; nProc++; }
-                else { total += v * 0.4; nProc++; }
+                else if (modelo === 'socio') { pct = 1; nProc++; }
+                else { pct = 0.4; nProc++; }
+                total += v * pct;
+                itens.push({ data: r[C.data], proc: r[C.proc], v: v, pct: pct, rep: v * pct });
             });
-            return { total, nCons, nProc };
+            itens.sort((a, b) => (parseDate(a.data) || 0) - (parseDate(b.data) || 0));
+            return { total, nCons, nProc, itens };
         }
         function repMesShift_(mes, dir) {
             const [y, m] = mes.split('-').map(Number);
             const d = new Date(y, m - 1 + dir, 1);
             return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         }
+        function repMesNomeCompleto_(mes) {
+            const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            const p = String(mes).split('-');
+            return (nomes[parseInt(p[1], 10) - 1] || '?') + '/' + p[0];
+        }
+
+        // Demonstrativo mensal imprimível (o que vai pro médico). Usa exatamente
+        // o mesmo cálculo da seção (repCalcTurno_/repCalcItem_) e, de propósito,
+        // NÃO inclui nome de paciente: só data, procedimento e valores.
+        function repDemonstrativo(chave) {
+            const md = REP_MEDICOS.find(x => x.m === chave);
+            if (!md || !_repMes) return;
+            const linhas = repLinhas_(chave, _repMes);
+            if (!linhas.length) { alert('Sem atendimentos no mês selecionado.'); return; }
+            const nome = repEsc_(linhas[0][_repCols.prof] || chave);
+            const mesLabel = repMesNomeCompleto_(_repMes);
+            let resumo = '', corpo = '', totalGeral = 0;
+
+            if (md.modelo === 'turno') {
+                const c = repCalcTurno_(linhas);
+                totalGeral = c.total;
+                resumo = `<table><tr class="cab">
+                        <th>Dias</th><th>Turnos</th><th>USG tratamento</th><th>USG complexas</th>
+                        <th>Total turnos</th><th>Total complexas (40%)</th><th class="azul">TOTAL GERAL</th></tr>
+                    <tr class="tot"><td>${c.nDias}</td><td>${c.nTurnos}</td><td>${c.nTrat}</td><td>${c.nCompl}</td>
+                        <td>${repFmt_(c.blocoA)}</td><td>${repFmt_(c.blocoB)}</td><td class="azul">${repFmt_(c.total)}</td></tr></table>`;
+                corpo = `<h3>Turnos (R$ 585/turno · franquia de 8 USG por turno · R$ 65 por USG de tratamento acima)</h3>
+                    <table><tr class="cab"><th>Turnos</th><th>Data</th><th>USGs</th><th>Complexas</th><th>Base</th><th>Total do dia</th></tr>` +
+                    c.diasDet.map(d => `<tr><td>${d.dois ? '2 turnos' : '1 turno'}</td><td>${d.data}</td><td>${d.usgs}</td>
+                        <td>${d.compl}</td><td>R$ 585</td><td><b>${repFmt_(d.g)}</b></td></tr>`).join('') + '</table>' +
+                    `<h3>USG complexas (40% do valor)</h3>
+                    <table><tr class="cab"><th>Data</th><th>Procedimento</th><th>Valor</th><th>Repasse (40%)</th></tr>` +
+                    c.complexas.map(x => `<tr><td>${x.data}</td><td style="text-align:left">${repEsc_(x.proc)}</td>
+                        <td>${repFmt_(x.v)}</td><td><b>${repFmt_(x.v * 0.4)}</b></td></tr>`).join('') +
+                    `<tr class="tot"><td colspan="2">Total complexas</td><td>${repFmt_(c.complexasValor)}</td><td>${repFmt_(c.blocoB)}</td></tr></table>`;
+            } else {
+                const c = repCalcItem_(linhas, md.modelo);
+                totalGeral = c.total;
+                const rot = md.modelo === 'socio' ? 'Consultas 50% · procedimentos 100%'
+                          : md.modelo === 'consulta' ? 'Consultas 50%'
+                          : 'Consultas 50% · procedimentos 40%';
+                resumo = `<table><tr class="cab"><th>Consultas</th><th>Procedimentos</th><th>Regra</th><th class="azul">TOTAL GERAL</th></tr>
+                    <tr class="tot"><td>${c.nCons}</td><td>${c.nProc}</td><td>${rot}</td><td class="azul">${repFmt_(c.total)}</td></tr></table>`;
+                corpo = `<h3>Atendimentos do mês</h3>
+                    <table><tr class="cab"><th>Data</th><th>Procedimento</th><th>Valor</th><th>%</th><th>Repasse</th></tr>` +
+                    c.itens.map(x => `<tr><td>${x.data}</td><td style="text-align:left">${repEsc_(x.proc)}</td>
+                        <td>${repFmt_(x.v)}</td><td>${Math.round(x.pct * 100)}%</td><td><b>${repFmt_(x.rep)}</b></td></tr>`).join('') +
+                    `<tr class="tot"><td colspan="4">TOTAL</td><td>${repFmt_(c.total)}</td></tr></table>` +
+                    (md.cobertura === 'parcial'
+                        ? '<p class="nota">Obs.: honorários lançados manualmente (ex: anestesia/embriologia) não constam neste demonstrativo automático.</p>'
+                        : '');
+            }
+
+            const w = window.open('', '_blank');
+            if (!w) { alert('O navegador bloqueou a janela. Libera pop-up pro app e tenta de novo.'); return; }
+            w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+                <title>Repasse ${nome} · ${mesLabel}</title>
+                <style>
+                    body{font-family:Arial,sans-serif;color:#111;margin:28px;max-width:860px}
+                    h1{font-size:19px;margin:0 0 2px} h3{font-size:14px;margin:18px 0 6px}
+                    .sub{color:#555;font-size:12px;margin-bottom:14px}
+                    table{border-collapse:collapse;width:100%;margin:8px 0}
+                    th,td{border:1px solid #9aa5b1;padding:6px 9px;font-size:12.5px;text-align:center}
+                    .cab th{background:#dce6f1}
+                    .tot td{background:#ffe08a;font-weight:bold}
+                    .azul{background:#4a86e8 !important;color:#fff !important}
+                    .nota{font-size:11.5px;color:#555}
+                    .rodape{font-size:11px;color:#777;margin-top:18px;border-top:1px solid #ccc;padding-top:8px}
+                    .no-print{text-align:right;margin-bottom:10px}
+                    @media print{.no-print{display:none}}
+                </style></head><body>
+                <div class="no-print"><button onclick="window.print()" style="padding:8px 16px;font-size:13px;cursor:pointer">🖨️ Imprimir / salvar PDF</button></div>
+                <h1>Demonstrativo de Repasse — ${nome}</h1>
+                <div class="sub">Instituto Paraser · ${mesLabel} · atendimentos realizados (agenda)</div>
+                ${resumo}${corpo}
+                <div class="rodape">Gerado automaticamente pelo sistema Paraser a partir da agenda (status Atendido) · valores sobre o cobrado · ${new Date().toLocaleDateString('pt-BR')}</div>
+                </body></html>`);
+            w.document.close();
+        }
+
         function repNavMonth(dir) {
             if (!_repMes) return; // dados ainda não carregaram; sem mês base não há o que navegar
             _repMes = repMesShift_(_repMes, dir);
@@ -12626,7 +12721,7 @@
                     <thead><tr style="color:var(--muted);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px">
                         <th style="padding:8px 10px">Médico</th><th style="padding:8px 10px">Modelo</th>
                         <th style="padding:8px 10px">Base do cálculo</th><th style="padding:8px 10px">Cobertura</th>
-                        <th style="padding:8px 10px;text-align:right">Repasse calculado</th></tr></thead>
+                        <th style="padding:8px 10px;text-align:right">Repasse calculado</th><th></th></tr></thead>
                     <tbody>` + resultados.map(r => `
                         <tr style="border-top:1px solid var(--border)">
                             <td style="padding:9px 10px;font-weight:600">${repEsc_(r.nome)}</td>
@@ -12636,6 +12731,7 @@
                                 ? '<span style="color:#34d399;font-weight:600">🟢 total</span>'
                                 : '<span style="color:#fbbf24;font-weight:600" title="Honorários lançados à mão na planilha (anestesia/embriologia/etc) não existem na agenda; este é o mínimo calculável">🟡 parcial</span>'}</td>
                             <td style="padding:9px 10px;text-align:right;font-weight:700;color:#34d399">${repFmt_(r.total)}</td>
+                            <td style="padding:9px 10px"><button class="cr-reload-btn" onclick="repDemonstrativo('${r.chave}')" title="Demonstrativo imprimível pra enviar ao médico">📄 Demonstrativo</button></td>
                         </tr>`).join('') + '</tbody></table>';
 
             // Spotlight Érica: modelo dela (turno) vs o modelo padrão (por item)
