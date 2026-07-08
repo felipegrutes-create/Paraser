@@ -2720,6 +2720,7 @@
             <div class="tab-dropdown">
                 <button class="tab-dropdown-item" onclick="showSection('sec-doadoras',null)">🏷️ Fluxo Pacientes</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-pend',null)">Cards Pacientes</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-meta',null)">🎯 Meta</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-arquivo-morto',null)">📦 Arquivo Morto <span class="tab-badge" id="tabBadgeArquivo" style="display:none"></span></button>
             </div>
         </div>
@@ -3301,6 +3302,12 @@
 
             <!-- Board Kanban — rola livremente -->
             <div class="kanban-board" id="kanbanBoard"></div>
+        </section>
+
+        <!-- META COMERCIAL (barra da meta + PIX a conferir) -->
+        <section id="sec-meta" class="section">
+            <p class="section-title">🎯 Meta Comercial</p>
+            <div id="metaBarFull" style="margin-top:4px"></div>
         </section>
 
         <!-- ARQUIVO MORTO -->
@@ -6159,6 +6166,7 @@
         let _dirtyDoadoras = false, _dirtyKanban = false;
 
         const SECTION_GROUP = {
+            'sec-meta':          'group-crm',
             'sec-pend':          'group-crm',
             'sec-arquivo-morto': 'group-crm',
             'sec-salas':         'group-pacientes',
@@ -6233,6 +6241,7 @@
             if (id === 'sec-estrutura') loadAndRenderEstrutura(false);
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
+            if (id === 'sec-meta') renderMetaBar();
             if (id === 'sec-arquivo-morto') renderArquivoMorto();
             if (id === 'sec-salas') renderMapaSalas();
         }
@@ -6820,8 +6829,9 @@
         }
         let _metaFetched = false;
         async function renderMetaBar() {
-            const bar = document.getElementById('metaBar');
-            if (!bar || !CRM_SCRIPT_URL) return;
+            const bars = ['metaBar', 'metaBarFull'].map(id => document.getElementById(id)).filter(Boolean);
+            if (!bars.length || !CRM_SCRIPT_URL) return;
+            const setAll = html => bars.forEach(b => b.innerHTML = html);
             try {
                 const mes = mesAtualMeta();
                 const res = await fetch(CRM_SCRIPT_URL + '?action=get_meta&mes=' + mes);
@@ -6830,14 +6840,14 @@
                 const total = Number(j.total != null ? j.total : j.confirmado) || 0;
                 const fmt  = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
                 if (meta <= 0) {
-                    bar.innerHTML = `<button onclick="editarMeta()" style="background:none;border:1px dashed var(--muted);color:var(--muted);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px">🎯 Definir meta do mês</button>`;
+                    setAll(`<button onclick="editarMeta()" style="background:none;border:1px dashed var(--muted);color:var(--muted);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px">🎯 Definir meta do mês</button>`);
                     renderAConferir();
                     return;
                 }
                 const pct   = Math.min(100, Math.round(total / meta * 100));
                 const falta = Math.max(0, meta - total);
                 const vend  = (j.porVendedora || []).map(v => `${v.vendedora} ${fmt(v.valor)}`).join(' · ');
-                bar.innerHTML = `
+                setAll(`
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px;color:var(--muted)">
                         <span>🎯 Meta de ${mes.split('-').reverse().join('/')}: <b style="color:#10b981">${fmt(total)}</b> de <b style="color:#fff">${fmt(meta)}</b> · faltam <b style="color:#f59e0b">${fmt(falta)}</b> (${pct}%)</span>
                         <button onclick="editarMeta()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px" title="Editar meta">✏️</button>
@@ -6849,12 +6859,12 @@
                         <span>🏷️ Comercial <b style="color:#e5e7eb">${fmt(j.comercial||0)}</b>${vend ? ` <span style="opacity:.65">(${vend})</span>` : ''}</span>
                         <span>➕ Outros <b style="color:#e5e7eb">${fmt(j.outros||0)}</b></span>
                         <span style="opacity:.7">💳 ${fmt(j.cartao||0)} · 📥 ${fmt(j.pixLinkado||0)}</span>
-                    </div>`;
+                    </div>`);
                 renderAConferir();
             } catch(e) { console.warn('meta bar:', e.message); }
         }
         async function renderAConferir() {
-            const bar = document.getElementById('metaBar');
+            const bar = document.getElementById('metaBarFull');
             if (!bar || !CRM_SCRIPT_URL) return;
             let box = document.getElementById('aConferirBox');
             if (!box) { box = document.createElement('div'); box.id = 'aConferirBox'; box.style.marginTop = '10px'; bar.after(box); }
