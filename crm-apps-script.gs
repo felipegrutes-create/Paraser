@@ -2759,14 +2759,26 @@ function wppChamarClaude_(systemPrompt, userPrompt) {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
     payload: JSON.stringify({
-      model: model, max_tokens: 1400,
+      model: model, max_tokens: 3000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
     })
   });
   if (res.getResponseCode() !== 200) throw new Error('Anthropic ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
   const body = JSON.parse(res.getContentText());
-  return (body.content && body.content[0] && body.content[0].text) || '';
+  // Resposta cortada no teto de tokens = JSON truncado; falhar com causa clara
+  // (foi exatamente o erro silencioso do 1º dia: "Unexpected end of JSON input").
+  if (body.stop_reason === 'max_tokens') throw new Error('Anthropic: resposta cortada em max_tokens');
+  // O texto pode não ser o primeiro bloco (ex: bloco de raciocínio antes);
+  // junta todos os blocos de texto. Vazio = erro com diagnóstico completo.
+  const texto = (body.content || []).filter(function(b) { return b && b.type === 'text'; })
+    .map(function(b) { return b.text || ''; }).join('');
+  if (!texto) {
+    throw new Error('Anthropic sem texto: stop=' + body.stop_reason + ' blocos=[' +
+      (body.content || []).map(function(b) { return b && b.type; }).join(',') + '] raw=' +
+      res.getContentText().slice(0, 220));
+  }
+  return texto;
 }
 
 // Analisa o dia e devolve o objeto da leitura (ou null sem chave/sem conversa).
@@ -2788,7 +2800,10 @@ function wppAnaliseIA_(msgs, assinaturas) {
   const texto = wppChamarClaude_(system, 'Transcrição do dia:\n' + transcript);
   if (texto === null) return null;
   const limpo = texto.replace(/^```(json)?/m, '').replace(/```\s*$/m, '').trim();
-  return JSON.parse(limpo);
+  // Aceita preâmbulo/rodapé acidental: parseia do primeiro { ao último }.
+  const ini = limpo.indexOf('{'), fim = limpo.lastIndexOf('}');
+  if (ini < 0 || fim <= ini) throw new Error('IA respondeu sem JSON: ' + limpo.slice(0, 120));
+  return JSON.parse(limpo.slice(ini, fim + 1));
 }
 
 // Card da leitura do dia (segundo post no #comercial). O JSON vem de um modelo:
