@@ -2403,6 +2403,8 @@ function handleWppAdmin(params) {
     if (op === 'qr')     return jsonOk(zapiComFetch_('/qr-code/image', 'get'));
     if (op === 'status') return jsonOk(zapiComFetch_('/status', 'get'));
     if (op === 'setup_trigger') return jsonOk({ ok: setupTriggerRelatorioWhatsApp() });
+    if (op === 'setup_watchdog') return jsonOk({ ok: setupTriggerWatchdog() });
+    if (op === 'watchdog_test') return jsonOk({ resultado: rodarWatchdogWhatsApp() });
     if (op === 'test_report') return jsonOk({ ok: true, resultado: rodarRelatorioWhatsApp() });
     if (op === 'set_anthropic') {
       if (params.akey)  p.setProperty('ANTHROPIC_KEY', String(params.akey));
@@ -3037,6 +3039,9 @@ function rodarRelatorioWhatsApp() {
       method: 'post', contentType: 'application/json',
       payload: JSON.stringify({ blocks: blocks, text: resumo })
     });
+    // Heartbeat: card saiu = o relatório rodou hoje. O vigia de manhã cobra
+    // se isto ficar velho (ver rodarWatchdogWhatsApp).
+    try { wppProps_().setProperty('WPP_HEARTBEAT', Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd')); } catch (e) {}
   };
   const blocks = [{ type: 'header', text: { type: 'plain_text',
     text: '💬 WhatsApp Comercial · ' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM'), emoji: true } }];
@@ -3098,7 +3103,14 @@ function rodarRelatorioWhatsApp() {
   try {
     const leitura = wppAnaliseIA_(msgs, assin, j.ini);
     if (leitura) { post(wppBlocosIA_(leitura), '🧠 WhatsApp: leitura do dia'); ia = 'ok'; }
-  } catch (e) { ia = 'erro: ' + String(e).slice(0, 200); }
+  } catch (e) {
+    ia = 'erro: ' + String(e).slice(0, 200);
+    // Falha da IA não fica escondida: uma linha no canal avisa que a leitura
+    // do dia não saiu (os números já foram postados normalmente acima).
+    try { post([{ type: 'section', text: { type: 'mrkdwn',
+      text: '🧠⚠️ *A leitura do dia por IA não saiu hoje* (os números acima estão ok). Registrado pra revisão.' } }],
+      '🧠⚠️ leitura do dia indisponível'); } catch (e3) {}
+  }
   try {
     wppProps_().setProperty('WPP_IA_ULTIMO',
       Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM HH:mm') + ' · ' + ia);
@@ -3128,7 +3140,9 @@ function wppDiag_() {
     zapi: !!(p.getProperty('ZAPI_COM_INSTANCE') && p.getProperty('ZAPI_COM_TOKEN') && p.getProperty('ZAPI_CLIENT_TOKEN')),
     webhook_key: !!p.getProperty('WPP_WEBHOOK_KEY'),
     anthropic: !!p.getProperty('ANTHROPIC_KEY'),
-    ia_ultimo: p.getProperty('WPP_IA_ULTIMO') || '(nunca rodou)'
+    gemini: !!p.getProperty('GEMINI_KEY'),
+    ia_ultimo: p.getProperty('WPP_IA_ULTIMO') || '(nunca rodou)',
+    heartbeat: p.getProperty('WPP_HEARTBEAT') || '(nunca)'
   } };
   try {
     const rows = wppQuery_(
@@ -3152,4 +3166,40 @@ function setupTriggerRelatorioWhatsApp() {
   });
   ScriptApp.newTrigger('rodarRelatorioWhatsApp').timeBased().everyDays(1).atHour(19).create();
   return 'gatilho 19h do relatório WhatsApp criado';
+}
+
+// VIGIA (dead-man's-switch): roda de manhã e cobra no Slack se o relatório das
+// 19h NÃO rodou. É a resposta pra "como sei se o agente parou?": em vez de
+// silêncio (fácil de não notar), o próprio canal avisa. Gatilho independente
+// do das 19h, então sobrevive se aquele for apagado ou falhar.
+function rodarWatchdogWhatsApp() {
+  const p = wppProps_();
+  const webhookUrl = p.getProperty('SLACK_COMERCIAL_WEBHOOK');
+  if (!webhookUrl) return 'sem webhook';
+  const hb = p.getProperty('WPP_HEARTBEAT') || '';
+  const agora = new Date();
+  const hojeIso = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  const ontemIso = Utilities.formatDate(new Date(agora.getTime() - 24 * 3600 * 1000), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  // Saudável se o último card saiu ontem ou hoje. Roda de manhã, então o
+  // relatório de ontem (19h) já deveria ter marcado o heartbeat.
+  if (hb === hojeIso || hb === ontemIso) return 'ok (' + hb + ')';
+  const dias = hb ? 'último relatório em ' + hb : 'nunca rodou';
+  UrlFetchApp.fetch(webhookUrl, {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ text:
+      '🚨 *Monitor WhatsApp parado* — o relatório das 19h não rodou (' + dias + '). ' +
+      'Provável: WhatsApp desconectado, Z-API vencido ou gatilho caído. Chamar o Felipe pra verificar.' })
+  });
+  return 'ALERTA enviado (hb=' + (hb || 'nunca') + ')';
+}
+function setupTriggerWatchdog() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'rodarWatchdogWhatsApp') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('rodarWatchdogWhatsApp').timeBased().everyDays(1).atHour(9).create();
+  // Inicia o heartbeat como hoje pra não disparar falso alarme antes do 1º relatório.
+  if (!wppProps_().getProperty('WPP_HEARTBEAT')) {
+    wppProps_().setProperty('WPP_HEARTBEAT', Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd'));
+  }
+  return 'vigia (watchdog) das 9h criado';
 }
