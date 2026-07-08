@@ -2402,7 +2402,7 @@ function handleWppAdmin(params) {
     if (op === 'qr')     return jsonOk(zapiComFetch_('/qr-code/image', 'get'));
     if (op === 'status') return jsonOk(zapiComFetch_('/status', 'get'));
     if (op === 'setup_trigger') return jsonOk({ ok: setupTriggerRelatorioWhatsApp() });
-    if (op === 'test_report') { rodarRelatorioWhatsApp(); return jsonOk({ ok: true }); }
+    if (op === 'test_report') return jsonOk({ ok: true, resultado: rodarRelatorioWhatsApp() });
     if (op === 'set_anthropic') {
       if (params.akey)  p.setProperty('ANTHROPIC_KEY', String(params.akey));
       if (params.model) p.setProperty('WPP_IA_MODEL', String(params.model));
@@ -2905,12 +2905,17 @@ function rodarRelatorioWhatsApp() {
   post(blocks, '💬 WhatsApp: ' + m.conversas + ' conversas, ' + m.semResposta.length + ' sem resposta');
 
   // Camada 2: leitura do dia por IA (segundo card). Falha aqui não derruba
-  // o relatório de números, que já foi postado.
+  // o relatório de números, que já foi postado. O resultado fica registrado
+  // em WPP_IA_ULTIMO (visível no op=diag), senão erro de IA é invisível.
   let ia = 'sem chave';
   try {
     const leitura = wppAnaliseIA_(msgs, assin);
     if (leitura) { post(wppBlocosIA_(leitura), '🧠 WhatsApp: leitura do dia'); ia = 'ok'; }
   } catch (e) { ia = 'erro: ' + String(e).slice(0, 200); }
+  try {
+    wppProps_().setProperty('WPP_IA_ULTIMO',
+      Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM HH:mm') + ' · ' + ia);
+  } catch (e2) {}
   return 'ok: ' + m.totalMsgs + ' mensagens · ia: ' + ia;
 }
 
@@ -2931,7 +2936,9 @@ function wppDiag_() {
   const p = wppProps_();
   const out = { props: {
     zapi: !!(p.getProperty('ZAPI_COM_INSTANCE') && p.getProperty('ZAPI_COM_TOKEN') && p.getProperty('ZAPI_CLIENT_TOKEN')),
-    webhook_key: !!p.getProperty('WPP_WEBHOOK_KEY')
+    webhook_key: !!p.getProperty('WPP_WEBHOOK_KEY'),
+    anthropic: !!p.getProperty('ANTHROPIC_KEY'),
+    ia_ultimo: p.getProperty('WPP_IA_ULTIMO') || '(nunca rodou)'
   } };
   try {
     const rows = wppQuery_(
