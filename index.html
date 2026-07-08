@@ -6876,12 +6876,19 @@
             } catch(e) { console.warn('a conferir:', e.message); }
         }
         async function conferirPix(fitid, decisao, btn) {
-            if (btn && btn.parentElement) { btn.parentElement.style.opacity = '0.4'; btn.parentElement.querySelectorAll('button').forEach(b => b.disabled = true); }
-            await fetch(CRM_SCRIPT_URL, {
-                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'conferir_pix', fitid, decisao })
-            }).catch(() => {});
-            setTimeout(() => { renderMetaBar(); }, 1400);
+            // Some com a linha NA HORA (feedback imediato) e atualiza o contador do cabeçalho.
+            const row = btn && btn.parentElement;
+            if (row) row.remove();
+            try {
+                await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'conferir_pix', fitid, decisao })
+                });
+            } catch(e) {}
+            // Re-sincroniza a FILA direto (rápido, só lê a aba) — não depende do get_meta lento.
+            setTimeout(renderAConferir, 800);
+            // Atualiza os TOTAIS da barra em segundo plano (get_meta é mais lento).
+            setTimeout(renderMetaBar, 1800);
         }
         async function editarMeta() {
             const off = prompt('Meta de qual mês?\n0 = este mês\n1 = mês que vem\n2 = daqui 2 meses ...', '0');
