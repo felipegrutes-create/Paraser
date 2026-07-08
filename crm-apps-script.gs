@@ -3108,10 +3108,13 @@ function rodarRelatorioWhatsApp() {
 
 // Últimas N mensagens (pra validar a atribuição celular/web com testes reais).
 function wppUltimas_(n) {
+  const comTrans = wppTransOk_();
   const rows = wppQuery_(
-    "SELECT FORMAT_TIMESTAMP('%d/%m %H:%M', momento, 'America/Sao_Paulo') hora, from_me, device, tipo, " +
-    "SUBSTR(texto, 1, 60) texto, chat_name, SUBSTR(message_id, 1, 8) id_prefixo " +
-    "FROM " + WPP_BQ_REF + " ORDER BY momento DESC LIMIT " + Math.min(50, Math.max(1, n)));
+    "SELECT FORMAT_TIMESTAMP('%d/%m %H:%M', m.momento, 'America/Sao_Paulo') hora, m.from_me, m.device, m.tipo, " +
+    (comTrans ? "SUBSTR(COALESCE(t.texto, m.texto), 1, 80) texto, " : "SUBSTR(m.texto, 1, 80) texto, ") +
+    "m.chat_name, SUBSTR(m.message_id, 1, 8) id_prefixo FROM " + WPP_BQ_REF + " m " +
+    (comTrans ? "LEFT JOIN " + WPP_BQ_TRANS + " t ON t.message_id = m.message_id " : "") +
+    "ORDER BY m.momento DESC LIMIT " + Math.min(50, Math.max(1, n)));
   return rows.map(function(r) {
     return { hora: r.f[0].v, from_me: String(r.f[1].v) === 'true', device: r.f[2].v || '',
              tipo: r.f[3].v, texto: r.f[4].v || '', chat: r.f[5].v || '', id_prefixo: r.f[6].v };
