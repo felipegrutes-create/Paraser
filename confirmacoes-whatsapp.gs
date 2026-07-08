@@ -2692,11 +2692,13 @@ function enviarAgendaMedicos() {
   // ontem). Anexadas na msg de cada médico (só quem tem pendência vê). Se falhar,
   // segue sem — a agenda é o que importa, a pendência é bônus.
   var presosEmAtend = [];
+  var presosOk = false;
   try {
     var _hj    = new Date();
     var _ontemP = new Date(_hj.getTime() - 24 * 60 * 60 * 1000);
     var _iniP  = new Date(_hj.getFullYear(), _hj.getMonth() - 1, 1);
     presosEmAtend = cfBuscarEmAtendimento(_iniP, _ontemP);
+    presosOk = true;
   } catch (e) {
     Logger.log('Pendências "Em atendimento" não carregadas (agenda segue normal): ' + e.message);
   }
@@ -2737,6 +2739,14 @@ function enviarAgendaMedicos() {
                ' · enviadas: ' + enviados + ' / falhas: ' + falhas + ' / sem agenda: ' + semAgenda;
   Logger.log(resumo);
   if (typeof slackPost === 'function') slackPost(resumo);
+
+  // Toda segunda, posta no Slack o panorama dos presos em "Em atendimento" (mesma
+  // info que foi pra cada médico). Aproveita este trigger, sem gatilho separado.
+  if (dow === 1 && presosOk && typeof slackPost === 'function') {
+    try { slackPost(_resumoPresosSlack(presosEmAtend, profMap, procMap)); }
+    catch (e) { Logger.log('Resumo presos (Slack) falhou: ' + e.message); }
+  }
+
   _propsAg.setProperty('AGENDA_MED_ENVIADA_EM', _hojeStr);
 }
 
@@ -2956,66 +2966,55 @@ function cfBuscarEmAtendimento(ini, fim) {
   });
 }
 
-function alertarEmAtendimento() {
-  var hoje    = new Date();
-  var ontem   = new Date(hoje.getTime() - 24 * 60 * 60 * 1000);
-  var ini     = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+// Monta o texto do resumo de presos pro Slack (agrupado por médico). Reaproveitado
+// pelo alertarEmAtendimento (manual) e pela agenda de segunda (automático).
+function _resumoPresosSlack(presos, profMap, procMap) {
+  var hoje  = new Date();
+  var ontem = new Date(hoje.getTime() - 24 * 60 * 60 * 1000);
+  var ini   = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
   var periodo = cfDataBR(ini) + ' a ' + cfDataBR(ontem);
-
-  var itens;
-  try {
-    itens = cfBuscarEmAtendimento(ini, ontem);
-  } catch (e) {
-    slackPost('🚨 Alerta "Em atendimento" não rodou: ' + e.message);
-    return;
+  if (!presos || !presos.length) {
+    return '🩺 *Presos em "Em atendimento"* (' + periodo + ')\n✅ Nenhum preso. Feegow em dia.';
   }
-
-  if (!itens.length) {
-    slackPost('🩺 *Presos em "Em atendimento"* (' + periodo + ')\n✅ Nenhum preso. Feegow em dia.');
-    return;
-  }
-
-  var profMap = carregarProfissionais();
-  var procMap = carregarNomesProcedimentos();
-  var grupos  = {};
-  itens.forEach(function(a) {
-    var pid   = a.profissional_id || 0;
-    var pnome = profMap[pid] || ('Profissional ' + pid);
+  var grupos = {};
+  presos.forEach(function(a) {
+    var pnome = profMap[a.profissional_id] || ('Profissional ' + (a.profissional_id || '?'));
     (grupos[pnome] = grupos[pnome] || []).push(a);
   });
-
   var nomes  = Object.keys(grupos).sort(function(x, y) { return grupos[y].length - grupos[x].length; });
-  var linhas = [];
-  linhas.push('🩺 *Agendamentos presos em "Em atendimento"* (' + periodo + ')');
-  linhas.push('_Só o médico marca "Atendido" no Feegow. Peça pra fecharem os itens abaixo (senão somem dos relatórios)._');
-  linhas.push('');
-
+  var linhas = ['🩺 *Agendamentos presos em "Em atendimento"* (' + periodo + ')',
+                '_Só o médico marca "Atendido" no Feegow. Peça pra fecharem os itens abaixo (senão somem dos relatórios)._', ''];
   var total = 0;
   nomes.forEach(function(nome) {
     var arr = grupos[nome].sort(function(x, y) { return cfDataKey(x.data).localeCompare(cfDataKey(y.data)); });
     total += arr.length;
-    linhas.push('• *' + nome + '* — ' + arr.length);
+    linhas.push('• *' + nome + '* · ' + arr.length);
     arr.slice(0, 6).forEach(function(a) {
       var proc = procMap[a.procedimento_id] || '';
       var pac  = '';
       try { pac = getPatientData(a.paciente_id).nome || ''; } catch (e) {}
       if (!pac) pac = '#' + (a.paciente_id || '?');
-      linhas.push('     ' + cfDataBRFeegow(a.data) + '  ' + pac + (proc ? ' · ' + proc : ''));
+      linhas.push('     ' + cfDataBRFeegow(a.data) + '  ' + _titleCaseNome(pac) + (proc ? ' · ' + _titleCaseNome(proc) : ''));
     });
     if (arr.length > 6) linhas.push('     _+' + (arr.length - 6) + ' mais_');
   });
-
   linhas.push('');
   linhas.push('Total: *' + total + '* preso' + (total === 1 ? '' : 's') + '.');
-  slackPost(linhas.join('\n'));
+  return linhas.join('\n');
 }
 
-function setupAlertaEmAtendimento() {
-  ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'alertarEmAtendimento') ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger('alertarEmAtendimento')
-    .timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8)
-    .inTimezone('America/Sao_Paulo').create();
-  Logger.log('✅ Trigger criado: alertarEmAtendimento toda segunda 8h');
+// Resumo dos presos no Slack. Roda automático toda segunda (dentro da agenda dos
+// médicos, sem gatilho separado); também pode ser chamado na mão pra testar.
+function alertarEmAtendimento() {
+  var itens;
+  try {
+    var hoje  = new Date();
+    var ontem = new Date(hoje.getTime() - 24 * 60 * 60 * 1000);
+    var ini   = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    itens = cfBuscarEmAtendimento(ini, ontem);
+  } catch (e) {
+    slackPost('🚨 Alerta "Em atendimento" não rodou: ' + e.message);
+    return;
+  }
+  slackPost(_resumoPresosSlack(itens, carregarProfissionais(), carregarNomesProcedimentos()));
 }
