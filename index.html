@@ -3897,7 +3897,7 @@
             <div class="chart-card" id="repEricaCard" style="border-left:3px solid #c084fc"></div>
 
             <div class="chart-card">
-                <h3>👩‍⚕️ Repasse por médico (agenda · status Atendido)</h3>
+                <h3>👩‍⚕️ Repasse por médico (agenda · Atendido + Em atendimento)</h3>
                 <div id="repTabela" style="margin-top:12px;overflow-x:auto"></div>
                 <p id="repNotas" style="font-size:11.5px;color:var(--muted);margin:16px 0 0;line-height:1.6"></p>
             </div>
@@ -12538,6 +12538,14 @@
         function repEhComplexa_(proc) {
             return REP_COMPLEXAS.some(function(c){ return proc.indexOf(c) >= 0; });
         }
+        // Conta como trabalho feito pro repasse: Atendido OU Em atendimento. "Em atendimento"
+        // fica congelado no Feegow quando ninguém fecha o status, mas a paciente foi vista
+        // (a USG foi feita). Sem isto o sistema paga a médica a menos (reclamação Érica 05/06:
+        // Jenypher USG FIV 1º + contagem de folículos da Marcela ficaram "Em atendimento").
+        function repFeito_(s) {
+            const t = String(s || '').toLowerCase().trim();
+            return t === 'atendido' || t === 'em atendimento';
+        }
         // G da planilha: repasse do dia no modelo turno (C=USGs do dia, D=complexas).
         function repGDia_(doisTurnos, C, D) {
             const E = 585;
@@ -12556,7 +12564,7 @@
             const C = _repCols;
             return _repRaw.filter(r => {
                 if (monthKey(r[C.data]) !== mes) return false;
-                if ((r[C.sta] || '').toLowerCase().trim() !== 'atendido') return false;
+                if (!repFeito_(r[C.sta])) return false;
                 const prof = repNorm_(r[C.prof]);
                 if (!prof.includes(chave)) return false;
                 if (chave === 'erica stein' && prof.includes('freitas')) return false;
@@ -12693,7 +12701,7 @@
                 <h1>Demonstrativo de Repasse — ${nome}</h1>
                 <div class="sub">Instituto Paraser · ${mesLabel} · atendimentos realizados (agenda)</div>
                 ${resumo}${corpo}
-                <div class="rodape">Gerado automaticamente pelo sistema Paraser a partir da agenda (status Atendido) · valores sobre o cobrado · ${new Date().toLocaleDateString('pt-BR')}</div>
+                <div class="rodape">Gerado automaticamente pelo sistema Paraser a partir da agenda (status Atendido e Em atendimento) · valores sobre o cobrado · ${new Date().toLocaleDateString('pt-BR')}</div>
                 </body></html>`);
             w.document.close();
         }
@@ -12800,7 +12808,7 @@
             const semRegra = {};
             _repRaw.forEach(r => {
                 if (monthKey(r[C.data]) !== _repMes) return;
-                if ((r[C.sta] || '').toLowerCase().trim() !== 'atendido') return;
+                if (!repFeito_(r[C.sta])) return;
                 const prof = (r[C.prof] || '').trim();
                 if (!prof) return;
                 const n = repNorm_(prof);
@@ -12810,7 +12818,7 @@
             const semRegraTxt = Object.keys(semRegra).sort((a, b) => semRegra[b] - semRegra[a])
                 .map(p => `${repEsc_(p)} (${semRegra[p]})`).join(', ');
             document.getElementById('repNotas').innerHTML =
-                '📌 <b>Como ler:</b> cálculo automático sobre a agenda (só status Atendido, valor cobrado). ' +
+                '📌 <b>Como ler:</b> cálculo automático sobre a agenda (status Atendido e Em atendimento, valor cobrado). ' +
                 'A planilha REPASSE pode divergir por 3 motivos conhecidos: conta alguns agendamentos não atendidos; ' +
                 'usa tabela fixa de preços (ex: Contagem de Folículos a R$400 na tabela vs R$300 cobrado); ' +
                 'e tem honorários lançados à mão que não geram agendamento (anestesia, embriologia), por isso a cobertura 🟡 parcial. ' +
