@@ -3884,7 +3884,7 @@
             <div class="kpi-grid">
                 <div class="kpi-card teal"><div class="value" id="rep-total">—</div><div class="label">Total calculado no mês</div></div>
                 <div class="kpi-card"><div class="value" id="rep-medicos">—</div><div class="label">Médicos com atividade</div></div>
-                <div class="kpi-card purple"><div class="value" id="rep-erica-dif">—</div><div class="label">Érica: prêmio dos turnos</div></div>
+                <div class="kpi-card purple"><div class="value" id="rep-erica-dif">—</div><div class="label">Érica: repasse (turno)</div></div>
             </div>
 
             <div class="chart-card" id="repEricaCard" style="border-left:3px solid #c084fc"></div>
@@ -12747,11 +12747,7 @@
                 document.getElementById('rep-erica-dif').textContent = '—';
             } else {
                 const turno = repCalcTurno_(linhasErica);
-                const REP_USG_JUSTO = 85; // R$/USG de tratamento — valor justo do trabalho (def. Felipe)
-                const justoTrat = REP_USG_JUSTO * turno.nTrat;      // USG de tratamento valoradas pelo trabalho
-                const justo     = justoTrat + turno.blocoB;         // + 40% das complexas (igual no modelo dela)
-                const premio    = turno.total - justo;              // o que os turnos garantidos pagam a mais
-                document.getElementById('rep-erica-dif').textContent = (premio > 0 ? '+' : '') + repFmt_(premio);
+                document.getElementById('rep-erica-dif').textContent = repFmt_(turno.total);
                 ericaEl.innerHTML = `
                     <h3>🔬 Érica Stein — por que o cálculo dela é diferente</h3>
                     <div style="display:flex;gap:14px;flex-wrap:wrap;margin:14px 0">
@@ -12763,21 +12759,18 @@
                                 ${turno.nCompl} USG complexas × 40% = ${repFmt_(turno.blocoB)}</div>
                         </div>
                         <div style="flex:1;min-width:220px;background:rgba(148,163,184,.06);border:1px solid var(--border);border-radius:12px;padding:14px">
-                            <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Valor justo do trabalho dela</div>
-                            <div style="font-size:24px;font-weight:800;margin:6px 0">${repFmt_(justo)}</div>
+                            <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Por que não é "por item"</div>
+                            <div style="font-size:24px;font-weight:800;margin:6px 0">${turno.tratZero} de ${turno.nTrat}</div>
                             <div style="font-size:12px;color:var(--muted);line-height:1.6">
-                                ${turno.nTrat} USG de tratamento × R$ 85 = ${repFmt_(justoTrat)}<br>
-                                + 40% das complexas = ${repFmt_(turno.blocoB)}</div>
+                                USG de tratamento sem preço avulso: o monitoramento de FIV vale R$ 0 na tabela do Feegow (só existe dentro do pacote). Não há sobre o que aplicar %.</div>
                         </div>
                     </div>
                     <p style="font-size:12.5px;color:var(--muted);margin:0;line-height:1.6">
-                        <b style="color:#c084fc">Prêmio dos turnos: ${repFmt_(premio)}/mês.</b>
-                        A maioria das USGs dela é acompanhamento de ciclo FIV, dentro de pacotes faturados R$ 0 avulso.
-                        Um modelo por item (% do valor cobrado) pagaria quase nada por esse trabalho real. Valorando cada
-                        USG de tratamento a R$ 85 + 40% das complexas, o trabalho dela vale ${repFmt_(justo)}; o modelo por
-                        turno paga ${repFmt_(turno.total)}. A diferença de ${repFmt_(premio)} é só o prêmio de garantir os
-                        turnos mesmo em dia fraco — não é regalia, é pagar o volume de trabalho que o faturamento não mostra.
-                        A Mabel usa o mesmo modelo.</p>`;
+                        A maioria das USGs da Érica é monitoramento de ciclo FIV, que <b style="color:#c084fc">não tem preço
+                        avulso</b> (R$ 0 na tabela do Feegow — só existe dentro do pacote vendido). Não dá pra pagar "% do valor
+                        cobrado" sobre R$ 0. O modelo por turno é como a clínica remunera esse volume de trabalho; as USG
+                        complexas (que têm preço) ela recebe 40%. Por isso o cálculo dela é diferente — não é regalia, é pagar
+                        um trabalho que o faturamento não precifica. A Mabel usa o mesmo modelo.</p>`;
             }
 
             // Notas + médicos com atividade no mês sem regra cadastrada
