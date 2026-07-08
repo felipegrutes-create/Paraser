@@ -6241,7 +6241,7 @@
 
         // Normaliza texto para busca: remove acentos + lowercase
         function norm(s) {
-            return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
         }
 
         function normalizeKey(name) {
