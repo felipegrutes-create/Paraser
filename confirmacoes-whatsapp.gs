@@ -2851,3 +2851,134 @@ function setupTriggerAgendaMedicos() {
     .timeBased().everyDays(1).atHour(18).inTimezone('America/Sao_Paulo').create();
   Logger.log('✅ Triggers: sexta 17h + seg-qui 18h (cada wrapper checa o dia; trava anti-duplo por dia)');
 }
+
+// ================================================================
+// ALERTA — agendamentos presos em "Em atendimento" no Feegow
+// ----------------------------------------------------------------
+// Só o MÉDICO consegue marcar "Atendido". Quando ele esquece de
+// fechar, o agendamento fica preso em "Em atendimento" e some dos
+// relatórios que filtram só "Atendido" (Médicos, produção). O
+// repasse já conta "Em atendimento" (não depende disto), mas as
+// outras telas não. Este alerta lista os presos por médico e posta
+// no Slack toda segunda 8h, pra alguém pedir ao médico pra fechar.
+// Lê o Feegow DIRETO (não a planilha), então cada item some do
+// alerta assim que o status é fechado. Janela: 1º dia do mês
+// passado até ontem (cobre o ciclo de repasse recente).
+// ================================================================
+var _cfStatusMap = null;
+function cfCarregarStatusMap() {
+  if (_cfStatusMap) return _cfStatusMap;
+  _cfStatusMap = {};
+  try {
+    var resp = UrlFetchApp.fetch(CF_FEEGOW_BASE + '/appoints/status', {
+      headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true
+    });
+    var json  = JSON.parse(resp.getContentText());
+    var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
+    items.forEach(function(s) {
+      var id = s.status_id || s.id;
+      if (id != null) _cfStatusMap[id] = String(s.nome || s.name || s.status || '').toLowerCase().trim();
+    });
+  } catch (e) { Logger.log('cfCarregarStatusMap erro: ' + e.message); }
+  return _cfStatusMap;
+}
+
+// dd/MM/yyyy a partir de um Date
+function cfDataBR(d) {
+  return Utilities.formatDate(d, 'America/Sao_Paulo', 'dd/MM/yyyy');
+}
+// dd/MM/yyyy a partir da string do Feegow (aceita yyyy-mm-dd, dd-mm-yyyy, dd/mm/yyyy)
+function cfDataBRFeegow(s) {
+  s = String(s || '').slice(0, 10);
+  var m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/))) return m[3] + '/' + m[2] + '/' + m[1];
+  if ((m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/))) return m[1] + '/' + m[2] + '/' + m[3];
+  return s;
+}
+// chave yyyymmdd pra ordenar cronologicamente
+function cfDataKey(s) {
+  s = String(s || '').slice(0, 10);
+  var m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/))) return m[1] + m[2] + m[3];
+  if ((m = s.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})$/))) return m[3] + m[2] + m[1];
+  return s;
+}
+
+// Busca no Feegow os agendamentos "Em atendimento" entre duas datas (Date).
+function cfBuscarEmAtendimento(ini, fim) {
+  var url  = CF_FEEGOW_BASE + '/appoints/search?data_start=' + fmtDataFeegow(ini) + '&data_end=' + fmtDataFeegow(fim);
+  var resp = UrlFetchApp.fetch(url, { headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) throw new Error('Feegow fora do ar (HTTP ' + resp.getResponseCode() + ')');
+  var json = JSON.parse(resp.getContentText());
+  if (json && json.success === false) throw new Error('Feegow: ' + (json.message || 'success=false'));
+  var items = Array.isArray(json.content) ? json.content : (Array.isArray(json) ? json : []);
+  var smap  = cfCarregarStatusMap();
+  return items.filter(function(a) {
+    var nome = (smap[a.status_id] || a.status || '').toLowerCase().trim();
+    return nome.indexOf('em atendimento') === 0;
+  });
+}
+
+function alertarEmAtendimento() {
+  var hoje    = new Date();
+  var ontem   = new Date(hoje.getTime() - 24 * 60 * 60 * 1000);
+  var ini     = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  var periodo = cfDataBR(ini) + ' a ' + cfDataBR(ontem);
+
+  var itens;
+  try {
+    itens = cfBuscarEmAtendimento(ini, ontem);
+  } catch (e) {
+    slackPost('🚨 Alerta "Em atendimento" não rodou: ' + e.message);
+    return;
+  }
+
+  if (!itens.length) {
+    slackPost('🩺 *Presos em "Em atendimento"* (' + periodo + ')\n✅ Nenhum preso. Feegow em dia.');
+    return;
+  }
+
+  var profMap = carregarProfissionais();
+  var procMap = carregarNomesProcedimentos();
+  var grupos  = {};
+  itens.forEach(function(a) {
+    var pid   = a.profissional_id || 0;
+    var pnome = profMap[pid] || ('Profissional ' + pid);
+    (grupos[pnome] = grupos[pnome] || []).push(a);
+  });
+
+  var nomes  = Object.keys(grupos).sort(function(x, y) { return grupos[y].length - grupos[x].length; });
+  var linhas = [];
+  linhas.push('🩺 *Agendamentos presos em "Em atendimento"* (' + periodo + ')');
+  linhas.push('_Só o médico marca "Atendido" no Feegow. Peça pra fecharem os itens abaixo (senão somem dos relatórios)._');
+  linhas.push('');
+
+  var total = 0;
+  nomes.forEach(function(nome) {
+    var arr = grupos[nome].sort(function(x, y) { return cfDataKey(x.data).localeCompare(cfDataKey(y.data)); });
+    total += arr.length;
+    linhas.push('• *' + nome + '* — ' + arr.length);
+    arr.slice(0, 6).forEach(function(a) {
+      var proc = procMap[a.procedimento_id] || '';
+      var pac  = '';
+      try { pac = getPatientData(a.paciente_id).nome || ''; } catch (e) {}
+      if (!pac) pac = '#' + (a.paciente_id || '?');
+      linhas.push('     ' + cfDataBRFeegow(a.data) + '  ' + pac + (proc ? ' · ' + proc : ''));
+    });
+    if (arr.length > 6) linhas.push('     _+' + (arr.length - 6) + ' mais_');
+  });
+
+  linhas.push('');
+  linhas.push('Total: *' + total + '* preso' + (total === 1 ? '' : 's') + '.');
+  slackPost(linhas.join('\n'));
+}
+
+function setupAlertaEmAtendimento() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'alertarEmAtendimento') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('alertarEmAtendimento')
+    .timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8)
+    .inTimezone('America/Sao_Paulo').create();
+  Logger.log('✅ Trigger criado: alertarEmAtendimento toda segunda 8h');
+}
