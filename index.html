@@ -12747,30 +12747,35 @@
                 document.getElementById('rep-erica-dif').textContent = '—';
             } else {
                 const turno = repCalcTurno_(linhasErica);
+                const REP_USG_TRAT = 65; // R$/USG de tratamento (mesmo valor do excedente da fórmula)
+                const semBase = REP_USG_TRAT * turno.nTrat + turno.blocoB; // sem a base: 65/USG tratamento + 40% complexas
+                const custoBase = turno.total - semBase;                   // = blocoA − 65×nTrat
                 document.getElementById('rep-erica-dif').textContent = repFmt_(turno.total);
                 ericaEl.innerHTML = `
                     <h3>🔬 Érica Stein — por que o cálculo dela é diferente</h3>
                     <div style="display:flex;gap:14px;flex-wrap:wrap;margin:14px 0">
                         <div style="flex:1;min-width:220px;background:rgba(192,132,252,.07);border:1px solid rgba(192,132,252,.25);border-radius:12px;padding:14px">
-                            <div style="font-size:11px;color:#c084fc;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Modelo dela · por turno</div>
+                            <div style="font-size:11px;color:#c084fc;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Modelo dela · com a base</div>
                             <div style="font-size:24px;font-weight:800;margin:6px 0">${repFmt_(turno.total)}</div>
                             <div style="font-size:12px;color:var(--muted);line-height:1.6">
                                 ${turno.nTurnos} turnos × R$585 + excedentes = ${repFmt_(turno.blocoA)}<br>
                                 ${turno.nCompl} USG complexas × 40% = ${repFmt_(turno.blocoB)}</div>
                         </div>
                         <div style="flex:1;min-width:220px;background:rgba(148,163,184,.06);border:1px solid var(--border);border-radius:12px;padding:14px">
-                            <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Por que não é "por item"</div>
-                            <div style="font-size:24px;font-weight:800;margin:6px 0">${turno.tratZero} de ${turno.nTrat}</div>
+                            <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Sem a base de R$ 585</div>
+                            <div style="font-size:24px;font-weight:800;margin:6px 0">${repFmt_(semBase)}</div>
                             <div style="font-size:12px;color:var(--muted);line-height:1.6">
-                                USG de tratamento sem preço avulso: o monitoramento de FIV vale R$ 0 na tabela do Feegow (só existe dentro do pacote). Não há sobre o que aplicar %.</div>
+                                ${turno.nTrat} USG de tratamento × R$ 65 = ${repFmt_(REP_USG_TRAT * turno.nTrat)}<br>
+                                + 40% das complexas = ${repFmt_(turno.blocoB)}</div>
                         </div>
                     </div>
                     <p style="font-size:12.5px;color:var(--muted);margin:0;line-height:1.6">
-                        A maioria das USGs da Érica é monitoramento de ciclo FIV, que <b style="color:#c084fc">não tem preço
-                        avulso</b> (R$ 0 na tabela do Feegow — só existe dentro do pacote vendido). Não dá pra pagar "% do valor
-                        cobrado" sobre R$ 0. O modelo por turno é como a clínica remunera esse volume de trabalho; as USG
-                        complexas (que têm preço) ela recebe 40%. Por isso o cálculo dela é diferente — não é regalia, é pagar
-                        um trabalho que o faturamento não precifica. A Mabel usa o mesmo modelo.</p>`;
+                        <b style="color:#c084fc">Custo da base: ${repFmt_(custoBase)}/mês.</b>
+                        Tirando só os R$ 585/turno e mantendo os R$ 65 por USG de tratamento + 40% das complexas, a Érica
+                        receberia ${repFmt_(semBase)}. A base garante os R$ 585 por turno mesmo em dia fraco (quando o movimento
+                        é baixo, ela rende mais do que os R$ 65 por USG dariam). Essa diferença é o custo de garantir os turnos,
+                        não é regalia. As USG de tratamento (monitoramento de FIV) não têm preço avulso na tabela, por isso o
+                        modelo por turno. A Mabel usa o mesmo modelo.</p>`;
             }
 
             // Notas + médicos com atividade no mês sem regra cadastrada
