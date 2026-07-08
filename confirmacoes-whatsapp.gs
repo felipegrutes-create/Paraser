@@ -2606,6 +2606,24 @@ function _formatarMensagemAgenda(nomeMedico, dataAlvo, agendamentos) {
          '\n\nEquipe Paraser';
 }
 
+// Bloco de pendências "Em atendimento" anexado na agenda do médico.
+// Só é chamado quando o médico tem pelo menos um preso.
+function _blocoPresosMedico(arr, procMap) {
+  arr.sort(function(x, y) { return cfDataKey(x.data).localeCompare(cfDataKey(y.data)); });
+  var n = arr.length;
+  var linhas = ['🔴 *Pendente no Feegow:* você tem *' + n + '* exame' + (n === 1 ? '' : 's') +
+                ' ainda em "Em atendimento". Quando puder, marque como "Atendido" (senão somem dos relatórios):'];
+  arr.slice(0, 8).forEach(function(a) {
+    var proc = procMap[a.procedimento_id] || '';
+    var pac  = '';
+    try { pac = getPatientData(a.paciente_id).nome || ''; } catch (e) {}
+    if (!pac) pac = '#' + (a.paciente_id || '?');
+    linhas.push('• ' + cfDataBRFeegow(a.data) + ' ' + _titleCaseNome(pac) + (proc ? ' · ' + _titleCaseNome(proc) : ''));
+  });
+  if (n > 8) linhas.push('_+' + (n - 8) + ' mais_');
+  return linhas.join('\n');
+}
+
 // FUNÇÃO PRINCIPAL — chamada pelo trigger Seg-Sex 18h
 function enviarAgendaMedicos() {
   var hoje = new Date();
@@ -2670,6 +2688,19 @@ function enviarAgendaMedicos() {
   var relevantes = agendamentos.filter(function(ag) { return idsMedicosLista[ag.agendamento_id]; });
   _carregarNomesPacientes(relevantes);
 
+  // Pendências: agendamentos presos em "Em atendimento" (do 1º do mês passado até
+  // ontem). Anexadas na msg de cada médico (só quem tem pendência vê). Se falhar,
+  // segue sem — a agenda é o que importa, a pendência é bônus.
+  var presosEmAtend = [];
+  try {
+    var _hj    = new Date();
+    var _ontemP = new Date(_hj.getTime() - 24 * 60 * 60 * 1000);
+    var _iniP  = new Date(_hj.getFullYear(), _hj.getMonth() - 1, 1);
+    presosEmAtend = cfBuscarEmAtendimento(_iniP, _ontemP);
+  } catch (e) {
+    Logger.log('Pendências "Em atendimento" não carregadas (agenda segue normal): ' + e.message);
+  }
+
   var enviados = 0, falhas = 0, semAgenda = 0;
   medicos.forEach(function(med) {
     try {
@@ -2684,6 +2715,12 @@ function enviarAgendaMedicos() {
       }
 
       var msg = _formatarMensagemAgenda(med.nome, alvo, agDoMedico);
+      var presosDoMed = presosEmAtend.filter(function(a) {
+        return _matchMedico(profMap[a.profissional_id] || '', [med]);
+      });
+      if (presosDoMed.length) {
+        msg = msg.replace('\n\nEquipe Paraser', '\n\n' + _blocoPresosMedico(presosDoMed, procMap) + '\n\nEquipe Paraser');
+      }
       sendWhatsApp(med.telefone, msg);
       Utilities.sleep(1200);
       enviados++;
