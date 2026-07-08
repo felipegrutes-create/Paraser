@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia · Repasse Dra. Érica Stein</title>
+<style>
+  :root{
+    --roxo:#8b5cf6; --roxo-d:#7c3aed; --ink:#1f2733; --muted:#6b7785;
+    --line:#e7ecf1; --bg:#f5f7fa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;padding:24px 14px}
+  .wrap{max-width:820px;margin:0 auto}
+
+  header{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border-radius:18px;padding:30px 28px;box-shadow:0 8px 24px rgba(124,58,237,.25)}
+  header .tag{display:inline-block;background:rgba(255,255,255,.2);padding:4px 12px;border-radius:30px;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px}
+  header h1{font-size:29px;line-height:1.15;margin-bottom:8px}
+  header p{font-size:16px;opacity:.96;max-width:600px}
+
+  .card{background:#fff;border-radius:18px;padding:26px 24px;margin-top:22px;box-shadow:0 2px 12px rgba(31,39,51,.06);border:1px solid var(--line)}
+  .card h2{font-size:20px;margin-bottom:6px}
+  .card .lead{font-size:14.5px;color:var(--muted);margin-bottom:18px}
+
+  .two{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .type{flex:1;min-width:240px;border:1px solid var(--line);border-radius:12px;padding:15px}
+  .type.trat{background:#f5f0ff;border-color:#ddd0fb}
+  .type.compl{background:#eef6ff;border-color:#cfe2fb}
+  .type h3{font-size:15px;margin-bottom:5px}
+  .type p{font-size:13.5px;color:#3c4655}
+  .type .money{font-size:12.5px;color:var(--muted);margin-top:6px}
+
+  .step{display:flex;gap:16px;padding:16px 0;border-top:1px dashed var(--line)}
+  .step:first-of-type{border-top:none}
+  .num{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--roxo);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .step-body h3{font-size:16px;margin-bottom:3px}
+  .step-body p{font-size:14.5px;color:#3c4655}
+  .step-body b{color:var(--ink)}
+  .pill{display:inline-block;background:#f2edff;border:1px solid #e0d4ff;border-radius:7px;padding:1px 8px;font-size:13px;font-weight:700;color:#6d28d9;margin:0 2px}
+
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  td b{color:var(--roxo-d)}
+  .zero{color:#c026d3;font-weight:700}
+
+  .cmp{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 4px}
+  .cmp-box{flex:1;min-width:240px;border-radius:14px;padding:18px}
+  .cmp-box .t{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+  .cmp-box .v{font-size:30px;font-weight:800;margin-bottom:10px}
+  .cmp-box .l{font-size:13px;line-height:1.7}
+  .cmp-box.hoje{background:#f5f0ff;border:1px solid #ddd0fb}
+  .cmp-box.hoje .t{color:var(--roxo-d)} .cmp-box.hoje .v{color:var(--roxo-d)}
+  .cmp-box.sem{background:#fff4f4;border:1px solid #f6cccc}
+  .cmp-box.sem .t{color:#c0392b} .cmp-box.sem .v{color:#c0392b}
+
+  .tip{display:flex;gap:10px;align-items:flex-start;background:#fff8e9;border:1px solid #f3dca0;border-radius:12px;padding:13px 15px;margin-top:16px;font-size:14px}
+  .tip.green{background:#e9faf2;border-color:#aee9cf}
+  .tip.roxo{background:#f5f0ff;border-color:#ddd0fb}
+  .tip b{display:block;margin-bottom:1px}
+
+  footer{text-align:center;color:var(--muted);font-size:13px;margin-top:26px;padding-bottom:10px}
+
+  @media (max-width:560px){ header h1{font-size:23px} }
+  @media print{body{background:#fff;padding:0}.card{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="tag">Financeiro · Repasses</span>
+    <h1>🔬 Repasse da Dra. Érica Stein</h1>
+    <p>Por que o cálculo dela é "por turno" e não por procedimento, e o que a base de R$ 585 realmente paga. (Mesma regra da Dra. Mabel.)</p>
+  </header>
+
+  <div class="card">
+    <h2>A conta, em uma linha</h2>
+    <p class="lead">Repasse do mês = <b>base dos turnos</b> + <b>40% das USG complexas</b>. Calculado dia a dia, sobre o valor cheio (sem o desconto de 15%).</p>
+
+    <div class="two">
+      <div class="type trat">
+        <h3>🧪 USG de tratamento</h3>
+        <p>Monitoramento do ciclo de FIV: USG FIV 1º/2º/3º, preparo TEC, coito programado.</p>
+        <div class="money">Não têm preço avulso (R$ 0 de tabela) · só existem dentro do pacote. São pagas pela <b>base do turno</b>.</div>
+      </div>
+      <div class="type compl">
+        <h3>🩺 USG complexa</h3>
+        <p>Pós beta, translucência, obstétrica, morfológica, doppler, gemelares, mamas, tireóide, abdome, transvaginal, contagem de folículos, 3D…</p>
+        <div class="money">Têm preço de tabela → a Érica recebe <b>40%</b> do valor.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>A base dos turnos</h2>
+    <p class="lead">É o que paga o volume de monitoramento de FIV do dia.</p>
+
+    <div class="step">
+      <div class="num">R$</div>
+      <div class="step-body">
+        <h3>R$ 585 por turno</h3>
+        <p>Só manhã <b>ou</b> só tarde = 1 turno. Manhã <b>e</b> tarde no mesmo dia = 2 turnos (R$ 1.170).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">8</div>
+      <div class="step-body">
+        <h3>Franquia de 8 USG por turno</h3>
+        <p>Até 8 USG de tratamento no turno (16 em 2 turnos), o turno vale só a base.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">+</div>
+      <div class="step-body">
+        <h3>Acima da franquia: + R$ 65 por USG</h3>
+        <p><b>1 turno:</b> excedente = (USG de tratamento − 8). &nbsp; <b>2 turnos:</b> junta o dia — excedente = (total de USG − 16).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">0</div>
+      <div class="step-body">
+        <h3>Dia dominado por complexas → base zera</h3>
+        <p>Se num dia as complexas forem <b>4 ou mais</b> <b>e</b> forem <b>mais da metade</b> dos procedimentos, a base daquele dia é <span class="pill">R$ 0</span>. Foi um dia de exames complexos, não um turno de FIV — ela recebe só os 40% das complexas.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Exemplos reais (junho/2026)</h2>
+    <table>
+      <tr><th>Dia</th><th>Turnos</th><th>USG (complexas)</th><th>Base</th><th>+ Complexas</th></tr>
+      <tr><td>03/06</td><td>1</td><td>10 (5 complexas)</td><td><b>R$ 715</b><br><span style="color:var(--muted);font-size:12px">585 + 2×65</span></td><td>40% das 5</td></tr>
+      <tr><td>08/06</td><td>2</td><td>18 (6 complexas)</td><td><b>R$ 1.300</b><br><span style="color:var(--muted);font-size:12px">2×585 + 2×65</span></td><td>40% das 6</td></tr>
+      <tr><td>12/06</td><td>1</td><td>8 (0 complexas)</td><td><b>R$ 585</b><br><span style="color:var(--muted);font-size:12px">franquia cheia</span></td><td>—</td></tr>
+      <tr><td>dia dominado</td><td>1</td><td>7 (4 complexas)</td><td class="zero">R$ 0</td><td>40% das 4</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>💰 E se a gente não pagasse a base de R$ 585?</h2>
+    <p class="lead">Simulação com os números de junho/2026. Mostra pra que a base serve de verdade.</p>
+
+    <div class="cmp">
+      <div class="cmp-box hoje">
+        <div class="t">Como é hoje · com a base</div>
+        <div class="v">R$ 13.895</div>
+        <div class="l">
+          Base dos turnos · <b>R$ 10.205</b><br>
+          40% das complexas · <b>R$ 3.690</b>
+        </div>
+      </div>
+      <div class="cmp-box sem">
+        <div class="t">Sem a base de R$ 585</div>
+        <div class="v">R$ 3.690</div>
+        <div class="l">
+          Só os 40% das complexas<br>
+          Monitoramento de FIV · <b>R$ 0</b> (sem preço avulso)
+        </div>
+      </div>
+    </div>
+
+    <div class="tip roxo">
+      <span>🔑</span>
+      <div><b>A base é o único pagamento pelo FIV</b>Sem ela, cerca de <b>R$ 10.205</b> de trabalho de monitoramento de FIV ficariam sem remuneração — a Érica faria tudo isso de graça, recebendo só os R$ 3.690 das complexas. A base de R$ 585 não é regalia: é o jeito de pagar um trabalho de verdade que o faturamento não precifica (as USG de FIV valem R$ 0 na tabela porque só existem dentro do pacote).</div>
+    </div>
+  </div>
+
+  <footer>
+    Paraser · Guia interno de repasses · dúvidas, fala com o Felipe
+  </footer>
+
+</div>
+</body>
+</html>
