@@ -12779,14 +12779,16 @@
         }
         let _repFeegowSug = {}; // chave -> sugestões de honorário FIV puxadas do Feegow
         let _repPagos = {};     // chave do caso (paciente|data|valor) -> true, repasses já pagos (aba Repasses_Pagos)
-        // Janela ampla (mês anterior ao seguinte) pra pegar honorário faturado adiantado; filtra por execução.
+        let _repFeegowOutros = {}; // chave -> honorários da Priscila em OUTROS meses (pra avisar "está no Feegow em abril")
+        // Janela ampla (4 meses antes ao seguinte) pra pegar honorário faturado adiantado e
+        // conseguir avisar quando um lançamento manual está no Feegow em outro mês. Filtra por execução.
         function repMesRange_(mes) {
             const [y, m] = mes.split('-').map(Number);
             const f = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
-            return { ini: f(new Date(y, m - 2, 1)), fim: f(new Date(y, m + 1, 0)) };
+            return { ini: f(new Date(y, m - 5, 1)), fim: f(new Date(y, m + 1, 0)) };
         }
         function repFiltraHonorarios_(data) {
-            const mesRef = _repMes.slice(5, 7), anoRef = _repMes.slice(0, 4), sug = [];
+            const mesRef = _repMes.slice(5, 7), anoRef = _repMes.slice(0, 4), sug = [], outros = [];
             (data || []).forEach(f => {
                 const pagTotal = (f.pagamentos || []).reduce((s, p) => s + (Number(p.valor) || 0) / 100, 0);
                 (f.itens || []).forEach(it => {
@@ -12795,12 +12797,25 @@
                     // Qualquer honorário da Priscila: FIV, coito programado (NP), congelamento de óvulos, OD... não só FIV.
                     if (!(nome.includes('honorario') && nome.includes('priscila')) || it.is_cancelado) return;
                     const de = String(it.data_execucao || ''); // DD-MM-YYYY
-                    if (de.slice(3, 5) !== mesRef || de.slice(6, 10) !== anoRef) return;
+                    if (!/^\d{2}-\d{2}-\d{4}$/.test(de)) return;
                     const tipo = raw.replace(/\s*-\s*dra\.?.*/i, '').replace(/^\s*honor[aá]rio\s*/i, '').trim();
-                    sug.push({ paciente: f.nomePaciente || '', val: (Number(it.valor) || 0) / 100, dexec: de, pagTotal, tipo });
+                    const val = (Number(it.valor) || 0) / 100;
+                    if (de.slice(3, 5) === mesRef && de.slice(6, 10) === anoRef) {
+                        sug.push({ paciente: f.nomePaciente || '', val, dexec: de, pagTotal, tipo });
+                    } else {
+                        outros.push({ paciente: f.nomePaciente || '', val, mesIso: de.slice(6, 10) + '-' + de.slice(3, 5), tipo });
+                    }
                 });
             });
-            return sug;
+            return { sug, outros };
+        }
+        // Match de nome robusto: exige >=2 partes do nome (tokens >=4 letras) em comum, pra não
+        // confundir pacientes diferentes que dividem o 1º nome (ex: duas "Monique", duas "Ana").
+        function repTokens_(s) { return repNorm_(s).replace(/[^a-z ]/g, ' ').split(/\s+/).filter(t => t.length >= 4); }
+        function repMatchNome_(a, b) {
+            const sb = new Set(repTokens_(b)); let n = 0;
+            repTokens_(a).forEach(t => { if (sb.has(t)) n++; });
+            return n >= 2;
         }
         async function repPuxarFeegow_(chave) {
             const box = document.getElementById('rep-feegow-' + chave);
@@ -12812,7 +12827,9 @@
                     fetch(`${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(r.ini)}&data_end=${encodeURIComponent(r.fim)}`),
                     fetch(`${CRM_SCRIPT_URL}?action=get_repasses_pagos`)
                 ]);
-                _repFeegowSug[chave] = repFiltraHonorarios_((await finRes.json()).data);
+                const fr = repFiltraHonorarios_((await finRes.json()).data);
+                _repFeegowSug[chave] = fr.sug;
+                _repFeegowOutros[chave] = fr.outros;
                 _repPagos = {}; ((await pagRes.json()).itens || []).forEach(function(x){ _repPagos[x.chave] = true; });
             } catch (e) {
                 box.innerHTML = '<div style="font-size:12px;color:#f87171;margin-top:6px">Erro ao buscar o Feegow. Tenta de novo.</div>';
@@ -12826,9 +12843,8 @@
             const sug = _repFeegowSug[chave] || [], fmt = repFmt_;
             const aj = repAjusteGet_(chave, _repMes) || {};
             const manuais = (aj.porFora || []).filter(x => x.desc);
-            const pk = s => repNorm_(s.paciente).split(' ').filter(t => t.length >= 3)[0] || '\x00';
-            const jaTem = s => manuais.some(m => repNorm_(m.desc).includes(pk(s)));
-            const semLastro = manuais.filter(m => !sug.some(s => repNorm_(m.desc).includes(pk(s))));
+            const jaTem = s => manuais.some(m => repMatchNome_(m.desc, s.paciente));
+            const semLastro = manuais.filter(m => !sug.some(s => repMatchNome_(m.desc, s.paciente)));
             let html = '<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:8px">';
             if (!sug.length) {
                 html += '<div style="font-size:12px;color:var(--muted)">Nenhum honorário da Priscila com execução em ' + repMesNomeCompleto_(_repMes) + ' no Feegow.</div>';
@@ -12850,7 +12866,19 @@
                 });
             }
             if (semLastro.length) {
-                html += '<div style="font-size:11px;color:#fbbf24;margin-top:8px">⚠️ Seus lançamentos sem honorário correspondente no Feegow deste mês: <b>' + semLastro.map(x => repEsc_(x.desc)).join(', ') + '</b>. Ou é mês errado, ou o honorário ainda não foi lançado no Feegow.</div>';
+                const outros = _repFeegowOutros[chave] || [];
+                const emOutroMes = [], semNada = [];
+                semLastro.forEach(m => {
+                    const o = outros.find(x => repMatchNome_(m.desc, x.paciente));
+                    if (o) emOutroMes.push(o); else semNada.push(m.desc);
+                });
+                if (emOutroMes.length) {
+                    html += '<div style="font-size:11px;color:#fbbf24;margin-top:8px">📅 <b>Está no Feegow, mas em OUTRO mês</b> (conte no repasse daquele mês, não neste): ' +
+                        emOutroMes.map(o => repEsc_(o.paciente) + ' → <b>' + repMesNomeCompleto_(o.mesIso) + '</b> (' + fmt(o.val) + ')').join(' · ') + '.</div>';
+                }
+                if (semNada.length) {
+                    html += '<div style="font-size:11px;color:#fbbf24;margin-top:6px">⚠️ <b>Sem honorário no Feegow em nenhum mês</b>: ' + semNada.map(repEsc_).join(', ') + '. Precisa lançar no Feegow pra puxar automático.</div>';
+                }
             }
             box.innerHTML = html + '</div>';
         }
