@@ -4733,6 +4733,7 @@
                     <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:10px;margin-top:4px">
                         <div style="font-size:13px;font-weight:600;color:#10b981;margin-bottom:6px">💰 Venda fechada (entra na meta)</div>
                         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <input type="text" id="crmVendaValor" placeholder="Valor desta parcela (opcional)" oninput="maskCurrency(this)" style="padding:6px 8px;border-radius:6px;width:190px">
                             <select id="crmVendaForma" style="padding:6px 8px;border-radius:6px">
                                 <option value="">Forma de pagamento...</option>
                                 <option value="PIX">PIX</option>
@@ -4742,7 +4743,7 @@
                             <button class="crm-btn crm-btn-save" onclick="marcarVendaFechada()">Marcar venda fechada</button>
                         </div>
                         <span class="crm-save-status" id="crmVendaStatus"></span>
-                        <div style="font-size:11px;color:var(--muted);margin-top:4px">Usa o valor preenchido acima. O sistema confirma sozinho quando o dinheiro entrar (PIX no extrato, cartão na Rede).</div>
+                        <div style="font-size:11px;color:var(--muted);margin-top:4px">Pagamento parcial? Preencha o valor desta parcela (o que vai cair no banco agora). Deixe vazio pra usar o valor cheio acima. O sistema confirma sozinho quando o dinheiro entrar (PIX no extrato, cartão na Rede).</div>
                     </div>
                     <div class="crm-check-row">
                         <label class="crm-check-group">
@@ -6733,6 +6734,8 @@
             if (vData) vData.value = new Date().toISOString().slice(0, 10);
             const vForma = document.getElementById('crmVendaForma');
             if (vForma) vForma.value = '';
+            const vValor = document.getElementById('crmVendaValor');
+            if (vValor) vValor.value = '';
             const vStatus = document.getElementById('crmVendaStatus');
             if (vStatus) vStatus.textContent = '';
 
@@ -6923,7 +6926,8 @@
             const st    = document.getElementById('crmVendaStatus');
             const forma = document.getElementById('crmVendaForma').value;
             const data  = document.getElementById('crmVendaData').value;
-            const valor = parseValorFloat(document.getElementById('crmValor').value);
+            const valorParcela = parseValorFloat(document.getElementById('crmVendaValor').value);
+            const valor = valorParcela > 0 ? valorParcela : parseValorFloat(document.getElementById('crmValor').value);
             const patient = pendPatients.find(p => normalizeKey(p.pac) === crmModalKey);
             if (!forma) { st.textContent = 'Escolha PIX ou Cartão'; st.style.color = '#ef4444'; return; }
             if (!valor) { st.textContent = 'Preencha o valor da venda acima'; st.style.color = '#ef4444'; return; }
