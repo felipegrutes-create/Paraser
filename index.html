@@ -3896,7 +3896,7 @@
 
             <div class="chart-card" id="repEricaCard" style="border-left:3px solid #c084fc"></div>
 
-            <div class="chart-card" id="repPriscilaCard" style="border-left:3px solid #38bdf8"></div>
+            <div id="repAjusteCards"></div>
 
             <div class="chart-card">
                 <h3>👩‍⚕️ Repasse por médico (agenda · Atendido + Em atendimento)</h3>
@@ -12502,7 +12502,7 @@
             { m: 'erica stein', modelo: 'turno',    cobertura: 'total'   },
             { m: 'mabel',       modelo: 'turno',    cobertura: 'total'   },
             { m: 'priscila',    modelo: 'priscila', cobertura: 'total'   },
-            { m: 'marcelle',    modelo: 'item',     cobertura: 'parcial' },
+            { m: 'marcelle',    modelo: 'priscila', cobertura: 'total'   },
             { m: 'bruna',       modelo: 'item',     cobertura: 'parcial' },
             { m: 'mario',       modelo: 'item',     cobertura: 'parcial' },
             { m: 'cris',        modelo: 'item',     cobertura: 'parcial' },
@@ -12625,19 +12625,24 @@
             return { total, nCons, nProc, itens };
         }
 
-        // Priscila Loyola: consulta 50% + USG de tratamento R$65 fixo + demais 40%
-        // (tudo sobre o cobrado). Menos deduções (estacionamento, tráfego) e mais
-        // itens "por fora" (punção, honorário FIV que vêm R$0 no Feegow). Deduções e
-        // por-fora mudam por mês → ficam em input manual, salvos no navegador por mês.
+        // Modelo Priscila/Marcelle: consulta 50% + USG de tratamento R$65 fixo + demais
+        // 40% (tudo sobre o cobrado). Preparo Tec conta como COMPLEXO (40%), não R$65
+        // (decisão Felipe 08/07; vale p/ Priscila e Marcelle, NÃO mexe no turno da Érica).
+        // Menos deduções (estacionamento/tráfego) e mais "por fora" (punção, honorário FIV
+        // que vêm R$0 no Feegow). Deduções e por-fora mudam por mês → input manual por médico,
+        // salvo no navegador. Default por médico:
         const REP_PRISCILA_USG = 65;
-        const REP_PRISCILA_DEFAULT = { estacionamento: 169.5, gestorTrafego: 800, trafegoMeta: 974.75, porFora: [] };
+        const REP_AJUSTE_DEFAULT = {
+            'priscila': { estacionamento: 169.5, gestorTrafego: 800, trafegoMeta: 974.75, porFora: [] },
+            'marcelle': { estacionamento: 179.5, gestorTrafego: 0,   trafegoMeta: 0,      porFora: [] }
+        };
         function repAjusteGet_(chave, mes) {
             try { return JSON.parse(localStorage.getItem('repAjuste_' + chave + '_' + mes)); } catch (e) { return null; }
         }
         function repAjusteSet_(chave, mes, obj) {
             try { localStorage.setItem('repAjuste_' + chave + '_' + mes, JSON.stringify(obj)); } catch (e) {}
         }
-        function repCalcPriscila_(linhas, mes) {
+        function repCalcPriscila_(linhas, mes, chave) {
             const C = _repCols;
             let nCons = 0, nUsgTrat = 0, nCompl = 0, consVal = 0, complVal = 0;
             const itens = [];
@@ -12648,7 +12653,7 @@
                 if (proc.includes('consulta')) {
                     nCons++; consVal += v;
                     itens.push({ data: r[C.data], proc: r[C.proc], v: v, rep: v * 0.5, tipo: 'Consulta 50%' });
-                } else if (proc.includes('usg') && !repEhComplexa_(proc)) {
+                } else if (proc.includes('usg') && !repEhComplexa_(proc) && !proc.includes('preparo tec')) {
                     nUsgTrat++;
                     itens.push({ data: r[C.data], proc: r[C.proc], v: v, rep: REP_PRISCILA_USG, tipo: 'USG trat · R$65' });
                 } else {
@@ -12658,38 +12663,47 @@
             });
             const tCons = consVal * 0.5, tUsg = nUsgTrat * REP_PRISCILA_USG, tCompl = complVal * 0.4;
             const auto = tCons + tUsg + tCompl;
-            const aj = repAjusteGet_('priscila', mes) || REP_PRISCILA_DEFAULT;
+            const aj = repAjusteGet_(chave, mes) || REP_AJUSTE_DEFAULT[chave] || { estacionamento: 0, gestorTrafego: 0, trafegoMeta: 0, porFora: [] };
             const deducoes = (Number(aj.estacionamento) || 0) + (Number(aj.gestorTrafego) || 0) + (Number(aj.trafegoMeta) || 0);
             const porForaTotal = (aj.porFora || []).reduce((s, x) => s + (Number(x.val) || 0), 0);
             itens.sort((a, b) => (parseDate(a.data) || 0) - (parseDate(b.data) || 0));
             return { nCons, nUsgTrat, nCompl, consVal, complVal, tCons, tUsg, tCompl, auto,
                      deducoes, porForaTotal, aj, itens, total: auto - deducoes + porForaTotal };
         }
-        function repPriscilaReadInputs_() {
+        function repAjusteReadInputs_(chave) {
             const num = id => { const e = document.getElementById(id); return e ? (parseFloat(String(e.value).replace(',', '.')) || 0) : 0; };
             const str = id => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
-            const porFora = [0, 1, 2].map(i => ({ desc: str('pf-desc-' + i), val: num('pf-val-' + i) })).filter(x => x.desc || x.val);
-            return { estacionamento: num('ded-est'), gestorTrafego: num('ded-gt'), trafegoMeta: num('ded-tm'), porFora };
+            const porFora = [0, 1, 2].map(i => ({ desc: str('pf-desc-' + chave + '-' + i), val: num('pf-val-' + chave + '-' + i) })).filter(x => x.desc || x.val);
+            return { estacionamento: num('ded-est-' + chave), gestorTrafego: num('ded-gt-' + chave), trafegoMeta: num('ded-tm-' + chave), porFora };
         }
-        function repPriscilaSaveLive_() {
-            repAjusteSet_('priscila', _repMes, repPriscilaReadInputs_());
-            const c = repCalcPriscila_(repLinhas_('priscila', _repMes), _repMes);
-            const el = document.getElementById('prisc-net');
+        function repAjusteSaveLive_(chave) {
+            repAjusteSet_(chave, _repMes, repAjusteReadInputs_(chave));
+            const c = repCalcPriscila_(repLinhas_(chave, _repMes), _repMes, chave);
+            const el = document.getElementById('net-' + chave);
             if (el) el.textContent = repFmt_(c.total);
         }
-        function renderPriscilaCard_(linhas) {
-            const el = document.getElementById('repPriscilaCard');
-            if (!el) return;
-            if (!linhas.length) { el.innerHTML = '<h3>💙 Priscila Loyola — repasse</h3><p style="color:var(--muted);font-size:13px">Sem atendimentos no mês selecionado.</p>'; return; }
-            const c = repCalcPriscila_(linhas, _repMes);
+        function renderAjusteCards_(linhasPorMedico) {
+            const cont = document.getElementById('repAjusteCards');
+            if (!cont) return;
+            const docs = REP_MEDICOS.filter(m => m.modelo === 'priscila');
+            cont.innerHTML = docs.map(md => {
+                const linhas = linhasPorMedico[md.m] || [];
+                const nome = linhas.length ? (linhas[0][_repCols.prof] || md.m) : md.m;
+                return `<div class="chart-card" style="border-left:3px solid #38bdf8">${ajusteCardHtml_(md.m, nome, linhas)}</div>`;
+            }).join('');
+        }
+        function ajusteCardHtml_(chave, nome, linhas) {
+            if (!linhas.length) return `<h3>💙 ${repEsc_(nome)} — repasse</h3><p style="color:var(--muted);font-size:13px">Sem atendimentos no mês selecionado.</p>`;
+            const c = repCalcPriscila_(linhas, _repMes, chave);
             const aj = c.aj, pf = aj.porFora || [];
             const inS = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);color:inherit;border-radius:6px;padding:5px 8px;font-size:13px';
-            const ded = (id, lbl, val) => `<label style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:var(--muted)"><span>${lbl}</span><input id="${id}" type="number" step="0.01" value="${val != null ? val : ''}" oninput="repPriscilaSaveLive_()" onchange="renderRepasses()" style="${inS};width:120px;text-align:right"></label>`;
+            const h = `repAjusteSaveLive_('${chave}')`;
+            const ded = (id, lbl, val) => `<label style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:var(--muted)"><span>${lbl}</span><input id="${id}" type="number" step="0.01" value="${val != null ? val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:120px;text-align:right"></label>`;
             const pfRow = i => { const it = pf[i] || { desc: '', val: '' }; return `<div style="display:flex;gap:6px;margin-top:6px">
-                <input id="pf-desc-${i}" placeholder="descrição (ex: Punção)" value="${repEsc_(it.desc)}" oninput="repPriscilaSaveLive_()" onchange="renderRepasses()" style="${inS};flex:1;min-width:0">
-                <input id="pf-val-${i}" type="number" step="0.01" placeholder="valor" value="${(it.val !== '' && it.val != null) ? it.val : ''}" oninput="repPriscilaSaveLive_()" onchange="renderRepasses()" style="${inS};width:110px;text-align:right"></div>`; };
-            el.innerHTML = `
-                <h3>💙 Priscila Loyola — repasse do mês</h3>
+                <input id="pf-desc-${chave}-${i}" placeholder="descrição (ex: Punção)" value="${repEsc_(it.desc)}" oninput="${h}" onchange="renderRepasses()" style="${inS};flex:1;min-width:0">
+                <input id="pf-val-${chave}-${i}" type="number" step="0.01" placeholder="valor" value="${(it.val !== '' && it.val != null) ? it.val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:110px;text-align:right"></div>`; };
+            return `
+                <h3>💙 ${repEsc_(nome)} — repasse do mês</h3>
                 <div style="display:flex;flex-wrap:wrap;gap:18px;margin:8px 0 4px;font-size:13px">
                     <span>Consultas 50%: <b style="color:#e5e7eb">${repFmt_(c.tCons)}</b> <span style="color:var(--muted)">(${c.nCons})</span></span>
                     <span>USG tratamento ${c.nUsgTrat}×R$65: <b style="color:#e5e7eb">${repFmt_(c.tUsg)}</b></span>
@@ -12699,9 +12713,9 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
                     <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
                         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#f87171;font-weight:700">➖ Deduções do mês</div>
-                        ${ded('ded-est', 'Estacionamento', aj.estacionamento)}
-                        ${ded('ded-gt', 'Gestor de tráfego', aj.gestorTrafego)}
-                        ${ded('ded-tm', 'Tráfego Meta', aj.trafegoMeta)}
+                        ${ded('ded-est-' + chave, 'Estacionamento', aj.estacionamento)}
+                        ${ded('ded-gt-' + chave, 'Gestor de tráfego', aj.gestorTrafego)}
+                        ${ded('ded-tm-' + chave, 'Tráfego Meta', aj.trafegoMeta)}
                     </div>
                     <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
                         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#34d399;font-weight:700">➕ Por fora (punção, honorário FIV…)</div>
@@ -12710,9 +12724,9 @@
                 </div>
                 <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
                     <span style="font-size:13px;color:var(--muted)">Líquido (subtotal − deduções + por fora)</span>
-                    <span id="prisc-net" style="font-size:20px;font-weight:800;color:#34d399">${repFmt_(c.total)}</span>
+                    <span id="net-${chave}" style="font-size:20px;font-weight:800;color:#34d399">${repFmt_(c.total)}</span>
                 </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:6px">As deduções e o "por fora" mudam por mês. Confira os valores acima; ficam salvos neste navegador, por mês.</div>`;
+                <div style="font-size:11px;color:var(--muted);margin-top:6px">Preparo Tec conta como complexo (40%). Deduções e "por fora" mudam por mês; ficam salvos neste navegador.</div>`;
         }
         function repMesShift_(mes, dir) {
             const [y, m] = mes.split('-').map(Number);
@@ -12755,7 +12769,7 @@
                         <td>${repFmt_(x.v)}</td><td><b>${repFmt_(x.v * 0.4)}</b></td></tr>`).join('') +
                     `<tr class="tot"><td colspan="2">Total complexas</td><td>${repFmt_(c.complexasValor)}</td><td>${repFmt_(c.blocoB)}</td></tr></table>`;
             } else if (md.modelo === 'priscila') {
-                const c = repCalcPriscila_(linhas, _repMes);
+                const c = repCalcPriscila_(linhas, _repMes, md.m);
                 totalGeral = c.total;
                 resumo = `<table><tr class="cab">
                         <th>Consultas (50%)</th><th>USG trat (R$65)</th><th>Complexos (40%)</th>
@@ -12848,7 +12862,7 @@
                 if (!linhas.length) return;
                 const nomeReal = linhas[0][C.prof] || md.m;
                 const calc = md.modelo === 'turno' ? repCalcTurno_(linhas)
-                           : md.modelo === 'priscila' ? repCalcPriscila_(linhas, _repMes)
+                           : md.modelo === 'priscila' ? repCalcPriscila_(linhas, _repMes, md.m)
                            : repCalcItem_(linhas, md.modelo);
                 const base = md.modelo === 'turno'
                     ? `${calc.nDias} dias · ${calc.nTurnos} turnos · ${calc.nTrat + calc.nCompl} USG (${calc.nTrat} trat + ${calc.nCompl} compl)`
@@ -12882,7 +12896,7 @@
                             <td style="padding:9px 10px"><button class="cr-reload-btn" onclick="repDemonstrativo('${r.chave}')" title="Demonstrativo imprimível pra enviar ao médico">📄 Demonstrativo</button></td>
                         </tr>`).join('') + '</tbody></table>';
 
-            renderPriscilaCard_(linhasPorMedico['priscila'] || []);
+            renderAjusteCards_(linhasPorMedico);
 
             // Spotlight Érica: modelo dela (turno) vs o modelo padrão (por item)
             const ericaEl = document.getElementById('repEricaCard');
