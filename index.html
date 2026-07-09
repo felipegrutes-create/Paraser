@@ -12640,7 +12640,7 @@
             const itens = [];
             linhas.forEach(r => {
                 const proc = repNorm_(r[C.proc]);
-                if (proc.includes('pacote')) return;
+                if (proc.includes('pacote') && !proc.includes('acupuntura')) return; // pacote FIV/USG vem R$0; pacote de acupuntura é real (Cristiane)
                 const v = parseValorFloat(r[C.val]);
                 let pct;
                 if (proc.includes('consulta')) { pct = 0.5; nCons++; }
