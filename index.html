@@ -12549,6 +12549,13 @@
             const t = String(s || '').toLowerCase().trim();
             return t === 'atendido' || t === 'em atendimento';
         }
+        // Médicos que NÃO fecham o status (ex: Dr. Helce marca "confirmado"/"aguardando" e
+        // nunca "atendido"). Pra eles contamos também esses status, com flag de alerta na tabela.
+        const REP_STATUS_EXTRA = { 'helce': true };
+        function repStatusExtraOk_(s) {
+            const t = repNorm_(s);
+            return t.includes('aguardando') || (t.includes('confirmado') && !t.includes('nao confirmado'));
+        }
         // G da planilha: repasse do dia no modelo turno (C=USGs do dia, D=complexas).
         function repGDia_(doisTurnos, C, D) {
             const E = 585;
@@ -12567,7 +12574,7 @@
             const C = _repCols;
             return _repRaw.filter(r => {
                 if (monthKey(r[C.data]) !== mes) return false;
-                if (!repFeito_(r[C.sta])) return false;
+                if (!(repFeito_(r[C.sta]) || (REP_STATUS_EXTRA[chave] && repStatusExtraOk_(r[C.sta])))) return false;
                 const prof = repNorm_(r[C.prof]);
                 if (!prof.includes(chave)) return false;
                 if (chave === 'erica stein' && prof.includes('freitas')) return false;
@@ -12805,7 +12812,8 @@
                     `<tr class="tot"><td colspan="4">TOTAL</td><td>${repFmt_(c.total)}</td></tr></table>` +
                     (md.cobertura === 'parcial'
                         ? '<p class="nota">Obs.: honorários lançados manualmente (ex: anestesia/embriologia) não constam neste demonstrativo automático.</p>'
-                        : '');
+                        : '') +
+                    (REP_STATUS_EXTRA[md.m] ? '<p class="nota">⚠️ Inclui agendamentos em "Aguardando" e "Marcado - confirmado" porque o status não foi fechado como Atendido.</p>' : '');
             }
 
             const w = window.open('', '_blank');
@@ -12870,7 +12878,9 @@
                     : md.modelo === 'priscila'
                     ? `${calc.nCons} consultas · ${calc.nUsgTrat} USG trat · ${calc.nCompl} complexos · líq. de deduções`
                     : `${calc.nCons} consultas${md.modelo !== 'consulta' ? ' · ' + calc.nProc + ' procedimentos' : ''}`;
-                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, calc, chave: md.m });
+                const temStatusExtra = !!REP_STATUS_EXTRA[md.m];
+                const naoFechados = temStatusExtra ? linhas.filter(r => repNorm_(r[C.sta]) !== 'atendido').length : 0;
+                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, calc, chave: md.m, temStatusExtra, naoFechados });
             });
             resultados.sort((a, b) => b.total - a.total);
 
@@ -12887,7 +12897,7 @@
                         <th style="padding:8px 10px;text-align:right">Repasse calculado</th><th></th></tr></thead>
                     <tbody>` + resultados.map(r => `
                         <tr style="border-top:1px solid var(--border)">
-                            <td style="padding:9px 10px;font-weight:600">${repEsc_(r.nome)}</td>
+                            <td style="padding:9px 10px;font-weight:600">${repEsc_(r.nome)}${r.temStatusExtra ? `<div style="font-size:10px;font-weight:600;color:#fbbf24;margin-top:2px" title="Este médico não fecha o status como Atendido. O repasse inclui Aguardando e Marcado-confirmado.">⚠️ status desatualizado (${r.naoFechados} não fechados)</div>` : ''}</td>
                             <td style="padding:9px 10px;color:var(--muted)">${REP_MODELO_ROT[r.modelo]}</td>
                             <td style="padding:9px 10px;color:var(--muted)">${r.base}</td>
                             <td style="padding:9px 10px">${r.cobertura === 'total'
