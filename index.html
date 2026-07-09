@@ -12573,6 +12573,24 @@
             const F = (C - D) - 8;
             return F < 0 ? E : E + F * 65;
         }
+        // Correções manuais de nomenclatura/valor por ID de agendamento. Uso: quando a recepção
+        // marca o procedimento errado no Feegow e o mês já fechou (a planilha "Dados Diários" não
+        // se auto-corrige retroativo). Só afeta o cálculo de repasse; é versionado (vale em toda
+        // máquina, ao contrário do ajuste que fica em localStorage). Uma linha por correção.
+        const REP_CORRECOES = {
+            // Érica · 29/06/2026 · Luana G. P. Vargas: recepção marcou "Obstétrica Comum" mas foi
+            // Gemelar (áudio da Dra. Érica, 09/07/2026). Gemelar = R$825 na tabela; complexa 40%.
+            '44770': { proc: 'Usg Obstétrica Comum Gemelar', valor: '825,00' }
+        };
+        function repAplicaCorrecao_(r) {
+            const C = _repCols;
+            const cor = REP_CORRECOES[String(r[C.id])];
+            if (!cor) return r;
+            const c = r.slice();
+            if (cor.proc  != null) c[C.proc] = cor.proc;
+            if (cor.valor != null) c[C.val]  = cor.valor;
+            return c;
+        }
         // Linhas ATENDIDAS de um médico num mês 'yyyy-mm'.
         function repLinhas_(chave, mes) {
             const C = _repCols;
@@ -12583,7 +12601,7 @@
                 if (!prof.includes(chave)) return false;
                 if (chave === 'erica stein' && prof.includes('freitas')) return false;
                 return true;
-            });
+            }).map(repAplicaCorrecao_);
         }
         function repCalcTurno_(linhas) {
             const C = _repCols, dias = {};
