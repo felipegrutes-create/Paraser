@@ -12489,7 +12489,7 @@
 
         // ===== REPASSES MÉDICOS — engine portada da planilha "REPASSE - Paraser" =====
         // Modelos decifrados da planilha e validados (jun-jul/2026):
-        //   turno (Érica, Mabel): R$585/turno, franquia 8 USG/turno (16 em 2 turnos),
+        //   turno (só Érica): R$585/turno, franquia 8 USG/turno (16 em 2 turnos),
         //     +R$65 por USG de tratamento acima da franquia, +40% do valor das
         //     complexas; dia dominado por complexas (D>=4 e D==C ou D>C/2) zera o turno.
         //   item (maioria): consulta 50% + demais procedimentos 40% (sócios: 100%).
@@ -12500,7 +12500,7 @@
         // (anestesia/embriologia não geram agendamento) — daí cobertura "parcial".
         const REP_MEDICOS = [
             { m: 'erica stein', modelo: 'turno',    cobertura: 'total'   },
-            { m: 'mabel',       modelo: 'turno',    cobertura: 'total'   },
+            { m: 'mabel',       modelo: 'priscila', cobertura: 'total'   },
             { m: 'priscila',    modelo: 'priscila', cobertura: 'total'   },
             { m: 'marcelle',    modelo: 'priscila', cobertura: 'total'   },
             { m: 'bruna',       modelo: 'item',     cobertura: 'parcial' },
@@ -12634,7 +12634,8 @@
         const REP_PRISCILA_USG = 65;
         const REP_AJUSTE_DEFAULT = {
             'priscila': { estacionamento: 169.5, gestorTrafego: 800, trafegoMeta: 974.75, porFora: [] },
-            'marcelle': { estacionamento: 179.5, gestorTrafego: 0,   trafegoMeta: 0,      porFora: [] }
+            'marcelle': { estacionamento: 179.5, gestorTrafego: 0,   trafegoMeta: 0,      porFora: [] },
+            'mabel':    { estacionamento: 0,     gestorTrafego: 0,   trafegoMeta: 0,      porFora: [] }
         };
         function repAjusteGet_(chave, mes) {
             try { return JSON.parse(localStorage.getItem('repAjuste_' + chave + '_' + mes)); } catch (e) { return null; }
