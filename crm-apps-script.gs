@@ -2297,7 +2297,7 @@ function handleToggleRepassePago(body) {
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][H.chave]) === chave) { sh.deleteRow(i + 1); return jsonOk({ ok: true, pago: false, chave: chave }); }
   }
-  sh.appendRow([chave, String(body.medico || ''), String(body.mes || ''), String(body.paciente || ''), Number(body.valor) || 0, new Date().toISOString()]);
+  sh.appendRow([chave, String(body.medico || ''), "'" + String(body.mes || ''), String(body.paciente || ''), Number(body.valor) || 0, new Date().toISOString()]);
   return jsonOk({ ok: true, pago: true, chave: chave });
 }
 
