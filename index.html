@@ -12695,7 +12695,7 @@
             const auto = tCons + tUsg + tCompl;
             const aj = repAjusteGet_(chave, mes) || REP_AJUSTE_DEFAULT[chave] || { estacionamento: 0, gestorTrafego: 0, trafegoMeta: 0, porFora: [] };
             const deducoes = (Number(aj.estacionamento) || 0) + (Number(aj.gestorTrafego) || 0) + (Number(aj.trafegoMeta) || 0);
-            const porForaTotal = (aj.porFora || []).reduce((s, x) => s + (Number(x.val) || 0), 0);
+            const porForaTotal = (aj.porFora || []).reduce((s, x) => s + (Number(x.val) || 0) * ((Number(x.pct) || 40) / 100), 0);
             itens.sort((a, b) => (parseDate(a.data) || 0) - (parseDate(b.data) || 0));
             return { nCons, nUsgTrat, nCompl, consVal, complVal, tCons, tUsg, tCompl, auto,
                      deducoes, porForaTotal, aj, itens, total: auto - deducoes + porForaTotal };
@@ -12703,7 +12703,14 @@
         function repAjusteReadInputs_(chave) {
             const num = id => { const e = document.getElementById(id); return e ? (parseFloat(String(e.value).replace(',', '.')) || 0) : 0; };
             const str = id => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
-            const porFora = [0, 1, 2].map(i => ({ desc: str('pf-desc-' + chave + '-' + i), val: num('pf-val-' + chave + '-' + i) })).filter(x => x.desc || x.val);
+            const has = id => !!document.getElementById(id);
+            const porFora = [];
+            for (let i = 0; has('pf-desc-' + chave + '-' + i) || has('pf-val-' + chave + '-' + i); i++) {
+                const desc = str('pf-desc-' + chave + '-' + i);
+                const val = num('pf-val-' + chave + '-' + i);
+                const pct = num('pf-pct-' + chave + '-' + i) || 40; // vazio/0 = 40%
+                if (desc || val) porFora.push({ desc, val, pct });
+            }
             return { estacionamento: num('ded-est-' + chave), gestorTrafego: num('ded-gt-' + chave), trafegoMeta: num('ded-tm-' + chave), porFora };
         }
         function repAjusteSaveLive_(chave) {
@@ -12729,9 +12736,14 @@
             const inS = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);color:inherit;border-radius:6px;padding:5px 8px;font-size:13px';
             const h = `repAjusteSaveLive_('${chave}')`;
             const ded = (id, lbl, val) => `<label style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:var(--muted)"><span>${lbl}</span><input id="${id}" type="number" step="0.01" value="${val != null ? val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:120px;text-align:right"></label>`;
-            const pfRow = i => { const it = pf[i] || { desc: '', val: '' }; return `<div style="display:flex;gap:6px;margin-top:6px">
-                <input id="pf-desc-${chave}-${i}" placeholder="descrição (ex: Punção)" value="${repEsc_(it.desc)}" oninput="${h}" onchange="renderRepasses()" style="${inS};flex:1;min-width:0">
-                <input id="pf-val-${chave}-${i}" type="number" step="0.01" placeholder="valor" value="${(it.val !== '' && it.val != null) ? it.val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:110px;text-align:right"></div>`; };
+            const pfRow = i => { const it = pf[i] || { desc: '', val: '', pct: '' };
+                const valn = Number(it.val) || 0, pctn = Number(it.pct) || 40;
+                const calc = valn ? repFmt_(valn * pctn / 100) : '';
+                return `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+                <input id="pf-desc-${chave}-${i}" placeholder="descrição (ex: Punção, FIV)" value="${repEsc_(it.desc)}" oninput="${h}" onchange="renderRepasses()" style="${inS};flex:1;min-width:0">
+                <input id="pf-val-${chave}-${i}" type="number" step="0.01" placeholder="valor cheio" value="${(it.val !== '' && it.val != null) ? it.val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:100px;text-align:right">
+                <input id="pf-pct-${chave}-${i}" type="number" step="1" placeholder="40" value="${(it.pct !== '' && it.pct != null) ? it.pct : ''}" oninput="${h}" onchange="renderRepasses()" title="% do valor (padrão 40)" style="${inS};width:50px;text-align:right">
+                <span style="font-size:11px;color:var(--muted);width:84px;text-align:right">${calc ? '= ' + calc : '%'}</span></div>`; };
             return `
                 <h3>💙 ${repEsc_(nome)} — repasse do mês</h3>
                 <div style="display:flex;flex-wrap:wrap;gap:18px;margin:8px 0 4px;font-size:13px">
@@ -12748,15 +12760,16 @@
                         ${ded('ded-tm-' + chave, 'Tráfego Meta', aj.trafegoMeta)}
                     </div>
                     <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#34d399;font-weight:700">➕ Por fora (punção, honorário FIV…)</div>
-                        ${pfRow(0)}${pfRow(1)}${pfRow(2)}
+                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#34d399;font-weight:700">➕ Por fora · valor cheio × % (padrão 40%)</div>
+                        <div style="display:flex;gap:6px;margin-top:6px;font-size:10px;color:var(--muted)"><span style="flex:1;min-width:0">descrição</span><span style="width:100px;text-align:right">valor cheio</span><span style="width:50px;text-align:right">%</span><span style="width:84px;text-align:right">repasse</span></div>
+                        ${Array.from({ length: Math.max(3, pf.length + 1) }, (_, i) => pfRow(i)).join('')}
                     </div>
                 </div>
                 <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
                     <span style="font-size:13px;color:var(--muted)">Líquido (subtotal − deduções + por fora)</span>
                     <span id="net-${chave}" style="font-size:20px;font-weight:800;color:#34d399">${repFmt_(c.total)}</span>
                 </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:6px">Preparo Tec conta como complexo (40%). Deduções e "por fora" mudam por mês; ficam salvos neste navegador.</div>`;
+                <div style="font-size:11px;color:var(--muted);margin-top:6px">Preparo Tec conta como complexo (40%). No "por fora" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar. Deduções e "por fora" mudam por mês; ficam salvos neste navegador.</div>`;
         }
         function repMesShift_(mes, dir) {
             const [y, m] = mes.split('-').map(Number);
@@ -12817,7 +12830,8 @@
                         <tr><td style="text-align:left">Estacionamento</td><td>− ${repFmt_(Number(c.aj.estacionamento) || 0)}</td></tr>
                         <tr><td style="text-align:left">Gestor de tráfego</td><td>− ${repFmt_(Number(c.aj.gestorTrafego) || 0)}</td></tr>
                         <tr><td style="text-align:left">Tráfego Meta</td><td>− ${repFmt_(Number(c.aj.trafegoMeta) || 0)}</td></tr>` +
-                        (c.aj.porFora || []).map(x => `<tr><td style="text-align:left">${repEsc_(x.desc || 'Por fora')}</td><td>+ ${repFmt_(Number(x.val) || 0)}</td></tr>`).join('') +
+                        (c.aj.porFora || []).map(x => { const pctn = Number(x.pct) || 40, pv = (Number(x.val) || 0) * pctn / 100;
+                            return `<tr><td style="text-align:left">${repEsc_(x.desc || 'Por fora')} <span style="color:#888">(${pctn}% de ${repFmt_(Number(x.val) || 0)})</span></td><td>+ ${repFmt_(pv)}</td></tr>`; }).join('') +
                         `<tr class="tot"><td>LÍQUIDO A PAGAR</td><td>${repFmt_(c.total)}</td></tr></table>`;
             } else {
                 const c = repCalcItem_(linhas, md.modelo);
