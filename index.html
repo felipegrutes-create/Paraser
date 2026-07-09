@@ -12643,7 +12643,7 @@
                 if (proc.includes('pacote') && !proc.includes('acupuntura')) return; // pacote FIV/USG vem R$0; pacote de acupuntura é real (Cristiane)
                 const v = parseValorFloat(r[C.val]);
                 let pct;
-                if (proc.includes('consulta')) { pct = 0.5; nCons++; }
+                if (proc.includes('consulta') || proc.includes('acupuntura')) { pct = 0.5; nCons++; } // acupuntura (Cristiane) conta como consulta, 50%
                 else if (modelo === 'consulta') return;
                 else if (modelo === 'socio') { pct = 1; nProc++; }
                 else { pct = 0.4; nProc++; }
