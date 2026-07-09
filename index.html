@@ -12555,7 +12555,7 @@
         }
         // Médicos que NÃO fecham o status (ex: Dr. Helce marca "confirmado"/"aguardando" e
         // nunca "atendido"). Pra eles contamos também esses status, com flag de alerta na tabela.
-        const REP_STATUS_EXTRA = { 'helce': true };
+        const REP_STATUS_EXTRA = { 'helce': true, 'graziela': true };
         function repStatusExtraOk_(s) {
             const t = repNorm_(s);
             return t.includes('aguardando') || (t.includes('confirmado') && !t.includes('nao confirmado'));
