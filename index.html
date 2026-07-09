@@ -12858,15 +12858,18 @@
             renderRepasses();
             repRenderSug_(chave);
         }
-        // Marca/desmarca "repasse já pago" (grava na aba Repasses_Pagos via CRM). Otimista.
+        // Marca/desmarca "repasse já pago" (grava na aba Repasses_Pagos). Toggle via GET porque a
+        // resposta é legível: reconcilia _repPagos com o estado REAL do servidor (o POST no-cors não confirma).
         function repTogglePago_(chave, i) {
             const s = (_repFeegowSug[chave] || [])[i];
             if (!s) return;
             const ch = repNorm_(s.paciente) + '|' + s.dexec + '|' + s.val;
-            if (_repPagos[ch]) delete _repPagos[ch]; else _repPagos[ch] = true;
-            fetch(CRM_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'toggle_repasse_pago', chave: ch, medico: chave, mes: _repMes, paciente: s.paciente, valor: s.val }) }).catch(() => {});
+            if (_repPagos[ch]) delete _repPagos[ch]; else _repPagos[ch] = true; // otimista
             repRenderSug_(chave);
+            const p = new URLSearchParams({ action: 'toggle_repasse_pago', chave: ch, medico: chave, mes: _repMes, paciente: s.paciente, valor: String(s.val), _: String(Date.now()) });
+            fetch(`${CRM_SCRIPT_URL}?${p.toString()}`).then(r => r.json()).then(j => {
+                if (j && j.ok) { if (j.pago) _repPagos[ch] = true; else delete _repPagos[ch]; repRenderSug_(chave); }
+            }).catch(() => {});
         }
         function repMesShift_(mes, dir) {
             const [y, m] = mes.split('-').map(Number);

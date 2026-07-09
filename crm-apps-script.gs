@@ -223,6 +223,8 @@ function doGet(e) {
 
     // Repasse: registro de "repasse já pago" ao médico (evita pagar 2x). Aba Repasses_Pagos.
     if (action === 'get_repasses_pagos') return handleGetRepassesPagos();
+    // Toggle via GET também (resposta legível pro frontend confirmar o estado; POST no-cors não retorna).
+    if (action === 'toggle_repasse_pago') return handleToggleRepassePago(e.parameter);
 
     if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
 
