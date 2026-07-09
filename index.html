@@ -12776,6 +12776,7 @@
                 <div style="font-size:11px;color:var(--muted);margin-top:6px">Preparo Tec conta como complexo (40%). No "por fora" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar. Deduções e "por fora" mudam por mês; ficam salvos neste navegador.</div>`;
         }
         let _repFeegowSug = {}; // chave -> sugestões de honorário FIV puxadas do Feegow
+        let _repPagos = {};     // chave do caso (paciente|data|valor) -> true, repasses já pagos (aba Repasses_Pagos)
         // Janela ampla (mês anterior ao seguinte) pra pegar honorário faturado adiantado; filtra por execução.
         function repMesRange_(mes) {
             const [y, m] = mes.split('-').map(Number);
@@ -12802,8 +12803,12 @@
             box.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-top:6px">Buscando no Feegow (pode levar alguns segundos)...</div>';
             const r = repMesRange_(_repMes);
             try {
-                const res = await fetch(`${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(r.ini)}&data_end=${encodeURIComponent(r.fim)}`);
-                _repFeegowSug[chave] = repFiltraHonorarios_((await res.json()).data);
+                const [finRes, pagRes] = await Promise.all([
+                    fetch(`${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(r.ini)}&data_end=${encodeURIComponent(r.fim)}`),
+                    fetch(`${CRM_SCRIPT_URL}?action=get_repasses_pagos`)
+                ]);
+                _repFeegowSug[chave] = repFiltraHonorarios_((await finRes.json()).data);
+                _repPagos = {}; ((await pagRes.json()).itens || []).forEach(function(x){ _repPagos[x.chave] = true; });
             } catch (e) {
                 box.innerHTML = '<div style="font-size:12px;color:#f87171;margin-top:6px">Erro ao buscar o Feegow. Tenta de novo.</div>';
                 return;
@@ -12825,14 +12830,17 @@
             } else {
                 html += '<div style="font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px">Honorários FIV no Feegow (execução no mês) — clique + pra contar a 40%</div>';
                 sug.forEach((s, i) => {
+                    const ch = repNorm_(s.paciente) + '|' + s.dexec + '|' + s.val;
+                    const pago = !!_repPagos[ch];
                     const badge = (s.pagTotal >= s.val && s.val > 0) ? '<span style="color:#34d399">● recebido ' + fmt(s.pagTotal) + '</span>'
                         : s.pagTotal > 0 ? '<span style="color:#fbbf24">◐ parcial ' + fmt(s.pagTotal) + '</span>'
                         : '<span style="color:#f87171">○ a receber</span>';
                     const btn = jaTem(s) ? '<span style="width:24px;text-align:center;color:#34d399;font-weight:800">✓</span>'
                         : `<button onclick="repAddPorForaSug_('${chave}',${i})" title="Adicionar ao por fora" style="background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.4);color:#34d399;border-radius:5px;padding:1px 8px;cursor:pointer;font-weight:800">+</button>`;
-                    html += `<div style="display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px">${btn}
+                    const pagoTag = `<span onclick="repTogglePago_('${chave}',${i})" title="${pago ? 'Repasse já pago à médica (clique pra desmarcar)' : 'Marcar que já paguei este repasse pra não pagar 2x'}" style="cursor:pointer;font-size:11px;white-space:nowrap;${pago ? 'color:#34d399;font-weight:700' : 'color:var(--muted);text-decoration:underline'}">${pago ? '✅ pago' : 'marcar pago'}</span>`;
+                    html += `<div style="display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px;${pago ? 'opacity:.55' : ''}">${btn}
                         <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${repEsc_(s.paciente)} <span style="color:var(--muted)">· ${fmt(s.val)} · 40% = ${fmt(s.val * 0.4)}</span></span>
-                        <span style="font-size:11px;white-space:nowrap">${badge}</span></div>`;
+                        <span style="font-size:11px;white-space:nowrap">${badge}</span>${pagoTag}</div>`;
                 });
             }
             if (semLastro.length) {
@@ -12848,6 +12856,16 @@
             if (!cur.porFora.some(x => repNorm_(x.desc) === repNorm_(desc))) cur.porFora.push({ desc, val: s.val, pct: 40 });
             repAjusteSet_(chave, _repMes, cur);
             renderRepasses();
+            repRenderSug_(chave);
+        }
+        // Marca/desmarca "repasse já pago" (grava na aba Repasses_Pagos via CRM). Otimista.
+        function repTogglePago_(chave, i) {
+            const s = (_repFeegowSug[chave] || [])[i];
+            if (!s) return;
+            const ch = repNorm_(s.paciente) + '|' + s.dexec + '|' + s.val;
+            if (_repPagos[ch]) delete _repPagos[ch]; else _repPagos[ch] = true;
+            fetch(CRM_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'toggle_repasse_pago', chave: ch, medico: chave, mes: _repMes, paciente: s.paciente, valor: s.val }) }).catch(() => {});
             repRenderSug_(chave);
         }
         function repMesShift_(mes, dir) {

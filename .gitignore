@@ -26,3 +26,6 @@ apps-script-crm/
 # Conversas de pacientes capturadas (LGPD - NAO commitar, repo publico)
 docs/ana/conversas-*.txt
 .playwright-mcp/
+
+# Áudios pra transcrever (não versionar)
+audio/

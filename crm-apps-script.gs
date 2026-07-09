@@ -221,6 +221,9 @@ function doGet(e) {
     // Entradas manuais de card (paciente sem agenda, pedido pela recepção).
     if (action === 'get_entradas_manuais') return handleGetEntradasManuais();
 
+    // Repasse: registro de "repasse já pago" ao médico (evita pagar 2x). Aba Repasses_Pagos.
+    if (action === 'get_repasses_pagos') return handleGetRepassesPagos();
+
     if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
 
     // Retornar registros CRM (padrão)
@@ -257,6 +260,7 @@ function doPost(e) {
       if (action === 'ajuste_estoque')       return handleAjusteEstoque(body);
       if (action === 'enviar_pipeline_slack') return handleEnviarPipelineSlack(body);
       if (action === 'inventario_inicial')   return handleInventarioInicial(body);
+      if (action === 'toggle_repasse_pago')  return handleToggleRepassePago(body);
 
       if (action === 'save_caixa') {
         return handleSaveCaixa(body);
@@ -2258,6 +2262,41 @@ function setupTriggerFechamento() {
   ScriptApp.newTrigger('rodarFechamentoDia').timeBased().everyDays(1).atHour(19).create();
   Logger.log('Gatilho de fechamento das 19h criado.');
   return 'ok';
+}
+
+// =========================================================
+// REPASSE PAGO — registro de honorários já repassados ao médico (evita pagar 2x).
+// O index.html chama get_repasses_pagos (ler) / toggle_repasse_pago (marca/desmarca).
+// Chave do caso = paciente|data_execucao|valor (estável). Aba Repasses_Pagos.
+// =========================================================
+const REPASSES_PAGOS_SHEET = 'Repasses_Pagos';
+const RP_HEADERS = ['chave','medico','mes','paciente','valor','pago_em'];
+
+function handleGetRepassesPagos() {
+  const sh = getOrCreateSheetGen_(REPASSES_PAGOS_SHEET, RP_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; RP_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const itens = [];
+  for (var i = 1; i < data.length; i++) {
+    if (!String(data[i][H.chave])) continue;
+    itens.push({ chave: String(data[i][H.chave]), medico: String(data[i][H.medico]), mes: String(data[i][H.mes]),
+                 paciente: String(data[i][H.paciente]), valor: Number(data[i][H.valor]) || 0, pago_em: String(data[i][H.pago_em]) });
+  }
+  return jsonOk({ ok: true, itens: itens });
+}
+
+// Alterna: se a chave já existe, remove (desmarca); senão adiciona (marca pago).
+function handleToggleRepassePago(body) {
+  const chave = String(body.chave || '').trim();
+  if (!chave) return jsonErr('chave obrigatoria');
+  const sh = getOrCreateSheetGen_(REPASSES_PAGOS_SHEET, RP_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; RP_HEADERS.forEach(function(h, i){ H[h] = i; });
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][H.chave]) === chave) { sh.deleteRow(i + 1); return jsonOk({ ok: true, pago: false, chave: chave }); }
+  }
+  sh.appendRow([chave, String(body.medico || ''), String(body.mes || ''), String(body.paciente || ''), Number(body.valor) || 0, new Date().toISOString()]);
+  return jsonOk({ ok: true, pago: true, chave: chave });
 }
 
 function jsonOk(data) {
