@@ -12516,8 +12516,7 @@
             { m: 'katia',       modelo: 'item',     cobertura: 'total'   },
             { m: 'veronica',    modelo: 'item',     cobertura: 'total'   },
             { m: 'sara',        modelo: 'item',     cobertura: 'total'   },
-            { m: 'rodolfo',     modelo: 'socio',    cobertura: 'parcial' },
-            { m: 'joselmo',     modelo: 'socio',    cobertura: 'parcial' },
+            // Sócios (Rodolfo, Joselmo) saíram da tabela: compensação por geração/retirada, não por este cálculo.
         ];
         const REP_MODELO_ROT = {
             turno: '⏱️ Por turno', item: 'Consulta 50% + proc. 40%',
@@ -12558,7 +12557,7 @@
         }
         // Médicos que NÃO fecham o status (ex: Dr. Helce marca "confirmado"/"aguardando" e
         // nunca "atendido"). Pra eles contamos também esses status, com flag de alerta na tabela.
-        const REP_STATUS_EXTRA = { 'helce': true, 'graziela': true, 'joselmo': true, 'veronica': true };
+        const REP_STATUS_EXTRA = { 'helce': true, 'graziela': true, 'veronica': true };
         function repStatusExtraOk_(s) {
             const t = repNorm_(s);
             return t.includes('aguardando') || (t.includes('confirmado') && !t.includes('nao confirmado'));
