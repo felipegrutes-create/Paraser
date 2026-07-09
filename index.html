@@ -12672,6 +12672,8 @@
         function repAjusteSet_(chave, mes, obj) {
             try { localStorage.setItem('repAjuste_' + chave + '_' + mes, JSON.stringify(obj)); } catch (e) {}
         }
+        // % de repasse de medicação (Marcelle): 30% padrão, 20% no Rekovelle (margem menor).
+        function repMedPctDefault_(desc) { return /rekovelle/i.test(String(desc || '')) ? 20 : 30; }
         function repCalcPriscila_(linhas, mes, chave) {
             const C = _repCols;
             let nCons = 0, nUsgTrat = 0, nCompl = 0, consVal = 0, complVal = 0;
@@ -12696,9 +12698,10 @@
             const aj = repAjusteGet_(chave, mes) || REP_AJUSTE_DEFAULT[chave] || { estacionamento: 0, gestorTrafego: 0, trafegoMeta: 0, porFora: [] };
             const deducoes = (Number(aj.estacionamento) || 0) + (Number(aj.gestorTrafego) || 0) + (Number(aj.trafegoMeta) || 0);
             const porForaTotal = (aj.porFora || []).reduce((s, x) => s + (Number(x.val) || 0) * ((Number(x.pct) || 40) / 100), 0);
+            const medicacoesTotal = (aj.medicacoes || []).reduce((s, x) => s + (Number(x.val) || 0) * ((Number(x.pct) || repMedPctDefault_(x.desc)) / 100), 0);
             itens.sort((a, b) => (parseDate(a.data) || 0) - (parseDate(b.data) || 0));
             return { nCons, nUsgTrat, nCompl, consVal, complVal, tCons, tUsg, tCompl, auto,
-                     deducoes, porForaTotal, aj, itens, total: auto - deducoes + porForaTotal };
+                     deducoes, porForaTotal, medicacoesTotal, aj, itens, total: auto - deducoes + porForaTotal + medicacoesTotal };
         }
         function repAjusteReadInputs_(chave) {
             const num = id => { const e = document.getElementById(id); return e ? (parseFloat(String(e.value).replace(',', '.')) || 0) : 0; };
@@ -12711,7 +12714,14 @@
                 const pct = num('pf-pct-' + chave + '-' + i) || 40; // vazio/0 = 40%
                 if (desc || val) porFora.push({ desc, val, pct });
             }
-            return { estacionamento: num('ded-est-' + chave), gestorTrafego: num('ded-gt-' + chave), trafegoMeta: num('ded-tm-' + chave), porFora };
+            const medicacoes = [];
+            for (let i = 0; has('med-desc-' + chave + '-' + i) || has('med-val-' + chave + '-' + i); i++) {
+                const desc = str('med-desc-' + chave + '-' + i);
+                const val = num('med-val-' + chave + '-' + i);
+                const pct = num('med-pct-' + chave + '-' + i) || repMedPctDefault_(desc); // vazio/0 = 30% (ou 20% Rekovelle)
+                if (desc || val) medicacoes.push({ desc, val, pct });
+            }
+            return { estacionamento: num('ded-est-' + chave), gestorTrafego: num('ded-gt-' + chave), trafegoMeta: num('ded-tm-' + chave), porFora, medicacoes };
         }
         function repAjusteSaveLive_(chave) {
             repAjusteSet_(chave, _repMes, repAjusteReadInputs_(chave));
@@ -12744,6 +12754,22 @@
                 <input id="pf-val-${chave}-${i}" type="number" step="0.01" placeholder="valor cheio" value="${(it.val !== '' && it.val != null) ? it.val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:100px;text-align:right">
                 <input id="pf-pct-${chave}-${i}" type="number" step="1" placeholder="40" value="${(it.pct !== '' && it.pct != null) ? it.pct : ''}" oninput="${h}" onchange="renderRepasses()" title="% do valor (padrão 40)" style="${inS};width:50px;text-align:right">
                 <span style="font-size:11px;color:var(--muted);width:84px;text-align:right">${calc ? '= ' + calc : '%'}</span></div>`; };
+            const med = aj.medicacoes || [];
+            const medRow = i => { const it = med[i] || { desc: '', val: '', pct: '' };
+                const valn = Number(it.val) || 0, pctn = Number(it.pct) || repMedPctDefault_(it.desc);
+                const calc = valn ? repFmt_(valn * pctn / 100) : '';
+                return `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+                <input id="med-desc-${chave}-${i}" placeholder="medicação (ex: Utrogestan, Rekovelle)" value="${repEsc_(it.desc)}" oninput="${h}" onchange="renderRepasses()" style="${inS};flex:1;min-width:0">
+                <input id="med-val-${chave}-${i}" type="number" step="0.01" placeholder="valor" value="${(it.val !== '' && it.val != null) ? it.val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:100px;text-align:right">
+                <input id="med-pct-${chave}-${i}" type="number" step="1" placeholder="${repMedPctDefault_(it.desc)}" value="${(it.pct !== '' && it.pct != null) ? it.pct : ''}" oninput="${h}" onchange="renderRepasses()" title="% (30 padrão · Rekovelle 20)" style="${inS};width:50px;text-align:right">
+                <span style="font-size:11px;color:var(--muted);width:84px;text-align:right">${calc ? '= ' + calc : '%'}</span></div>`; };
+            const medBlock = chave === 'marcelle' ? `
+                <div style="border:1px solid rgba(167,139,250,0.32);background:rgba(167,139,250,0.06);border-radius:10px;padding:12px 14px;margin-top:14px">
+                    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#a78bfa;font-weight:700">💊 Medicações · valor × % (30% · Rekovelle 20%)</div>
+                    <div style="display:flex;gap:6px;margin-top:6px;font-size:10px;color:var(--muted)"><span style="flex:1;min-width:0">medicação</span><span style="width:100px;text-align:right">valor</span><span style="width:50px;text-align:right">%</span><span style="width:84px;text-align:right">repasse</span></div>
+                    ${Array.from({ length: Math.max(3, med.length + 1) }, (_, i) => medRow(i)).join('')}
+                    <div style="font-size:11px;color:#a78bfa;margin-top:8px;text-align:right">Repasse medicações (30% · Rekovelle 20%): <b>${repFmt_(c.medicacoesTotal || 0)}</b></div>
+                </div>` : '';
             return `
                 <h3 style="margin-bottom:12px">💙 ${repEsc_(nome)} — repasse do mês</h3>
                 <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
@@ -12771,11 +12797,12 @@
                     <button onclick="repPuxarFeegow_('${chave}')" style="width:100%;padding:8px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.45);color:#38bdf8;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🔌 Puxar honorários do Feegow (${repMesNomeCompleto_(_repMes)})</button>
                     <div id="rep-feegow-${chave}"></div>
                 </div>
+                ${medBlock}
                 <div style="margin-top:14px;background:rgba(52,211,153,0.11);border:1px solid rgba(52,211,153,0.34);border-radius:10px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center">
-                    <span style="font-size:13px;color:#a7f3d0">Líquido (subtotal − deduções + FIV/OD/NP)</span>
+                    <span style="font-size:13px;color:#a7f3d0">Líquido (subtotal − deduções + FIV/OD/NP${chave === 'marcelle' ? ' + medicações' : ''})</span>
                     <span id="net-${chave}" style="font-size:22px;font-weight:800;color:#34d399">${repFmt_(c.total)}</span>
                 </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:8px">Preparo Tec conta como complexo (40%). Em "FIV - OD - NP" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar. Deduções e honorários mudam por mês; ficam salvos neste navegador.</div>`;
+                <div style="font-size:11px;color:var(--muted);margin-top:8px">Preparo Tec conta como complexo (40%). Em "FIV - OD - NP" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar.${chave === 'marcelle' ? ' 💊 Medicações lançadas à mão (a lista que ela manda): 30%, Rekovelle 20% automático.' : ''} Deduções, honorários${chave === 'marcelle' ? ', medicações' : ''} mudam por mês; ficam salvos neste navegador.</div>`;
         }
         let _repFeegowSug = {}; // chave -> sugestões de honorário FIV puxadas do Feegow
         let _repPagos = {};     // chave do caso (paciente|data|valor) -> true, repasses já pagos (aba Repasses_Pagos)
@@ -12950,9 +12977,9 @@
                 totalGeral = c.total;
                 resumo = `<table><tr class="cab">
                         <th>Consultas (50%)</th><th>USG trat (R$65)</th><th>Complexos (40%)</th>
-                        <th>Subtotal</th><th>Deduções</th><th>Por fora</th><th class="azul">LÍQUIDO</th></tr>
+                        <th>Subtotal</th><th>Deduções</th><th>Por fora</th>${md.m === 'marcelle' ? '<th>Medicações</th>' : ''}<th class="azul">LÍQUIDO</th></tr>
                     <tr class="tot"><td>${repFmt_(c.tCons)}</td><td>${c.nUsgTrat} · ${repFmt_(c.tUsg)}</td><td>${repFmt_(c.tCompl)}</td>
-                        <td>${repFmt_(c.auto)}</td><td>− ${repFmt_(c.deducoes)}</td><td>+ ${repFmt_(c.porForaTotal)}</td>
+                        <td>${repFmt_(c.auto)}</td><td>− ${repFmt_(c.deducoes)}</td><td>+ ${repFmt_(c.porForaTotal)}</td>${md.m === 'marcelle' ? '<td>+ ' + repFmt_(c.medicacoesTotal || 0) + '</td>' : ''}
                         <td class="azul">${repFmt_(c.total)}</td></tr></table>`;
                 corpo = `<h3>Atendimentos do mês (consulta 50% · USG de tratamento R$ 65 · complexos 40%)</h3>
                     <table><tr class="cab"><th>Data</th><th>Procedimento</th><th>Valor cobrado</th><th>Regra</th><th>Repasse</th></tr>` +
@@ -12966,6 +12993,8 @@
                         <tr><td style="text-align:left">Tráfego Meta</td><td>− ${repFmt_(Number(c.aj.trafegoMeta) || 0)}</td></tr>` +
                         (c.aj.porFora || []).map(x => { const pctn = Number(x.pct) || 40, pv = (Number(x.val) || 0) * pctn / 100;
                             return `<tr><td style="text-align:left">${repEsc_(x.desc || 'Por fora')} <span style="color:#888">(${pctn}% de ${repFmt_(Number(x.val) || 0)})</span></td><td>+ ${repFmt_(pv)}</td></tr>`; }).join('') +
+                        (c.aj.medicacoes || []).map(x => { const pctn = Number(x.pct) || repMedPctDefault_(x.desc), pv = (Number(x.val) || 0) * pctn / 100;
+                            return `<tr><td style="text-align:left">💊 ${repEsc_(x.desc || 'Medicação')} <span style="color:#888">(${pctn}% de ${repFmt_(Number(x.val) || 0)})</span></td><td>+ ${repFmt_(pv)}</td></tr>`; }).join('') +
                         `<tr class="tot"><td>LÍQUIDO A PAGAR</td><td>${repFmt_(c.total)}</td></tr></table>`;
             } else {
                 const c = repCalcItem_(linhas, md.modelo);
