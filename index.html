@@ -12765,11 +12765,90 @@
                         ${Array.from({ length: Math.max(3, pf.length + 1) }, (_, i) => pfRow(i)).join('')}
                     </div>
                 </div>
+                <div style="margin-top:10px">
+                    <button onclick="repPuxarFeegow_('${chave}')" style="width:100%;padding:7px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.35);color:#38bdf8;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">🔌 Puxar honorários FIV do Feegow (${repMesNomeCompleto_(_repMes)})</button>
+                    <div id="rep-feegow-${chave}"></div>
+                </div>
                 <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
                     <span style="font-size:13px;color:var(--muted)">Líquido (subtotal − deduções + por fora)</span>
                     <span id="net-${chave}" style="font-size:20px;font-weight:800;color:#34d399">${repFmt_(c.total)}</span>
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-top:6px">Preparo Tec conta como complexo (40%). No "por fora" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar. Deduções e "por fora" mudam por mês; ficam salvos neste navegador.</div>`;
+        }
+        let _repFeegowSug = {}; // chave -> sugestões de honorário FIV puxadas do Feegow
+        // Janela ampla (mês anterior ao seguinte) pra pegar honorário faturado adiantado; filtra por execução.
+        function repMesRange_(mes) {
+            const [y, m] = mes.split('-').map(Number);
+            const f = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+            return { ini: f(new Date(y, m - 2, 1)), fim: f(new Date(y, m + 1, 0)) };
+        }
+        function repFiltraHonorarios_(data) {
+            const mesRef = _repMes.slice(5, 7), anoRef = _repMes.slice(0, 4), sug = [];
+            (data || []).forEach(f => {
+                const pagTotal = (f.pagamentos || []).reduce((s, p) => s + (Number(p.valor) || 0) / 100, 0);
+                (f.itens || []).forEach(it => {
+                    const nome = repNorm_(it.nomeResolvido || it.descricao);
+                    if (!(nome.includes('honorario') && nome.includes('fiv') && nome.includes('priscila')) || it.is_cancelado) return;
+                    const de = String(it.data_execucao || ''); // DD-MM-YYYY
+                    if (de.slice(3, 5) !== mesRef || de.slice(6, 10) !== anoRef) return;
+                    sug.push({ paciente: f.nomePaciente || '', val: (Number(it.valor) || 0) / 100, dexec: de, pagTotal });
+                });
+            });
+            return sug;
+        }
+        async function repPuxarFeegow_(chave) {
+            const box = document.getElementById('rep-feegow-' + chave);
+            if (!box) return;
+            box.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-top:6px">Buscando no Feegow (pode levar alguns segundos)...</div>';
+            const r = repMesRange_(_repMes);
+            try {
+                const res = await fetch(`${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(r.ini)}&data_end=${encodeURIComponent(r.fim)}`);
+                _repFeegowSug[chave] = repFiltraHonorarios_((await res.json()).data);
+            } catch (e) {
+                box.innerHTML = '<div style="font-size:12px;color:#f87171;margin-top:6px">Erro ao buscar o Feegow. Tenta de novo.</div>';
+                return;
+            }
+            repRenderSug_(chave);
+        }
+        function repRenderSug_(chave) {
+            const box = document.getElementById('rep-feegow-' + chave);
+            if (!box) return;
+            const sug = _repFeegowSug[chave] || [], fmt = repFmt_;
+            const aj = repAjusteGet_(chave, _repMes) || {};
+            const manuais = (aj.porFora || []).filter(x => x.desc);
+            const pk = s => repNorm_(s.paciente).split(' ').filter(t => t.length >= 3)[0] || '\x00';
+            const jaTem = s => manuais.some(m => repNorm_(m.desc).includes(pk(s)));
+            const semLastro = manuais.filter(m => !sug.some(s => repNorm_(m.desc).includes(pk(s))));
+            let html = '<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:8px">';
+            if (!sug.length) {
+                html += '<div style="font-size:12px;color:var(--muted)">Nenhum honorário FIV da Priscila com execução em ' + repMesNomeCompleto_(_repMes) + ' no Feegow.</div>';
+            } else {
+                html += '<div style="font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px">Honorários FIV no Feegow (execução no mês) — clique + pra contar a 40%</div>';
+                sug.forEach((s, i) => {
+                    const badge = (s.pagTotal >= s.val && s.val > 0) ? '<span style="color:#34d399">● recebido ' + fmt(s.pagTotal) + '</span>'
+                        : s.pagTotal > 0 ? '<span style="color:#fbbf24">◐ parcial ' + fmt(s.pagTotal) + '</span>'
+                        : '<span style="color:#f87171">○ a receber</span>';
+                    const btn = jaTem(s) ? '<span style="width:24px;text-align:center;color:#34d399;font-weight:800">✓</span>'
+                        : `<button onclick="repAddPorForaSug_('${chave}',${i})" title="Adicionar ao por fora" style="background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.4);color:#34d399;border-radius:5px;padding:1px 8px;cursor:pointer;font-weight:800">+</button>`;
+                    html += `<div style="display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px">${btn}
+                        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${repEsc_(s.paciente)} <span style="color:var(--muted)">· ${fmt(s.val)} · 40% = ${fmt(s.val * 0.4)}</span></span>
+                        <span style="font-size:11px;white-space:nowrap">${badge}</span></div>`;
+                });
+            }
+            if (semLastro.length) {
+                html += '<div style="font-size:11px;color:#fbbf24;margin-top:8px">⚠️ Seus lançamentos sem honorário FIV no Feegow deste mês: <b>' + semLastro.map(x => repEsc_(x.desc)).join(', ') + '</b>. Confere se é mês errado ou ainda não faturado.</div>';
+            }
+            box.innerHTML = html + '</div>';
+        }
+        function repAddPorForaSug_(chave, i) {
+            const s = (_repFeegowSug[chave] || [])[i];
+            if (!s) return;
+            const cur = repAjusteReadInputs_(chave);
+            const desc = 'Honorário FIV - ' + s.paciente;
+            if (!cur.porFora.some(x => repNorm_(x.desc) === repNorm_(desc))) cur.porFora.push({ desc, val: s.val, pct: 40 });
+            repAjusteSet_(chave, _repMes, cur);
+            renderRepasses();
+            repRenderSug_(chave);
         }
         function repMesShift_(mes, dir) {
             const [y, m] = mes.split('-').map(Number);
