@@ -12674,6 +12674,33 @@
         }
         // % de repasse de medicação (Marcelle): 30% padrão, 20% no Rekovelle (margem menor).
         function repMedPctDefault_(desc) { return /rekovelle/i.test(String(desc || '')) ? 20 : 30; }
+        // Tabela de medicações com valor pré-definido (editável). Dropdown no card da Marcelle.
+        const MED_TABELA = [
+            { nome: 'Choriomon 5.000 ui',      apres: 'Ampola', valor: 300 },
+            { nome: 'Rekovelle 72 mcg',        apres: 'Caneta', valor: 4100 },
+            { nome: 'Pergoveris 900 ui',       apres: 'Caneta', valor: 2850 },
+            { nome: 'Gonapeptyl Daily 0,1 mg', apres: 'Ampola', valor: 110 },
+            { nome: 'Ovidrel 250 mcg',         apres: 'Caneta', valor: 600 },
+            { nome: 'Elonva 150 mcg',          apres: 'Caneta', valor: 2900 },
+            { nome: 'Tractocile 7,5 mg/ml',    apres: 'Ampola', valor: 650 },
+            { nome: 'Merional 75 ui',          apres: 'Ampola', valor: 200 },
+            { nome: 'Merional 150 ui',         apres: 'Ampola', valor: 360 },
+            { nome: 'Menopur 75 ui',           apres: 'Ampola', valor: 200 },
+            { nome: 'Duphaston 10 mg',         apres: 'Caixa',  valor: 85 },
+            { nome: 'Orgalutran 0,25 mg',      apres: 'Ampola', valor: 430 },
+            { nome: 'Utrogestan 200 mg',       apres: 'Caixa',  valor: 150 },
+            { nome: 'Filgrastrim 300 mcg',     apres: 'Ampola', valor: 475 }
+        ];
+        // Ao escolher a medicação no dropdown: pré-preenche valor (editável) e o % (30 ou 20 Rekovelle).
+        function repMedPick_(chave, i, nome) {
+            const m = MED_TABELA.find(x => x.nome === nome);
+            const vEl = document.getElementById('med-val-' + chave + '-' + i);
+            const pEl = document.getElementById('med-pct-' + chave + '-' + i);
+            if (m && vEl) vEl.value = m.valor;
+            if (pEl) pEl.value = repMedPctDefault_(nome);
+            repAjusteSaveLive_(chave);
+            renderRepasses();
+        }
         function repCalcPriscila_(linhas, mes, chave) {
             const C = _repCols;
             let nCons = 0, nUsgTrat = 0, nCompl = 0, consVal = 0, complVal = 0;
@@ -12759,7 +12786,7 @@
                 const valn = Number(it.val) || 0, pctn = Number(it.pct) || repMedPctDefault_(it.desc);
                 const calc = valn ? repFmt_(valn * pctn / 100) : '';
                 return `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
-                <input id="med-desc-${chave}-${i}" placeholder="medicação (ex: Utrogestan, Rekovelle)" value="${repEsc_(it.desc)}" oninput="${h}" onchange="renderRepasses()" style="${inS};flex:1;min-width:0">
+                <select id="med-desc-${chave}-${i}" onchange="repMedPick_('${chave}',${i},this.value)" style="${inS};flex:1;min-width:0"><option value="">medicação...</option>${MED_TABELA.map(m => `<option value="${repEsc_(m.nome)}"${repNorm_(m.nome) === repNorm_(it.desc) ? ' selected' : ''}>${repEsc_(m.nome)} · ${m.apres} · ${repFmt_(m.valor)}</option>`).join('')}</select>
                 <input id="med-val-${chave}-${i}" type="number" step="0.01" placeholder="valor" value="${(it.val !== '' && it.val != null) ? it.val : ''}" oninput="${h}" onchange="renderRepasses()" style="${inS};width:100px;text-align:right">
                 <input id="med-pct-${chave}-${i}" type="number" step="1" placeholder="${repMedPctDefault_(it.desc)}" value="${(it.pct !== '' && it.pct != null) ? it.pct : ''}" oninput="${h}" onchange="renderRepasses()" title="% (30 padrão · Rekovelle 20)" style="${inS};width:50px;text-align:right">
                 <span style="font-size:11px;color:var(--muted);width:84px;text-align:right">${calc ? '= ' + calc : '%'}</span></div>`; };
