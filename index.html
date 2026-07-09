@@ -12507,8 +12507,8 @@
             { m: 'mabel',       modelo: 'priscila', cobertura: 'total'   },
             { m: 'priscila',    modelo: 'priscila', cobertura: 'total'   },
             { m: 'marcelle',    modelo: 'priscila', cobertura: 'total'   },
-            { m: 'bruna',       modelo: 'item',     cobertura: 'parcial' },
-            { m: 'mario',       modelo: 'item',     cobertura: 'parcial' },
+            { m: 'bruna',       modelo: 'item',     cobertura: 'total'   },
+            { m: 'mario',       modelo: 'item',     cobertura: 'total'   },
             { m: 'cris',        modelo: 'item',     cobertura: 'total'   },
             { m: 'helce',       modelo: 'consulta', cobertura: 'total'   },
             { m: 'graziela',    modelo: 'item',     cobertura: 'total'   },
@@ -12636,24 +12636,27 @@
             return { total: blocoA + complexasValor * 0.4, blocoA, blocoB: complexasValor * 0.4,
                      nDias, nTurnos, nTrat, nCompl, tratZero, diasDet, complexas, complexasValor };
         }
-        function repCalcItem_(linhas, modelo) {
+        function repCalcItem_(linhas, modelo, chave, mes) {
             const C = _repCols;
-            let total = 0, nCons = 0, nProc = 0;
+            let auto = 0, nCons = 0, nProc = 0, tCons = 0, tProc = 0;
             const itens = [];
             linhas.forEach(r => {
                 const proc = repNorm_(r[C.proc]);
                 if (proc.includes('pacote') && !proc.includes('acupuntura')) return; // pacote FIV/USG vem R$0; pacote de acupuntura é real (Cristiane)
                 const v = parseValorFloat(r[C.val]);
                 let pct;
-                if (proc.includes('consulta') || proc.includes('acupuntura')) { pct = 0.5; nCons++; } // acupuntura (Cristiane) conta como consulta, 50%
+                if (proc.includes('consulta') || proc.includes('acupuntura')) { pct = 0.5; nCons++; tCons += v * pct; } // acupuntura (Cristiane) conta como consulta, 50%
                 else if (modelo === 'consulta') return;
-                else if (modelo === 'socio') { pct = 1; nProc++; }
-                else { pct = 0.4; nProc++; }
-                total += v * pct;
+                else if (modelo === 'socio') { pct = 1; nProc++; tProc += v * pct; }
+                else { pct = 0.4; nProc++; tProc += v * pct; }
+                auto += v * pct;
                 itens.push({ data: r[C.data], proc: r[C.proc], v: v, pct: pct, rep: v * pct });
             });
             itens.sort((a, b) => (parseDate(a.data) || 0) - (parseDate(b.data) || 0));
-            return { total, nCons, nProc, itens };
+            // honorários lançados/puxados à mão (por fora), pra Bruna/Mário saírem do "parcial"
+            const aj = (chave && mes) ? (repAjusteGet_(chave, mes) || { porFora: [] }) : { porFora: [] };
+            const porForaTotal = (aj.porFora || []).reduce((s, x) => s + (Number(x.val) || 0) * ((Number(x.pct) || 40) / 100), 0);
+            return { total: auto + porForaTotal, auto, nCons, nProc, tCons, tProc, itens, aj, porForaTotal };
         }
 
         // Modelo Priscila/Marcelle: consulta 50% + USG de tratamento R$65 fixo + demais
@@ -12754,14 +12757,16 @@
         }
         function repAjusteSaveLive_(chave) {
             repAjusteSet_(chave, _repMes, repAjusteReadInputs_(chave));
-            const c = repCalcPriscila_(repLinhas_(chave, _repMes), _repMes, chave);
+            const md = REP_MEDICOS.find(m => m.m === chave) || {};
+            const linhas = repLinhas_(chave, _repMes);
+            const c = md.modelo === 'priscila' ? repCalcPriscila_(linhas, _repMes, chave) : repCalcItem_(linhas, md.modelo, chave, _repMes);
             const el = document.getElementById('net-' + chave);
             if (el) el.textContent = repFmt_(c.total);
         }
         function renderAjusteCards_(linhasPorMedico) {
             const cont = document.getElementById('repAjusteCards');
             if (!cont) return;
-            const docs = REP_MEDICOS.filter(m => m.modelo === 'priscila');
+            const docs = REP_MEDICOS.filter(m => m.modelo === 'priscila' || m.m === 'bruna' || m.m === 'mario');
             cont.innerHTML = docs.map(md => {
                 const linhas = linhasPorMedico[md.m] || [];
                 const nome = linhas.length ? (linhas[0][_repCols.prof] || md.m) : md.m;
@@ -12770,7 +12775,9 @@
         }
         function ajusteCardHtml_(chave, nome, linhas) {
             if (!linhas.length) return `<h3>💙 ${repEsc_(nome)} — repasse</h3><p style="color:var(--muted);font-size:13px">Sem atendimentos no mês selecionado.</p>`;
-            const c = repCalcPriscila_(linhas, _repMes, chave);
+            const md = REP_MEDICOS.find(m => m.m === chave) || {};
+            const ehItem = md.modelo !== 'priscila';
+            const c = ehItem ? repCalcItem_(linhas, md.modelo, chave, _repMes) : repCalcPriscila_(linhas, _repMes, chave);
             const aj = c.aj, pf = aj.porFora || [];
             const inS = 'background:rgba(255,255,255,0.04);border:1px solid var(--border);color:inherit;border-radius:6px;padding:5px 8px;font-size:13px';
             const h = `repAjusteSaveLive_('${chave}')`;
@@ -12799,23 +12806,28 @@
                     ${Array.from({ length: Math.max(3, med.length + 1) }, (_, i) => medRow(i)).join('')}
                     <div style="font-size:11px;color:#a78bfa;margin-top:8px;text-align:right">Repasse medicações (30% · Rekovelle 20%): <b>${repFmt_(c.medicacoesTotal || 0)}</b></div>
                 </div>` : '';
-            return `
-                <h3 style="margin-bottom:12px">💙 ${repEsc_(nome)} — repasse do mês</h3>
-                <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
-                    <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:13px">
-                        <span>Consultas 50%: <b style="color:#e5e7eb">${repFmt_(c.tCons)}</b> <span style="color:var(--muted)">(${c.nCons})</span></span>
-                        <span>USG tratamento ${c.nUsgTrat}×R$65: <b style="color:#e5e7eb">${repFmt_(c.tUsg)}</b></span>
-                        <span>Complexos 40%: <b style="color:#e5e7eb">${repFmt_(c.tCompl)}</b> <span style="color:var(--muted)">(${c.nCompl})</span></span>
-                    </div>
-                    <div style="font-size:13px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,0.07)">Subtotal automático (agenda): <b style="color:#38bdf8;font-size:15px">${repFmt_(c.auto)}</b></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
-                    <div style="border:1px solid rgba(248,113,113,0.30);background:rgba(248,113,113,0.05);border-radius:10px;padding:12px 14px">
+            const statsHtml = ehItem
+                ? `<span>Consultas 50%: <b style="color:#e5e7eb">${repFmt_(c.tCons)}</b> <span style="color:var(--muted)">(${c.nCons})</span></span>
+                   <span>Procedimentos ${md.modelo === 'socio' ? '100%' : '40%'}: <b style="color:#e5e7eb">${repFmt_(c.tProc)}</b> <span style="color:var(--muted)">(${c.nProc})</span></span>`
+                : `<span>Consultas 50%: <b style="color:#e5e7eb">${repFmt_(c.tCons)}</b> <span style="color:var(--muted)">(${c.nCons})</span></span>
+                   <span>USG tratamento ${c.nUsgTrat}×R$65: <b style="color:#e5e7eb">${repFmt_(c.tUsg)}</b></span>
+                   <span>Complexos 40%: <b style="color:#e5e7eb">${repFmt_(c.tCompl)}</b> <span style="color:var(--muted)">(${c.nCompl})</span></span>`;
+            const dedBlock = ehItem ? '' : `<div style="border:1px solid rgba(248,113,113,0.30);background:rgba(248,113,113,0.05);border-radius:10px;padding:12px 14px">
                         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#f87171;font-weight:700">➖ Deduções do mês</div>
                         ${ded('ded-est-' + chave, 'Estacionamento', aj.estacionamento)}
                         ${ded('ded-gt-' + chave, 'Gestor de tráfego', aj.gestorTrafego)}
                         ${ded('ded-tm-' + chave, 'Tráfego Meta', aj.trafegoMeta)}
-                    </div>
+                    </div>`;
+            const gridCols = ehItem ? '1fr' : '1fr 1fr';
+            const liqLabel = ehItem ? 'Líquido (subtotal + honorários)' : `Líquido (subtotal − deduções + FIV/OD/NP${chave === 'marcelle' ? ' + medicações' : ''})`;
+            return `
+                <h3 style="margin-bottom:12px">💙 ${repEsc_(nome)} — repasse do mês</h3>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+                    <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:13px">${statsHtml}</div>
+                    <div style="font-size:13px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,0.07)">Subtotal automático (agenda): <b style="color:#38bdf8;font-size:15px">${repFmt_(c.auto)}</b></div>
+                </div>
+                <div style="display:grid;grid-template-columns:${gridCols};gap:14px;margin-top:14px">
+                    ${dedBlock}
                     <div style="border:1px solid rgba(52,211,153,0.30);background:rgba(52,211,153,0.05);border-radius:10px;padding:12px 14px">
                         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#34d399;font-weight:700">➕ FIV - OD - NP · valor cheio × % (padrão 40%)</div>
                         <div style="display:flex;gap:6px;margin-top:6px;font-size:10px;color:var(--muted)"><span style="flex:1;min-width:0">descrição</span><span style="width:100px;text-align:right">valor cheio</span><span style="width:50px;text-align:right">%</span><span style="width:84px;text-align:right">repasse</span></div>
@@ -12828,7 +12840,7 @@
                 </div>
                 ${medBlock}
                 <div style="margin-top:14px;background:rgba(52,211,153,0.11);border:1px solid rgba(52,211,153,0.34);border-radius:10px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center">
-                    <span style="font-size:13px;color:#a7f3d0">Líquido (subtotal − deduções + FIV/OD/NP${chave === 'marcelle' ? ' + medicações' : ''})</span>
+                    <span style="font-size:13px;color:#a7f3d0">${liqLabel}</span>
                     <span id="net-${chave}" style="font-size:22px;font-weight:800;color:#34d399">${repFmt_(c.total)}</span>
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-top:8px">Preparo Tec conta como complexo (40%). Em "FIV - OD - NP" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar.${chave === 'marcelle' ? ' 💊 Medicações lançadas à mão (a lista que ela manda): 30%, Rekovelle 20% automático.' : ''} Deduções, honorários${chave === 'marcelle' ? ', medicações' : ''} mudam por mês; ficam salvos neste navegador.</div>`;
@@ -12843,15 +12855,15 @@
             const f = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
             return { ini: f(new Date(y, m - 5, 1)), fim: f(new Date(y, m + 1, 0)) };
         }
-        function repFiltraHonorarios_(data) {
+        function repFiltraHonorarios_(data, chave) {
             const mesRef = _repMes.slice(5, 7), anoRef = _repMes.slice(0, 4), sug = [], outros = [];
             (data || []).forEach(f => {
                 const pagTotal = (f.pagamentos || []).reduce((s, p) => s + (Number(p.valor) || 0) / 100, 0);
                 (f.itens || []).forEach(it => {
                     const raw = it.nomeResolvido || it.descricao || '';
                     const nome = repNorm_(raw);
-                    // Qualquer honorário da Priscila: FIV, coito programado (NP), congelamento de óvulos, OD... não só FIV.
-                    if (!(nome.includes('honorario') && nome.includes('priscila')) || it.is_cancelado) return;
+                    // Qualquer honorário DAQUELE médico (FIV, coito programado, congelamento de óvulos, OD...), casa pelo nome no item.
+                    if (!(nome.includes('honorario') && nome.includes(chave)) || it.is_cancelado) return;
                     const de = String(it.data_execucao || ''); // DD-MM-YYYY
                     if (!/^\d{2}-\d{2}-\d{4}$/.test(de)) return;
                     const tipo = raw.replace(/\s*-\s*dra\.?.*/i, '').replace(/^\s*honor[aá]rio\s*/i, '').trim();
@@ -12883,7 +12895,7 @@
                     fetch(`${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(r.ini)}&data_end=${encodeURIComponent(r.fim)}`),
                     fetch(`${CRM_SCRIPT_URL}?action=get_repasses_pagos`)
                 ]);
-                const fr = repFiltraHonorarios_((await finRes.json()).data);
+                const fr = repFiltraHonorarios_((await finRes.json()).data, chave);
                 _repFeegowSug[chave] = fr.sug;
                 _repFeegowOutros[chave] = fr.outros;
                 _repPagos = {}; ((await pagRes.json()).itens || []).forEach(function(x){ _repPagos[x.chave] = true; });
@@ -12903,7 +12915,7 @@
             const semLastro = manuais.filter(m => !sug.some(s => repMatchNome_(m.desc, s.paciente)));
             let html = '<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:8px">';
             if (!sug.length) {
-                html += '<div style="font-size:12px;color:var(--muted)">Nenhum honorário da Priscila com execução em ' + repMesNomeCompleto_(_repMes) + ' no Feegow.</div>';
+                html += '<div style="font-size:12px;color:var(--muted)">Nenhum honorário deste profissional com execução em ' + repMesNomeCompleto_(_repMes) + ' no Feegow.</div>';
             } else {
                 html += '<div style="font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:4px">Honorários no Feegow (execução no mês · FIV, coito, congelamento…) — clique + pra contar a 40%</div>';
                 sug.forEach((s, i) => {
@@ -13026,7 +13038,7 @@
                             return `<tr><td style="text-align:left">💊 ${repEsc_(x.desc || 'Medicação')} <span style="color:#888">(${pctn}% de ${repFmt_(Number(x.val) || 0)})</span></td><td>+ ${repFmt_(pv)}</td></tr>`; }).join('') +
                         `<tr class="tot"><td>LÍQUIDO A PAGAR</td><td>${repFmt_(c.total)}</td></tr></table>`;
             } else {
-                const c = repCalcItem_(linhas, md.modelo);
+                const c = repCalcItem_(linhas, md.modelo, md.m, _repMes);
                 totalGeral = c.total;
                 const rot = md.modelo === 'socio' ? 'Consultas 50% · procedimentos 100%'
                           : md.modelo === 'consulta' ? 'Consultas 50%'
@@ -13037,7 +13049,12 @@
                     <table><tr class="cab"><th>Data</th><th>Procedimento</th><th>Valor</th><th>%</th><th>Repasse</th></tr>` +
                     c.itens.map(x => `<tr><td>${x.data}</td><td style="text-align:left">${repEsc_(x.proc)}</td>
                         <td>${repFmt_(x.v)}</td><td>${Math.round(x.pct * 100)}%</td><td><b>${repFmt_(x.rep)}</b></td></tr>`).join('') +
-                    `<tr class="tot"><td colspan="4">TOTAL</td><td>${repFmt_(c.total)}</td></tr></table>` +
+                    `<tr class="tot"><td colspan="4">Subtotal (agenda)</td><td>${repFmt_(c.auto)}</td></tr></table>` +
+                    ((c.aj && (c.aj.porFora || []).length) ? `<h3>Honorários (por fora)</h3>
+                        <table><tr class="cab"><th>Item</th><th>Valor</th></tr>` +
+                        c.aj.porFora.map(x => { const pctn = Number(x.pct) || 40, pv = (Number(x.val) || 0) * pctn / 100;
+                            return `<tr><td style="text-align:left">${repEsc_(x.desc || 'Por fora')} <span style="color:#888">(${pctn}% de ${repFmt_(Number(x.val) || 0)})</span></td><td>+ ${repFmt_(pv)}</td></tr>`; }).join('') +
+                        `<tr class="tot"><td>LÍQUIDO A PAGAR</td><td>${repFmt_(c.total)}</td></tr></table>` : '') +
                     (md.cobertura === 'parcial'
                         ? '<p class="nota">Obs.: honorários lançados manualmente (ex: anestesia/embriologia) não constam neste demonstrativo automático.</p>'
                         : '') +
@@ -13100,7 +13117,7 @@
                 const nomeReal = linhas[0][C.prof] || md.m;
                 const calc = md.modelo === 'turno' ? repCalcTurno_(linhas)
                            : md.modelo === 'priscila' ? repCalcPriscila_(linhas, _repMes, md.m)
-                           : repCalcItem_(linhas, md.modelo);
+                           : repCalcItem_(linhas, md.modelo, md.m, _repMes);
                 const base = md.modelo === 'turno'
                     ? `${calc.nDias} dias · ${calc.nTurnos} turnos · ${calc.nTrat + calc.nCompl} USG (${calc.nTrat} trat + ${calc.nCompl} compl)`
                     : md.modelo === 'priscila'
