@@ -2589,7 +2589,20 @@ function handleWppAdmin(params) {
           texto: wppRedigir_(String(r.f[3].v || ('[' + (r.f[2].v || '') + ']'))).replace(/\n+/g, ' / ').slice(0, 180)
         };
       });
-      return jsonOk({ q: q, dias: dias, total: itens.length, chaves: chavesSet, itens: itens });
+      let amostraRaw = null;
+      if (String(params.raw) === '1') {
+        // 1 payload cru por chave (pra descobrir onde o @lid e o telefone real se ligam)
+        const rr = wppQuery_(
+          "SELECT chat_phone, ARRAY_AGG(raw ORDER BY momento DESC LIMIT 1)[OFFSET(0)] raw FROM " + WPP_BQ_REF + " " +
+          "WHERE chat_phone IN (SELECT DISTINCT chat_phone FROM " + WPP_BQ_REF + " " +
+          "  WHERE (LOWER(chat_name) LIKE @q OR LOWER(sender_name) LIKE @q OR LOWER(texto) LIKE @q) " +
+          "  AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY)) " +
+          "AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY) GROUP BY chat_phone",
+          [{ name: 'q', parameterType: { type: 'STRING' }, parameterValue: { value: '%' + q + '%' } }]);
+        amostraRaw = {};
+        rr.forEach(function(r) { try { amostraRaw[String(r.f[0].v)] = JSON.parse(r.f[1].v); } catch (e) { amostraRaw[String(r.f[0].v)] = r.f[1].v; } });
+      }
+      return jsonOk({ q: q, dias: dias, total: itens.length, chaves: chavesSet, amostra_raw: amostraRaw, itens: itens });
     }
     if (op === 'stats_captura') {
       // Diagnóstico de captura: enviadas vs recebidas nos últimos N dias e em quantas
