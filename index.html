@@ -3938,7 +3938,7 @@
                 <p id="repNotas" style="font-size:11.5px;color:var(--muted);margin:16px 0 0;line-height:1.6"></p>
             </div>
 
-            <div class="chart-card" id="repEricaCard" style="border-left:3px solid #c084fc"></div>
+            <div class="rep-aj-card" id="repEricaCard" style="--rep-cor:#c084fc"></div>
 
             <div id="repAjusteCards"></div>
         </section>
@@ -13277,7 +13277,7 @@
             const ericaEl = document.getElementById('repEricaCard');
             const linhasErica = linhasPorMedico['erica stein'] || [];
             if (!linhasErica.length) {
-                ericaEl.innerHTML = '<h3>🔬 Érica Stein — comparativo de modelos</h3><p style="color:var(--muted);font-size:13px">Sem atendimentos no mês selecionado.</p>';
+                ericaEl.innerHTML = '<div class="rep-aj-head"><div class="rep-aj-avatar">ES</div><div style="min-width:0"><div class="rep-aj-name">Érica Stein</div><div class="rep-aj-model">sem atendimentos no mês selecionado</div></div></div>';
                 document.getElementById('rep-erica-dif').textContent = '—';
             } else {
                 const turno = repCalcTurno_(linhasErica);
@@ -13286,30 +13286,39 @@
                 const custoBase = turno.total - semBase;                   // = blocoA − 65×nTrat
                 document.getElementById('rep-erica-dif').textContent = repFmt_(turno.total);
                 ericaEl.innerHTML = `
-                    <h3>🔬 Érica Stein — por que o cálculo dela é diferente</h3>
-                    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:14px 0">
-                        <div style="flex:1;min-width:220px;background:rgba(192,132,252,.07);border:1px solid rgba(192,132,252,.25);border-radius:12px;padding:14px">
-                            <div style="font-size:11px;color:#c084fc;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Modelo dela · com a base</div>
-                            <div style="font-size:24px;font-weight:800;margin:6px 0">${repFmt_(turno.total)}</div>
-                            <div style="font-size:12px;color:var(--muted);line-height:1.6">
-                                ${turno.nTurnos} turnos × R$585 + excedentes = ${repFmt_(turno.blocoA)}<br>
-                                ${turno.nCompl} USG complexas × 40% = ${repFmt_(turno.blocoB)}</div>
+                    <div class="rep-aj-head">
+                        <div class="rep-aj-avatar">ES</div>
+                        <div style="min-width:0">
+                            <div class="rep-aj-name">Érica Stein</div>
+                            <div class="rep-aj-model">⏱️ Por turno · por que o cálculo dela é diferente</div>
                         </div>
-                        <div style="flex:1;min-width:220px;background:rgba(148,163,184,.06);border:1px solid var(--border);border-radius:12px;padding:14px">
-                            <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Sem a base de R$ 585</div>
-                            <div style="font-size:24px;font-weight:800;margin:6px 0">${repFmt_(semBase)}</div>
-                            <div style="font-size:12px;color:var(--muted);line-height:1.6">
-                                ${turno.nTrat} USG de tratamento × R$ 65 = ${repFmt_(REP_USG_TRAT * turno.nTrat)}<br>
-                                + 40% das complexas = ${repFmt_(turno.blocoB)}</div>
-                        </div>
+                        <div class="rep-aj-total"><b>${repFmt_(turno.total)}</b><span>repasse do mês</span></div>
                     </div>
-                    <p style="font-size:12.5px;color:var(--muted);margin:0;line-height:1.6">
-                        <b style="color:#c084fc">Custo da base: ${repFmt_(custoBase)}/mês.</b>
-                        Tirando só os R$ 585/turno e mantendo os R$ 65 por USG de tratamento + 40% das complexas, a Érica
-                        receberia ${repFmt_(semBase)}. A base garante os R$ 585 por turno mesmo em dia fraco (quando o movimento
-                        é baixo, ela rende mais do que os R$ 65 por USG dariam). Essa diferença é o custo de garantir os turnos,
-                        não é regalia. As USG de tratamento (monitoramento de FIV) não têm preço avulso na tabela, por isso o
-                        modelo por turno. A Mabel usa o mesmo modelo.</p>`;
+                    <div class="rep-aj-body">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+                            <div style="background:color-mix(in srgb,var(--rep-cor) 8%,transparent);border:1px solid color-mix(in srgb,var(--rep-cor) 30%,transparent);border-radius:12px;padding:16px 18px">
+                                <div style="font-size:11px;color:var(--rep-cor);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Modelo dela · com a base</div>
+                                <div style="font-size:26px;font-weight:800;margin:8px 0;letter-spacing:-.5px">${repFmt_(turno.total)}</div>
+                                <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
+                                    ${turno.nTurnos} turnos × R$ 585 + excedentes = <b style="color:var(--text)">${repFmt_(turno.blocoA)}</b><br>
+                                    ${turno.nCompl} USG complexas × 40% = <b style="color:var(--text)">${repFmt_(turno.blocoB)}</b></div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:16px 18px">
+                                <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Sem a base de R$ 585</div>
+                                <div style="font-size:26px;font-weight:800;margin:8px 0;letter-spacing:-.5px;color:var(--muted)">${repFmt_(semBase)}</div>
+                                <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
+                                    ${turno.nTrat} USG de tratamento × R$ 65 = <b style="color:var(--text)">${repFmt_(REP_USG_TRAT * turno.nTrat)}</b><br>
+                                    + 40% das complexas = <b style="color:var(--text)">${repFmt_(turno.blocoB)}</b></div>
+                            </div>
+                        </div>
+                        <div style="margin-top:16px;padding:14px 16px;background:color-mix(in srgb,var(--rep-cor) 7%,transparent);border-radius:12px;font-size:13px;color:var(--text);line-height:1.75;max-width:75ch">
+                            <b style="color:var(--rep-cor)">Custo da base: ${repFmt_(custoBase)}/mês.</b>
+                            Tirando só os R$ 585/turno e mantendo os R$ 65 por USG de tratamento + 40% das complexas, a Érica
+                            receberia ${repFmt_(semBase)}. A base garante os R$ 585 por turno mesmo em dia fraco (quando o movimento
+                            é baixo, ela rende mais do que os R$ 65 por USG dariam). Essa diferença é o custo de garantir os turnos,
+                            não é regalia. As USG de tratamento (monitoramento de FIV) não têm preço avulso na tabela, por isso o
+                            modelo por turno. A Mabel usa o mesmo modelo.</div>
+                    </div>`;
             }
 
             // Notas + médicos com atividade no mês sem regra cadastrada
