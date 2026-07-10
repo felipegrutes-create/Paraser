@@ -2569,24 +2569,26 @@ function handleWppAdmin(params) {
       // Acha as chaves de chat (chat_phone) por nome OU por texto (a clínica cita o
       // nome da paciente nas enviadas) e devolve tudo dessas chaves, nas 2 direções.
       // Mostra a chave (últimos 6 chars) pra revelar conversa PARTIDA entre @lid e telefone.
+      const CANON = "COALESCE(NULLIF(JSON_EXTRACT_SCALAR(raw, '$.chatLid'), ''), chat_phone)";
       const rows = wppQuery_(
-        "SELECT UNIX_MILLIS(momento) ts, from_me, tipo, texto, chat_phone FROM " + WPP_BQ_REF + " " +
-        "WHERE chat_phone IN (SELECT DISTINCT chat_phone FROM " + WPP_BQ_REF + " " +
+        "SELECT UNIX_MILLIS(momento) ts, from_me, tipo, texto, chat_phone, " + CANON + " canonica FROM " + WPP_BQ_REF + " " +
+        "WHERE " + CANON + " IN (SELECT DISTINCT " + CANON + " FROM " + WPP_BQ_REF + " " +
         "  WHERE (LOWER(chat_name) LIKE @q OR LOWER(sender_name) LIKE @q OR LOWER(texto) LIKE @q) " +
         "  AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY)) " +
         "AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY) " +
         "ORDER BY momento",
         [{ name: 'q', parameterType: { type: 'STRING' }, parameterValue: { value: '%' + q + '%' } }]);
-      const chavesSet = {};
+      const curto = function(cp) { return cp.indexOf('@lid') !== -1 ? ('lid…' + cp.slice(0, 4)) : ('tel…' + cp.slice(-4)); };
+      const chavesSet = {}, canonSet = {};
       const itens = rows.map(function(r) {
-        const cp = String(r.f[4].v || '');
-        const chave = cp.indexOf('@lid') !== -1 ? ('lid…' + cp.slice(0, 4)) : ('tel…' + cp.slice(-4));
+        const chave = curto(String(r.f[4].v || '')), canon = curto(String(r.f[5].v || ''));
         chavesSet[chave] = (chavesSet[chave] || 0) + 1;
+        canonSet[canon] = (canonSet[canon] || 0) + 1;
         return {
           hora: Utilities.formatDate(new Date(Number(r.f[0].v)), 'America/Sao_Paulo', 'dd/MM HH:mm'),
           quem: String(r.f[1].v) === 'true' ? 'CLINICA' : 'PACIENTE',
-          chave: chave,
-          texto: wppRedigir_(String(r.f[3].v || ('[' + (r.f[2].v || '') + ']'))).replace(/\n+/g, ' / ').slice(0, 180)
+          chave: chave, canonica: canon,
+          texto: wppRedigir_(String(r.f[3].v || ('[' + (r.f[2].v || '') + ']'))).replace(/\n+/g, ' / ').slice(0, 160)
         };
       });
       let amostraRaw = null;
@@ -2602,7 +2604,7 @@ function handleWppAdmin(params) {
         amostraRaw = {};
         rr.forEach(function(r) { try { amostraRaw[String(r.f[0].v)] = JSON.parse(r.f[1].v); } catch (e) { amostraRaw[String(r.f[0].v)] = r.f[1].v; } });
       }
-      return jsonOk({ q: q, dias: dias, total: itens.length, chaves: chavesSet, amostra_raw: amostraRaw, itens: itens });
+      return jsonOk({ q: q, dias: dias, total: itens.length, chaves_originais: chavesSet, chave_canonica: canonSet, amostra_raw: amostraRaw, itens: itens });
     }
     if (op === 'stats_captura') {
       // Diagnóstico de captura: enviadas vs recebidas nos últimos N dias e em quantas
@@ -2752,7 +2754,10 @@ function wppMensagensJanela_(iniIso, fimIso) {
   // falado. O JOIN só entra quando a tabela existe (flag do setup_bq).
   const comTrans = wppTransOk_();
   const rows = wppQuery_(
-    "SELECT ANY_VALUE(m.chat_phone) chat_phone, ANY_VALUE(m.chat_name) chat_name, " +
+    // chat_phone canônico = chatLid do payload (igual nas 2 direções) ou o telefone.
+    // O WhatsApp entrega recebidas sob o telefone real e enviadas sob o @lid; sem isto
+    // a conversa parte em duas e o "sem resposta" acusa a vendedora que RESPONDEU.
+    "SELECT COALESCE(NULLIF(ANY_VALUE(JSON_EXTRACT_SCALAR(m.raw, '$.chatLid')), ''), ANY_VALUE(m.chat_phone)) chat_phone, ANY_VALUE(m.chat_name) chat_name, " +
     "ANY_VALUE(m.from_me) from_me, ANY_VALUE(m.device) device, UNIX_MILLIS(ANY_VALUE(m.momento)) ts, " +
     "ANY_VALUE(m.sender_name) sender_name, ANY_VALUE(m.tipo) tipo, " +
     (comTrans ? "SUBSTR(COALESCE(ANY_VALUE(t.texto), ANY_VALUE(m.texto)), 1, 400) texto "
@@ -2776,8 +2781,8 @@ function wppMensagensJanela_(iniIso, fimIso) {
 // que escreve parece "nova"); se corrige sozinho com o histórico acumulando.
 function wppNovosContatosJanela_(iniIso, fimIso) {
   const rows = wppQuery_(
-    "SELECT COUNT(*) FROM (SELECT chat_phone, MIN(momento) primeiro " +
-    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE GROUP BY chat_phone) " +
+    "SELECT COUNT(*) FROM (SELECT COALESCE(NULLIF(JSON_EXTRACT_SCALAR(raw, '$.chatLid'), ''), chat_phone) chave, MIN(momento) primeiro " +
+    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE GROUP BY chave) " +
     "WHERE primeiro >= @ini AND primeiro < @fim",
     [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
   return rows.length ? Number(rows[0].f[0].v) : 0;
@@ -2789,7 +2794,7 @@ function wppNovosContatosJanela_(iniIso, fimIso) {
 // dispositivo não separa; ver decisão 07/07).
 function wppAssinaturas_(fimIso) {
   const rows = wppQuery_(
-    "SELECT chat_phone, texto, UNIX_MILLIS(momento) ts FROM " + WPP_BQ_REF + " " +
+    "SELECT COALESCE(NULLIF(JSON_EXTRACT_SCALAR(raw, '$.chatLid'), ''), chat_phone) chat_phone, texto, UNIX_MILLIS(momento) ts FROM " + WPP_BQ_REF + " " +
     "WHERE from_me = TRUE AND momento < @fim " +
     "AND momento >= TIMESTAMP_SUB(@fim, INTERVAL 30 DAY) " +
     "AND REGEXP_CONTAINS(texto, r'(?i)aqui [ée] [ao] [A-Za-zÀ-ú]') ORDER BY ts",
@@ -2980,14 +2985,14 @@ function wppContextoAnterior_(msgs, iniIso) {
   msgs.forEach(function(m) { if (phones.indexOf(m.chat_phone) === -1) phones.push(m.chat_phone); });
   if (!phones.length) return null;
   const rows = wppQuery_(
-    "SELECT ANY_VALUE(m.chat_phone) chat_phone, ANY_VALUE(m.from_me) from_me, " +
+    "SELECT COALESCE(NULLIF(ANY_VALUE(JSON_EXTRACT_SCALAR(m.raw, '$.chatLid')), ''), ANY_VALUE(m.chat_phone)) chat_phone, ANY_VALUE(m.from_me) from_me, " +
     "UNIX_MILLIS(ANY_VALUE(m.momento)) ts, ANY_VALUE(m.tipo) tipo, " +
     (wppTransOk_() ? "SUBSTR(COALESCE(ANY_VALUE(t.texto), ANY_VALUE(m.texto)), 1, 200) texto "
                    : "SUBSTR(ANY_VALUE(m.texto), 1, 200) texto ") +
     "FROM " + WPP_BQ_REF + " m " +
     (wppTransOk_() ? "LEFT JOIN " + WPP_BQ_TRANS + " t ON t.message_id = m.message_id " : "") +
     "WHERE m.momento >= TIMESTAMP_SUB(@ini, INTERVAL 6 DAY) AND m.momento < @ini " +
-    "AND m.chat_phone IN UNNEST(@phones) " +
+    "AND COALESCE(NULLIF(JSON_EXTRACT_SCALAR(m.raw, '$.chatLid'), ''), m.chat_phone) IN UNNEST(@phones) " +
     "GROUP BY m.message_id ORDER BY ts",
     [WPP_TS_PARAM_('ini', iniIso),
      { name: 'phones', parameterType: { type: 'ARRAY', arrayType: { type: 'STRING' } },
