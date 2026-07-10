@@ -3948,8 +3948,14 @@
             </div>
 
             <div class="chart-card" id="repRankingCard" style="margin-bottom:22px">
-                <h3>🏆 Quem mais faturou <span id="repRankingMes" style="color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0"></span></h3>
-                <div id="repRanking" style="margin-top:14px"></div>
+                <div onclick="repToggleRanking()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px">
+                    <p style="margin:0;font-size:13px;font-weight:700;color:var(--text)">🏆 Faturamento Bruto por médico <span style="color:var(--muted);font-weight:600">(− sócios)</span></p>
+                    <span id="repRankingChevron" style="color:var(--muted);font-size:13px;transition:transform .2s ease;flex:none">▸</span>
+                </div>
+                <div id="repRankingWrap" style="display:none;margin-top:16px">
+                    <div id="repRankingMes" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px"></div>
+                    <div id="repRanking"></div>
+                </div>
             </div>
 
             <div class="chart-card">
@@ -13231,6 +13237,15 @@
             _repMes = repMesShift_(_repMes, dir);
             renderRepasses();
         }
+        // Ranking "Faturamento Bruto por médico": card expansível (fechado por padrão).
+        function repToggleRanking() {
+            const w = document.getElementById('repRankingWrap');
+            const ch = document.getElementById('repRankingChevron');
+            if (!w) return;
+            const aberto = w.style.display !== 'none';
+            w.style.display = aberto ? 'none' : 'block';
+            if (ch) ch.style.transform = aberto ? 'rotate(0deg)' : 'rotate(90deg)';
+        }
 
         function renderRepasses() {
             const tabelaEl = document.getElementById('repTabela');
@@ -13290,7 +13305,7 @@
             const rankBruto = resultados.slice().filter(r => r.bruto > 0).sort((a, b) => b.bruto - a.bruto);
             const maxBruto = rankBruto.length ? rankBruto[0].bruto : 1;
             const rkMesEl = document.getElementById('repRankingMes');
-            if (rkMesEl) rkMesEl.textContent = '· ' + repMesNomeCompleto_(_repMes) + ' (sem sócios)';
+            if (rkMesEl) rkMesEl.textContent = repMesNomeCompleto_(_repMes) + ' · ordenado pelo faturamento bruto';
             const rkEl = document.getElementById('repRanking');
             if (rkEl) rkEl.innerHTML = rankBruto.length ? rankBruto.map((r, i) => {
                 const cor = RANK_PAL[i % RANK_PAL.length];
