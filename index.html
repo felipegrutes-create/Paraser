@@ -12593,12 +12593,22 @@
             if (cor.valor != null) c[C.val]  = cor.valor;
             return c;
         }
+        // Encaixes que o repasse DEVE contar mesmo com status "Marcado - não confirmado":
+        // a sessão aconteceu, mas ninguém fechou o status no Feegow. É per-ID (não por médico,
+        // ao contrário do REP_STATUS_EXTRA) pra não inflar contando TODO não-confirmado — só
+        // estes agendamentos específicos, confirmados pelo Felipe. Uma linha por agendamento;
+        // o texto é o motivo/quem confirmou. Aparece com flag ⚠️ na tabela e no demonstrativo.
+        const REP_INCLUI = {
+            '44831': 'Encaixe Pacote Paulus 15/06 (Jéssica Santos Aranha) — sessão feita, status não fechado no Feegow. Felipe 10/07/2026.',
+            '44927': 'Encaixe Pacote Paulus 15/06 (Beatriz Miranda Soares) — sessão feita, status não fechado no Feegow. Felipe 10/07/2026.'
+        };
+        function repInclui_(r) { return !!REP_INCLUI[String(r[_repCols.id])]; }
         // Linhas ATENDIDAS de um médico num mês 'yyyy-mm'.
         function repLinhas_(chave, mes) {
             const C = _repCols;
             return _repRaw.filter(r => {
                 if (monthKey(r[C.data]) !== mes) return false;
-                if (!(repFeito_(r[C.sta]) || (REP_STATUS_EXTRA[chave] && repStatusExtraOk_(r[C.sta])))) return false;
+                if (!(repFeito_(r[C.sta]) || (REP_STATUS_EXTRA[chave] && repStatusExtraOk_(r[C.sta])) || REP_INCLUI[String(r[C.id])])) return false;
                 const prof = repNorm_(r[C.prof]);
                 if (!prof.includes(chave)) return false;
                 if (chave === 'erica stein' && prof.includes('freitas')) return false;
@@ -12650,7 +12660,7 @@
                 else if (modelo === 'socio') { pct = 1; nProc++; tProc += v * pct; }
                 else { pct = 0.4; nProc++; tProc += v * pct; }
                 auto += v * pct;
-                itens.push({ data: r[C.data], proc: r[C.proc], v: v, pct: pct, rep: v * pct });
+                itens.push({ data: r[C.data], proc: r[C.proc], v: v, pct: pct, rep: v * pct, incluido: !!REP_INCLUI[String(r[C.id])] });
             });
             itens.sort((a, b) => (parseDate(a.data) || 0) - (parseDate(b.data) || 0));
             // honorários lançados/puxados à mão (por fora), pra Bruna/Mário saírem do "parcial"
@@ -13047,7 +13057,7 @@
                     <tr class="tot"><td>${c.nCons}</td><td>${c.nProc}</td><td>${rot}</td><td class="azul">${repFmt_(c.total)}</td></tr></table>`;
                 corpo = `<h3>Atendimentos do mês</h3>
                     <table><tr class="cab"><th>Data</th><th>Procedimento</th><th>Valor</th><th>%</th><th>Repasse</th></tr>` +
-                    c.itens.map(x => `<tr><td>${x.data}</td><td style="text-align:left">${repEsc_(x.proc)}</td>
+                    c.itens.map(x => `<tr><td>${x.data}</td><td style="text-align:left">${repEsc_(x.proc)}${x.incluido ? ' <span style="color:#c47f00" title="Incluído manualmente: a sessão aconteceu mas o status ficou &quot;Marcado - não confirmado&quot; no Feegow">⚠️</span>' : ''}</td>
                         <td>${repFmt_(x.v)}</td><td>${Math.round(x.pct * 100)}%</td><td><b>${repFmt_(x.rep)}</b></td></tr>`).join('') +
                     `<tr class="tot"><td colspan="4">Subtotal (agenda)</td><td>${repFmt_(c.auto)}</td></tr></table>` +
                     ((c.aj && (c.aj.porFora || []).length) ? `<h3>Honorários (por fora)</h3>
@@ -13058,7 +13068,8 @@
                     (md.cobertura === 'parcial'
                         ? '<p class="nota">Obs.: honorários lançados manualmente (ex: anestesia/embriologia) não constam neste demonstrativo automático.</p>'
                         : '') +
-                    (REP_STATUS_EXTRA[md.m] ? '<p class="nota">⚠️ Inclui agendamentos em "Aguardando" e "Marcado - confirmado" porque o status não foi fechado como Atendido.</p>' : '');
+                    (REP_STATUS_EXTRA[md.m] ? '<p class="nota">⚠️ Inclui agendamentos em "Aguardando" e "Marcado - confirmado" porque o status não foi fechado como Atendido.</p>' : '') +
+                    (c.itens.some(x => x.incluido) ? '<p class="nota">⚠️ Inclui atendimento(s) marcados com ⚠️: a sessão aconteceu mas o status ficou "Marcado - não confirmado" no Feegow (encaixe incluído manualmente).</p>' : '');
             }
 
             const w = window.open('', '_blank');
@@ -13125,7 +13136,8 @@
                     : `${calc.nCons} consultas${md.modelo !== 'consulta' ? ' · ' + calc.nProc + ' procedimentos' : ''}`;
                 const temStatusExtra = !!REP_STATUS_EXTRA[md.m];
                 const naoFechados = temStatusExtra ? linhas.filter(r => repNorm_(r[C.sta]) !== 'atendido').length : 0;
-                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, calc, chave: md.m, temStatusExtra, naoFechados });
+                const nIncluidos = linhas.filter(repInclui_).length;
+                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, calc, chave: md.m, temStatusExtra, naoFechados, nIncluidos });
             });
             resultados.sort((a, b) => b.total - a.total);
 
@@ -13142,7 +13154,7 @@
                         <th style="padding:8px 10px;text-align:right">Repasse calculado</th><th></th></tr></thead>
                     <tbody>` + resultados.map(r => `
                         <tr style="border-top:1px solid var(--border)">
-                            <td style="padding:9px 10px;font-weight:600">${repEsc_(r.nome)}${r.temStatusExtra ? `<div style="font-size:10px;font-weight:600;color:#fbbf24;margin-top:2px" title="Este médico não fecha o status como Atendido. O repasse inclui Aguardando e Marcado-confirmado.">⚠️ status desatualizado (${r.naoFechados} não fechados)</div>` : ''}</td>
+                            <td style="padding:9px 10px;font-weight:600">${repEsc_(r.nome)}${r.temStatusExtra ? `<div style="font-size:10px;font-weight:600;color:#fbbf24;margin-top:2px" title="Este médico não fecha o status como Atendido. O repasse inclui Aguardando e Marcado-confirmado.">⚠️ status desatualizado (${r.naoFechados} não fechados)</div>` : ''}${r.nIncluidos ? `<div style="font-size:10px;font-weight:600;color:#fbbf24;margin-top:2px" title="Encaixe(s) incluídos manualmente: a sessão aconteceu mas o status ficou &quot;Marcado - não confirmado&quot; no Feegow.">⚠️ inclui ${r.nIncluidos} encaixe${r.nIncluidos > 1 ? 's' : ''} fora do status</div>` : ''}</td>
                             <td style="padding:9px 10px;color:var(--muted)">${REP_MODELO_ROT[r.modelo]}</td>
                             <td style="padding:9px 10px;color:var(--muted)">${r.base}</td>
                             <td style="padding:9px 10px">${r.cobertura === 'total'
