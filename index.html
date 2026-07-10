@@ -408,6 +408,18 @@
         .rep-aj-total span { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
         .rep-aj-body { padding: 16px 20px 18px; }
 
+        /* Cabeçalho da seção Repasses fixo ao rolar (título + navegação de mês + KPIs) */
+        .rep-sticky-head {
+            position: sticky;
+            top: 108px;
+            z-index: 40;
+            background: var(--bg);
+            padding-bottom: 16px;
+            box-shadow: 0 12px 16px -12px var(--bg);
+        }
+        .rep-sticky-head .cr-top-bar { margin-bottom: 16px; }
+        .rep-sticky-head .kpi-grid { margin-bottom: 0; }
+
         .chart-card h3 {
             font-size: 11px;
             font-weight: 600;
@@ -3918,19 +3930,21 @@
 
         <!-- REPASSES MÉDICOS -->
         <section id="sec-repasses" class="section">
-            <div class="cr-top-bar">
-                <p class="section-title" style="margin:0">🧾 Repasses Médicos — cálculo automático</p>
-                <div class="cr-month-nav">
-                    <button class="cr-nav-btn" onclick="repNavMonth(-1)">‹</button>
-                    <span id="repMonthLabel" style="font-size:15px;font-weight:600;min-width:130px;text-align:center">—</span>
-                    <button class="cr-nav-btn" onclick="repNavMonth(1)">›</button>
+            <div class="rep-sticky-head">
+                <div class="cr-top-bar">
+                    <p class="section-title" style="margin:0">🧾 Repasses Médicos — cálculo automático</p>
+                    <div class="cr-month-nav">
+                        <button class="cr-nav-btn" onclick="repNavMonth(-1)">‹</button>
+                        <span id="repMonthLabel" style="font-size:15px;font-weight:600;min-width:130px;text-align:center">—</span>
+                        <button class="cr-nav-btn" onclick="repNavMonth(1)">›</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="kpi-grid">
-                <div class="kpi-card teal"><div class="value" id="rep-total">—</div><div class="label">Total calculado no mês</div></div>
-                <div class="kpi-card"><div class="value" id="rep-medicos">—</div><div class="label">Médicos com atividade</div></div>
-                <div class="kpi-card purple"><div class="value" id="rep-erica-dif">—</div><div class="label">Érica: repasse (turno)</div></div>
+                <div class="kpi-grid">
+                    <div class="kpi-card teal"><div class="value" id="rep-total">—</div><div class="label">Total calculado no mês</div></div>
+                    <div class="kpi-card"><div class="value" id="rep-medicos">—</div><div class="label">Médicos com atividade</div></div>
+                    <div class="kpi-card purple"><div class="value" id="rep-bruto">—</div><div class="label" id="rep-bruto-label">Bruto gerado (sem sócios)</div></div>
+                </div>
             </div>
 
             <div class="chart-card">
@@ -13229,10 +13243,16 @@
             const C = _repCols;
             const linhasPorMedico = {};
             const resultados = [];
+            let brutoTotal = 0; // valor bruto gerado (cobrado) por todos os médicos da tabela (sócios já ficam de fora de REP_MEDICOS)
             REP_MEDICOS.forEach(md => {
                 const linhas = repLinhas_(md.m, _repMes);
                 linhasPorMedico[md.m] = linhas;
                 if (!linhas.length) return;
+                // Bruto = cobrado da agenda + honorários "por fora" (valor cheio) + medicações (valor cheio)
+                const ajB = repAjusteGet_(md.m, _repMes) || {};
+                brutoTotal += linhas.reduce((s, r) => s + parseValorFloat(r[C.val]), 0)
+                    + (ajB.porFora || []).reduce((s, x) => s + (Number(x.val) || 0), 0)
+                    + (ajB.medicacoes || []).reduce((s, x) => s + (Number(x.val) || 0), 0);
                 const nomeReal = linhas[0][C.prof] || md.m;
                 const calc = md.modelo === 'turno' ? repCalcTurno_(linhas)
                            : md.modelo === 'priscila' ? repCalcPriscila_(linhas, _repMes, md.m)
@@ -13252,6 +13272,12 @@
             const totalMes = resultados.reduce((s, r) => s + r.total, 0);
             document.getElementById('rep-total').textContent = repFmt_(totalMes);
             document.getElementById('rep-medicos').textContent = resultados.length;
+            // 3º KPI: bruto gerado pelos médicos (sem sócios) + % que vira repasse
+            const pctRepasse = brutoTotal > 0 ? (totalMes / brutoTotal * 100) : 0;
+            document.getElementById('rep-bruto').textContent = repFmt_(brutoTotal);
+            const _blEl = document.getElementById('rep-bruto-label');
+            if (_blEl) _blEl.innerHTML = 'Bruto médicos (sem sócios) · <b style="color:#c084fc">' +
+                pctRepasse.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%</b> em repasse';
 
             tabelaEl.innerHTML = !resultados.length
                 ? '<p style="color:var(--muted)">Nenhum atendimento no mês.</p>'
@@ -13279,13 +13305,11 @@
             const linhasErica = linhasPorMedico['erica stein'] || [];
             if (!linhasErica.length) {
                 ericaEl.innerHTML = '<div class="rep-aj-head"><div class="rep-aj-avatar">ES</div><div style="min-width:0"><div class="rep-aj-name">Érica Stein</div><div class="rep-aj-model">sem atendimentos no mês selecionado</div></div></div>';
-                document.getElementById('rep-erica-dif').textContent = '—';
             } else {
                 const turno = repCalcTurno_(linhasErica);
                 const REP_USG_TRAT = 65; // R$/USG de tratamento (mesmo valor do excedente da fórmula)
                 const semBase = REP_USG_TRAT * turno.nTrat + turno.blocoB; // sem a base: 65/USG tratamento + 40% complexas
                 const custoBase = turno.total - semBase;                   // = blocoA − 65×nTrat
-                document.getElementById('rep-erica-dif').textContent = repFmt_(turno.total);
                 ericaEl.innerHTML = `
                     <div class="rep-aj-head">
                         <div class="rep-aj-avatar">ES</div>
