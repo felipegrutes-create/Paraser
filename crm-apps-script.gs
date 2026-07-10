@@ -2566,26 +2566,30 @@ function handleWppAdmin(params) {
       const q = String(params.q || '').toLowerCase().trim();
       if (!q) return jsonErr('faltou q (nome ou telefone)');
       const dias = Math.min(45, Math.max(1, Number(params.dias) || 12));
-      // Acha o(s) telefone(s) do chat pelo nome (bate nas RECEBIDAS, que trazem o nome
-      // da paciente) e devolve a conversa INTEIRA nas duas direções — as ENVIADAS pela
-      // clínica não têm o nome da paciente no remetente, só casam por telefone.
+      // Acha as chaves de chat (chat_phone) por nome OU por texto (a clínica cita o
+      // nome da paciente nas enviadas) e devolve tudo dessas chaves, nas 2 direções.
+      // Mostra a chave (últimos 6 chars) pra revelar conversa PARTIDA entre @lid e telefone.
       const rows = wppQuery_(
-        "SELECT UNIX_MILLIS(momento) ts, from_me, tipo, texto FROM " + WPP_BQ_REF + " " +
+        "SELECT UNIX_MILLIS(momento) ts, from_me, tipo, texto, chat_phone FROM " + WPP_BQ_REF + " " +
         "WHERE chat_phone IN (SELECT DISTINCT chat_phone FROM " + WPP_BQ_REF + " " +
-        "  WHERE (LOWER(chat_name) LIKE @q OR LOWER(sender_name) LIKE @q) " +
+        "  WHERE (LOWER(chat_name) LIKE @q OR LOWER(sender_name) LIKE @q OR LOWER(texto) LIKE @q) " +
         "  AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY)) " +
         "AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY) " +
         "ORDER BY momento",
         [{ name: 'q', parameterType: { type: 'STRING' }, parameterValue: { value: '%' + q + '%' } }]);
+      const chavesSet = {};
       const itens = rows.map(function(r) {
+        const cp = String(r.f[4].v || '');
+        const chave = cp.indexOf('@lid') !== -1 ? ('lid…' + cp.slice(0, 4)) : ('tel…' + cp.slice(-4));
+        chavesSet[chave] = (chavesSet[chave] || 0) + 1;
         return {
           hora: Utilities.formatDate(new Date(Number(r.f[0].v)), 'America/Sao_Paulo', 'dd/MM HH:mm'),
           quem: String(r.f[1].v) === 'true' ? 'CLINICA' : 'PACIENTE',
-          tipo: r.f[2].v || 'texto',
-          texto: wppRedigir_(String(r.f[3].v || '')).replace(/\n+/g, ' / ').slice(0, 220)
+          chave: chave,
+          texto: wppRedigir_(String(r.f[3].v || ('[' + (r.f[2].v || '') + ']'))).replace(/\n+/g, ' / ').slice(0, 180)
         };
       });
-      return jsonOk({ q: q, dias: dias, total: itens.length, itens: itens });
+      return jsonOk({ q: q, dias: dias, total: itens.length, chaves: chavesSet, itens: itens });
     }
     if (op === 'stats_captura') {
       // Diagnóstico de captura: enviadas vs recebidas nos últimos N dias e em quantas
