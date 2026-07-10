@@ -2587,6 +2587,29 @@ function handleWppAdmin(params) {
       });
       return jsonOk({ q: q, dias: dias, total: itens.length, itens: itens });
     }
+    if (op === 'stats_captura') {
+      // Diagnóstico de captura: enviadas vs recebidas nos últimos N dias e em quantas
+      // conversas a clínica aparece enviando (se for baixo, as ENVIADAS estão se perdendo).
+      const dias = Math.min(30, Math.max(1, Number(params.dias) || 3));
+      const rows = wppQuery_(
+        "SELECT COUNTIF(from_me) enviadas, COUNTIF(NOT from_me) recebidas, " +
+        "COUNT(DISTINCT IF(from_me, chat_phone, NULL)) chats_com_envio, " +
+        "COUNT(DISTINCT chat_phone) chats_total " +
+        "FROM " + WPP_BQ_REF + " " +
+        "WHERE momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY)");
+      const f = rows[0].f;
+      // Amostra de device das enviadas (pra ver se alguma sessão reporta e outra não)
+      const dev = wppQuery_(
+        "SELECT COALESCE(device,'(vazio)') device, COUNT(*) n FROM " + WPP_BQ_REF + " " +
+        "WHERE from_me AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY) " +
+        "GROUP BY device ORDER BY n DESC");
+      return jsonOk({
+        dias: dias,
+        enviadas: Number(f[0].v), recebidas: Number(f[1].v),
+        chats_com_envio: Number(f[2].v), chats_total: Number(f[3].v),
+        enviadas_por_device: dev.map(function(r) { return { device: r.f[0].v, n: Number(r.f[1].v) }; })
+      });
+    }
     return jsonErr('op desconhecida');
   } catch (err) {
     return jsonErr(String(err));
