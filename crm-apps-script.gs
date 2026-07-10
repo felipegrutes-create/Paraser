@@ -2566,9 +2566,14 @@ function handleWppAdmin(params) {
       const q = String(params.q || '').toLowerCase().trim();
       if (!q) return jsonErr('faltou q (nome ou telefone)');
       const dias = Math.min(45, Math.max(1, Number(params.dias) || 12));
+      // Acha o(s) telefone(s) do chat pelo nome (bate nas RECEBIDAS, que trazem o nome
+      // da paciente) e devolve a conversa INTEIRA nas duas direções — as ENVIADAS pela
+      // clínica não têm o nome da paciente no remetente, só casam por telefone.
       const rows = wppQuery_(
         "SELECT UNIX_MILLIS(momento) ts, from_me, tipo, texto FROM " + WPP_BQ_REF + " " +
-        "WHERE (LOWER(chat_name) LIKE @q OR LOWER(sender_name) LIKE @q) " +
+        "WHERE chat_phone IN (SELECT DISTINCT chat_phone FROM " + WPP_BQ_REF + " " +
+        "  WHERE (LOWER(chat_name) LIKE @q OR LOWER(sender_name) LIKE @q) " +
+        "  AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY)) " +
         "AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY) " +
         "ORDER BY momento",
         [{ name: 'q', parameterType: { type: 'STRING' }, parameterValue: { value: '%' + q + '%' } }]);
