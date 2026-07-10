@@ -3943,7 +3943,7 @@
                 <div class="kpi-grid">
                     <div class="kpi-card teal"><div class="value" id="rep-total">—</div><div class="label">Total calculado no mês</div></div>
                     <div class="kpi-card"><div class="value" id="rep-medicos">—</div><div class="label">Médicos com atividade</div></div>
-                    <div class="kpi-card purple"><div class="value" id="rep-bruto">—</div><div class="label" id="rep-bruto-label">Bruto gerado (sem sócios)</div></div>
+                    <div class="kpi-card purple"><div class="value" id="rep-bruto">—</div><div class="label" id="rep-bruto-label">FAT. Bruto (sem sócios)</div></div>
                 </div>
             </div>
 
@@ -13276,7 +13276,7 @@
             const pctRepasse = brutoTotal > 0 ? (totalMes / brutoTotal * 100) : 0;
             document.getElementById('rep-bruto').textContent = repFmt_(brutoTotal);
             const _blEl = document.getElementById('rep-bruto-label');
-            if (_blEl) _blEl.innerHTML = 'Bruto médicos (sem sócios) · <b style="color:#c084fc">' +
+            if (_blEl) _blEl.innerHTML = 'FAT. Bruto (sem sócios) · <b style="color:#c084fc">' +
                 pctRepasse.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%</b> em repasse';
 
             tabelaEl.innerHTML = !resultados.length
