@@ -1960,6 +1960,14 @@ function conciliarVendasFechadas_(postarSlack) {
   }
 
   const usados = {};
+  // Recibos JÁ consumidos por vendas confirmadas (rodadas anteriores): nunca
+  // reutilizar. Sem isto, uma venda lançada 2x — ou duas vendas de mesmo valor —
+  // casam o MESMO NSU/PIX e inflam o total (caso Luanda/Isabela, Tathiana/Letícia,
+  // 10/07). match_info = "<chave> (<quem>)"; a chave é tudo antes do " (".
+  for (let i = 1; i < data.length; i++) {
+    const mi = String(data[i][H.match_info] || '');
+    if (mi) { const k = mi.split(' (')[0].trim(); if (k) usados[k] = true; }
+  }
   const novas = [];
   pendentes.forEach(function(p) {
     const valor = Number(p.v[H.valor]);
@@ -2628,6 +2636,38 @@ function handleWppAdmin(params) {
         chats_com_envio: Number(f[2].v), chats_total: Number(f[3].v),
         enviadas_por_device: dev.map(function(r) { return { device: r.f[0].v, n: Number(r.f[1].v) }; })
       });
+    }
+    if (op === 'vf_dedup') {
+      // Acha recibos (NSU/PIX) casados com >1 venda CONFIRMADA e rebaixa a extra
+      // pra DUPLICADA (não apaga). Auto só quando é a MESMA paciente; pacientes
+      // diferentes ficam pra revisão manual. Dry-run sem aplicar=1.
+      const aplicar = String(params.aplicar) === '1';
+      const sh = getOrCreateSheetGen_(VENDAS_FECHADAS_SHEET, VF_HEADERS);
+      const data = sh.getDataRange().getValues();
+      const H = {}; VF_HEADERS.forEach(function(h, i) { H[h] = i; });
+      const porRecibo = {};
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][H.status]) !== 'CONFIRMADA') continue;
+        const k = String(data[i][H.match_info] || '').split(' (')[0].trim();
+        if (!k) continue;
+        (porRecibo[k] = porRecibo[k] || []).push({ row: i + 1, vend: data[i][H.vendedora], pac: data[i][H.paciente], val: data[i][H.valor], ts: String(data[i][H.timestamp] || '') });
+      }
+      const corrigidas = [], revisar = [];
+      Object.keys(porRecibo).forEach(function(k) {
+        const l = porRecibo[k];
+        if (l.length < 2) return;
+        const nomes = {}; l.forEach(function(x) { nomes[normNome_(x.pac)] = true; });
+        if (Object.keys(nomes).length === 1) {
+          l.sort(function(a, b) { return a.ts < b.ts ? -1 : 1; }); // mantém a mais antiga
+          for (var j = 1; j < l.length; j++) {
+            corrigidas.push({ recibo: k, linha: l[j].row, vendedora: l[j].vend, paciente: l[j].pac, valor: l[j].val });
+            if (aplicar) sh.getRange(l[j].row, H.status + 1).setValue('DUPLICADA');
+          }
+        } else {
+          revisar.push({ recibo: k, itens: l.map(function(x) { return { linha: x.row, vendedora: x.vend, paciente: x.pac, valor: x.val }; }) });
+        }
+      });
+      return jsonOk({ aplicado: aplicar, corrigidas: corrigidas, revisar_manual: revisar });
     }
     return jsonErr('op desconhecida');
   } catch (err) {
