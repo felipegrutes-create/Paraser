@@ -225,6 +225,9 @@ function doGet(e) {
     if (action === 'get_repasses_pagos') return handleGetRepassesPagos();
     // Toggle via GET também (resposta legível pro frontend confirmar o estado; POST no-cors não retorna).
     if (action === 'toggle_repasse_pago') return handleToggleRepassePago(e.parameter);
+    // Repasse: ajustes do mês por médico (deduções, honorários "por fora", medicações).
+    // Salvos na nuvem (aba Repasses_Ajustes) pra valer em qualquer máquina, não só no navegador.
+    if (action === 'get_repasses_ajustes') return handleGetRepassesAjustes();
 
     if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
 
@@ -263,6 +266,7 @@ function doPost(e) {
       if (action === 'enviar_pipeline_slack') return handleEnviarPipelineSlack(body);
       if (action === 'inventario_inicial')   return handleInventarioInicial(body);
       if (action === 'toggle_repasse_pago')  return handleToggleRepassePago(body);
+      if (action === 'save_repasse_ajuste')  return handleSaveRepasseAjuste(body);
 
       if (action === 'save_caixa') {
         return handleSaveCaixa(body);
@@ -2299,6 +2303,49 @@ function handleToggleRepassePago(body) {
   }
   sh.appendRow([chave, String(body.medico || ''), "'" + String(body.mes || ''), String(body.paciente || ''), Number(body.valor) || 0, new Date().toISOString()]);
   return jsonOk({ ok: true, pago: true, chave: chave });
+}
+
+// =========================================================
+// REPASSE — AJUSTES DO MÊS (deduções + honorários "por fora" + medicações)
+// Antes ficavam só no localStorage do navegador (cada máquina via um número).
+// Agora salvos na nuvem (aba Repasses_Ajustes) → mesmo número em qualquer lugar.
+// Uma linha por médico+mês; o objeto de ajuste vai serializado em JSON numa célula.
+// index.html chama get_repasses_ajustes (ler tudo) / save_repasse_ajuste (upsert um).
+// =========================================================
+const REPASSES_AJUSTES_SHEET = 'Repasses_Ajustes';
+const RA_HEADERS = ['id', 'medico', 'mes', 'json', 'atualizado_em'];
+
+function handleGetRepassesAjustes() {
+  const sh = getOrCreateSheetGen_(REPASSES_AJUSTES_SHEET, RA_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; RA_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const itens = [];
+  for (var i = 1; i < data.length; i++) {
+    if (!String(data[i][H.id])) continue;
+    itens.push({ medico: String(data[i][H.medico]), mes: String(data[i][H.mes]), json: String(data[i][H.json]) });
+  }
+  return jsonOk({ ok: true, itens: itens });
+}
+
+// Upsert por id = medico|mes. Grava o JSON do ajuste inteiro (deduções + por-fora + medicações).
+function handleSaveRepasseAjuste(body) {
+  const medico = String(body.medico || '').trim();
+  const mes    = String(body.mes || '').trim();
+  if (!medico || !mes) return jsonErr('medico/mes obrigatorio');
+  const id = medico + '|' + mes;
+  const json = String(body.json || '');
+  const sh = getOrCreateSheetGen_(REPASSES_AJUSTES_SHEET, RA_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; RA_HEADERS.forEach(function(h, i){ H[h] = i; });
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][H.id]) === id) {
+      sh.getRange(i + 1, H.json + 1).setValue(json);
+      sh.getRange(i + 1, H.atualizado_em + 1).setValue(new Date().toISOString());
+      return jsonOk({ ok: true, updated: true, id: id });
+    }
+  }
+  sh.appendRow([id, medico, "'" + mes, json, new Date().toISOString()]);
+  return jsonOk({ ok: true, updated: false, id: id });
 }
 
 function jsonOk(data) {

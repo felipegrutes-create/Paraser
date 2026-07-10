@@ -6236,7 +6236,7 @@
             if (id === 'sec-socios') loadSociosLive();
             if (id === 'sec-medicamentos') loadMedicamentosLive();
             if (id === 'sec-caixa') loadAndRenderMedicos();
-            if (id === 'sec-repasses') renderRepasses();
+            if (id === 'sec-repasses') { renderRepasses(); repEnsureAjustesCloud_().then(renderRepasses); }
             if (id === 'sec-exec')    loadAndRenderExec();
             if (id === 'sec-estoque') loadAndRenderEstoque();
             if (id === 'sec-cr') loadAndRenderCR();
@@ -12681,11 +12681,64 @@
             'marcelle': { estacionamento: 179.5, gestorTrafego: 0,   trafegoMeta: 0,      porFora: [] },
             'mabel':    { estacionamento: 0,     gestorTrafego: 0,   trafegoMeta: 0,      porFora: [] }
         };
+        // Ajustes (deduções + honorários "por fora" + medicações) ficam na NUVEM (aba
+        // Repasses_Ajustes via CRM), pro número ser igual em qualquer máquina. O localStorage
+        // vira só cache offline. Prioridade de leitura: nuvem → cache local → default.
+        let _repAjustesCloud = {};          // 'chave_mes' -> objeto de ajuste (fonte da nuvem, em memória)
+        let _repAjusteSaveTimers = {};      // debounce do POST por médico+mês (não spammar a cada tecla)
+        let _repAjustesCloudPromise = null; // carrega a nuvem uma vez por sessão
+        function repAjusteCloudKey_(chave, mes) { return chave + '_' + mes; }
         function repAjusteGet_(chave, mes) {
+            const k = repAjusteCloudKey_(chave, mes);
+            if (_repAjustesCloud[k]) return _repAjustesCloud[k];
             try { return JSON.parse(localStorage.getItem('repAjuste_' + chave + '_' + mes)); } catch (e) { return null; }
         }
         function repAjusteSet_(chave, mes, obj) {
-            try { localStorage.setItem('repAjuste_' + chave + '_' + mes, JSON.stringify(obj)); } catch (e) {}
+            _repAjustesCloud[repAjusteCloudKey_(chave, mes)] = obj;                          // memória (reflete na hora)
+            try { localStorage.setItem('repAjuste_' + chave + '_' + mes, JSON.stringify(obj)); } catch (e) {} // cache offline
+            repAjusteCloudSave_(chave, mes, obj);                                            // nuvem (debounced)
+        }
+        // Salva na nuvem com debounce (700ms) — digitar "15640" não vira 5 POSTs.
+        function repAjusteCloudSave_(chave, mes, obj) {
+            if (!CRM_SCRIPT_URL) return;
+            const k = repAjusteCloudKey_(chave, mes);
+            clearTimeout(_repAjusteSaveTimers[k]);
+            _repAjusteSaveTimers[k] = setTimeout(function () {
+                fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'save_repasse_ajuste', medico: chave, mes: mes, json: JSON.stringify(obj) })
+                }).catch(function () {});
+            }, 700);
+        }
+        // Carrega os ajustes da nuvem (1x/sessão). Se o endpoint ainda não existe (deployment
+        // antigo do CRM), j.itens vem vazio e tudo cai no cache local — nada quebra. Depois
+        // migra pra nuvem o que só existe no navegador desta máquina (não sobrescreve a nuvem).
+        function repEnsureAjustesCloud_() {
+            if (_repAjustesCloudPromise) return _repAjustesCloudPromise;
+            _repAjustesCloudPromise = (async () => {
+                if (CRM_SCRIPT_URL) {
+                    try {
+                        const res = await fetch(CRM_SCRIPT_URL + '?action=get_repasses_ajustes');
+                        const j = await res.json();
+                        (j.itens || []).forEach(x => { try { _repAjustesCloud[x.medico + '_' + x.mes] = JSON.parse(x.json); } catch (e) {} });
+                    } catch (e) { console.warn('Ajustes da nuvem indisponíveis, usando cache local:', e.message); }
+                }
+                repMigrarAjustesLocalParaNuvem_();
+            })();
+            return _repAjustesCloudPromise;
+        }
+        function repMigrarAjustesLocalParaNuvem_() {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const m = key && key.match(/^repAjuste_(.+)_(\d{4}-\d{2})$/);
+                if (!m) continue;
+                const chave = m[1], mes = m[2], ck = chave + '_' + mes;
+                if (_repAjustesCloud[ck]) continue; // nuvem já tem: não sobrescreve
+                let obj; try { obj = JSON.parse(localStorage.getItem(key)); } catch (e) { continue; }
+                if (!obj) continue;
+                _repAjustesCloud[ck] = obj;
+                repAjusteCloudSave_(chave, mes, obj); // sobe pra nuvem (fica igual em toda máquina)
+            }
         }
         // % de repasse de medicação (Marcelle): 30% padrão, 20% no Rekovelle (margem menor).
         function repMedPctDefault_(desc) { return /rekovelle/i.test(String(desc || '')) ? 20 : 30; }
@@ -12853,7 +12906,7 @@
                     <span style="font-size:13px;color:#a7f3d0">${liqLabel}</span>
                     <span id="net-${chave}" style="font-size:22px;font-weight:800;color:#34d399">${repFmt_(c.total)}</span>
                 </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:8px">Preparo Tec conta como complexo (40%). Em "FIV - OD - NP" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar.${chave === 'marcelle' ? ' 💊 Medicações lançadas à mão (a lista que ela manda): 30%, Rekovelle 20% automático.' : ''} Deduções, honorários${chave === 'marcelle' ? ', medicações' : ''} mudam por mês; ficam salvos neste navegador.</div>`;
+                <div style="font-size:11px;color:var(--muted);margin-top:8px">Preparo Tec conta como complexo (40%). Em "FIV - OD - NP" digite o valor cheio (o sistema conta o % da linha, padrão 40%); uma linha em branco aparece sozinha pra adicionar quantas precisar.${chave === 'marcelle' ? ' 💊 Medicações lançadas à mão (a lista que ela manda): 30%, Rekovelle 20% automático.' : ''} Deduções, honorários${chave === 'marcelle' ? ', medicações' : ''} mudam por mês; ficam salvos na nuvem (valem em qualquer máquina).</div>`;
         }
         let _repFeegowSug = {}; // chave -> sugestões de honorário FIV puxadas do Feegow
         let _repPagos = {};     // chave do caso (paciente|data|valor) -> true, repasses já pagos (aba Repasses_Pagos)
