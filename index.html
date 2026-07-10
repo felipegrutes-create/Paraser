@@ -3947,6 +3947,11 @@
                 </div>
             </div>
 
+            <div class="chart-card" id="repRankingCard" style="margin-bottom:22px">
+                <h3>🏆 Quem mais faturou <span id="repRankingMes" style="color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0"></span></h3>
+                <div id="repRanking" style="margin-top:14px"></div>
+            </div>
+
             <div class="chart-card">
                 <h3>👩‍⚕️ Repasse por médico (agenda · Atendido + Em atendimento)</h3>
                 <div id="repTabela" style="margin-top:12px;overflow-x:auto"></div>
@@ -13250,9 +13255,10 @@
                 if (!linhas.length) return;
                 // Bruto = cobrado da agenda + honorários "por fora" (valor cheio) + medicações (valor cheio)
                 const ajB = repAjusteGet_(md.m, _repMes) || {};
-                brutoTotal += linhas.reduce((s, r) => s + parseValorFloat(r[C.val]), 0)
+                const brutoMed = linhas.reduce((s, r) => s + parseValorFloat(r[C.val]), 0)
                     + (ajB.porFora || []).reduce((s, x) => s + (Number(x.val) || 0), 0)
                     + (ajB.medicacoes || []).reduce((s, x) => s + (Number(x.val) || 0), 0);
+                brutoTotal += brutoMed;
                 const nomeReal = linhas[0][C.prof] || md.m;
                 const calc = md.modelo === 'turno' ? repCalcTurno_(linhas)
                            : md.modelo === 'priscila' ? repCalcPriscila_(linhas, _repMes, md.m)
@@ -13265,7 +13271,7 @@
                 const temStatusExtra = !!REP_STATUS_EXTRA[md.m];
                 const naoFechados = temStatusExtra ? linhas.filter(r => repNorm_(r[C.sta]) !== 'atendido').length : 0;
                 const nIncluidos = linhas.filter(repInclui_).length;
-                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, calc, chave: md.m, temStatusExtra, naoFechados, nIncluidos });
+                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, bruto: brutoMed, calc, chave: md.m, temStatusExtra, naoFechados, nIncluidos });
             });
             resultados.sort((a, b) => b.total - a.total);
 
@@ -13278,6 +13284,31 @@
             const _blEl = document.getElementById('rep-bruto-label');
             if (_blEl) _blEl.innerHTML = 'FAT. Bruto (sem sócios) · <b style="color:#c084fc">' +
                 pctRepasse.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%</b> em repasse';
+
+            // 🏆 Ranking de quem mais faturou (bruto), com barras proporcionais
+            const RANK_PAL = ['#c084fc', '#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#22d3ee', '#f87171', '#a3e635', '#fb923c', '#e879f9', '#60a5fa', '#4ade80'];
+            const rankBruto = resultados.slice().filter(r => r.bruto > 0).sort((a, b) => b.bruto - a.bruto);
+            const maxBruto = rankBruto.length ? rankBruto[0].bruto : 1;
+            const rkMesEl = document.getElementById('repRankingMes');
+            if (rkMesEl) rkMesEl.textContent = '· ' + repMesNomeCompleto_(_repMes) + ' (sem sócios)';
+            const rkEl = document.getElementById('repRanking');
+            if (rkEl) rkEl.innerHTML = rankBruto.length ? rankBruto.map((r, i) => {
+                const cor = RANK_PAL[i % RANK_PAL.length];
+                const pctBar = Math.max(3, r.bruto / maxBruto * 100);
+                const pctTot = brutoTotal > 0 ? (r.bruto / brutoTotal * 100) : 0;
+                return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:11px">
+                    <div style="width:22px;flex:none;text-align:right;font-weight:800;font-size:14px;color:${i < 3 ? cor : 'var(--muted)'}">${i + 1}</div>
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:4px">
+                            <span style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${repEsc_(r.nome)}</span>
+                            <span style="white-space:nowrap;color:var(--muted)"><b style="color:#fff">${repFmt_(r.bruto)}</b> · ${pctTot.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span>
+                        </div>
+                        <div style="height:8px;border-radius:5px;background:rgba(255,255,255,0.05);overflow:hidden">
+                            <div style="height:100%;width:${pctBar}%;border-radius:5px;background:linear-gradient(90deg, ${cor}, color-mix(in srgb, ${cor} 45%, transparent))"></div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') : '<p style="color:var(--muted);font-size:13px">Sem faturamento no mês selecionado.</p>';
 
             tabelaEl.innerHTML = !resultados.length
                 ? '<p style="color:var(--muted)">Nenhum atendimento no mês.</p>'
