@@ -2560,6 +2560,28 @@ function handleWppAdmin(params) {
         "ORDER BY momento DESC LIMIT " + Math.min(10, Math.max(1, Number(params.n) || 3)));
       return jsonOk({ itens: rows.map(function(r) { return JSON.parse(r.f[0].v); }) });
     }
+    if (op === 'inspecionar') {
+      // Auditoria de uma conversa por nome/telefone (últimos N dias): hora, quem enviou
+      // e texto (CPF/telefone censurados). Pra checar se uma resposta foi mesmo gravada.
+      const q = String(params.q || '').toLowerCase().trim();
+      if (!q) return jsonErr('faltou q (nome ou telefone)');
+      const dias = Math.min(45, Math.max(1, Number(params.dias) || 12));
+      const rows = wppQuery_(
+        "SELECT UNIX_MILLIS(momento) ts, from_me, tipo, texto FROM " + WPP_BQ_REF + " " +
+        "WHERE (LOWER(chat_name) LIKE @q OR LOWER(sender_name) LIKE @q) " +
+        "AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + dias + " DAY) " +
+        "ORDER BY momento",
+        [{ name: 'q', parameterType: { type: 'STRING' }, parameterValue: { value: '%' + q + '%' } }]);
+      const itens = rows.map(function(r) {
+        return {
+          hora: Utilities.formatDate(new Date(Number(r.f[0].v)), 'America/Sao_Paulo', 'dd/MM HH:mm'),
+          quem: String(r.f[1].v) === 'true' ? 'CLINICA' : 'PACIENTE',
+          tipo: r.f[2].v || 'texto',
+          texto: wppRedigir_(String(r.f[3].v || '')).replace(/\n+/g, ' / ').slice(0, 220)
+        };
+      });
+      return jsonOk({ q: q, dias: dias, total: itens.length, itens: itens });
+    }
     return jsonErr('op desconhecida');
   } catch (err) {
     return jsonErr(String(err));
