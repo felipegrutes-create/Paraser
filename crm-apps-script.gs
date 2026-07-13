@@ -1715,7 +1715,7 @@ function testarPixBigQuery() {
 // das vendas APPROVED. Token OAuth client_credentials (Bearer, ~24min).
 // Credenciais em Script Properties (REDE_CLIENT_ID/SECRET/PV), nunca no código.
 // =========================================================
-const REDE_BASE = 'https://rl7-sandbox-api.useredecloud.com.br'; // SANDBOX — trocar p/ produção depois
+const REDE_BASE = PropertiesService.getScriptProperties().getProperty('REDE_BASE') || 'https://rl7-sandbox-api.useredecloud.com.br'; // property REDE_BASE = produção; fallback sandbox
 
 // =========================================================
 // META COMERCIAL — leitor do CSV de vendas da Rede (cartão, PONTE)
@@ -1823,7 +1823,7 @@ function redeVendasDia_(token, dia) {
   const out = [];
   pvs.forEach(function(pv) {
     const url = REDE_BASE + '/merchant-statement/v1/sales?parentCompanyNumber=' + pv +
-                '&subsidiaries=' + pv + '&startDate=' + ds + '&endDate=' + ds + '&status=APPROVED&size=200';
+                '&subsidiaries=' + pv + '&startDate=' + ds + '&endDate=' + ds + '&status=APPROVED&size=100'; // produção: size máx 100
     const resp = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
     if (resp.getResponseCode() !== 200) throw new Error('REDE vendas HTTP ' + resp.getResponseCode() + ' (PV ' + pv + '): ' + resp.getContentText().slice(0, 200));
     const j = JSON.parse(resp.getContentText());
@@ -2226,8 +2226,22 @@ function handleSetupRede(body) {
   if (body.client_id) p.setProperty('REDE_CLIENT_ID', String(body.client_id));
   if (body.client_secret) p.setProperty('REDE_CLIENT_SECRET', String(body.client_secret));
   if (body.pv) p.setProperty('REDE_PV', String(body.pv));
+  if (body.base) p.setProperty('REDE_BASE', String(body.base));   // URL de produção (não secreta)
   if (body.fonte) p.setProperty('REDE_FONTE', String(body.fonte)); // 'arquivo' (CSV) ou 'api'
-  return jsonOk({ ok: true, tem_id: !!p.getProperty('REDE_CLIENT_ID'), tem_secret: !!p.getProperty('REDE_CLIENT_SECRET'), pv: p.getProperty('REDE_PV') || '', fonte: p.getProperty('REDE_FONTE') || 'arquivo' });
+  return jsonOk({ ok: true, tem_id: !!p.getProperty('REDE_CLIENT_ID'), tem_secret: !!p.getProperty('REDE_CLIENT_SECRET'), pv: p.getProperty('REDE_PV') || '', base: p.getProperty('REDE_BASE') || '', fonte: p.getProperty('REDE_FONTE') || 'arquivo' });
+}
+
+// Teste da API REDE (token + vendas de um dia). Retorna status mascarado, nunca as credenciais.
+function handleTestRede(param) {
+  try {
+    const token = redeToken_();
+    const dia = (param && param.data) ? new Date(param.data + 'T12:00:00-03:00') : (function(){ var d = new Date(); d.setDate(d.getDate() - 1); return d; })();
+    const vendas = redeVendasDia_(token, dia);
+    const total = vendas.reduce(function(s, v){ return s + (Number(v.valor) || 0); }, 0);
+    return jsonOk({ ok: true, base: PropertiesService.getScriptProperties().getProperty('REDE_BASE') || REDE_BASE, dia: Utilities.formatDate(dia, 'America/Sao_Paulo', 'yyyy-MM-dd'), token_ok: !!token, n_vendas: vendas.length, total: total, amostra: vendas.slice(0, 3) });
+  } catch (e) {
+    return jsonErr('REDE teste: ' + e.message);
+  }
 }
 
 // Apaga os dados de teste das abas (mantém os cabeçalhos). Usado 1x no go-live.
