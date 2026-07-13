@@ -53,6 +53,15 @@ const TMPL = {
     'Ressaltamos que exames solicitados durante a consulta, como coleta de preventivo, aplicação de vitaminas, ultrassonografia e demais procedimentos, não estão inclusos no valor da consulta.\n\n' +
     'Podemos confirmar? 💜',
 
+  MARCELLE_ONLINE:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua consulta ONLINE com a Dra. Marcelle Moura, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    'Caso tenha exames peço que envie para o nosso setor de enfermagem, dessa forma iremos anexar ao sistema com mais agilidade. Segue o email: mmenezesmoura@gmail.com\n\n' +
+    '⛔ Caso não haja confirmação, a consulta será cancelada. ⛔\n\n' +
+    'A consulta será realizada por videochamada no WhatsApp.\n\n' +
+    'Ressaltamos que exames solicitados durante a consulta, como coleta de preventivo, aplicação de vitaminas, ultrassonografia e demais procedimentos, não estão inclusos no valor da consulta.\n\n' +
+    'Podemos confirmar? 💜',
+
   BRUNA_PRESENCIAL:
     'Olá! Tudo bem?\n' +
     'Passando para confirmar sua consulta PRESENCIAL com a Dra. Bruna Ortiz, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -327,9 +336,12 @@ function enviarConfirmacoes() {
       }
 
       tmplKey = resolveTemplateKey(ag);
-      if (!tmplKey) {
-        logRow(ag, 'SEM_TEMPLATE', phone, '');
-        Logger.log('Sem template: prof=' + ag._profNome + ' proc=' + ag._procNome + ' procId=' + ag.procedimento_id + ' tele=' + ag.telemedicina);
+      // !TMPL[tmplKey]: a chave existe na regra mas o texto não foi cadastrado (ex:
+      // MARCELLE_ONLINE faltando 13/07). Sem esta guarda, fillTemplate(undefined) quebra
+      // e a paciente cai em "Erro" sem confirmação. Trata como sem template (logado).
+      if (!tmplKey || !TMPL[tmplKey]) {
+        logRow(ag, 'SEM_TEMPLATE' + (tmplKey ? ' (' + tmplKey + ' não cadastrado)' : ''), phone, tmplKey || '');
+        Logger.log('Sem template: key=' + (tmplKey || '(null)') + ' prof=' + ag._profNome + ' proc=' + ag._procNome + ' procId=' + ag.procedimento_id + ' tele=' + ag.telemedicina);
         semTemplate++;
         return;
       }
