@@ -230,6 +230,7 @@ function doGet(e) {
     if (action === 'get_repasses_ajustes') return handleGetRepassesAjustes();
 
     if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
+    if (action === 'get_rede_mensal') return handleRedeMensal_(e.parameter); // vendas cartao por mes (grafico Analise Executiva)
 
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
@@ -1841,6 +1842,38 @@ function redeVendasPeriodo_(token, iniIso, fimIso) {
 function redeVendasDia_(token, dia) {
   const ds = Utilities.formatDate(dia, 'America/Sao_Paulo', 'yyyy-MM-dd');
   return redeVendasPeriodo_(token, ds, ds);
+}
+
+// Vendas de cartão (Rede) somadas por mês, de 'desde' (yyyy-MM, default 2026-01) até o mês atual.
+// Meses fechados ficam em cache (REDE_MENSAL_CACHE) pois não mudam; o mês corrente é sempre ao vivo.
+// ?fresh=1 ignora o cache e recomputa tudo. Sempre lê a API da Rede (independe de REDE_FONTE).
+function handleRedeMensal_(param) {
+  const p = PropertiesService.getScriptProperties();
+  const desde = (param && param.desde) ? String(param.desde).slice(0, 7) : '2026-01';
+  const fresh = !!(param && param.fresh);
+  const hojeMes = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
+  let cache = {}; try { cache = JSON.parse(p.getProperty('REDE_MENSAL_CACHE') || '{}'); } catch (e) { cache = {}; }
+  const token = redeToken_();
+  const out = [];
+  let y = parseInt(desde.slice(0, 4), 10), m = parseInt(desde.slice(5, 7), 10);
+  const yFim = parseInt(hojeMes.slice(0, 4), 10), mFim = parseInt(hojeMes.slice(5, 7), 10);
+  let guard = 0;
+  while ((y < yFim || (y === yFim && m <= mFim)) && guard++ < 60) {
+    const mes = y + '-' + ('0' + m).slice(-2);
+    const fechado = (mes !== hojeMes);
+    let total;
+    if (!fresh && fechado && cache[mes] != null) {
+      total = cache[mes];
+    } else {
+      total = redeVendasPeriodo_(token, inicioDoMesIso_(mes), fimDoMesIso_(mes))
+                .reduce(function(s, t){ return s + (Number(t.valor) || 0); }, 0);
+      if (fechado) cache[mes] = total;
+    }
+    out.push({ mes: mes, total: total, parcial: !fechado });
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  p.setProperty('REDE_MENSAL_CACHE', JSON.stringify(cache));
+  return jsonOk({ ok: true, meses: out });
 }
 
 // =========================================================
