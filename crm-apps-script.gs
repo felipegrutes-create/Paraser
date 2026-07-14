@@ -231,6 +231,7 @@ function doGet(e) {
 
     if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
     if (action === 'get_rede_mensal') return handleRedeMensal_(e.parameter); // vendas cartao por mes (grafico Analise Executiva)
+    if (action === 'get_rede_caixa')  return handleRedeCaixa_(e.parameter);  // agenda de recebiveis futuros + taxas (Resumo)
 
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
@@ -1831,7 +1832,9 @@ function redeVendasPeriodo_(token, iniIso, fimIso) {
       if (resp.getResponseCode() !== 200) throw new Error('REDE vendas HTTP ' + resp.getResponseCode() + ' (PV ' + pv + '): ' + resp.getContentText().slice(0, 200));
       var j = JSON.parse(resp.getContentText());
       ((j.content && j.content.transactions) || []).forEach(function(t) {
-        out.push({ valor: t.amount, data: t.saleDate, modalidade: t.modality && t.modality.type, parcelas: t.installmentQuantity, nsu: t.nsu, pv: pv });
+        out.push({ valor: t.amount, data: t.saleDate, modalidade: t.modality && t.modality.type, parcelas: t.installmentQuantity, nsu: t.nsu, pv: pv,
+                   // custos da venda (pro painel de taxas): MDR + antecipação flex + total descontado
+                   mdr: t.mdrAmount || 0, flex: t.flexAmount || 0, desconto: t.discountAmount || 0, temFlex: !!t.flex });
       });
       pageKey = (j.cursor && j.cursor.hasNextKey) ? j.cursor.nextKey : '';
     } while (pageKey && ++guard < 60);
@@ -1842,6 +1845,82 @@ function redeVendasPeriodo_(token, iniIso, fimIso) {
 function redeVendasDia_(token, dia) {
   const ds = Utilities.formatDate(dia, 'America/Sao_Paulo', 'yyyy-MM-dd');
   return redeVendasPeriodo_(token, ds, ds);
+}
+
+// Agenda de PAGAMENTOS (liquidações) da Rede num período — a API limita a 30 dias por consulta,
+// então quem chama fatia em janelas. Paginado (pageKey), todos os PVs.
+function redePagamentosPeriodo_(token, iniIso, fimIso) {
+  const p = PropertiesService.getScriptProperties();
+  const pvs = (p.getProperty('REDE_PV') || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  const out = [];
+  pvs.forEach(function(pv) {
+    var pageKey = '', guard = 0;
+    do {
+      var url = REDE_BASE + '/merchant-statement/v1/payments?parentCompanyNumber=' + pv +
+                '&subsidiaries=' + pv + '&startDate=' + iniIso + '&endDate=' + fimIso + '&size=100';
+      if (pageKey) url += '&pageKey=' + encodeURIComponent(pageKey);
+      var resp = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+      if (resp.getResponseCode() !== 200) break; // janela sem movimento pode dar erro: segue o jogo
+      var j = JSON.parse(resp.getContentText());
+      ((j.content && j.content.payments) || []).forEach(function(pg) {
+        out.push({ data: pg.paymentDate, liquido: Number(pg.netAmount) || 0, status: pg.status, pv: pv });
+      });
+      pageKey = (j.cursor && j.cursor.hasNextKey) ? j.cursor.nextKey : '';
+    } while (pageKey && ++guard < 30);
+  });
+  return out;
+}
+
+// Caixa da Rede (pro Resumo Financeiro). Cache de 6h (REDE_CAIXA_CACHE).
+// liquidacoes: o que pingou/pinga por DIA (últimos 30 dias + próximos 60, se houver agenda).
+// Obs: com a antecipação automática (flex) ligada, a agenda futura é ~vazia (tudo liquida em D+1).
+// taxas: mês corrente e anterior — bruto, MDR, antecipação flex, % por modalidade.
+function handleRedeCaixa_(param) {
+  const p = PropertiesService.getScriptProperties();
+  const fresh = !!(param && param.fresh);
+  let c = null; try { c = JSON.parse(p.getProperty('REDE_CAIXA_CACHE') || 'null'); } catch (e) { c = null; }
+  const agora = new Date().getTime();
+  if (!fresh && c && (agora - (c.ts || 0)) < 6 * 3600 * 1000) return jsonOk(c.dados);
+
+  const token = redeToken_();
+  const iso = function(d){ return Utilities.formatDate(d, 'America/Sao_Paulo', 'yyyy-MM-dd'); };
+  const hojeIso = iso(new Date());
+
+  // Liquidações por dia: 3 janelas de 30 dias (-30..-1, hoje..+29, +30..+59)
+  const porDia = {};
+  var ini = new Date(); ini.setDate(ini.getDate() - 30);
+  for (var w = 0; w < 3; w++) {
+    var fim = new Date(ini.getTime()); fim.setDate(fim.getDate() + 29);
+    redePagamentosPeriodo_(token, iso(ini), iso(fim)).forEach(function(pg) {
+      var dia = String(pg.data).slice(0, 10);
+      porDia[dia] = (porDia[dia] || 0) + pg.liquido;
+    });
+    ini = new Date(fim.getTime()); ini.setDate(ini.getDate() + 1);
+  }
+  const liquidacoes = Object.keys(porDia).sort().map(function(d) {
+    return { dia: d, liquido: porDia[d], futuro: d > hojeIso };
+  });
+
+  // Taxas: mês corrente + anterior
+  const hoje = new Date();
+  const mesAtual = Utilities.formatDate(hoje, 'America/Sao_Paulo', 'yyyy-MM');
+  const mesAnt = Utilities.formatDate(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1), 'America/Sao_Paulo', 'yyyy-MM');
+  const taxas = [mesAtual, mesAnt].map(function(mes) {
+    const vs = redeVendasPeriodo_(token, inicioDoMesIso_(mes), fimDoMesIso_(mes));
+    const t = { mes: mes, bruto: 0, mdr: 0, flex: 0, desconto: 0, n: 0, nFlex: 0, mods: {} };
+    vs.forEach(function(v) {
+      t.bruto += v.valor || 0; t.mdr += v.mdr || 0; t.flex += v.flex || 0; t.desconto += v.desconto || 0;
+      t.n++; if (v.temFlex) t.nFlex++;
+      var k = v.modalidade === 'DEBIT' ? 'Débito' : ((v.parcelas || 1) > 1 ? 'Crédito parcelado' : 'Crédito à vista');
+      var m = t.mods[k] || (t.mods[k] = { bruto: 0, mdr: 0, flex: 0, n: 0 });
+      m.bruto += v.valor || 0; m.mdr += v.mdr || 0; m.flex += v.flex || 0; m.n++;
+    });
+    return t;
+  });
+
+  const dados = { ok: true, liquidacoes: liquidacoes, taxas: taxas };
+  p.setProperty('REDE_CAIXA_CACHE', JSON.stringify({ ts: agora, dados: dados }));
+  return jsonOk(dados);
 }
 
 // Vendas de cartão (Rede) somadas por mês, de 'desde' (yyyy-MM, default 2026-01) até o mês atual.

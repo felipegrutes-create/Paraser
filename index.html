@@ -4162,10 +4162,22 @@
             </div>
 
             <!-- Comparativo entre anos (controle manual META RECEITA) -->
-            <div class="cr-charts-row" style="margin-bottom:20px">
+            <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
                     <h3>📅 Receita Recebida — 2025 × 2026 <span id="resAnosSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
                     <canvas id="resChartAnos" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Caixa da Rede: o que pingou por dia + taxas pagas -->
+            <div class="cr-charts-row" style="margin-bottom:20px">
+                <div class="chart-card" style="flex:1.4">
+                    <h3>🗓️ Liquidações da Rede — o que pingou na conta, por dia <span id="resLiqSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <canvas id="resChartLiq" height="200"></canvas>
+                </div>
+                <div class="chart-card" style="flex:1">
+                    <h3>💸 Taxas Pagas à Rede <span id="resTaxasSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <div id="resTaxasBox"></div>
                 </div>
             </div>
         </section>
@@ -14775,7 +14787,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null; _resMpPlanF = null;
+            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null; _resMpPlanF = null; _resCaixaData = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
@@ -14833,6 +14845,7 @@
             _execRenderCartaoMes();
             _resRenderEntSai(receb || [], desp || {});
             _resRenderAnos();
+            _resRenderCaixa();
         }
 
         function _resRenderKPIs(k) {
@@ -14958,6 +14971,63 @@
                 },
                 plugins: [yoyPlugin]
             });
+        }
+
+        // Caixa da Rede: liquidações por dia (o que pingou, líquido) + painel de taxas (MDR + antecipação).
+        // Fonte: CRM get_rede_caixa (cache de 6h no backend). Sem agenda futura = antecipação flex em D+1.
+        let _resCaixaData = null;
+        async function _resRenderCaixa() {
+            const elC = document.getElementById('resChartLiq');
+            const box = document.getElementById('resTaxasBox');
+            if (!elC || !box) return;
+            if (!_resCaixaData) {
+                box.innerHTML = '<div style="color:var(--muted);padding:14px;font-size:13px">Carregando…</div>';
+                try {
+                    const j = await fetch(`${CRM_SCRIPT_URL}?action=get_rede_caixa`).then(r => r.json());
+                    if (!j.ok) throw new Error(j.error || 'falhou');
+                    _resCaixaData = j;
+                } catch (e) { box.innerHTML = '<div style="color:var(--muted);padding:14px;font-size:13px">⚠ não foi possível carregar as taxas agora</div>'; return; }
+            }
+            const d = _resCaixaData;
+            // Gráfico: liquidações por dia
+            if (_resCharts.liq) { try{_resCharts.liq.destroy();}catch(e){} }
+            const liq = d.liquidacoes || [];
+            const temFuturo = liq.some(x => x.futuro);
+            const subL = document.getElementById('resLiqSub');
+            if (subL) subL.textContent = temFuturo
+                ? 'líquido de taxas · barras claras = agenda futura'
+                : 'líquido de taxas · sem agenda futura: a antecipação automática liquida tudo em D+1';
+            if (liq.length) {
+                _resCharts.liq = new Chart(elC.getContext('2d'), {
+                    type: 'bar',
+                    data: { labels: liq.map(x => x.dia.slice(8,10) + '/' + x.dia.slice(5,7)),
+                        datasets: [{ label: 'Liquidado (R$)', data: liq.map(x => x.liquido),
+                            backgroundColor: liq.map(x => x.futuro ? 'rgba(0,212,170,0.35)' : '#00d4aa'), borderRadius: 3, maxBarThickness: 28 }] },
+                    options: { responsive: true,
+                        plugins: { legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => ' R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) } } },
+                        scales: { x: { ticks: { color: '#6b7a99', font: { size: 10 } }, grid: { display: false } },
+                                  y: { ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } } } }
+                });
+            }
+            // Painel: taxas do mês corrente + anterior
+            const fmt = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+            const pct = (a, b) => b ? (a / b * 100).toFixed(2).replace('.', ',') + '%' : '—';
+            const rows = (d.taxas || []).map(t => {
+                const mods = Object.entries(t.mods || {}).map(([k, m]) =>
+                    `<tr><td style="padding:3px 8px 3px 0;color:var(--muted)">${k} (${m.n})</td>
+                     <td style="text-align:right;padding:3px 10px">${pct(m.mdr, m.bruto)}</td>
+                     <td style="text-align:right;padding:3px 0">${pct(m.flex, m.bruto)}</td></tr>`).join('');
+                const nome = _MONTHS_PT[parseInt(t.mes.slice(5, 7)) - 1];
+                return `<div style="margin-bottom:14px">
+                    <div style="font-weight:600;margin-bottom:3px">${nome}: <span style="color:#f87171">${fmt(t.desconto)}</span>
+                      <span style="color:var(--muted);font-weight:400;font-size:12px">(${pct(t.desconto, t.bruto)} do bruto ${fmt(t.bruto)})</span></div>
+                    <div style="color:var(--muted);font-size:12px;margin-bottom:6px">MDR ${fmt(t.mdr)} · antecipação ${fmt(t.flex)} · ${t.nFlex}/${t.n} vendas antecipadas</div>
+                    <table style="font-size:12px;border-collapse:collapse"><tr style="color:var(--muted)"><td></td><td style="text-align:right;padding:0 10px">MDR</td><td style="text-align:right">antecip.</td></tr>${mods}</table>
+                </div>`;
+            }).join('');
+            const flexAnt = (d.taxas && d.taxas[1] && d.taxas[1].flex) || (d.taxas && d.taxas[0] && d.taxas[0].flex) || 0;
+            box.innerHTML = rows + `<div style="border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:12px;color:var(--muted)">💡 A <b>antecipação automática</b> é a maior parte do custo (~4% do bruto; mês anterior: ${fmt(flexAnt)}). Desligando, o parcelado entra ao longo dos meses, sem esse custo.</div>`;
         }
 
         // Entradas (recebido real) × Saídas (despesas pagas) por mês, com rótulo em cima de cada barra.
