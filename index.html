@@ -14645,6 +14645,41 @@
             const temParcial = meses.some(x => x.parcial);
             if (sub) sub.textContent = (fechados.length ? `média mensal (fechados): R$ ${media.toLocaleString('pt-BR',{maximumFractionDigits:0})}` : '')
                 + (temParcial ? ' · * mês em andamento' : '');
+            // Rótulos: valor de cada fatia dentro da barra + total no topo (mesmo estilo do finTotalLabels)
+            const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
+            const cartaoLabelPlugin = {
+                id: 'cartaoLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    // valores dentro das fatias (só se a fatia for alta o bastante)
+                    chart.data.datasets.forEach((ds, di) => {
+                        const meta = chart.getDatasetMeta(di);
+                        ctx.font = '600 11px Outfit, sans-serif';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = di === 0 ? '#053b33' : '#ffffff'; // escuro no teal, branco no índigo
+                        meta.data.forEach((bar, i) => {
+                            const v = ds.data[i]; if (!v) return;
+                            const h = Math.abs(bar.base - bar.y);
+                            if (h < 18) return;
+                            ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base) / 2);
+                        });
+                    });
+                    // total no topo de cada barra
+                    const meta1 = chart.getDatasetMeta(chart.data.datasets.length - 1);
+                    ctx.font = '600 11px Outfit, sans-serif';
+                    ctx.fillStyle = '#e2e8f4';
+                    ctx.textBaseline = 'bottom';
+                    chart.data.labels.forEach((_, i) => {
+                        const total = chart.data.datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0);
+                        if (!total) return;
+                        const bar = meta1.data[i]; if (!bar) return;
+                        ctx.fillText('R$ ' + fmtK(total), bar.x, bar.y - 4);
+                    });
+                    ctx.restore();
+                }
+            };
             _execCharts.cartao = new Chart(el.getContext('2d'), {
                 type: 'bar',
                 data: {
@@ -14665,9 +14700,10 @@
                     },
                     scales: {
                         x: { stacked:true, ticks:{color:'#6b7a99',font:{size:11}}, grid:{display:false} },
-                        y: { stacked:true, ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} }
+                        y: { stacked:true, grace:'8%', ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} }
                     }
-                }
+                },
+                plugins: [cartaoLabelPlugin]
             });
         }
 
