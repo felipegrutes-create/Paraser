@@ -2790,6 +2790,7 @@
         <div class="tab-group" id="group-fin">
             <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-fin',event)">Financeiro <span class="tab-group-arrow">▾</span></button>
             <div class="tab-dropdown">
+                <button class="tab-dropdown-item" onclick="showSection('sec-resumo',null)">📊 Resumo Financeiro</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-fin',null)">💰 Financeiro</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
@@ -4125,16 +4126,40 @@
                 </div>
             </div>
 
-            <!-- Cartão (Rede) por mês, desde janeiro -->
-            <div class="cr-charts-row" style="margin-bottom:20px">
+            <!-- Insights -->
+            <div id="execInsights"></div>
+        </section>
+
+        <!-- RESUMO FINANCEIRO — como está o dinheiro da clínica agora? -->
+        <section id="sec-resumo" class="section">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+                <p class="section-title" style="margin:0">📊 Resumo Financeiro</p>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <button class="cr-nav-btn" onclick="resNavMonth(-1)">‹</button>
+                    <span id="resMonthLabel" style="font-size:15px;font-weight:600;min-width:130px;text-align:center">—</span>
+                    <button class="cr-nav-btn" onclick="resNavMonth(+1)">›</button>
+                    <button class="cr-reload-btn" onclick="resReload()">↺ Recarregar</button>
+                </div>
+            </div>
+
+            <!-- KPIs do mês, cada um com etiqueta do CONCEITO (recebido ≠ faturado ≠ despesas) -->
+            <div id="resKpiGrid" class="exec-grid" style="margin-bottom:24px"></div>
+
+            <!-- Recebimentos ao vivo (cartão + PIX), o único caixa real do app -->
+            <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
                     <h3>💳 Recebimentos por Mês — Cartão (Rede) + PIX (Itaú) <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
                     <canvas id="execChartCartaoMes" height="200"></canvas>
                 </div>
             </div>
 
-            <!-- Insights -->
-            <div id="execInsights"></div>
+            <!-- Entradas x Saídas -->
+            <div class="cr-charts-row" style="margin-bottom:20px">
+                <div class="chart-card" style="flex:1">
+                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX recebidos · saídas = despesas pagas (sem retiradas)</span></h3>
+                    <canvas id="resChartEntSai" height="200"></canvas>
+                </div>
+            </div>
         </section>
 
         <!-- ESTOQUE MEDICAMENTOS -->
@@ -6250,6 +6275,7 @@
             'sec-doavol':        'group-pacientes',
             'sec-receptoras':    'group-pacientes',
             'sec-embriao':       'group-pacientes',
+            'sec-resumo':        'group-fin',
             'sec-fin':           'group-fin',
             'sec-cr':            'group-fin',
             'sec-caixa':         'group-fin',
@@ -6304,6 +6330,7 @@
             if (id === 'sec-doavol') dvTab.renderPending();
             if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-embriao') ebTab.renderPending();
+            if (id === 'sec-resumo') loadAndRenderResumo();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             if (id === 'sec-socios') loadSociosLive();
             if (id === 'sec-medicamentos') loadMedicamentosLive();
@@ -14445,30 +14472,42 @@
         let _execDate   = new Date();
         let _execCache  = {};   // 'YYYY-MM' → data[]
         let _execCharts = {};   // id → Chart instance
-        let _execCartaoData = null;  // série cartão Rede por mês (desde jan) — busca 1x por sessão
+        let _execCartaoData = null;  // série cartão+PIX por mês (desde jan) — busca 1x por sessão
+        let _resCharts = {};         // charts do Resumo Financeiro (cartão empilhado + entradas×saídas)
         const _MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
         function _execKey(d)    { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
         function _execFmtDate(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
         function execNavMonth(dir) { _execDate = new Date(_execDate.getFullYear(), _execDate.getMonth()+dir, 1); loadAndRenderExec(); }
-        function execReload()   { delete _execCache[_execKey(_execDate)]; _execCartaoData = null; loadAndRenderExec(); }
+        function execReload()   { delete _execCache[_execKey(_execDate)]; delete _fgMonthCache[_execKey(_execDate)]; loadAndRenderExec(); }
 
         function _execDestroyCharts() {
             Object.values(_execCharts).forEach(c => { try { c.destroy(); } catch(e){} });
             _execCharts = {};
         }
 
-        async function _execLoadMonth(d) {
-            const key = _execKey(d);
-            if (_execCache[key]) return _execCache[key];
+        // ===== Cache ÚNICO do Feegow (get_financial) por mês — compartilhado entre Exec, CR e Resumo.
+        // Guarda a Promise (dedupe: 2 abas pedindo o mesmo mês geram 1 fetch). Falha remove do cache pra retry.
+        const _fgMonthCache = {};   // 'YYYY-MM' → Promise<faturas[]>
+        function _fgKey(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+        function fgLoadMonth(d, opts) {
+            const key = _fgKey(d);
+            if (_fgMonthCache[key]) return _fgMonthCache[key];
             const start = new Date(d.getFullYear(), d.getMonth(), 1);
             const end   = new Date(d.getFullYear(), d.getMonth()+1, 0);
             const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(_execFmtDate(start))}&data_end=${encodeURIComponent(_execFmtDate(end))}`;
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-            const json = await resp.json();
-            if (json.error) throw new Error(json.error);
-            _execCache[key] = json.data || [];
+            const p = fetch(url, (opts && opts.signal) ? { signal: opts.signal } : undefined)
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(j => { if (j.error) throw new Error(j.error); return j.data || []; })
+                .catch(e => { delete _fgMonthCache[key]; throw e; });
+            _fgMonthCache[key] = p;
+            return p;
+        }
+
+        async function _execLoadMonth(d) {
+            const key = _execKey(d);
+            if (_execCache[key]) return _execCache[key];
+            _execCache[key] = await fgLoadMonth(d);
             return _execCache[key];
         }
 
@@ -14543,7 +14582,6 @@
             _execRenderMedico(m);
             _execRenderMix(m);
             _execRenderInsights(m, mp);
-            _execRenderCartaoMes();
         }
 
         function _execRenderKPIs(m, mp) {
@@ -14619,21 +14657,27 @@
             });
         }
 
-        // Recebimentos por mês, desde janeiro: Cartão (Rede, API) + PIX (Itaú). Barras empilhadas.
-        // Fonte: CRM get_rede_mensal. Escopo anual (independe do mês navegado). Valores em REAIS.
-        // Mês corrente = parcial (rótulo com *; PIX vem do BigQuery ao vivo, meses fechados do histórico).
+        // Recebimentos (cartão Rede + PIX Itaú) por mês desde janeiro, do CRM get_rede_mensal.
+        // Usado pelo Resumo Financeiro (KPIs + gráficos). Valores em REAIS. Busca 1x por sessão.
+        async function resLoadRecebimentos() {
+            if (_execCartaoData) return _execCartaoData;
+            const resp = await fetch(`${CRM_SCRIPT_URL}?action=get_rede_mensal`);
+            const json = await resp.json();
+            if (!json.ok) throw new Error(json.error || 'falhou');
+            _execCartaoData = json.meses || [];
+            return _execCartaoData;
+        }
+
+        // Gráfico Recebimentos por Mês (barras empilhadas Cartão + PIX). Vive no Resumo Financeiro.
+        // Mês corrente = parcial (rótulo com *; PIX do BigQuery ao vivo, meses fechados do histórico).
         async function _execRenderCartaoMes() {
             const el = document.getElementById('execChartCartaoMes'); if (!el) return;
-            if (_execCharts.cartao) { try{_execCharts.cartao.destroy();}catch(e){} }
+            if (_resCharts.cartao) { try{_resCharts.cartao.destroy();}catch(e){} }
             const sub = document.getElementById('execCartaoSub');
             if (!_execCartaoData) {
                 if (sub) sub.textContent = 'carregando…';
-                try {
-                    const resp = await fetch(`${CRM_SCRIPT_URL}?action=get_rede_mensal`);
-                    const json = await resp.json();
-                    if (!json.ok) throw new Error(json.error || 'falhou');
-                    _execCartaoData = json.meses || [];
-                } catch(e) { _execCartaoData = []; if (sub) sub.textContent = '⚠ não foi possível carregar'; return; }
+                try { await resLoadRecebimentos(); }
+                catch(e) { _execCartaoData = []; if (sub) sub.textContent = '⚠ não foi possível carregar'; return; }
             }
             const meses = _execCartaoData;
             if (!meses.length) { if (sub) sub.textContent = '⚠ sem dados'; return; }
@@ -14680,7 +14724,7 @@
                     ctx.restore();
                 }
             };
-            _execCharts.cartao = new Chart(el.getContext('2d'), {
+            _resCharts.cartao = new Chart(el.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels,
@@ -14704,6 +14748,154 @@
                     }
                 },
                 plugins: [cartaoLabelPlugin]
+            });
+        }
+
+        // ===================== RESUMO FINANCEIRO (sec-resumo) =====================
+        // Responde: "como está o dinheiro da clínica agora?" — 3 fontes, cada uma com etiqueta de conceito:
+        // RECEBIDO (cartão+PIX ao vivo) · FATURADO (Feegow, competência) · DESPESAS (extrato, sem retiradas).
+        let _resDate = new Date();
+        let _resDespesasMap = null; // 'YYYY-MM' → total de despesas pagas (reais)
+
+        function resNavMonth(dir) {
+            const alvo = new Date(_resDate.getFullYear(), _resDate.getMonth() + dir, 1);
+            const hoje = new Date();
+            if (alvo > new Date(hoje.getFullYear(), hoje.getMonth(), 1)) return; // não passa do mês atual
+            _resDate = alvo;
+            loadAndRenderResumo();
+        }
+        function resReload() {
+            _execCartaoData = null; _resDespesasMap = null;
+            delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
+            loadAndRenderResumo();
+        }
+
+        // Despesas pagas por mês — mesma régua da aba Financeiro (LANÇAMENTOS+LANÇAMENTOS_I,
+        // sem retiradas/empréstimos). Se o prefetch da sec-fin ainda não rodou, carrega sem mexer no estado dela.
+        async function resDespesasPorMes() {
+            if (_resDespesasMap) return _resDespesasMap;
+            let src = finData;
+            if (!finDataLoaded) {
+                const rows = await loadFinanceData();
+                src = processFinanceData(rows);
+            }
+            const map = {};
+            src.forEach(d => {
+                const p = (d.caixa || '').split('/'); // 'MM/2026'
+                if (p.length !== 2) return;
+                const key = p[1] + '-' + p[0];
+                map[key] = (map[key] || 0) + d.valor;
+            });
+            _resDespesasMap = map;
+            return map;
+        }
+
+        async function loadAndRenderResumo() {
+            const lbl = document.getElementById('resMonthLabel');
+            if (lbl) lbl.textContent = _MONTHS_PT[_resDate.getMonth()] + ' ' + _resDate.getFullYear();
+            const grid = document.getElementById('resKpiGrid');
+            if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Carregando dados…</div>';
+            const mesKey = _fgKey(_resDate);
+
+            // 3 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
+            const [receb, fg, desp] = await Promise.all([
+                resLoadRecebimentos().catch(() => null),
+                fgLoadMonth(_resDate).catch(() => null),
+                resDespesasPorMes().catch(() => null),
+            ]);
+
+            const rec = receb ? receb.find(x => x.mes === mesKey) : null;
+            const recebido = rec ? (rec.rede || 0) + (rec.pix || 0) : null;
+            const m = fg ? _execMetrics(fg) : null; // Feegow em CENTAVOS
+            const despesas = (desp && desp[mesKey] != null) ? desp[mesKey] : null;
+            const resultado = (recebido != null && despesas != null) ? recebido - despesas : null;
+
+            _resRenderKPIs({
+                recebido, despesas, resultado,
+                faturado: m ? m.fat / 100 : null,
+                aReceber: m ? m.pend / 100 : null,
+                parcial: rec ? !!rec.parcial : false
+            });
+            _execRenderCartaoMes();
+            _resRenderEntSai(receb || [], desp || {});
+        }
+
+        function _resRenderKPIs(k) {
+            const grid = document.getElementById('resKpiGrid'); if (!grid) return;
+            const R = v => v == null ? '—' : 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const resS = k.resultado == null ? 'blue' : (k.resultado >= 0 ? 'green' : 'red');
+            const parc = k.parcial ? ' <span style="font-size:10px;color:#f59e0b;text-transform:none">(mês em andamento)</span>' : '';
+            grid.innerHTML = `
+                <div class="exec-kpi green">
+                    <div class="exec-kpi-val">${R(k.recebido)}</div>
+                    <div class="exec-kpi-label">💵 Recebido (caixa real)${parc}</div>
+                    <div class="exec-kpi-bench">Cartão Rede + PIX Itaú que <b>caíram</b> no mês</div>
+                </div>
+                <div class="exec-kpi blue">
+                    <div class="exec-kpi-val">${R(k.faturado)}</div>
+                    <div class="exec-kpi-label">🧾 Faturado (Feegow)</div>
+                    <div class="exec-kpi-bench">Produção do mês, <b>pago ou não</b> (competência)</div>
+                </div>
+                <div class="exec-kpi red">
+                    <div class="exec-kpi-val">${R(k.despesas)}</div>
+                    <div class="exec-kpi-label">📤 Despesas pagas</div>
+                    <div class="exec-kpi-bench">Extrato das 2 empresas, <b>sem</b> retiradas e empréstimos</div>
+                </div>
+                <div class="exec-kpi ${resS}">
+                    <div class="exec-kpi-val">${R(k.resultado)}</div>
+                    <div class="exec-kpi-label">🧮 Resultado de caixa</div>
+                    <div class="exec-kpi-bench">Recebido <b>menos</b> despesas pagas</div>
+                </div>
+                <div class="exec-kpi blue" style="cursor:pointer" onclick="showSection('sec-cr',null)" title="Abrir Contas a Receber">
+                    <div class="exec-kpi-val">${R(k.aReceber)}</div>
+                    <div class="exec-kpi-label">⏳ A Receber (Feegow)</div>
+                    <div class="exec-kpi-bench">Faturado − recebido do mês · <b>clique</b> pra detalhar</div>
+                </div>`;
+        }
+
+        // Entradas (recebido real) × Saídas (despesas pagas) por mês, com rótulo em cima de cada barra.
+        function _resRenderEntSai(receb, despMap) {
+            const el = document.getElementById('resChartEntSai'); if (!el) return;
+            if (_resCharts.entsai) { try{_resCharts.entsai.destroy();}catch(e){} }
+            const keys = [...new Set([...(receb || []).map(x => x.mes), ...Object.keys(despMap || {})])].sort();
+            if (!keys.length) return;
+            const ent = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) : 0; });
+            const sai = keys.map(k => despMap[k] || 0);
+            const labels = keys.map(k => { const i = parseInt(k.slice(5, 7), 10) - 1; return _MONTHS_PT[i].slice(0, 3) + '/' + k.slice(2, 4); });
+            const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
+            const entSaiLabels = {
+                id: 'entSaiLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    ctx.save(); ctx.font = '600 10px Outfit, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
+                    chart.data.datasets.forEach((ds, di) => {
+                        const meta = chart.getDatasetMeta(di);
+                        meta.data.forEach((bar, i) => { const v = ds.data[i]; if (!v) return; ctx.fillText(fmtK(v), bar.x, bar.y - 3); });
+                    });
+                    ctx.restore();
+                }
+            };
+            _resCharts.entsai = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [
+                    { label: 'Entradas (recebido)', data: ent, backgroundColor: '#00d4aa', borderRadius: 4, maxBarThickness: 40 },
+                    { label: 'Saídas (despesas)',   data: sai, backgroundColor: '#ef4444', borderRadius: 4, maxBarThickness: 40 }
+                ]},
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: { callbacks: {
+                            label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                            footer: items => { const e = items.find(i => i.datasetIndex === 0), s = items.find(i => i.datasetIndex === 1); if (!e || !s) return ''; return 'Resultado: R$ ' + (e.raw - s.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+                        } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
+                        y: { grace: '10%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                },
+                plugins: [entSaiLabels]
             });
         }
 
@@ -15578,7 +15770,8 @@ GONAPEPTYL,56`;
                     Promise.allSettled([
                         loadAndRenderFinanceiro().catch(e => { console.warn('prefetch Financeiro:', e.message); throw e; }),
                         loadAndRenderMedicos().catch(e => { console.warn('prefetch Médicos:', e.message); throw e; }),
-                        loadAndRenderCR().catch(e => { console.warn('prefetch CR:', e.message); throw e; })
+                        loadAndRenderCR().catch(e => { console.warn('prefetch CR:', e.message); throw e; }),
+                        loadAndRenderResumo().catch(e => { console.warn('prefetch Resumo:', e.message); throw e; })
                     ]).then(results => {
                         const ok = results.filter(r => r.status === 'fulfilled').length;
                         console.log(`✓ Prefetch ${ok}/${results.length} tabs prontas em background`);
@@ -15620,7 +15813,7 @@ GONAPEPTYL,56`;
             crDataLoaded = false;
             loadAndRenderCR();
         }
-        function crReload() { crDataLoaded = false; loadAndRenderCR(); }
+        function crReload() { crDataLoaded = false; delete _fgMonthCache[_fgKey(crCurrentDate)]; delete _execCache[_fgKey(crCurrentDate)]; loadAndRenderCR(); }
 
         async function crEnviarPipelineSlack() {
             const pipeline = crData.filter(inv => crInvoiceStatus(inv) === 'pipeline');
@@ -16093,13 +16286,9 @@ GONAPEPTYL,56`;
             try {
                 // Timeout de 350s — Apps Script pode demorar até ~5min na 1ª vez (sem cache)
                 const timeoutId = setTimeout(() => { try { _crFetchController.abort(); } catch(e){} }, 350000);
-                const url = `${CRM_SCRIPT_URL}?action=get_financial&data_start=${encodeURIComponent(ds)}&data_end=${encodeURIComponent(de)}`;
-                const resp = await fetch(url, { signal });
+                // Cache único por mês (fgLoadMonth): se a Exec ou o Resumo já baixaram este mês, reusa sem novo fetch
+                crData = await fgLoadMonth(crCurrentDate, { signal });
                 clearTimeout(timeoutId);
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const json = await resp.json();
-                if (json.error) throw new Error(json.error);
-                crData = json.data || [];
                 crDataLoaded = true;
                 renderCR();
             } catch(e) {
