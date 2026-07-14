@@ -4154,10 +4154,18 @@
             </div>
 
             <!-- Entradas x Saídas -->
-            <div class="cr-charts-row" style="margin-bottom:20px">
+            <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
                     <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX recebidos · saídas = despesas pagas (sem retiradas)</span></h3>
                     <canvas id="resChartEntSai" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Comparativo entre anos (controle manual META RECEITA) -->
+            <div class="cr-charts-row" style="margin-bottom:20px">
+                <div class="chart-card" style="flex:1">
+                    <h3>📅 Receita Recebida — 2025 × 2026 <span id="resAnosSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <canvas id="resChartAnos" height="200"></canvas>
                 </div>
             </div>
         </section>
@@ -14765,7 +14773,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null;
+            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
@@ -14818,6 +14826,7 @@
             });
             _execRenderCartaoMes();
             _resRenderEntSai(receb || [], desp || {});
+            _resRenderAnos();
         }
 
         function _resRenderKPIs(k) {
@@ -14851,6 +14860,77 @@
                     <div class="exec-kpi-label">⏳ A Receber (Feegow)</div>
                     <div class="exec-kpi-bench">Faturado − recebido do mês · <b>clique</b> pra detalhar</div>
                 </div>`;
+        }
+
+        // Comparativo de anos — lê o CONTROLE MANUAL da aba META RECEITA (FIN_SHEET):
+        // linha 2 = 2026 mensal, linha 4 = 2025 mensal (cols I:T = jan..dez).
+        // Régua desse controle: PIX de pacientes + cartão (Rede + Mercado Pago) — receita comercial recebida.
+        let _resAnosData = null;
+        async function _resLoadAnos() {
+            if (_resAnosData) return _resAnosData;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('META RECEITA!I2:T4')}?key=${API_KEY}`;
+            const j = await fetch(url).then(r => r.json());
+            if (!j.values) throw new Error(j.error && j.error.message || 'sem dados');
+            const br = s => { const v = parseFloat(String(s || '').replace(/[R$\s.]/g, '').replace(',', '.')); return isNaN(v) ? 0 : v; };
+            _resAnosData = { m2026: (j.values[0] || []).map(br), m2025: (j.values[2] || []).map(br) };
+            return _resAnosData;
+        }
+
+        async function _resRenderAnos() {
+            const el = document.getElementById('resChartAnos'); if (!el) return;
+            const sub = document.getElementById('resAnosSub');
+            let d;
+            try { d = await _resLoadAnos(); }
+            catch (e) { if (sub) sub.textContent = '⚠ não consegui ler o controle (META RECEITA)'; return; }
+            if (_resCharts.anos) { try{_resCharts.anos.destroy();}catch(e){} }
+            const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            const t26 = d.m2026.reduce((s, v) => s + v, 0), t25 = d.m2025.reduce((s, v) => s + v, 0);
+            const fmtM = v => 'R$ ' + (v/1000000).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + 'M';
+            if (sub) sub.textContent = `controle manual (PIX de pacientes + cartão Rede/MP) · acumulado: 2026 ${fmtM(t26)} × 2025 ${fmtM(t25)}`;
+            // % de variação ano contra ano em cima de cada par de barras (só meses que 2026 já tem valor)
+            const yoyPlugin = {
+                id: 'resYoY',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    const meta0 = chart.getDatasetMeta(0), meta1 = chart.getDatasetMeta(1);
+                    ctx.save(); ctx.font = '700 10px Outfit, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                    chart.data.labels.forEach((_, i) => {
+                        const v25 = chart.data.datasets[0].data[i], v26 = chart.data.datasets[1].data[i];
+                        if (!v26 || !v25) return;
+                        const pct = (v26 - v25) / v25 * 100;
+                        const b0 = meta0.data[i], b1 = meta1.data[i]; if (!b0 || !b1) return;
+                        ctx.fillStyle = pct >= 0 ? '#34d399' : '#f87171';
+                        ctx.fillText((pct >= 0 ? '▲' : '▼') + Math.abs(pct).toFixed(0) + '%', (b0.x + b1.x) / 2, Math.min(b0.y, b1.y) - 4);
+                    });
+                    ctx.restore();
+                }
+            };
+            _resCharts.anos = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: { labels: meses, datasets: [
+                    { label: '2025', data: d.m2025, backgroundColor: '#64748b', borderRadius: 4, maxBarThickness: 32 },
+                    { label: '2026', data: d.m2026, backgroundColor: '#00d4aa', borderRadius: 4, maxBarThickness: 32 }
+                ]},
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: { callbacks: {
+                            label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                            footer: items => {
+                                const a = items.find(i => i.datasetIndex === 0), b = items.find(i => i.datasetIndex === 1);
+                                if (!a || !b || !a.raw || !b.raw) return '';
+                                return 'Variação: ' + ((b.raw - a.raw) / a.raw * 100).toFixed(1) + '%';
+                            }
+                        } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
+                        y: { grace: '10%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                },
+                plugins: [yoyPlugin]
+            });
         }
 
         // Entradas (recebido real) × Saídas (despesas pagas) por mês, com rótulo em cima de cada barra.
