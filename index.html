@@ -16989,16 +16989,20 @@ GONAPEPTYL,56`;
     </div>
     <script>
         (function() {
-            var currentEtag = null;
             var toastShown = false;
+            var parseD = function(s){ var t = Date.parse(s); return isNaN(t) ? 0 : t; };
+            // Versão que ESTE navegador carregou (Last-Modified do documento; bate com o header do servidor).
+            var loadedLM = parseD(document.lastModified);
 
             function checkForUpdate() {
-                fetch(location.href, { method: 'HEAD', cache: 'no-store' })
+                // Query única fura o cache do CDN (Fastly, TTL 10min): traz sempre o Last-Modified do deploy mais novo.
+                fetch(location.pathname + '?_upd=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
                     .then(function(res) {
-                        var etag = res.headers.get('etag') || res.headers.get('last-modified');
-                        if (!etag) return;
-                        if (currentEtag === null) { currentEtag = etag; return; }
-                        if (etag !== currentEtag && !toastShown) {
+                        var lm = res.headers.get('last-modified');
+                        if (!lm) return;
+                        var latest = parseD(lm);
+                        // Nova versão = deploy mais recente do que o que este navegador está rodando (folga de 2s).
+                        if (latest && loadedLM && latest > loadedLM + 2000 && !toastShown) {
                             toastShown = true;
                             showUpdateToast();
                         }
@@ -17006,25 +17010,31 @@ GONAPEPTYL,56`;
                     .catch(function() {});
             }
 
+            function forceReload() {
+                // Recarrega furando o cache, preservando params (ex.: ?only=salas).
+                try {
+                    var u = new URL(location.href);
+                    u.searchParams.set('_v', String(Date.now()));
+                    location.replace(u.toString());
+                } catch (e) { location.reload(); }
+            }
+
             function showUpdateToast() {
                 var toast = document.getElementById('update-toast');
                 var countdown = document.getElementById('update-countdown');
-                toast.style.display = 'block';
+                if (toast) toast.style.display = 'block';
                 var secs = 5;
                 var interval = setInterval(function() {
                     secs--;
-                    countdown.textContent = secs;
-                    if (secs <= 0) {
-                        clearInterval(interval);
-                        location.reload(true);
-                    }
+                    if (countdown) countdown.textContent = secs;
+                    if (secs <= 0) { clearInterval(interval); forceReload(); }
                 }, 1000);
             }
 
-            // Primeira checagem após 30s (deixa a página carregar), depois a cada 5min
+            // Primeira checagem após 30s (deixa a página carregar), depois a cada 3min.
             setTimeout(function() {
                 checkForUpdate();
-                setInterval(checkForUpdate, 5 * 60 * 1000);
+                setInterval(checkForUpdate, 3 * 60 * 1000);
             }, 30000);
         })();
     </script>
