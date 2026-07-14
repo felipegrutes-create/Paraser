@@ -1811,29 +1811,36 @@ function redeToken_() {
   return JSON.parse(resp.getContentText()).access_token;
 }
 
-// Vendas APROVADAS de um dia (Date). Uma página (size 200) basta p/ volume diário de clínica.
-function redeVendasDia_(token, dia) {
+// Vendas APROVADAS de um período [iniIso, fimIso] (yyyy-MM-dd), TODOS os PVs, PAGINADO (pageKey).
+// Produção: size máx 100 por página; segue cursor.nextKey até hasNextKey=false.
+function redeVendasPeriodo_(token, iniIso, fimIso) {
   const p = PropertiesService.getScriptProperties();
   const pvRaw = p.getProperty('REDE_PV');
   if (!pvRaw) throw new Error('REDE_PV não configurado');
-  const ds = Utilities.formatDate(dia, 'America/Sao_Paulo', 'yyyy-MM-dd');
-  // A Paraser tem mais de um PV (PARASER SERVICOS + INSTITUTO) — REDE_PV pode ser
-  // vários separados por vírgula; consulta cada um e junta.
+  // A Paraser tem mais de um PV (PARASER SERVICOS + INSTITUTO) — vírgula separa; consulta cada um.
   const pvs = pvRaw.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
   const out = [];
   pvs.forEach(function(pv) {
-    const url = REDE_BASE + '/merchant-statement/v1/sales?parentCompanyNumber=' + pv +
-                '&subsidiaries=' + pv + '&startDate=' + ds + '&endDate=' + ds + '&status=APPROVED&size=100'; // produção: size máx 100
-    const resp = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) throw new Error('REDE vendas HTTP ' + resp.getResponseCode() + ' (PV ' + pv + '): ' + resp.getContentText().slice(0, 200));
-    const j = JSON.parse(resp.getContentText());
-    const txns = (j.content && j.content.transactions) || [];
-    if (j.cursor && j.cursor.hasNextKey) Logger.log('REDE ' + ds + ' PV ' + pv + ': >200 vendas (paginação não tratada)');
-    txns.forEach(function(t) {
-      out.push({ valor: t.amount, data: t.saleDate, modalidade: t.modality && t.modality.type, parcelas: t.installmentQuantity, nsu: t.nsu, pv: pv });
-    });
+    var pageKey = '', guard = 0;
+    do {
+      var url = REDE_BASE + '/merchant-statement/v1/sales?parentCompanyNumber=' + pv +
+                '&subsidiaries=' + pv + '&startDate=' + iniIso + '&endDate=' + fimIso + '&status=APPROVED&size=100';
+      if (pageKey) url += '&pageKey=' + encodeURIComponent(pageKey);
+      var resp = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+      if (resp.getResponseCode() !== 200) throw new Error('REDE vendas HTTP ' + resp.getResponseCode() + ' (PV ' + pv + '): ' + resp.getContentText().slice(0, 200));
+      var j = JSON.parse(resp.getContentText());
+      ((j.content && j.content.transactions) || []).forEach(function(t) {
+        out.push({ valor: t.amount, data: t.saleDate, modalidade: t.modality && t.modality.type, parcelas: t.installmentQuantity, nsu: t.nsu, pv: pv });
+      });
+      pageKey = (j.cursor && j.cursor.hasNextKey) ? j.cursor.nextKey : '';
+    } while (pageKey && ++guard < 60);
   });
   return out;
+}
+// Vendas APROVADAS de um dia (Date) — usado na conciliação. Delega no período.
+function redeVendasDia_(token, dia) {
+  const ds = Utilities.formatDate(dia, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  return redeVendasPeriodo_(token, ds, ds);
 }
 
 // =========================================================
@@ -2131,7 +2138,12 @@ function computarMetaMes_(mes) {
   const noMes = function(iso){ return String(iso).slice(0, 7) === mesRe; };
 
   let cartao = 0;
-  lerRedeRecebimentos_().forEach(function(t){ if (noMes(diaToIso_(t.dia))) cartao += t.valor; });
+  const fonteRede = PropertiesService.getScriptProperties().getProperty('REDE_FONTE') || 'arquivo';
+  if (fonteRede === 'api') {
+    redeVendasPeriodo_(redeToken_(), inicioDoMesIso_(mesRe), fimDoMesIso_(mesRe)).forEach(function(t){ cartao += (Number(t.valor) || 0); });
+  } else {
+    lerRedeRecebimentos_().forEach(function(t){ if (noMes(diaToIso_(t.dia))) cartao += t.valor; });
+  }
 
   const shC = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
   const dd = shC.getDataRange().getValues();
@@ -2227,7 +2239,7 @@ function handleSetupRede(body) {
   if (body.client_secret) p.setProperty('REDE_CLIENT_SECRET', String(body.client_secret));
   if (body.pv) p.setProperty('REDE_PV', String(body.pv));
   if (body.base) p.setProperty('REDE_BASE', String(body.base));   // URL de produção (não secreta)
-  if (body.fonte) p.setProperty('REDE_FONTE', String(body.fonte)); // 'arquivo' (CSV) ou 'api'
+  if (body.fonte) { p.setProperty('REDE_FONTE', String(body.fonte)); p.deleteProperty('META_CACHE'); } // troca fonte + invalida cache da meta
   return jsonOk({ ok: true, tem_id: !!p.getProperty('REDE_CLIENT_ID'), tem_secret: !!p.getProperty('REDE_CLIENT_SECRET'), pv: p.getProperty('REDE_PV') || '', base: p.getProperty('REDE_BASE') || '', fonte: p.getProperty('REDE_FONTE') || 'arquivo' });
 }
 
@@ -2235,6 +2247,28 @@ function handleSetupRede(body) {
 function handleTestRede(param) {
   try {
     const token = redeToken_();
+    // Modo mês: compara API x CSV do mês inteiro (leitura pura, NÃO troca a fonte).
+    if (param && param.mes) {
+      const mesRe = String(param.mes).slice(0, 7);
+      const noMes = function(iso){ return String(iso).slice(0, 7) === mesRe; };
+      const vendasApi = redeVendasPeriodo_(token, inicioDoMesIso_(mesRe), fimDoMesIso_(mesRe));
+      const totalApi = vendasApi.reduce(function(s, v){ return s + (Number(v.valor) || 0); }, 0);
+      let totalCsv = 0, nCsv = 0;
+      const csvRows = [];
+      lerRedeRecebimentos_().forEach(function(t){ if (noMes(diaToIso_(t.dia))) { totalCsv += t.valor; nCsv++; csvRows.push(t); } });
+      if (param.detalhe == '1') {
+        // Diagnóstico por NSU: duplicatas no CSV, e o que existe só num lado.
+        const apiKey = {}; vendasApi.forEach(function(v){ apiKey[String(v.nsu) + ':' + String(v.pv)] = (apiKey[String(v.nsu)+':'+String(v.pv)]||0) + 1; });
+        const csvKey = {}; csvRows.forEach(function(t){ var k = String(t.key).replace(/^rede:/, ''); csvKey[k] = (csvKey[k]||0) + t.valor; }); // key = nsu:pv
+        const csvCnt = {}; csvRows.forEach(function(t){ var k = String(t.key).replace(/^rede:/, ''); csvCnt[k] = (csvCnt[k]||0) + 1; });
+        let dupN = 0, dupVal = 0; Object.keys(csvCnt).forEach(function(k){ if (csvCnt[k] > 1) { dupN += csvCnt[k]-1; } });
+        let soCsvN = 0, soCsvVal = 0; Object.keys(csvKey).forEach(function(k){ if (!apiKey[k]) { soCsvN++; soCsvVal += csvKey[k]; } });
+        let soApiN = 0, soApiVal = 0; vendasApi.forEach(function(v){ var k = String(v.nsu)+':'+String(v.pv); if (!csvKey[k]) { soApiN++; soApiVal += (Number(v.valor)||0); } });
+        return jsonOk({ ok: true, mes: mesRe, api_n: vendasApi.length, api_total: totalApi, csv_n: nCsv, csv_uniq: Object.keys(csvKey).length, csv_total: totalCsv,
+          csv_duplicatas: dupN, so_csv_n: soCsvN, so_csv_val: soCsvVal, so_api_n: soApiN, so_api_val: soApiVal });
+      }
+      return jsonOk({ ok: true, mes: mesRe, api_n: vendasApi.length, api_total: totalApi, csv_n: nCsv, csv_total: totalCsv, diff: totalApi - totalCsv });
+    }
     const dia = (param && param.data) ? new Date(param.data + 'T12:00:00-03:00') : (function(){ var d = new Date(); d.setDate(d.getDate() - 1); return d; })();
     const vendas = redeVendasDia_(token, dia);
     const total = vendas.reduce(function(s, v){ return s + (Number(v.valor) || 0); }, 0);
