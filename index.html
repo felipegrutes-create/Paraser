@@ -4148,7 +4148,7 @@
             <!-- Recebimentos ao vivo (cartão + PIX), o único caixa real do app -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>💳 Receita Recebida por Mês — Cartão (Rede) + PIX de Pacientes <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <h3>💳 Receita Recebida por Mês — Cartão (Rede) + PIX de Pacientes + MP <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
                     <canvas id="execChartCartaoMes" height="200"></canvas>
                 </div>
             </div>
@@ -4156,7 +4156,7 @@
             <!-- Entradas x Saídas -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes · saídas = despesas pagas (sem retiradas)</span></h3>
+                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes + MP · saídas = despesas pagas (sem retiradas)</span></h3>
                     <canvas id="resChartEntSai" height="200"></canvas>
                 </div>
             </div>
@@ -14692,8 +14692,9 @@
             const labels   = meses.map(x => { const i = parseInt(x.mes.slice(5,7),10)-1; return _MONTHS_PT[i].slice(0,3) + '/' + x.mes.slice(2,4) + (x.parcial ? '*' : ''); });
             const redeData = meses.map(x => x.rede || 0);
             const pixData  = meses.map(x => x.pix  || 0);
+            const mpData   = meses.map(x => x.mp   || 0);
             const fechados = meses.filter(x => !x.parcial);
-            const media = fechados.length ? fechados.reduce((s,x)=>s+(x.rede||0)+(x.pix||0),0)/fechados.length : 0;
+            const media = fechados.length ? fechados.reduce((s,x)=>s+(x.rede||0)+(x.pix||0)+(x.mp||0),0)/fechados.length : 0;
             const temParcial = meses.some(x => x.parcial);
             if (sub) sub.textContent = (fechados.length ? `média mensal (fechados): R$ ${media.toLocaleString('pt-BR',{maximumFractionDigits:0})}` : '')
                 + (temParcial ? ' · * mês em andamento' : '');
@@ -14710,7 +14711,7 @@
                         const meta = chart.getDatasetMeta(di);
                         ctx.font = '600 11px Outfit, sans-serif';
                         ctx.textBaseline = 'middle';
-                        ctx.fillStyle = di === 0 ? '#053b33' : '#ffffff'; // escuro no teal, branco no índigo
+                        ctx.fillStyle = ['#053b33', '#ffffff', '#4a3405'][di] || '#ffffff'; // escuro no teal, branco no índigo, escuro no âmbar
                         meta.data.forEach((bar, i) => {
                             const v = ds.data[i]; if (!v) return;
                             const h = Math.abs(bar.base - bar.y);
@@ -14737,8 +14738,9 @@
                 data: {
                     labels,
                     datasets: [
-                        { label:'Cartão (Rede)',     data: redeData, backgroundColor:'#00d4aa', borderRadius:4, maxBarThickness:64 },
-                        { label:'PIX de pacientes',  data: pixData,  backgroundColor:'#6366f1', borderRadius:4, maxBarThickness:64 }
+                        { label:'Cartão (Rede)',        data: redeData, backgroundColor:'#00d4aa', borderRadius:4, maxBarThickness:64 },
+                        { label:'PIX de pacientes',     data: pixData,  backgroundColor:'#6366f1', borderRadius:4, maxBarThickness:64 },
+                        { label:'Maquininha MP (controle)', data: mpData, backgroundColor:'#f59e0b', borderRadius:4, maxBarThickness:64 }
                     ]
                 },
                 options: {
@@ -14773,7 +14775,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null;
+            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null; _resMpPlanF = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
@@ -14805,15 +14807,19 @@
             if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Carregando dados…</div>';
             const mesKey = _fgKey(_resDate);
 
-            // 3 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
-            const [receb, fg, desp] = await Promise.all([
+            // 4 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
+            const [receb, fg, desp, planF] = await Promise.all([
                 resLoadRecebimentos().catch(() => null),
                 fgLoadMonth(_resDate).catch(() => null),
                 resDespesasPorMes().catch(() => null),
+                _resLoadMpPlanF().catch(() => null),
             ]);
 
+            // Fatia MP = controle manual (REDE/MP) menos a Rede da API, nunca negativa
+            if (receb && planF) receb.forEach(x => { x.mp = Math.max(0, (planF[x.mes] || 0) - (x.rede || 0)); });
+
             const rec = receb ? receb.find(x => x.mes === mesKey) : null;
-            const recebido = rec ? (rec.rede || 0) + (rec.pix || 0) : null;
+            const recebido = rec ? (rec.rede || 0) + (rec.pix || 0) + (rec.mp || 0) : null;
             const m = fg ? _execMetrics(fg) : null; // Feegow em CENTAVOS
             const despesas = (desp && desp[mesKey] != null) ? desp[mesKey] : null;
             const resultado = (recebido != null && despesas != null) ? recebido - despesas : null;
@@ -14838,7 +14844,7 @@
                 <div class="exec-kpi green">
                     <div class="exec-kpi-val">${R(k.recebido)}</div>
                     <div class="exec-kpi-label">💵 Recebido (receita comercial)${parc}</div>
-                    <div class="exec-kpi-bench">Cartão Rede + <b>PIX de pacientes</b> · não inclui maquininha MP</div>
+                    <div class="exec-kpi-bench">Cartão Rede + <b>PIX de pacientes</b> + maquininha MP (do controle)</div>
                 </div>
                 <div class="exec-kpi blue">
                     <div class="exec-kpi-val">${R(k.faturado)}</div>
@@ -14860,6 +14866,26 @@
                     <div class="exec-kpi-label">⏳ A Receber (Feegow)</div>
                     <div class="exec-kpi-bench">Faturado − recebido do mês · <b>clique</b> pra detalhar</div>
                 </div>`;
+        }
+
+        // Maquininha MP (Mercado Pago): ainda sem API integrada, então a fatia vem do CONTROLE MANUAL
+        // validado: MP do mês = coluna REDE/MP da META RECEITA (diário, agregado) MENOS a Rede da API.
+        let _resMpPlanF = null; // 'YYYY-MM' → total da coluna REDE/MP da planilha
+        async function _resLoadMpPlanF() {
+            if (_resMpPlanF) return _resMpPlanF;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('META RECEITA!A7:G400')}?key=${API_KEY}`;
+            const j = await fetch(url).then(r => r.json());
+            const br = s => { const v = parseFloat(String(s || '').replace(/[R$\s.]/g, '').replace(',', '.')); return isNaN(v) ? 0 : v; };
+            const map = {};
+            (j.values || []).forEach(r => {
+                if (!r || r.length < 6) return;
+                const p = String(r[3] || '').split('/');
+                if (p.length !== 3) return;
+                const key = p[2] + '-' + p[1].padStart(2, '0');
+                map[key] = (map[key] || 0) + br(r[5]);
+            });
+            _resMpPlanF = map;
+            return map;
         }
 
         // Comparativo de anos — lê o CONTROLE MANUAL da aba META RECEITA (FIN_SHEET):
@@ -14939,7 +14965,7 @@
             if (_resCharts.entsai) { try{_resCharts.entsai.destroy();}catch(e){} }
             const keys = [...new Set([...(receb || []).map(x => x.mes), ...Object.keys(despMap || {})])].sort();
             if (!keys.length) return;
-            const ent = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) : 0; });
+            const ent = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) + (r.mp || 0) : 0; });
             const sai = keys.map(k => despMap[k] || 0);
             const labels = keys.map(k => { const i = parseInt(k.slice(5, 7), 10) - 1; return _MONTHS_PT[i].slice(0, 3) + '/' + k.slice(2, 4); });
             const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
