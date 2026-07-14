@@ -2817,6 +2817,12 @@ function handleWppAdmin(params) {
       if (params.gkey) p.setProperty('GEMINI_KEY', String(params.gkey));
       return jsonOk({ ok: true });
     }
+    if (op === 'set_slack_rec') { // card da recepção via bot no #atendimento
+      if (params.token)   p.setProperty('SLACK_BOT_TOKEN', String(params.token));
+      if (params.channel) p.setProperty('SLACK_RECEPCAO_CHANNEL', String(params.channel));
+      return jsonOk({ ok: true, tem_token: !!p.getProperty('SLACK_BOT_TOKEN'), canal: p.getProperty('SLACK_RECEPCAO_CHANNEL') || '' });
+    }
+    if (op === 'test_recepcao') return jsonOk({ resultado: rodarRelatorioRecepcao_() });
     if (op === 'transcrever') return jsonOk(wppTranscreverAudios_(Number(params.n) || 20));
     if (op === 'setup_trigger_transcricao') return jsonOk({ ok: setupTriggerTranscricao() });
     if (op === 'transcript_preview') {
@@ -3730,7 +3736,7 @@ function rodarRelatorioRecepcao_() {
     text: '🏥 WhatsApp Recepção · ' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM'), emoji: true } }];
   if (!reais.length) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: 'Nenhum atendimento real na janela' + (fora ? ' (só ' + fora + ' confirmações automáticas).' : '.') } });
-    UrlFetchApp.fetch(webhookUrl, { method: 'post', contentType: 'application/json', payload: JSON.stringify({ blocks: blocks, text: '🏥 WhatsApp Recepção' }) });
+    _postRecepcaoSlack_(webhookUrl, blocks);
     return 'ok 0 reais';
   }
   const m = wppMetricasDia_(reais, null);
@@ -3747,9 +3753,26 @@ function rodarRelatorioRecepcao_() {
     if (ia) blocks.push.apply(blocks, wppBlocosRecepcaoIA_(ia));
   } catch (e) {}
   blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: 'recepção · atendimento real (confirmações automáticas filtradas) · leitura por IA · confira antes de agir' }] });
+  _postRecepcaoSlack_(webhookUrl, blocks);
+  return 'ok ' + reais.length + '/' + msgs.length + ' msgs';
+}
+
+// Posta o card da recepção. Se SLACK_BOT_TOKEN + SLACK_RECEPCAO_CHANNEL estiverem setados,
+// usa chat.postMessage (canal #atendimento, mesmo bot das confirmações); senão, o webhook.
+function _postRecepcaoSlack_(webhookUrl, blocks) {
+  const p = wppProps_();
+  const bot = p.getProperty('SLACK_BOT_TOKEN'), canal = p.getProperty('SLACK_RECEPCAO_CHANNEL');
+  if (bot && canal) {
+    UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + bot },
+      payload: JSON.stringify({ channel: canal, blocks: blocks, text: '🏥 WhatsApp Recepção' }),
+      muteHttpExceptions: true
+    });
+    return;
+  }
   UrlFetchApp.fetch(webhookUrl, { method: 'post', contentType: 'application/json',
     payload: JSON.stringify({ blocks: blocks, text: '🏥 WhatsApp Recepção' }) });
-  return 'ok ' + reais.length + '/' + msgs.length + ' msgs';
 }
 
 // Últimas N mensagens (pra validar a atribuição celular/web com testes reais).
