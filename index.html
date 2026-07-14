@@ -4148,7 +4148,7 @@
             <!-- Recebimentos ao vivo (cartão + PIX), o único caixa real do app -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>💳 Recebimentos por Mês — Cartão (Rede) + PIX (Itaú) <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <h3>💳 Receita Recebida por Mês — Cartão (Rede) + PIX de Pacientes <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
                     <canvas id="execChartCartaoMes" height="200"></canvas>
                 </div>
             </div>
@@ -4156,7 +4156,7 @@
             <!-- Entradas x Saídas -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX recebidos · saídas = despesas pagas (sem retiradas)</span></h3>
+                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes · saídas = despesas pagas (sem retiradas)</span></h3>
                     <canvas id="resChartEntSai" height="200"></canvas>
                 </div>
             </div>
@@ -14737,8 +14737,8 @@
                 data: {
                     labels,
                     datasets: [
-                        { label:'Cartão (Rede)', data: redeData, backgroundColor:'#00d4aa', borderRadius:4, maxBarThickness:64 },
-                        { label:'PIX (Itaú)',    data: pixData,  backgroundColor:'#6366f1', borderRadius:4, maxBarThickness:64 }
+                        { label:'Cartão (Rede)',     data: redeData, backgroundColor:'#00d4aa', borderRadius:4, maxBarThickness:64 },
+                        { label:'PIX de pacientes',  data: pixData,  backgroundColor:'#6366f1', borderRadius:4, maxBarThickness:64 }
                     ]
                 },
                 options: {
@@ -14837,8 +14837,8 @@
             grid.innerHTML = `
                 <div class="exec-kpi green">
                     <div class="exec-kpi-val">${R(k.recebido)}</div>
-                    <div class="exec-kpi-label">💵 Recebido (caixa real)${parc}</div>
-                    <div class="exec-kpi-bench">Cartão Rede + PIX Itaú que <b>caíram</b> no mês</div>
+                    <div class="exec-kpi-label">💵 Recebido (receita comercial)${parc}</div>
+                    <div class="exec-kpi-bench">Cartão Rede + <b>PIX de pacientes</b> · não inclui maquininha MP</div>
                 </div>
                 <div class="exec-kpi blue">
                     <div class="exec-kpi-val">${R(k.faturado)}</div>
@@ -14852,8 +14852,8 @@
                 </div>
                 <div class="exec-kpi ${resS}">
                     <div class="exec-kpi-val">${R(k.resultado)}</div>
-                    <div class="exec-kpi-label">🧮 Resultado de caixa</div>
-                    <div class="exec-kpi-bench">Recebido <b>menos</b> despesas pagas</div>
+                    <div class="exec-kpi-label">🧮 Resultado do mês</div>
+                    <div class="exec-kpi-bench">Receita comercial recebida <b>menos</b> despesas pagas</div>
                 </div>
                 <div class="exec-kpi blue" style="cursor:pointer" onclick="showSection('sec-cr',null)" title="Abrir Contas a Receber">
                     <div class="exec-kpi-val">${R(k.aReceber)}</div>

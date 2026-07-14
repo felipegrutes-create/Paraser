@@ -1873,21 +1873,35 @@ function handleRedeMensal_(param) {
                .reduce(function(s, t){ return s + (Number(t.valor) || 0); }, 0);
       if (fechado) cache[mes] = rede;
     }
-    // PIX (Itaú) — mês fechado do histórico salvo; mês corrente do BigQuery ao vivo.
+    // PIX COMERCIAL (só de pacientes — decisão do Felipe 14/07: régua igual à meta/planilha,
+    // sem transferências internas/sócios). Fechado = histórico do cofre (conciliado com o controle
+    // META RECEITA); corrente = pixLinkado da meta; fechado pós-BigQuery sem histórico = computa e salva.
     let pix = null;
     if (fechado && pixHist[mes] != null) {
       pix = pixHist[mes];
-    } else {
-      try {
-        pix = lerPixBigQuery_(inicioDoMesIso_(mes), fimDoMesIso_(mes))
-                .reduce(function(s, r){ return s + (Number(r.valor) || 0); }, 0);
-      } catch (e) { pix = null; }
+    } else if (!fechado) {
+      pix = pixComercialMesAtual_(mes);
+    } else if (mes >= '2026-07') {
+      try { pix = computarMetaMes_(mes).pixLinkado || 0; pixHist[mes] = pix; } catch (e) { pix = null; }
     }
     out.push({ mes: mes, total: rede, rede: rede, pix: pix, parcial: !fechado });
     m++; if (m > 12) { m = 1; y++; }
   }
   p.setProperty('REDE_MENSAL_CACHE', JSON.stringify(cache));
+  p.setProperty('PIX_MENSAL_HIST', JSON.stringify(pixHist));
   return jsonOk({ ok: true, meses: out });
+}
+
+// PIX comercial do mês corrente: usa o META_CACHE se estiver fresco (o get_meta o mantém);
+// senão recomputa a meta (mesma conta que a barra da meta faz o dia inteiro).
+function pixComercialMesAtual_(mes) {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    let c = null; try { c = JSON.parse(p.getProperty('META_CACHE') || 'null'); } catch (e) { c = null; }
+    const agora = new Date().getTime();
+    if (c && c.mes === mes && (agora - (c.ts || 0)) <= 1200000) return c.pixLinkado || 0;
+    return computarMetaMes_(mes).pixLinkado || 0;
+  } catch (e) { return null; }
 }
 
 // =========================================================
