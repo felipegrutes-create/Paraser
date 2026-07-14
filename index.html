@@ -4128,7 +4128,7 @@
             <!-- Cartão (Rede) por mês, desde janeiro -->
             <div class="cr-charts-row" style="margin-bottom:20px">
                 <div class="chart-card" style="flex:1">
-                    <h3>💳 Vendas no Cartão (Rede) por Mês — desde Janeiro <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <h3>💳 Recebimentos por Mês — Cartão (Rede) + PIX (Itaú) <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
                     <canvas id="execChartCartaoMes" height="200"></canvas>
                 </div>
             </div>
@@ -14619,8 +14619,9 @@
             });
         }
 
-        // Vendas no cartão (Rede) por mês, desde janeiro. Fonte: API da Rede via CRM (get_rede_mensal).
-        // Escopo anual (independe do mês navegado). Valores em REAIS (não centavos como o Feegow).
+        // Recebimentos por mês, desde janeiro: Cartão (Rede, API) + PIX (Itaú). Barras empilhadas.
+        // Fonte: CRM get_rede_mensal. Escopo anual (independe do mês navegado). Valores em REAIS.
+        // Mês corrente = parcial (rótulo com *; PIX vem do BigQuery ao vivo, meses fechados do histórico).
         async function _execRenderCartaoMes() {
             const el = document.getElementById('execChartCartaoMes'); if (!el) return;
             if (_execCharts.cartao) { try{_execCharts.cartao.destroy();}catch(e){} }
@@ -14636,26 +14637,35 @@
             }
             const meses = _execCartaoData;
             if (!meses.length) { if (sub) sub.textContent = '⚠ sem dados'; return; }
-            const labels = meses.map(x => { const i = parseInt(x.mes.slice(5,7),10)-1; return _MONTHS_PT[i].slice(0,3) + '/' + x.mes.slice(2,4); });
-            const vals   = meses.map(x => x.total);
-            const cores  = meses.map(x => x.parcial ? '#f59e0b' : '#00d4aa');
+            const labels   = meses.map(x => { const i = parseInt(x.mes.slice(5,7),10)-1; return _MONTHS_PT[i].slice(0,3) + '/' + x.mes.slice(2,4) + (x.parcial ? '*' : ''); });
+            const redeData = meses.map(x => x.rede || 0);
+            const pixData  = meses.map(x => x.pix  || 0);
             const fechados = meses.filter(x => !x.parcial);
-            const media = fechados.length ? fechados.reduce((s,x)=>s+x.total,0)/fechados.length : 0;
-            if (sub) sub.textContent = fechados.length
-                ? `média dos meses fechados: R$ ${media.toLocaleString('pt-BR',{maximumFractionDigits:0})} · barra amarela = mês em andamento`
-                : '';
+            const media = fechados.length ? fechados.reduce((s,x)=>s+(x.rede||0)+(x.pix||0),0)/fechados.length : 0;
+            const temParcial = meses.some(x => x.parcial);
+            if (sub) sub.textContent = (fechados.length ? `média mensal (fechados): R$ ${media.toLocaleString('pt-BR',{maximumFractionDigits:0})}` : '')
+                + (temParcial ? ' · * mês em andamento' : '');
             _execCharts.cartao = new Chart(el.getContext('2d'), {
                 type: 'bar',
-                data: { labels, datasets: [{ label:'Cartão (Rede)', data: vals, backgroundColor: cores, borderRadius:5, maxBarThickness:64 }] },
+                data: {
+                    labels,
+                    datasets: [
+                        { label:'Cartão (Rede)', data: redeData, backgroundColor:'#00d4aa', borderRadius:4, maxBarThickness:64 },
+                        { label:'PIX (Itaú)',    data: pixData,  backgroundColor:'#6366f1', borderRadius:4, maxBarThickness:64 }
+                    ]
+                },
                 options: {
                     responsive:true,
                     plugins: {
-                        legend:{ display:false },
-                        tooltip:{ callbacks:{ label: ctx => ' R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2}) + (meses[ctx.dataIndex].parcial ? ' (parcial)' : '') } }
+                        legend:{ labels:{ color:'#9ca3af', font:{size:11} } },
+                        tooltip:{ callbacks:{
+                            label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2}),
+                            footer: items => { const t = items.reduce((s,i)=>s+i.raw,0); return 'Total: R$ ' + t.toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+                        } }
                     },
                     scales: {
-                        x: { ticks:{color:'#6b7a99',font:{size:11}}, grid:{display:false} },
-                        y: { ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} }
+                        x: { stacked:true, ticks:{color:'#6b7a99',font:{size:11}}, grid:{display:false} },
+                        y: { stacked:true, ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} }
                     }
                 }
             });

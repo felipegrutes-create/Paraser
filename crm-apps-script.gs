@@ -1853,6 +1853,9 @@ function handleRedeMensal_(param) {
   const fresh = !!(param && param.fresh);
   const hojeMes = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
   let cache = {}; try { cache = JSON.parse(p.getProperty('REDE_MENSAL_CACHE') || '{}'); } catch (e) { cache = {}; }
+  // PIX (Itaú) dos meses fechados: histórico salvo no cofre (o Apps Script não fala mTLS com o Itaú;
+  // esse histórico foi puxado da API oficial do Itaú e é imutável). O mês corrente vem do BigQuery ao vivo.
+  let pixHist = {}; try { pixHist = JSON.parse(p.getProperty('PIX_MENSAL_HIST') || '{}'); } catch (e) { pixHist = {}; }
   const token = redeToken_();
   const out = [];
   let y = parseInt(desde.slice(0, 4), 10), m = parseInt(desde.slice(5, 7), 10);
@@ -1861,15 +1864,26 @@ function handleRedeMensal_(param) {
   while ((y < yFim || (y === yFim && m <= mFim)) && guard++ < 60) {
     const mes = y + '-' + ('0' + m).slice(-2);
     const fechado = (mes !== hojeMes);
-    let total;
+    // Cartão (Rede) — API da Rede, meses fechados cacheados.
+    let rede;
     if (!fresh && fechado && cache[mes] != null) {
-      total = cache[mes];
+      rede = cache[mes];
     } else {
-      total = redeVendasPeriodo_(token, inicioDoMesIso_(mes), fimDoMesIso_(mes))
-                .reduce(function(s, t){ return s + (Number(t.valor) || 0); }, 0);
-      if (fechado) cache[mes] = total;
+      rede = redeVendasPeriodo_(token, inicioDoMesIso_(mes), fimDoMesIso_(mes))
+               .reduce(function(s, t){ return s + (Number(t.valor) || 0); }, 0);
+      if (fechado) cache[mes] = rede;
     }
-    out.push({ mes: mes, total: total, parcial: !fechado });
+    // PIX (Itaú) — mês fechado do histórico salvo; mês corrente do BigQuery ao vivo.
+    let pix = null;
+    if (fechado && pixHist[mes] != null) {
+      pix = pixHist[mes];
+    } else {
+      try {
+        pix = lerPixBigQuery_(inicioDoMesIso_(mes), fimDoMesIso_(mes))
+                .reduce(function(s, r){ return s + (Number(r.valor) || 0); }, 0);
+      } catch (e) { pix = null; }
+    }
+    out.push({ mes: mes, total: rede, rede: rede, pix: pix, parcial: !fechado });
     m++; if (m > 12) { m = 1; y++; }
   }
   p.setProperty('REDE_MENSAL_CACHE', JSON.stringify(cache));
