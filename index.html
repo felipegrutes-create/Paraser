@@ -4180,6 +4180,14 @@
                     <div id="resTaxasBox"></div>
                 </div>
             </div>
+
+            <!-- Taxas por mês (MDR + antecipação, valores nas barras) -->
+            <div class="cr-charts-row" style="margin-bottom:20px">
+                <div class="chart-card" style="flex:1">
+                    <h3>📉 Taxas Pagas à Rede por Mês <span id="resTaxasMesSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <canvas id="resChartTaxasMes" height="200"></canvas>
+                </div>
+            </div>
         </section>
 
         <!-- ESTOQUE MEDICAMENTOS -->
@@ -15028,6 +15036,72 @@
             }).join('');
             const flexAnt = (d.taxas && d.taxas[1] && d.taxas[1].flex) || (d.taxas && d.taxas[0] && d.taxas[0].flex) || 0;
             box.innerHTML = rows + `<div style="border-top:1px dashed rgba(255,255,255,0.12);padding-top:8px;font-size:12px;color:var(--muted)">💡 A <b>antecipação automática</b> é a maior parte do custo (~4% do bruto; mês anterior: ${fmt(flexAnt)}). Desligando, o parcelado entra ao longo dos meses, sem esse custo.</div>`;
+        }
+
+        // Taxas pagas à Rede por mês (MDR + antecipação flex), empilhado, valor em cada fatia e total no topo.
+        // Fonte: mesma série do get_rede_mensal (_execCartaoData), que agora traz mdr/flex por mês.
+        function _resRenderTaxasMes() {
+            const el = document.getElementById('resChartTaxasMes'); if (!el) return;
+            if (_resCharts.taxasMes) { try{_resCharts.taxasMes.destroy();}catch(e){} }
+            const meses = (_execCartaoData || []).filter(x => x.mdr != null || x.flex != null);
+            const sub = document.getElementById('resTaxasMesSub');
+            if (!meses.length) { if (sub) sub.textContent = '⚠ sem dados de taxa (recarregue)'; return; }
+            const totAno = meses.reduce((s, x) => s + (x.mdr || 0) + (x.flex || 0), 0);
+            if (sub) sub.textContent = `MDR + antecipação automática · total no ano: R$ ${totAno.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
+            const labels = meses.map(x => { const i = parseInt(x.mes.slice(5,7),10)-1; return _MONTHS_PT[i].slice(0,3) + '/' + x.mes.slice(2,4) + (x.parcial ? '*' : ''); });
+            const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(1).replace('.', ',') + 'k';
+            const taxasLabelPlugin = {
+                id: 'taxasLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    ctx.save(); ctx.textAlign = 'center';
+                    chart.data.datasets.forEach((ds, di) => {
+                        const meta = chart.getDatasetMeta(di);
+                        ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'middle';
+                        ctx.fillStyle = di === 0 ? '#1e293b' : '#ffffff'; // escuro no cinza, branco no vermelho
+                        meta.data.forEach((bar, i) => {
+                            const v = ds.data[i]; if (!v) return;
+                            const h = Math.abs(bar.base - bar.y); if (h < 14) return;
+                            ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base) / 2);
+                        });
+                    });
+                    const metaTop = chart.getDatasetMeta(chart.data.datasets.length - 1);
+                    ctx.font = '700 10px Outfit, sans-serif'; ctx.fillStyle = '#e2e8f4'; ctx.textBaseline = 'bottom';
+                    chart.data.labels.forEach((_, i) => {
+                        const tot = chart.data.datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0);
+                        if (!tot) return; const bar = metaTop.data[i]; if (!bar) return;
+                        ctx.fillText('R$ ' + fmtK(tot), bar.x, bar.y - 3);
+                    });
+                    ctx.restore();
+                }
+            };
+            _resCharts.taxasMes = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [
+                    { label: 'MDR (taxa da máquina)',   data: meses.map(x => x.mdr  || 0), backgroundColor: '#94a3b8', borderRadius: 4, maxBarThickness: 56 },
+                    { label: 'Antecipação automática',  data: meses.map(x => x.flex || 0), backgroundColor: '#ef4444', borderRadius: 4, maxBarThickness: 56 }
+                ]},
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: { callbacks: {
+                            label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                            footer: items => {
+                                const t = items.reduce((s, i) => s + i.raw, 0);
+                                const m = meses[items[0].dataIndex];
+                                const pct = m.rede ? (t / m.rede * 100).toFixed(2).replace('.', ',') : '—';
+                                return 'Total: R$ ' + t.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' (' + pct + '% do bruto)';
+                            }
+                        } }
+                    },
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
+                        y: { stacked: true, grace: '10%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                },
+                plugins: [taxasLabelPlugin]
+            });
         }
 
         // Entradas (recebido real) × Saídas (despesas pagas) por mês, com rótulo em cima de cada barra.

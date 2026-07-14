@@ -1943,14 +1943,17 @@ function handleRedeMensal_(param) {
   while ((y < yFim || (y === yFim && m <= mFim)) && guard++ < 60) {
     const mes = y + '-' + ('0' + m).slice(-2);
     const fechado = (mes !== hojeMes);
-    // Cartão (Rede) — API da Rede, meses fechados cacheados.
-    let rede;
-    if (!fresh && fechado && cache[mes] != null) {
-      rede = cache[mes];
+    // Cartão (Rede) — API da Rede, meses fechados cacheados (com as taxas junto).
+    // Cache novo = objeto {t: bruto, m: MDR, f: antecipação flex}; entradas antigas (número) recomputam 1x.
+    let rede = 0, mdr = 0, flex = 0;
+    const cv = cache[mes];
+    if (!fresh && fechado && cv != null && typeof cv === 'object') {
+      rede = cv.t || 0; mdr = cv.m || 0; flex = cv.f || 0;
     } else {
-      rede = redeVendasPeriodo_(token, inicioDoMesIso_(mes), fimDoMesIso_(mes))
-               .reduce(function(s, t){ return s + (Number(t.valor) || 0); }, 0);
-      if (fechado) cache[mes] = rede;
+      redeVendasPeriodo_(token, inicioDoMesIso_(mes), fimDoMesIso_(mes)).forEach(function(t) {
+        rede += Number(t.valor) || 0; mdr += Number(t.mdr) || 0; flex += Number(t.flex) || 0;
+      });
+      if (fechado) cache[mes] = { t: rede, m: mdr, f: flex };
     }
     // PIX COMERCIAL (só de pacientes — decisão do Felipe 14/07: régua igual à meta/planilha,
     // sem transferências internas/sócios). Fechado = histórico do cofre (conciliado com o controle
@@ -1963,7 +1966,7 @@ function handleRedeMensal_(param) {
     } else if (mes >= '2026-07') {
       try { pix = computarMetaMes_(mes).pixLinkado || 0; pixHist[mes] = pix; } catch (e) { pix = null; }
     }
-    out.push({ mes: mes, total: rede, rede: rede, pix: pix, parcial: !fechado });
+    out.push({ mes: mes, total: rede, rede: rede, pix: pix, mdr: mdr, flex: flex, parcial: !fechado });
     m++; if (m > 12) { m = 1; y++; }
   }
   p.setProperty('REDE_MENSAL_CACHE', JSON.stringify(cache));
