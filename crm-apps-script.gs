@@ -232,6 +232,7 @@ function doGet(e) {
     if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
     if (action === 'get_rede_mensal') return handleRedeMensal_(e.parameter); // vendas cartao por mes (grafico Analise Executiva)
     if (action === 'get_rede_caixa')  return handleRedeCaixa_(e.parameter);  // agenda de recebiveis futuros + taxas (Resumo)
+    if (action === 'get_cartao_fatura') return handleCartaoFatura_();        // fatura do cartao importada (pasta no Drive)
 
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
@@ -1586,6 +1587,106 @@ function parseOfxPix_(texto, arquivo) {
     });
   });
   return out;
+}
+
+// =========================================================
+// FATURA DO CARTÃO DE CRÉDITO (importador): a analista exporta a fatura do portal Itaú
+// (OFX ou CSV) e larga na pasta do Drive; aqui a gente lê, itemiza e soma por mês.
+// =========================================================
+const CARTAO_FOLDER_PROP = 'CARTAO_FATURA_FOLDER_ID';
+
+function getOrCreateCartaoFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty(CARTAO_FOLDER_PROP);
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch (e) { /* sumiu, recria abaixo */ }
+  }
+  const folder = DriveApp.createFolder('Faturas_Cartao_Credito_Paraser');
+  props.setProperty(CARTAO_FOLDER_PROP, folder.getId());
+  return folder;
+}
+
+// Gastos de um OFX de cartão: compras vêm como TRNAMT negativo; pagamento da fatura (crédito) é ignorado.
+function parseOfxCartao_(texto, arquivo) {
+  const out = [];
+  texto.split('<STMTTRN>').slice(1).forEach(function(b) {
+    const tag = function(t) { const m = b.match(new RegExp('<' + t + '>([^\\r\\n<]*)')); return m ? m[1].trim() : ''; };
+    const valor = parseFloat(tag('TRNAMT'));
+    if (!(valor < 0)) return; // só gastos
+    const memo = tag('MEMO') || tag('NAME');
+    if (/PAGAMENTO|PGTO/i.test(memo)) return;
+    const dt = tag('DTPOSTED').slice(0, 8); // yyyymmdd
+    out.push({
+      data: dt ? (dt.slice(0,4) + '-' + dt.slice(4,6) + '-' + dt.slice(6,8)) : '',
+      descricao: memo.replace(/\s+/g, ' ').trim(),
+      valor: Math.abs(valor),
+      fitid: tag('FITID') || (dt + '|' + memo + '|' + valor),
+      arquivo: arquivo
+    });
+  });
+  return out;
+}
+
+// Gastos de um CSV genérico de fatura: acha a coluna de data (dd/mm/yyyy) e a de valor (formato BR);
+// o resto da linha vira descrição. Linhas de pagamento/estorno (valor a crédito) são ignoradas.
+function parseCsvCartao_(texto, arquivo) {
+  const out = [];
+  const sep = (texto.indexOf(';') >= 0) ? ';' : ',';
+  texto.split(/\r?\n/).forEach(function(linha) {
+    if (!linha.trim()) return;
+    const cols = linha.split(sep).map(function(c){ return c.trim().replace(/^"|"$/g, ''); });
+    let data = '', valor = null;
+    const resto = [];
+    cols.forEach(function(c) {
+      const md = c.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (md && !data) { data = md[3] + '-' + md[2] + '-' + md[1]; return; }
+      const vs = c.replace(/^R\$\s*/, '');
+      if (valor === null && /^-?\d{1,3}(\.\d{3})*,\d{2}$/.test(vs)) { valor = parseFloat(vs.replace(/\./g, '').replace(',', '.')); return; }
+      if (valor === null && /^-?\d+\.\d{2}$/.test(vs)) { valor = parseFloat(vs); return; }
+      if (c) resto.push(c);
+    });
+    if (!data || valor === null) return;                 // linha sem data+valor = cabeçalho/rodapé
+    const desc = resto.join(' ').replace(/\s+/g, ' ').trim();
+    if (/PAGAMENTO|PGTO/i.test(desc)) return;
+    if (valor < 0) return;                               // crédito/estorno na fatura
+    out.push({ data: data, descricao: desc, valor: valor, fitid: data + '|' + desc + '|' + valor, arquivo: arquivo });
+  });
+  return out;
+}
+
+// action=get_cartao_fatura: lê todos os arquivos da pasta, deduplica e devolve itens + total por mês.
+function handleCartaoFatura_() {
+  const folder = getOrCreateCartaoFolder_();
+  const files = folder.getFiles();
+  const vistos = {};
+  const itens = [];
+  let nArq = 0;
+  while (files.hasNext()) {
+    const f = files.next();
+    const nome = f.getName();
+    let parsed = null;
+    if (/\.ofx$/i.test(nome)) parsed = parseOfxCartao_(f.getBlob().getDataAsString('ISO-8859-1'), nome);
+    else if (/\.(csv|txt)$/i.test(nome)) parsed = parseCsvCartao_(f.getBlob().getDataAsString('UTF-8'), nome);
+    if (!parsed) continue;
+    nArq++;
+    parsed.forEach(function(it) {
+      if (vistos[it.fitid]) return; // mesmo lançamento em 2 arquivos (fatura re-exportada)
+      vistos[it.fitid] = true;
+      itens.push(it);
+    });
+  }
+  const porMes = {};
+  itens.forEach(function(it) {
+    const mes = String(it.data).slice(0, 7);
+    if (!porMes[mes]) porMes[mes] = { total: 0, n: 0 };
+    porMes[mes].total += it.valor; porMes[mes].n++;
+  });
+  itens.sort(function(a, b){ return a.data < b.data ? 1 : -1; });
+  return jsonOk({
+    ok: true, arquivos: nArq, itens: itens.slice(0, 400),
+    porMes: Object.keys(porMes).sort().map(function(m){ return { mes: m, total: porMes[m].total, n: porMes[m].n }; }),
+    pasta: folder.getUrl()
+  });
 }
 
 // Teste: lê a pasta e loga o resumo. Rodar manual no editor depois de largar o OFX.
