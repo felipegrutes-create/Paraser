@@ -1828,6 +1828,7 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
     if (body && body.src === 'manychat') { _gravarNayara(body); return _okText(); } // 📊 coletor das conversas do front da Nayara (Manychat)
     _gravarMsgRecebida(body); // 📊 gravador temporário p/ mapear demandas da recepção (remover após análise)
+    try { _repassarMonitor(body); } catch (e) {} // 📡 fan-out pro monitor (recepção lê as msgs); BLINDADO: nunca afeta a confirmação
     if (body.fromMe === true) return _okText();
 
     var r = interpretarResposta(body);
@@ -1838,6 +1839,35 @@ function doPost(e) {
     Logger.log('doPost erro: ' + err.message);
   }
   return _okText(); // sempre 200 pro Z-API não reenviar em loop
+}
+
+// 📡 Fan-out pro monitor WhatsApp: repassa o payload cru da Z-API pro /exec do CRM
+// (?action=zapi_webhook&wk=...), que grava no BigQuery. Assim a recepção (número
+// das confirmações) é lida SEM trocar o webhook desta instância. A URL (com a wk)
+// fica em MONITOR_INGEST_URL (setada 1x via ?action=set_monitor). Sem ela, no-op.
+function _repassarMonitor(body) {
+  var url = _P.getProperty('MONITOR_INGEST_URL');
+  if (!url) return;
+  UrlFetchApp.fetch(url, {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify(body), muteHttpExceptions: true
+  });
+}
+
+// Liga o "notify sent by me" NESTA instância (a das confirmações), pra o monitor
+// ver também as mensagens ENVIADAS pela recepção. O doPost já ignora fromMe (linha
+// do return), então isto NÃO afeta a confirmação — só faz as enviadas passarem pelo
+// doPost e serem repassadas pro monitor. NÃO mexe no webhook-received.
+function _ligarNotifySent() {
+  try {
+    var url = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID + '/token/' + CF_ZAPI_TOKEN + '/update-notify-sent-by-me';
+    var r = UrlFetchApp.fetch(url, {
+      method: 'put', contentType: 'application/json',
+      headers: CF_ZAPI_CLIENT_TOKEN ? { 'Client-Token': CF_ZAPI_CLIENT_TOKEN } : {},
+      payload: JSON.stringify({ notifySentByMe: true }), muteHttpExceptions: true
+    });
+    return { code: r.getResponseCode(), body: r.getContentText().slice(0, 200) };
+  } catch (e) { return { error: e.message }; }
 }
 
 // 📊 Coletor das conversas do front da Nayara — o Manychat manda (via External Request) uma cópia de cada msg do lead
@@ -1863,6 +1893,16 @@ function doGet(e) {
     return ContentService
       .createTextOutput(JSON.stringify(_diagConfirmacoes(), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+  // Liga o fan-out pro monitor: guarda a URL de ingestão + liga o notify-sent.
+  // Devolve o instance_id (pra rotular a recepção no monitor). ?url= vazio só liga o notify.
+  if (params.action === 'set_monitor' && params.key === 'paraser2026') {
+    if (params.url) _P.setProperty('MONITOR_INGEST_URL', String(params.url));
+    var _ns = _ligarNotifySent();
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: true, monitor_url: _P.getProperty('MONITOR_INGEST_URL') || '(vazio)',
+      instance_id: CF_ZAPI_INSTANCE_ID, notify_sent: _ns
+    }, null, 2)).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'setup-webhook' && params.key === 'paraser2026') {
     return ContentService
