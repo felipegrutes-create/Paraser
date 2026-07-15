@@ -193,12 +193,12 @@ function doGet(e) {
       if (!c || c.mes !== _mes || (agora - (c.ts || 0)) > 1200000 || e.parameter.fresh) {
         const m = computarMetaMes_(_mes);
         c = { mes: m.mes, meta: m.meta, total: m.total, comercial: m.comercial, outros: m.outros,
-              cartao: m.cartao, pixLinkado: m.pixLinkado, aConferirValor: m.aConferirValor,
+              cartao: m.cartao, pixLinkado: m.pixLinkado, dinheiro: m.dinheiro, aConferirValor: m.aConferirValor,
               aConferirQtd: m.aConferirQtd, porVendedora: m.porVendedora, ts: agora };
         props.setProperty('META_CACHE', JSON.stringify(c));
       }
       return jsonOk({ ok: true, mes: c.mes, meta: c.meta, total: c.total, comercial: c.comercial,
-        outros: c.outros, cartao: c.cartao, pixLinkado: c.pixLinkado,
+        outros: c.outros, cartao: c.cartao, pixLinkado: c.pixLinkado, dinheiro: c.dinheiro || 0,
         aConferirValor: c.aConferirValor, aConferirQtd: c.aConferirQtd,
         porVendedora: c.porVendedora, confirmado: c.comercial });
     }
@@ -301,6 +301,7 @@ function doPost(e) {
 
       if (action === 'marcar_venda_fechada') return handleMarcarVendaFechada(body);
       if (action === 'set_meta')             return handleSetMeta(body);
+      if (action === 'set_meta_dinheiro')    return handleSetMetaDinheiro(body);
       if (action === 'conferir_pix')         return handleConferirPix(body);
       if (action === 'add_entrada_manual')    return handleAddEntradaManual(body);
       if (action === 'remove_entrada_manual') return handleRemoveEntradaManual(body);
@@ -2166,6 +2167,29 @@ function handleSetMeta(body) {
   return jsonOk({ ok: true, mes: mes, valor: valor });
 }
 
+// Dinheiro em espécie do mês (lançado à mão pela analista; aba Meta_Dinheiro).
+const META_DINHEIRO_SHEET = 'Meta_Dinheiro';
+function getMetaDinheiro_(mes) {
+  const sh = getOrCreateSheetGen_(META_DINHEIRO_SHEET, ['mes', 'valor']);
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) if (normMes_(data[i][0]) === mes) return Number(data[i][1]) || 0;
+  return 0;
+}
+function handleSetMetaDinheiro(body) {
+  const mes = String(body.mes || '').trim();
+  const valor = Number(body.valor) || 0;
+  if (!/^\d{4}-\d{2}$/.test(mes)) return jsonErr('mes deve ser YYYY-MM');
+  const sh = getOrCreateSheetGen_(META_DINHEIRO_SHEET, ['mes', 'valor']);
+  const data = sh.getDataRange().getValues();
+  let achou = false;
+  for (let i = 1; i < data.length; i++) {
+    if (normMes_(data[i][0]) === mes) { sh.getRange(i + 1, 2).setValue(valor); achou = true; break; }
+  }
+  if (!achou) sh.appendRow(["'" + mes, valor]);
+  try { PropertiesService.getScriptProperties().deleteProperty('META_CACHE'); } catch (e) {} // recomputa na próxima leitura
+  return jsonOk({ ok: true, mes: mes, valor: valor });
+}
+
 // Normaliza nome pra comparação (minúsculo, sem acento, só letras).
 function normNome_(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
@@ -2313,7 +2337,7 @@ function notificarMetaSlack_(novas, fechamento) {
   if (m.aConferirValor > 0) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '⏳ *A conferir:* ' + fmt(m.aConferirValor) + ' · ' + m.aConferirQtd + ' PIX sem link no Feegow (dar ok no painel)' } });
   }
-  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '💳 cartão ' + fmt(m.cartao) + ' · 📥 PIX ' + fmt(m.pixLinkado) + ' · atualizado ' + hora } ] });
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '💳 cartão ' + fmt(m.cartao) + ' · 📥 PIX ' + fmt(m.pixLinkado) + (m.dinheiro > 0 ? ' · 💵 dinheiro ' + fmt(m.dinheiro) : '') + ' · atualizado ' + hora } ] });
 
   UrlFetchApp.fetch(webhookUrl, {
     method: 'post', contentType: 'application/json',
@@ -2407,11 +2431,14 @@ function computarMetaMes_(mes) {
 
   const porVendedora = comercialPorVendedora_(mes);
   let comercial = 0; porVendedora.forEach(function(x){ comercial += x.valor; });
-  const total = cartao + pixLinkado;
+  // Dinheiro em espécie: lançado à mão pela analista (não vem de banco). Entra no
+  // total pra bater com o Recebido do Financeiro. Vai pra "outros" (sem vendedora).
+  const dinheiro = getMetaDinheiro_(mes);
+  const total = cartao + pixLinkado + dinheiro;
   return {
     mes: mesRe, meta: getMetaMes_(mes), total: total, comercial: comercial,
     outros: Math.max(0, total - comercial), cartao: cartao, pixLinkado: pixLinkado,
-    aConferirValor: aConfValor, aConferirQtd: aConfQtd, porVendedora: porVendedora
+    dinheiro: dinheiro, aConferirValor: aConfValor, aConferirQtd: aConfQtd, porVendedora: porVendedora
   };
 }
 

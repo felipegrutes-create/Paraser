@@ -6966,13 +6966,13 @@
             return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         }
         let _metaFetched = false;
-        async function renderMetaBar() {
+        async function renderMetaBar(fresh) {
             const bars = ['metaBar', 'metaBarFull'].map(id => document.getElementById(id)).filter(Boolean);
             if (!bars.length || !CRM_SCRIPT_URL) return;
             const setAll = html => bars.forEach(b => b.innerHTML = html);
             try {
                 const mes = mesAtualMeta();
-                const res = await fetch(CRM_SCRIPT_URL + '?action=get_meta&mes=' + mes);
+                const res = await fetch(CRM_SCRIPT_URL + '?action=get_meta&mes=' + mes + (fresh ? '&fresh=1' : ''));
                 const j   = await res.json();
                 const meta = Number(j.meta) || 0;
                 const total = Number(j.total != null ? j.total : j.confirmado) || 0;
@@ -6993,10 +6993,11 @@
                     <div style="height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden">
                         <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#10b981,#00d4aa)"></div>
                     </div>
-                    <div style="margin-top:6px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px">
+                    <div style="margin-top:6px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;align-items:center">
                         <span>🏷️ Comercial <b style="color:#e5e7eb">${fmt(j.comercial||0)}</b>${vend ? ` <span style="opacity:.65">(${vend})</span>` : ''}</span>
                         <span>➕ Outros <b style="color:#e5e7eb">${fmt(j.outros||0)}</b></span>
                         <span style="opacity:.7">💳 ${fmt(j.cartao||0)} · 📥 ${fmt(j.pixLinkado||0)}</span>
+                        <span style="background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:2px 9px">💵 Dinheiro <b style="color:#f59e0b">${fmt(j.dinheiro||0)}</b> <button onclick="editarDinheiro('${mes}',${Number(j.dinheiro)||0})" style="background:none;border:none;color:#f59e0b;cursor:pointer;font-size:12px;padding:0 0 0 4px" title="Lançar o dinheiro em espécie recebido no mês (entra no total)">✏️</button></span>
                     </div>`);
                 renderAConferir();
             } catch(e) { console.warn('meta bar:', e.message); }
@@ -7054,6 +7055,19 @@
                 body: JSON.stringify({ action: 'set_meta', mes, valor })
             }).catch(() => {});
             setTimeout(renderMetaBar, 900);
+        }
+        // Analista lança o dinheiro em espécie do mês → entra no total da meta (bate com o Recebido).
+        async function editarDinheiro(mes, atual) {
+            const raw = prompt('💵 Dinheiro em espécie recebido em ' + mes.split('-').reverse().join('/') + '\n(valor total do mês, ex: 35000 ou 35.000,00):', atual || '');
+            if (raw === null) return;
+            let s = String(raw).trim().replace(/[^\d.,]/g, '');
+            if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.'); // formato pt-BR
+            const valor = parseFloat(s) || 0;
+            await fetch(CRM_SCRIPT_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'set_meta_dinheiro', mes, valor })
+            }).catch(() => {});
+            setTimeout(() => renderMetaBar(true), 1500); // fresh: o servidor recomputa com o dinheiro novo
         }
         async function marcarVendaFechada() {
             const st    = document.getElementById('crmVendaStatus');
