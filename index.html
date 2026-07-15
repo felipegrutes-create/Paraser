@@ -2723,24 +2723,63 @@
     </style>
 </head>
 <body>
-    <!-- 🔒 Trava de acesso (afasta pacientes/curiosos). Guarda só o hash SHA-256 da senha, nunca a senha. Trocar senha: me peça. -->
-    <div id="pr-lock" style="position:fixed;inset:0;background:#f3f0f8;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#5b3a8c;font-size:17px;text-align:center;padding:20px">🔒 Verificando acesso…</div>
+    <!-- 🔒 Login individual (cada pessoa com sua senha). A senha nunca fica no navegador; guarda só o token de sessão. -->
+    <div id="pr-lock" style="position:fixed;inset:0;background:var(--bg);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:20px"></div>
     <script>
     (function(){
-      var HASH = '3128ece6821fa44fb2defd2da4c90fe8d9d5cf5f5e5d0b126f8407bdcdef092a';
+      var CRM = "https://script.google.com/macros/s/AKfycbzVhtXPGjYwJmoKTj3sd9_EF86xcIyLuQMWWyMT33R59C-B4xVZMoD70qEn7pK6MF1ncA/exec";
       var lock = document.getElementById('pr-lock');
       function unlock(){ if (lock) lock.remove(); }
-      function deny(t){ if (lock) lock.textContent = '🔒 ' + t; }
-      // Modo "só Mapa de Salas" (mapa-salas.html → ?only=salas): acesso direto, sem senha (não dá acesso ao resto do painel)
+      // Modo "só Mapa de Salas" (mapa-salas.html → ?only=salas): acesso direto, sem login.
       if (/[?&]only=salas\b/.test(location.search)) { try { document.body.classList.add('only-salas'); } catch(e){} unlock(); return; }
-      try { if (sessionStorage.getItem('pr_ok') === HASH) { unlock(); return; } } catch(e){}
-      var pwd = prompt('🔒 Senha do Sistema Paraser:');
-      if (pwd === null) { deny('Acesso restrito.'); return; }
-      crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd)).then(function(buf){
-        var hex = Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
-        if (hex === HASH) { try { sessionStorage.setItem('pr_ok', HASH); } catch(e){} unlock(); }
-        else { deny('Senha incorreta. Recarregue a página pra tentar de novo.'); }
-      }).catch(function(){ deny('Erro ao verificar. Recarregue a página.'); });
+      // Sessão já ativa? (fecha e reabre o navegador = pede login de novo; sessionStorage)
+      try {
+        var raw = sessionStorage.getItem('pr_session');
+        if (raw) { var s = JSON.parse(raw); if (s && s.token && s.usuario) { window.PR_SESSION = s; unlock(); return; } }
+      } catch(e){}
+      var INP = 'width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;box-sizing:border-box';
+      render('');
+      function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+      function render(erro){
+        lock.innerHTML =
+          '<div style="width:100%;max-width:360px">' +
+            '<div style="text-align:center;margin-bottom:26px">' +
+              '<div style="width:56px;height:56px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#04121a;margin:0 auto 14px">F</div>' +
+              '<div style="font-size:19px;font-weight:700;color:var(--text)">Sistema Integrado Paraser</div>' +
+              '<div style="font-size:13px;color:var(--muted);margin-top:4px">Entre com seu usuário e senha</div>' +
+            '</div>' +
+            '<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px">' +
+              (erro ? '<div id="pr-err" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;font-size:13px;border-radius:8px;padding:9px 11px;margin-bottom:14px">'+esc(erro)+'</div>' : '') +
+              '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">Usuário</label>' +
+              '<input id="pr-user" autocomplete="username" autocapitalize="off" spellcheck="false" style="'+INP+'" placeholder="ex: leticia">' +
+              '<label style="font-size:12px;color:var(--muted);display:block;margin:14px 0 5px">Senha</label>' +
+              '<input id="pr-pass" type="password" autocomplete="current-password" style="'+INP+'" placeholder="sua senha">' +
+              '<button id="pr-btn" style="width:100%;margin-top:18px;background:var(--accent);border:none;color:#04121a;font-weight:700;font-size:15px;border-radius:9px;padding:12px;cursor:pointer">Entrar</button>' +
+            '</div>' +
+            '<div style="text-align:center;font-size:11px;color:var(--muted);margin-top:16px">Esqueceu a senha? Fale com o Felipe.</div>' +
+          '</div>';
+        var u = document.getElementById('pr-user'), p = document.getElementById('pr-pass'), b = document.getElementById('pr-btn');
+        b.onclick = entrar;
+        p.addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
+        u.addEventListener('keydown', function(e){ if (e.key === 'Enter') p.focus(); });
+        (u.value ? p : u).focus();
+      }
+      function entrar(){
+        var usuario = (document.getElementById('pr-user').value || '').trim().toLowerCase();
+        var senha = document.getElementById('pr-pass').value || '';
+        var b = document.getElementById('pr-btn');
+        if (!usuario || !senha) { render('Preencha usuário e senha.'); return; }
+        b.textContent = 'Entrando…'; b.disabled = true;
+        fetch(CRM, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ action:'login', usuario:usuario, senha:senha, ctx: navigator.userAgent.slice(0,60) }) })
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if (j && j.ok && j.token) {
+              try { sessionStorage.setItem('pr_session', JSON.stringify({ usuario:j.usuario, nome:j.nome, papel:j.papel, token:j.token })); } catch(e){}
+              location.reload();
+            } else { render((j && j.erro) || 'Usuário ou senha inválidos.'); }
+          })
+          .catch(function(){ render('Não consegui conectar. Tente de novo.'); });
+      }
     })();
     </script>
     <div id="loadingOverlay">
@@ -2804,6 +2843,7 @@
 
         <button class="tab" onclick="showSection('sec-marketing',this)">📊 Marketing</button>
         <button class="tab" onclick="showSection('sec-estrutura',this)">🧩 Estrutura</button>
+        <button class="tab" id="tab-uso" style="display:none" onclick="showSection('sec-uso',this)">🔐 Uso</button>
     </div>
 
     <div class="container">
@@ -6341,7 +6381,161 @@
         var _debouncedEbRender  = _debounce(function(){ ebTab.renderCards(); }, 250);
 
         var _cachedSections = null, _cachedTabs = null, _cachedTabGroups = null;
+
+        // ===== Login individual + acesso por função + registro de uso =====
+        // Quais papéis podem ver cada área. Área sem entrada aqui = liberada (evita bloquear algo novo por engano).
+        const AREA_PERM = {
+            'sec-vg': ['admin','comercial'], 'sec-pv': ['admin','comercial'],
+            'sec-txconv': ['admin','comercial'], 'sec-ret': ['admin','comercial'],
+            'sec-doadoras': ['admin','comercial'], 'sec-pend': ['admin','comercial','recepcao'],
+            'sec-meta': ['admin','comercial'], 'sec-arquivo-morto': ['admin','comercial'],
+            'sec-salas': ['admin','recepcao'],
+            'sec-doashared': ['admin'], 'sec-doavol': ['admin'], 'sec-receptoras': ['admin'], 'sec-embriao': ['admin'],
+            'sec-resumo': ['admin'], 'sec-fin': ['admin'], 'sec-cr': ['admin'], 'sec-caixa': ['admin'],
+            'sec-repasses': ['admin'], 'sec-socios': ['admin'], 'sec-medicamentos': ['admin'],
+            'sec-exec': ['admin'], 'sec-estoque': ['admin'],
+            'sec-marketing': ['admin'], 'sec-estrutura': ['admin'], 'sec-uso': ['admin'],
+        };
+        function prSession() { return window.PR_SESSION || null; }
+        function prPapel()   { return (prSession() || {}).papel || ''; }
+        function areaAllowed(id) {
+            const s = prSession(); if (!s) return true;      // sem sessão (ex: só-salas): não bloqueia
+            const allow = AREA_PERM[id];
+            return !allow || allow.indexOf(s.papel) >= 0;
+        }
+        // Registra uso no CRM (fire-and-forget). Área aberta e ações comerciais.
+        function logUso(evento, area, detalhe) {
+            const s = prSession(); if (!s || !s.token) return;
+            try {
+                fetch(CRM_SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
+                    body: JSON.stringify({ action:'log_uso', usuario:s.usuario, token:s.token, evento:evento, area:area||'', detalhe:detalhe||'' }) });
+            } catch(e) {}
+        }
+        let _lastArea = '', _lastAreaTs = 0;
+        function logAbriuArea(id) {
+            const now = Date.now();
+            if (id === _lastArea && (now - _lastAreaTs) < 3000) return; // não repete a mesma área em 3s
+            _lastArea = id; _lastAreaTs = now;
+            logUso('abriu_area', id, '');
+        }
+        function prLogout() {
+            try { sessionStorage.removeItem('pr_session'); } catch(e){}
+            location.reload();
+        }
+        // Aplica o bloqueio por função: esconde nav não permitida, mostra badge do usuário, ajusta seção ativa.
+        function applyRoleGating() {
+            const s = prSession(); if (!s) return;
+            injectUserBadge(s);
+            const usoTab = document.getElementById('tab-uso');
+            if (usoTab) usoTab.style.display = (s.papel === 'admin') ? '' : 'none';
+            if (s.papel === 'admin') return; // admin vê tudo
+            document.querySelectorAll('.tab, .tab-dropdown-item').forEach(function(btn){
+                const oc = btn.getAttribute('onclick') || '';
+                const m = oc.match(/showSection\('(sec-[a-z0-9-]+)'/);
+                if (m && !areaAllowed(m[1])) btn.style.display = 'none';
+            });
+            document.querySelectorAll('.tab-group').forEach(function(g){
+                const vis = Array.prototype.filter.call(g.querySelectorAll('.tab-dropdown-item'), function(it){ return it.style.display !== 'none'; });
+                if (!vis.length) g.style.display = 'none';
+            });
+            const active = document.querySelector('.section.active');
+            if (active && !areaAllowed(active.id)) {
+                const first = ['sec-vg','sec-pv','sec-txconv','sec-ret','sec-doadoras','sec-pend','sec-meta','sec-salas'].filter(areaAllowed)[0];
+                if (first) showSection(first, document.querySelector('.tab[onclick*="'+first+'"]'));
+            }
+        }
+        function injectUserBadge(s) {
+            if (document.getElementById('pr-badge')) return;
+            const header = document.querySelector('.header');
+            if (!header) return;
+            const papelTxt = { admin:'Admin', comercial:'Comercial', recepcao:'Recepção' }[s.papel] || s.papel;
+            const wrap = document.createElement('div');
+            wrap.id = 'pr-badge';
+            wrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin-left:auto';
+            wrap.innerHTML = '<span style="font-size:12px;color:var(--muted)">👤 <b style="color:var(--text)">'+(s.nome||s.usuario)+'</b> · '+papelTxt+'</span>' +
+                '<button onclick="prLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:5px 11px;cursor:pointer;font-size:12px">Sair</button>';
+            const refresh = header.querySelector('.btn-refresh');
+            if (refresh) header.insertBefore(wrap, refresh); else header.appendChild(wrap);
+        }
+
+        // ===== Relatório "Uso do Sistema" (só admin) =====
+        const USO_AREA_NOMES = { 'sec-vg':'Visão Geral','sec-pv':'1ª Vez','sec-txconv':'TX Conversão','sec-ret':'Retorno','sec-doadoras':'Fluxo Pacientes','sec-pend':'Cards Pacientes','sec-meta':'Meta','sec-arquivo-morto':'Arquivo Morto','sec-salas':'Mapa de Salas','sec-resumo':'Resumo Financeiro','sec-fin':'Financeiro','sec-cr':'Contas a Receber','sec-caixa':'Médicos','sec-repasses':'Repasses','sec-socios':'Sócios','sec-medicamentos':'Medicamentos','sec-exec':'Análise Executiva','sec-estoque':'Estoque','sec-marketing':'Marketing','sec-estrutura':'Estrutura','sec-uso':'Uso do Sistema' };
+        const USO_ACAO_NOMES = { 'marcar_venda':'Marcou venda','editar_meta':'Editou meta','lancar_dinheiro':'Lançou dinheiro','remover_dinheiro':'Removeu dinheiro','salvar_card':'Salvou card','apagar_card':'Apagou card','entrada_manual':'Entrada manual','mover_card':'Moveu card' };
+        function _usoAreaNome(id) { return USO_AREA_NOMES[id] || id; }
+        let _usoDias = 30;
+        function renderUso(dias) {
+            if (dias) _usoDias = dias;
+            let sec = document.getElementById('sec-uso');
+            if (!sec) {
+                sec = document.createElement('section');
+                sec.id = 'sec-uso'; sec.className = 'section';
+                (document.getElementById('sec-vg') || document.body).parentNode.appendChild(sec);
+            }
+            const s = prSession();
+            if (!s || s.papel !== 'admin') { sec.innerHTML = '<div style="padding:24px;color:var(--muted)">Acesso restrito.</div>'; return; }
+            sec.innerHTML = '<div style="padding:8px 0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+                '<h2 style="font-size:18px;color:var(--text)">🔐 Uso do Sistema</h2>' +
+                '<div style="display:flex;gap:6px">' + [7,30,90].map(function(d){ return '<button onclick="renderUso('+d+')" style="background:'+(_usoDias===d?'var(--accent)':'var(--surface)')+';color:'+(_usoDias===d?'#04121a':'var(--muted)')+';border:1px solid var(--border);border-radius:7px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:600">'+d+' dias</button>'; }).join('') + '</div>' +
+                '</div><div id="usoBody" style="color:var(--muted);font-size:13px;padding:12px">Carregando…</div></div>';
+            fetch(CRM_SCRIPT_URL + '?action=get_log_uso&usuario=' + encodeURIComponent(s.usuario) + '&token=' + encodeURIComponent(s.token) + '&dias=' + _usoDias)
+                .then(function(r){ return r.json(); })
+                .then(function(j){
+                    const body = document.getElementById('usoBody'); if (!body) return;
+                    if (!j || !j.ok) { body.innerHTML = '<div style="color:var(--danger)">Não consegui carregar o relatório.</div>'; return; }
+                    body.innerHTML = renderUsoHtml(j);
+                })
+                .catch(function(){ const body = document.getElementById('usoBody'); if (body) body.innerHTML = '<div style="color:var(--danger)">Erro ao carregar.</div>'; });
+        }
+        function renderUsoHtml(j) {
+            const users = j.usuarios || [];
+            const fmtQuando = function(iso){ if(!iso) return 'nunca'; const dt = new Date(iso); if(isNaN(dt)) return ''; const dif = Date.now()-dt.getTime(); const min=Math.round(dif/60000); if(min<1)return'agora'; if(min<60)return'há '+min+'min'; const h=Math.round(min/60); if(h<24)return'há '+h+'h'; return dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); };
+            if (!users.length) return '<div style="color:var(--muted);padding:12px">Nenhum uso registrado nos últimos '+j.dias+' dias.</div>';
+            let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">';
+            users.forEach(function(u){
+                const cor = u.papel==='admin' ? 'var(--accent2)' : (u.papel==='comercial' ? 'var(--accent)' : 'var(--muted)');
+                html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">' +
+                      '<div><div style="font-size:15px;font-weight:700;color:var(--text)">'+(u.nome||u.usuario)+'</div>' +
+                      '<div style="font-size:11px;color:'+cor+';font-weight:600;text-transform:uppercase;letter-spacing:.03em">'+u.papel+'</div></div>' +
+                      '<div style="text-align:right"><div style="font-size:11px;color:var(--muted)">último acesso</div><div style="font-size:12px;color:var(--text)">'+fmtQuando(u.ultimoIso)+'</div></div>' +
+                    '</div>' +
+                    '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:'+((u.topAreas&&u.topAreas.length)||(u.topAcoes&&u.topAcoes.length)?'12px':'0')+'">' +
+                      '<div><div style="font-size:20px;font-weight:800;color:var(--text)">'+u.logins+'</div><div style="font-size:11px;color:var(--muted)">acessos</div></div>' +
+                      '<div><div style="font-size:20px;font-weight:800;color:var(--text)">'+u.aberturas+'</div><div style="font-size:11px;color:var(--muted)">áreas abertas</div></div>' +
+                      '<div><div style="font-size:20px;font-weight:800;color:var(--text)">'+u.acoes+'</div><div style="font-size:11px;color:var(--muted)">ações</div></div>' +
+                      (u.loginsFalhos ? '<div><div style="font-size:20px;font-weight:800;color:var(--danger)">'+u.loginsFalhos+'</div><div style="font-size:11px;color:var(--muted)">falhas login</div></div>' : '') +
+                    '</div>';
+                if (u.topAreas && u.topAreas.length) {
+                    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Áreas mais usadas</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">' +
+                        u.topAreas.slice(0,6).map(function(a){ return '<span style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text)">'+_usoAreaNome(a.area)+' <b style="color:var(--muted)">'+a.n+'</b></span>'; }).join('') + '</div>';
+                }
+                if (u.topAcoes && u.topAcoes.length) {
+                    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Ações comerciais</div><div style="display:flex;flex-wrap:wrap;gap:5px">' +
+                        u.topAcoes.slice(0,6).map(function(a){ return '<span style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.25);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--accent)">'+(USO_ACAO_NOMES[a.acao]||a.acao)+' <b>'+a.n+'</b></span>'; }).join('') + '</div>';
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+            const rec = j.recentes || [];
+            if (rec.length) {
+                html += '<h3 style="font-size:14px;color:var(--text);margin:22px 0 10px">Atividade recente</h3><div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">';
+                rec.slice(0,40).forEach(function(r, i){
+                    const dt = new Date(r.ts); const quando = isNaN(dt)?'':dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+                    const oQ = r.evento==='login'?'entrou':(r.evento==='login_falhou'?'errou a senha':(r.evento==='abriu_area'?('abriu '+_usoAreaNome(r.area)):(USO_ACAO_NOMES[r.detalhe]||r.detalhe||'ação')));
+                    const cor = r.evento==='login_falhou'?'var(--danger)':(r.evento==='acao'?'var(--accent)':'var(--muted)');
+                    html += '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 14px;'+(i%2?'background:var(--surface2)':'')+';font-size:12px">' +
+                        '<span style="color:var(--text)"><b>'+(r.nome||r.usuario)+'</b> <span style="color:'+cor+'">'+oQ+'</span></span>' +
+                        '<span style="color:var(--muted);white-space:nowrap">'+quando+'</span></div>';
+                });
+                html += '</div>';
+            }
+            return html;
+        }
+
         function showSection(id, el) {
+            if (!areaAllowed(id)) return;   // 🔒 bloqueio por função
+            logAbriuArea(id);               // 📊 registra uso
+            if (id === 'sec-uso') renderUso();
             if (!_cachedSections) {
                 _cachedSections   = document.querySelectorAll(".section");
                 _cachedTabs       = document.querySelectorAll(".tab, .tab-group-trigger, .tab-dropdown-item");
@@ -6885,6 +7079,7 @@
         }
 
         async function saveCRMRecord() {
+            logUso('acao', '', 'salvar_card');
             const statusEl   = document.getElementById('crmSaveStatus');
             const engravidou = document.getElementById('crmEngravidou').checked;
             const desistiu   = document.getElementById('crmDesistiu').checked;
@@ -7050,6 +7245,7 @@
             if (atual === null) return;
             const valor = Number(String(atual).replace(/[^\d]/g, ''));
             if (!valor) return;
+            logUso('acao', '', 'editar_meta');
             await fetch(CRM_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({ action: 'set_meta', mes, valor })
@@ -7139,6 +7335,7 @@
             if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.'); // pt-BR
             const valor = parseFloat(s) || 0;
             if (!(valor > 0)) { alert('Informe o valor do lançamento (ex: 350 ou 350,00).'); return; }
+            logUso('acao', '', 'lancar_dinheiro');
             await fetch(CRM_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({ action: 'add_meta_dinheiro', mes: _dinMes, paciente: pac, cpf, servico: serv, valor })
@@ -7149,6 +7346,7 @@
             setTimeout(() => renderMetaBar(true), 1400); // atualiza o total da barra
         }
         async function delDinheiroItem(id) {
+            logUso('acao', '', 'remover_dinheiro');
             await fetch(CRM_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({ action: 'del_meta_dinheiro', id })
@@ -7165,6 +7363,7 @@
             const patient = pendPatients.find(p => normalizeKey(p.pac) === crmModalKey);
             if (!forma) { st.textContent = 'Escolha PIX ou Cartão'; st.style.color = '#ef4444'; return; }
             if (!valor) { st.textContent = 'Preencha o valor da venda acima'; st.style.color = '#ef4444'; return; }
+            logUso('acao', '', 'marcar_venda');
             st.textContent = 'Marcando...'; st.style.color = 'var(--muted)';
             await fetch(CRM_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
@@ -7189,6 +7388,7 @@
                 `Esta ação será registrada no log.`
             );
             if (!ok) return;
+            logUso('acao', '', 'apagar_card');
 
             const crm = crmMap[key] || {};
             const crmCol = getCRMColumn(Object.keys(crm).length ? crm : null, patient);
@@ -16168,6 +16368,7 @@ GONAPEPTYL,56`;
                 document.getElementById('loadingMsg').textContent = 'Processando dados...';
                 const d = processData(rows);
                 buildUI(d);
+                try { applyRoleGating(); } catch(e) { console.warn('gating:', e); }
 
                 // Mostrar banner de status Feegow
                 updateFeegowStatusBanner();
@@ -16204,6 +16405,8 @@ GONAPEPTYL,56`;
         }
 
         init();
+        // Rede de segurança: garante o bloqueio por função mesmo se o init falhar no meio.
+        setTimeout(function(){ try { applyRoleGating(); } catch(e){} }, 60);
 
         // ===== CONTAS A RECEBER =====
         // Critério unificado: medicamento por tipo OU por nome (usado no donut E no Controle)

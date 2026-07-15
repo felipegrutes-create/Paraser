@@ -207,6 +207,8 @@ function doGet(e) {
     if (action === 'get_meta_dinheiro') return handleGetMetaDinheiro(e.parameter);
     // Total de dinheiro do quadro por mês (fonte única do dinheiro no Resumo Financeiro).
     if (action === 'get_meta_dinheiro_mensal') return handleMetaDinheiroMensal_();
+    // Relatório de uso do sistema (só admin, valida usuario+token).
+    if (action === 'get_log_uso') return handleGetLogUso(e.parameter);
 
     // Lista os PIX pendentes de conferência (não linkaram por CPF).
     if (action === 'get_aconferir') {
@@ -309,6 +311,8 @@ function doPost(e) {
       if (action === 'set_meta_dinheiro')    return handleSetMetaDinheiro(body);
       if (action === 'add_meta_dinheiro')    return handleAddMetaDinheiro(body);
       if (action === 'del_meta_dinheiro')    return handleDelMetaDinheiro(body);
+      if (action === 'login')                return handleLogin(body);
+      if (action === 'log_uso')              return handleLogUso(body);
       if (action === 'conferir_pix')         return handleConferirPix(body);
       if (action === 'add_entrada_manual')    return handleAddEntradaManual(body);
       if (action === 'remove_entrada_manual') return handleRemoveEntradaManual(body);
@@ -2876,6 +2880,117 @@ function wppHash_(s) {
     .map(function(b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
 }
 
+// =========================================================
+// USUÁRIOS + LOG DE USO — login individual, papel (acesso) e relatório de utilização.
+// Trust model: página estática, então isto é accountability (quem usou o quê), não cofre.
+// Guarda só o hash da senha. O token de sessão = hash(usuario|senha_hash|segredo).
+// =========================================================
+const USUARIOS_SHEET = 'Usuarios';
+const USU_HEADERS = ['usuario', 'nome', 'senha_hash', 'papel', 'ativo', 'criado_em'];
+const LOG_USO_SHEET = 'Log_Uso';
+const LOGUSO_HEADERS = ['ts', 'usuario', 'nome', 'papel', 'evento', 'area', 'detalhe'];
+
+function usuSecret_() {
+  const p = PropertiesService.getScriptProperties();
+  let s = p.getProperty('USUARIOS_SECRET');
+  if (!s) { s = Utilities.getUuid(); p.setProperty('USUARIOS_SECRET', s); }
+  return s;
+}
+function usuToken_(usuario, senhaHash) {
+  return wppHash_(String(usuario) + '|' + String(senhaHash) + '|' + usuSecret_());
+}
+function usuBuscar_(usuario) {
+  const sh = getOrCreateSheetGen_(USUARIOS_SHEET, USU_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; USU_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const u = String(usuario || '').trim().toLowerCase();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][H.usuario]).trim().toLowerCase() === u) {
+      return { row: i + 1, usuario: u, nome: String(data[i][H.nome] || ''),
+        senha_hash: String(data[i][H.senha_hash] || ''), papel: String(data[i][H.papel] || ''),
+        ativo: String(data[i][H.ativo]) !== 'false' && data[i][H.ativo] !== false,
+        criado_em: data[i][H.criado_em] };
+    }
+  }
+  return null;
+}
+function usuAutenticar_(usuario, token) {
+  const u = usuBuscar_(usuario);
+  if (!u || !u.ativo) return null;
+  if (usuToken_(u.usuario, u.senha_hash) !== String(token || '')) return null;
+  return u;
+}
+function logUso_(usuario, nome, papel, evento, area, detalhe) {
+  try {
+    const sh = getOrCreateSheetGen_(LOG_USO_SHEET, LOGUSO_HEADERS);
+    sh.appendRow([new Date().toISOString(), usuario, nome, papel, evento, area || '', detalhe || '']);
+  } catch (e) {}
+}
+
+// POST login — {usuario, senha} → {ok, nome, papel, token} ou {ok:false}
+function handleLogin(body) {
+  const usuario = String(body.usuario || '').trim().toLowerCase();
+  const senha = String(body.senha || '');
+  const u = usuBuscar_(usuario);
+  if (!u || !u.ativo || wppHash_(senha) !== u.senha_hash) {
+    logUso_(usuario, u ? u.nome : '', u ? u.papel : '', 'login_falhou', '', '');
+    return jsonOk({ ok: false, erro: 'usuário ou senha inválidos' });
+  }
+  logUso_(u.usuario, u.nome, u.papel, 'login', '', String(body.ctx || ''));
+  return jsonOk({ ok: true, usuario: u.usuario, nome: u.nome, papel: u.papel, token: usuToken_(u.usuario, u.senha_hash) });
+}
+
+// POST log_uso — registra evento de uso (área aberta / ação). Exige usuario+token.
+function handleLogUso(body) {
+  const u = usuAutenticar_(body.usuario, body.token);
+  if (!u) return jsonOk({ ok: false });
+  logUso_(u.usuario, u.nome, u.papel, String(body.evento || 'acao'), String(body.area || ''), String(body.detalhe || ''));
+  return jsonOk({ ok: true });
+}
+
+// GET get_log_uso — relatório agregado de uso (só admin). ?usuario=&token=&dias=30
+function handleGetLogUso(param) {
+  const u = usuAutenticar_(param.usuario, param.token);
+  if (!u || u.papel !== 'admin') return jsonErr('acesso negado');
+  const dias = Math.max(1, Math.min(180, Number(param.dias) || 30));
+  const corte = new Date().getTime() - dias * 86400000;
+  const sh = getOrCreateSheetGen_(LOG_USO_SHEET, LOGUSO_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; LOGUSO_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const porUsuario = {};
+  const recentes = [];
+  for (let i = 1; i < data.length; i++) {
+    const ts = new Date(data[i][H.ts]).getTime();
+    if (isNaN(ts) || ts < corte) continue;
+    const usuario = String(data[i][H.usuario] || '');
+    const nome = String(data[i][H.nome] || usuario);
+    const papel = String(data[i][H.papel] || '');
+    const evento = String(data[i][H.evento] || '');
+    const area = String(data[i][H.area] || '');
+    const detalhe = String(data[i][H.detalhe] || '');
+    const k = usuario || '(anon)';
+    const s = porUsuario[k] = porUsuario[k] || { usuario: usuario, nome: nome, papel: papel,
+      logins: 0, loginsFalhos: 0, aberturas: 0, acoes: 0, ultimo: 0, areas: {}, acoesDet: {} };
+    s.nome = nome; s.papel = papel;
+    if (ts > s.ultimo) s.ultimo = ts;
+    if (evento === 'login') s.logins++;
+    else if (evento === 'login_falhou') s.loginsFalhos++;
+    else if (evento === 'abriu_area') { s.aberturas++; s.areas[area] = (s.areas[area] || 0) + 1; }
+    else if (evento === 'acao') { s.acoes++; s.acoesDet[detalhe] = (s.acoesDet[detalhe] || 0) + 1; }
+    recentes.push({ ts: data[i][H.ts], usuario: usuario, nome: nome, evento: evento, area: area, detalhe: detalhe });
+  }
+  const usuarios = Object.keys(porUsuario).map(function(k){
+    const s = porUsuario[k];
+    s.ultimoIso = s.ultimo ? new Date(s.ultimo).toISOString() : '';
+    s.topAreas = Object.keys(s.areas).map(function(a){ return { area: a, n: s.areas[a] }; }).sort(function(a,b){ return b.n - a.n; });
+    s.topAcoes = Object.keys(s.acoesDet).map(function(a){ return { acao: a, n: s.acoesDet[a] }; }).sort(function(a,b){ return b.n - a.n; });
+    delete s.areas; delete s.acoesDet; delete s.ultimo;
+    return s;
+  }).sort(function(a,b){ return (b.ultimoIso || '').localeCompare(a.ultimoIso || ''); });
+  recentes.sort(function(a,b){ return String(b.ts).localeCompare(String(a.ts)); });
+  return jsonOk({ ok: true, dias: dias, usuarios: usuarios, recentes: recentes.slice(0, 120) });
+}
+
 // Rotas administrativas do monitor. Autenticação por hash fixo no código
 // (sem first-call-wins: não existe janela de captura pós-deploy).
 function handleWppAdmin(params) {
@@ -2976,6 +3091,36 @@ function handleWppAdmin(params) {
       try { PropertiesService.getScriptProperties().deleteProperty('META_CACHE'); } catch (e) {}
       notificarMetaSlack_([]);
       return jsonOk({ ok: true, msg: 'card da Meta repostado no Slack' });
+    }
+    if (op === 'set_usuario') { // cria/atualiza usuário do sistema (?usuario=&nome=&senha=&papel=&ativo=)
+      const usuario = String(params.usuario || '').trim().toLowerCase();
+      if (!usuario) return jsonErr('usuario obrigatório');
+      const shU = getOrCreateSheetGen_(USUARIOS_SHEET, USU_HEADERS);
+      const dd = shU.getDataRange().getValues();
+      const Hu = {}; USU_HEADERS.forEach(function(h, i){ Hu[h] = i; });
+      let row = -1;
+      for (let i = 1; i < dd.length; i++) if (String(dd[i][Hu.usuario]).trim().toLowerCase() === usuario) { row = i + 1; break; }
+      const nome = params.nome != null ? String(params.nome) : (row > 0 ? String(dd[row-1][Hu.nome]) : usuario);
+      const papel = params.papel != null ? String(params.papel).toLowerCase() : (row > 0 ? String(dd[row-1][Hu.papel]) : 'comercial');
+      const senhaHash = params.senha ? wppHash_(String(params.senha)) : (row > 0 ? String(dd[row-1][Hu.senha_hash]) : '');
+      const ativo = params.ativo != null ? (String(params.ativo) !== 'false' && String(params.ativo) !== '0') : (row > 0 ? (String(dd[row-1][Hu.ativo]) !== 'false') : true);
+      const criado = row > 0 ? (dd[row-1][Hu.criado_em] || new Date().toISOString()) : new Date().toISOString();
+      if (row > 0) shU.getRange(row, 1, 1, USU_HEADERS.length).setValues([[usuario, nome, senhaHash, papel, ativo, criado]]);
+      else shU.appendRow([usuario, nome, senhaHash, papel, ativo, criado]);
+      return jsonOk({ ok: true, usuario: usuario, nome: nome, papel: papel, ativo: ativo });
+    }
+    if (op === 'list_usuarios') {
+      const shU = getOrCreateSheetGen_(USUARIOS_SHEET, USU_HEADERS);
+      const dd = shU.getDataRange().getValues();
+      const out = [];
+      for (let i = 1; i < dd.length; i++) out.push({ usuario: dd[i][0], nome: dd[i][1], papel: dd[i][3], ativo: dd[i][4] });
+      return jsonOk({ usuarios: out });
+    }
+    if (op === 'reset_log_uso') { // zera o histórico de uso (mantém cabeçalho)
+      const shL = getOrCreateSheetGen_(LOG_USO_SHEET, LOGUSO_HEADERS);
+      const n = shL.getLastRow() - 1;
+      if (n > 0) shL.deleteRows(2, n);
+      return jsonOk({ ok: true, apagadas: Math.max(0, n) });
     }
     if (op === 'sem_resposta') {
       // Detalhe dos "sem resposta" da janela atual (o card só mostra 6 nomes):
