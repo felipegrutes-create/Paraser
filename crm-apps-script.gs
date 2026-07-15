@@ -2972,6 +2972,11 @@ function handleWppAdmin(params) {
     if (op === 'ultimas') return jsonOk({ itens: wppUltimas_(Number(params.n) || 10) });
     if (op === 'rede_status') return handleSetupRede({}); // só status (sem setar nada): fonte/pv/base/tem_id/tem_secret
     if (op === 'test_rede')   return handleTestRede(params); // teste da API Rede (token+vendas; ?mes= compara API×CSV; ?detalhe=1)
+    if (op === 'repost_meta') { // reposta o card da Meta no Slack agora (com o dinheiro do quadro já somado)
+      try { PropertiesService.getScriptProperties().deleteProperty('META_CACHE'); } catch (e) {}
+      notificarMetaSlack_([]);
+      return jsonOk({ ok: true, msg: 'card da Meta repostado no Slack' });
+    }
     if (op === 'sem_resposta') {
       // Detalhe dos "sem resposta" da janela atual (o card só mostra 6 nomes):
       // quem é, última mensagem recebida (hora + prévia) e volume da conversa.
