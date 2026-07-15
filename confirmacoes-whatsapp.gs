@@ -914,8 +914,26 @@ function listarPacientesAmanha() {
   }
 
   var dia          = getDiaAlvo();
-  var agendamentos = getAgendamentos(dia);
   var dataStr      = fmtDataBR(dia);
+
+  // Feegow pode dar um blip às 8h. Tenta 1x, espera 5s e tenta de novo; se ainda assim
+  // falhar, AVISA a recepção no Slack (antes ela falhava em silêncio e ninguém sabia).
+  var agendamentos;
+  try {
+    agendamentos = getAgendamentos(dia);
+  } catch (e1) {
+    Utilities.sleep(5000);
+    try {
+      agendamentos = getAgendamentos(dia);
+    } catch (e2) {
+      Logger.log('listarPacientesAmanha: Feegow fora — ' + e2.message);
+      try {
+        slackPost('🚨 *Lista da recepção (Keyaccess) não saiu.* A Feegow não respondeu na hora de gerar a lista de ' +
+                  dataStr + '. Assim que ela voltar, dá pra gerar de novo pra criar o link do Keyaccess.');
+      } catch (se) {}
+      return;
+    }
+  }
 
   var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
   var sh = ss.getSheetByName('Pacientes_Amanha');
@@ -1908,6 +1926,29 @@ function doGet(e) {
     return ContentService
       .createTextOutput(JSON.stringify(_configurarWebhookZapi(params.url || ''), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+  // Lista os triggers do projeto (diagnóstico: confirmar se o job das 8h existe).
+  if (params.action === 'list-triggers' && params.key === 'paraser2026') {
+    var _trs = ScriptApp.getProjectTriggers().map(function(t){
+      return { fn: t.getHandlerFunction(), tipo: String(t.getEventType()), fonte: String(t.getTriggerSource()) };
+    });
+    return ContentService.createTextOutput(JSON.stringify(_trs, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  }
+  // Reinstala o trigger diário 8h da lista da recepção (idempotente: remove os antigos primeiro).
+  if (params.action === 'setup-trigger-lista' && params.key === 'paraser2026') {
+    ScriptApp.getProjectTriggers().forEach(function(t){
+      if (t.getHandlerFunction() === 'listarPacientesAmanha') ScriptApp.deleteTrigger(t);
+    });
+    ScriptApp.newTrigger('listarPacientesAmanha').timeBased().atHour(8).everyDays(1).inTimezone('America/Sao_Paulo').create();
+    return ContentService.createTextOutput('{"ok":true,"msg":"trigger listarPacientesAmanha diario 8h (America/Sao_Paulo) reinstalado"}').setMimeType(ContentService.MimeType.JSON);
+  }
+  // Regera a lista de pacientes da recepção (Keyaccess) sob demanda — desbloqueia
+  // quando o job das 8h não rodou/falhou. Escreve na aba Pacientes_Amanha e posta no Slack.
+  if (params.action === 'gerar-lista-recepcao' && params.key === 'paraser2026') {
+    var _rl;
+    try { listarPacientesAmanha(); _rl = { ok: true, msg: 'lista regerada — veja a aba Pacientes_Amanha e o Slack' }; }
+    catch (e) { _rl = { ok: false, erro: e.message }; }
+    return ContentService.createTextOutput(JSON.stringify(_rl, null, 2)).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'setup-medicos' && params.key === 'paraser2026') {
     setupListaMedicos();
