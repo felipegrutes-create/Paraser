@@ -6997,7 +6997,7 @@
                         <span>🏷️ Comercial <b style="color:#e5e7eb">${fmt(j.comercial||0)}</b>${vend ? ` <span style="opacity:.65">(${vend})</span>` : ''}</span>
                         <span>➕ Outros <b style="color:#e5e7eb">${fmt(j.outros||0)}</b></span>
                         <span style="opacity:.7">💳 ${fmt(j.cartao||0)} · 📥 ${fmt(j.pixLinkado||0)}</span>
-                        <span style="background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:2px 9px">💵 Dinheiro <b style="color:#f59e0b">${fmt(j.dinheiro||0)}</b> <button onclick="editarDinheiro('${mes}',${Number(j.dinheiro)||0})" style="background:none;border:none;color:#f59e0b;cursor:pointer;font-size:12px;padding:0 0 0 4px" title="Lançar o dinheiro em espécie recebido no mês (entra no total)">✏️</button></span>
+                        <span style="background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:2px 9px">💵 Dinheiro <b style="color:#f59e0b">${fmt(j.dinheiro||0)}</b> <button onclick="abrirDinheiro('${mes}')" style="background:none;border:none;color:#f59e0b;cursor:pointer;font-size:12px;padding:0 0 0 4px" title="Lançar o dinheiro em espécie recebido no mês (paciente, CPF, serviço) — entra no total">✏️</button></span>
                     </div>`);
                 renderAConferir();
             } catch(e) { console.warn('meta bar:', e.message); }
@@ -7056,18 +7056,105 @@
             }).catch(() => {});
             setTimeout(renderMetaBar, 900);
         }
-        // Analista lança o dinheiro em espécie do mês → entra no total da meta (bate com o Recebido).
-        async function editarDinheiro(mes, atual) {
-            const raw = prompt('💵 Dinheiro em espécie recebido em ' + mes.split('-').reverse().join('/') + '\n(valor total do mês, ex: 35000 ou 35.000,00):', atual || '');
-            if (raw === null) return;
-            let s = String(raw).trim().replace(/[^\d.,]/g, '');
-            if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.'); // formato pt-BR
+        // ===== Dinheiro em espécie: lançamento por paciente (paciente/CPF/serviço/valor) =====
+        // Cada linha é um pagamento em dinheiro, pra depois cruzar com o Feegow. O total entra na Meta.
+        let _dinMes = null;
+        function abrirDinheiro(mes) {
+            _dinMes = mes;
+            let ov = document.getElementById('dinOverlay');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'dinOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(4,8,18,.72);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px';
+                ov.addEventListener('click', e => { if (e.target === ov) fecharDinheiro(); });
+                document.body.appendChild(ov);
+            }
+            ov.style.display = 'flex';
+            ov.innerHTML = `
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:640px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.55)">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border)">
+                        <div>
+                            <div style="font-size:16px;font-weight:700;color:var(--text)">💵 Dinheiro em espécie · ${mes.split('-').reverse().join('/')}</div>
+                            <div style="font-size:12px;color:var(--muted);margin-top:3px">Lance cada pagamento em dinheiro. Depois dá pra cruzar com o Feegow pelo CPF.</div>
+                        </div>
+                        <button onclick="fecharDinheiro()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+                    </div>
+                    <div id="dinLista" style="padding:14px 20px;overflow:auto;flex:1;min-height:80px">
+                        <div style="color:var(--muted);font-size:13px;text-align:center;padding:18px">Carregando…</div>
+                    </div>
+                    <div style="padding:14px 20px;border-top:1px solid var(--border);background:var(--surface2);border-radius:0 0 14px 14px">
+                        <div style="font-size:12px;color:var(--warning);font-weight:600;margin-bottom:8px">➕ Novo lançamento</div>
+                        <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:8px">
+                            <input id="dinPac" placeholder="Nome da paciente" style="${DIN_INP}">
+                            <input id="dinCpf" placeholder="CPF" inputmode="numeric" style="${DIN_INP}">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:10px">
+                            <input id="dinServ" placeholder="Serviço (ex: consulta, USG...)" style="${DIN_INP}">
+                            <input id="dinVal" placeholder="Valor R$" inputmode="decimal" style="${DIN_INP}" onkeydown="if(event.key==='Enter')addDinheiroItem()">
+                        </div>
+                        <button onclick="addDinheiroItem()" style="width:100%;background:var(--warning);border:none;color:#1a1206;font-weight:700;border-radius:8px;padding:10px;cursor:pointer;font-size:14px">Adicionar lançamento</button>
+                    </div>
+                </div>`;
+            _dinRenderLista();
+        }
+        const DIN_INP = 'background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;width:100%;outline:none';
+        function fecharDinheiro() {
+            const ov = document.getElementById('dinOverlay');
+            if (ov) ov.style.display = 'none';
+        }
+        async function _dinRenderLista() {
+            const box = document.getElementById('dinLista');
+            if (!box) return;
+            const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            try {
+                const res = await fetch(CRM_SCRIPT_URL + '?action=get_meta_dinheiro&mes=' + _dinMes);
+                const j = await res.json();
+                const itens = (j && j.itens) || [];
+                if (!itens.length) {
+                    box.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:22px 8px">Nenhum lançamento ainda.<br>Adicione o primeiro pagamento em dinheiro abaixo.</div>`;
+                    return;
+                }
+                box.innerHTML = itens.map(it => `
+                    <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;margin-bottom:6px">
+                        <div style="flex:1;min-width:0">
+                            <div style="font-size:13px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.paciente || '<span style="color:var(--muted);font-weight:400">sem nome</span>'}</div>
+                            <div style="font-size:11px;color:var(--muted);margin-top:2px">${[it.cpf ? 'CPF ' + it.cpf : '', it.servico].filter(Boolean).join(' · ') || '—'}</div>
+                        </div>
+                        <div style="font-size:13px;color:var(--warning);font-weight:700;white-space:nowrap">${fmt(it.valor)}</div>
+                        <button onclick="delDinheiroItem('${it.id}')" title="Remover" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:2px 4px">🗑</button>
+                    </div>`).join('') +
+                    `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px">
+                        <span style="color:var(--muted)">${itens.length} lançamento${itens.length > 1 ? 's' : ''}</span>
+                        <span style="color:var(--text);font-weight:700">Total ${fmt(j.total || 0)}</span>
+                    </div>`;
+            } catch (e) {
+                box.innerHTML = `<div style="color:var(--danger);font-size:13px;text-align:center;padding:18px">Erro ao carregar. Tente de novo.</div>`;
+            }
+        }
+        async function addDinheiroItem() {
+            const pac = document.getElementById('dinPac').value.trim();
+            const cpf = document.getElementById('dinCpf').value.replace(/\D/g, '');
+            const serv = document.getElementById('dinServ').value.trim();
+            let s = document.getElementById('dinVal').value.trim().replace(/[^\d.,]/g, '');
+            if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.'); // pt-BR
             const valor = parseFloat(s) || 0;
+            if (!(valor > 0)) { alert('Informe o valor do lançamento (ex: 350 ou 350,00).'); return; }
             await fetch(CRM_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'set_meta_dinheiro', mes, valor })
+                body: JSON.stringify({ action: 'add_meta_dinheiro', mes: _dinMes, paciente: pac, cpf, servico: serv, valor })
             }).catch(() => {});
-            setTimeout(() => renderMetaBar(true), 1500); // fresh: o servidor recomputa com o dinheiro novo
+            ['dinPac', 'dinCpf', 'dinServ', 'dinVal'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('dinPac').focus();
+            setTimeout(_dinRenderLista, 900);   // recarrega a lista
+            setTimeout(() => renderMetaBar(true), 1400); // atualiza o total da barra
+        }
+        async function delDinheiroItem(id) {
+            await fetch(CRM_SCRIPT_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'del_meta_dinheiro', id })
+            }).catch(() => {});
+            setTimeout(_dinRenderLista, 900);
+            setTimeout(() => renderMetaBar(true), 1400);
         }
         async function marcarVendaFechada() {
             const st    = document.getElementById('crmVendaStatus');

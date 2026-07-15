@@ -203,6 +203,9 @@ function doGet(e) {
         porVendedora: c.porVendedora, confirmado: c.comercial });
     }
 
+    // Lista os lançamentos de dinheiro em espécie do mês (paciente/CPF/serviço/valor).
+    if (action === 'get_meta_dinheiro') return handleGetMetaDinheiro(e.parameter);
+
     // Lista os PIX pendentes de conferência (não linkaram por CPF).
     if (action === 'get_aconferir') {
       const sh = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
@@ -302,6 +305,8 @@ function doPost(e) {
       if (action === 'marcar_venda_fechada') return handleMarcarVendaFechada(body);
       if (action === 'set_meta')             return handleSetMeta(body);
       if (action === 'set_meta_dinheiro')    return handleSetMetaDinheiro(body);
+      if (action === 'add_meta_dinheiro')    return handleAddMetaDinheiro(body);
+      if (action === 'del_meta_dinheiro')    return handleDelMetaDinheiro(body);
       if (action === 'conferir_pix')         return handleConferirPix(body);
       if (action === 'add_entrada_manual')    return handleAddEntradaManual(body);
       if (action === 'remove_entrada_manual') return handleRemoveEntradaManual(body);
@@ -2167,13 +2172,78 @@ function handleSetMeta(body) {
   return jsonOk({ ok: true, mes: mes, valor: valor });
 }
 
-// Dinheiro em espécie do mês (lançado à mão pela analista; aba Meta_Dinheiro).
+// Dinheiro em espécie do mês (lançado à mão pela analista).
+// Legado: aba Meta_Dinheiro [mes, valor] = total do mês (mantida como fallback).
+// Novo: aba Meta_Dinheiro_Itens = um lançamento por paciente (paciente/CPF/serviço/valor),
+// pra depois cruzar com o Feegow. O total do mês = soma dos itens.
 const META_DINHEIRO_SHEET = 'Meta_Dinheiro';
+const META_DINHEIRO_ITENS_SHEET = 'Meta_Dinheiro_Itens';
+const MDI_HEADERS = ['id', 'mes', 'data', 'paciente', 'cpf', 'servico', 'valor', 'ts'];
+
+function metaDinheiroItens_(mes) {
+  const sh = getOrCreateSheetGen_(META_DINHEIRO_ITENS_SHEET, MDI_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; MDI_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const out = [];
+  for (let i = 1; i < data.length; i++) {
+    if (normMes_(data[i][H.mes]) !== mes) continue;
+    out.push({
+      id: String(data[i][H.id]), mes: mes, data: data[i][H.data] ? String(data[i][H.data]) : '',
+      paciente: String(data[i][H.paciente] || ''), cpf: String(data[i][H.cpf] || ''),
+      servico: String(data[i][H.servico] || ''), valor: Number(data[i][H.valor]) || 0
+    });
+  }
+  return out;
+}
+
 function getMetaDinheiro_(mes) {
+  const itens = metaDinheiroItens_(mes);
+  if (itens.length) { let s = 0; itens.forEach(function(x){ s += x.valor; }); return s; }
+  // fallback: total legado (aba Meta_Dinheiro [mes, valor]) enquanto o mês não tiver itens
   const sh = getOrCreateSheetGen_(META_DINHEIRO_SHEET, ['mes', 'valor']);
   const data = sh.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) if (normMes_(data[i][0]) === mes) return Number(data[i][1]) || 0;
   return 0;
+}
+
+// Lista os lançamentos de dinheiro do mês (GET get_meta_dinheiro).
+function handleGetMetaDinheiro(param) {
+  const mes = String((param && param.mes) || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(mes)) return jsonErr('mes deve ser YYYY-MM');
+  const itens = metaDinheiroItens_(mes);
+  let total = 0; itens.forEach(function(x){ total += x.valor; });
+  return jsonOk({ ok: true, mes: mes, itens: itens, total: total });
+}
+
+// Adiciona um lançamento de dinheiro em espécie (POST add_meta_dinheiro).
+function handleAddMetaDinheiro(body) {
+  const mes = String(body.mes || '').trim();
+  const valor = Number(body.valor) || 0;
+  if (!/^\d{4}-\d{2}$/.test(mes)) return jsonErr('mes deve ser YYYY-MM');
+  if (!(valor > 0)) return jsonErr('valor deve ser maior que zero');
+  const sh = getOrCreateSheetGen_(META_DINHEIRO_ITENS_SHEET, MDI_HEADERS);
+  const id = Utilities.getUuid();
+  const cpf = String(body.cpf || '').replace(/\D/g, '');
+  sh.appendRow([id, "'" + mes, String(body.data || '').trim(), String(body.paciente || '').trim(),
+    cpf, String(body.servico || '').trim(), valor, new Date().toISOString()]);
+  try { PropertiesService.getScriptProperties().deleteProperty('META_CACHE'); } catch (e) {}
+  return jsonOk({ ok: true, id: id });
+}
+
+// Remove um lançamento de dinheiro pelo id (POST del_meta_dinheiro).
+function handleDelMetaDinheiro(body) {
+  const id = String(body.id || '').trim();
+  if (!id) return jsonErr('id obrigatório');
+  const sh = getOrCreateSheetGen_(META_DINHEIRO_ITENS_SHEET, MDI_HEADERS);
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === id) {
+      sh.deleteRow(i + 1);
+      try { PropertiesService.getScriptProperties().deleteProperty('META_CACHE'); } catch (e) {}
+      return jsonOk({ ok: true });
+    }
+  }
+  return jsonErr('id não encontrado');
 }
 function handleSetMetaDinheiro(body) {
   const mes = String(body.mes || '').trim();
