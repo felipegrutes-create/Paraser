@@ -205,6 +205,8 @@ function doGet(e) {
 
     // Lista os lançamentos de dinheiro em espécie do mês (paciente/CPF/serviço/valor).
     if (action === 'get_meta_dinheiro') return handleGetMetaDinheiro(e.parameter);
+    // Total de dinheiro do quadro por mês (fonte única do dinheiro no Resumo Financeiro).
+    if (action === 'get_meta_dinheiro_mensal') return handleMetaDinheiroMensal_();
 
     // Lista os PIX pendentes de conferência (não linkaram por CPF).
     if (action === 'get_aconferir') {
@@ -2213,6 +2215,21 @@ function handleGetMetaDinheiro(param) {
   const itens = metaDinheiroItens_(mes);
   let total = 0; itens.forEach(function(x){ total += x.valor; });
   return jsonOk({ ok: true, mes: mes, itens: itens, total: total });
+}
+
+// Totais de dinheiro em espécie por mês (todos os meses do quadro). GET get_meta_dinheiro_mensal.
+// Alimenta o "Recebido" do Resumo Financeiro: o quadro é a fonte única do dinheiro.
+function handleMetaDinheiroMensal_() {
+  const sh = getOrCreateSheetGen_(META_DINHEIRO_ITENS_SHEET, MDI_HEADERS);
+  const data = sh.getDataRange().getValues();
+  const H = {}; MDI_HEADERS.forEach(function(h, i){ H[h] = i; });
+  const meses = {};
+  for (let i = 1; i < data.length; i++) {
+    const mes = normMes_(data[i][H.mes]);
+    if (!/^\d{4}-\d{2}$/.test(mes)) continue;
+    meses[mes] = (meses[mes] || 0) + (Number(data[i][H.valor]) || 0);
+  }
+  return jsonOk({ ok: true, meses: meses });
 }
 
 // Adiciona um lançamento de dinheiro em espécie (POST add_meta_dinheiro).

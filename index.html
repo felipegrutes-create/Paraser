@@ -14942,7 +14942,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null; _resMpPlanF = null; _resCaixaData = null;
+            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
@@ -14974,16 +14974,22 @@
             if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Carregando dados…</div>';
             const mesKey = _fgKey(_resDate);
 
-            // 4 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
-            const [receb, fg, desp, planF] = await Promise.all([
+            // 5 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
+            const [receb, fg, desp, planF, dinQ] = await Promise.all([
                 resLoadRecebimentos().catch(() => null),
                 fgLoadMonth(_resDate).catch(() => null),
                 resDespesasPorMes().catch(() => null),
                 _resLoadMpPlanF().catch(() => null),
+                _resLoadDinQuadro().catch(() => null),
             ]);
 
-            // Fatia MP = controle manual (REDE/MP) menos a Rede da API, nunca negativa
-            if (receb && planF) receb.forEach(x => { x.mp = Math.max(0, (planF[x.mes] || 0) - (x.rede || 0)); });
+            // Dinheiro em espécie: a fonte ÚNICA é o QUADRO (por paciente/CPF). Se o mês tem lançamento
+            // no quadro, usa ele; senão cai no histórico da planilha (coluna REDE/MP − Rede API) pra não
+            // perder os meses antigos que a analista lançava por lá.
+            if (receb) receb.forEach(x => {
+                if (dinQ && dinQ[x.mes] != null) x.mp = dinQ[x.mes];
+                else x.mp = Math.max(0, ((planF && planF[x.mes]) || 0) - (x.rede || 0));
+            });
 
             const rec = receb ? receb.find(x => x.mes === mesKey) : null;
             const recebido = rec ? (rec.rede || 0) + (rec.pix || 0) + (rec.mp || 0) : null;
@@ -15040,7 +15046,17 @@
         // 'Dinheiro e outros': a coluna REDE/MP do controle carrega, além da Rede, o DINHEIRO EM ESPÉCIE
         // (confirmado com a analista + Feegow) e cartão que a API da Rede ainda não publicou (se ajusta sozinho).
         // Fatia = coluna REDE/MP da META RECEITA (diário, agregado por mês) MENOS a Rede da API.
-        let _resMpPlanF = null; // 'YYYY-MM' → total da coluna REDE/MP da planilha
+        // Dinheiro em espécie do QUADRO por mês (fonte única do dinheiro, por paciente/CPF).
+        let _resDinQuadro = null; // 'YYYY-MM' → total lançado no quadro
+        async function _resLoadDinQuadro() {
+            if (_resDinQuadro) return _resDinQuadro;
+            if (!CRM_SCRIPT_URL) return {};
+            const j = await fetch(CRM_SCRIPT_URL + '?action=get_meta_dinheiro_mensal').then(r => r.json());
+            _resDinQuadro = (j && j.meses) || {};
+            return _resDinQuadro;
+        }
+
+        let _resMpPlanF = null; // 'YYYY-MM' → total da coluna REDE/MP da planilha (histórico do dinheiro)
         async function _resLoadMpPlanF() {
             if (_resMpPlanF) return _resMpPlanF;
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('META RECEITA!A7:G400')}?key=${API_KEY}`;
