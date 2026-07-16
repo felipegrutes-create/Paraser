@@ -1174,7 +1174,262 @@ function _estruturaMonth_(ym) {
   return result;
 }
 
+// ================================================================
+// CLARITY — coleta diária + agente que lê os números e propõe plano de ação
+// ================================================================
+// O QUE FAZ:
+//   1× ao dia (trigger 7h) puxa as métricas de comportamento do Microsoft
+//   Clarity (rage/dead click, scroll, engajamento, páginas, dispositivo),
+//   grava uma linha na aba CLARITY_HISTORICO e chama o Claude pra escrever
+//   um plano de ação em cima dos números + da variação vs. a semana passada.
+//
+//     ?action=clarity        → últimos números + variação + plano (lê da aba)
+//     ?action=clarity-now    → força uma coleta agora (gasta 1 das 10 chamadas)
+//     coletarClarity()       → o que a trigger das 7h roda
+//
+// ⚠️ POR QUE O DASHBOARD NÃO CHAMA A API DO CLARITY DIRETO:
+//   A API do Clarity permite só 10 chamadas/dia por projeto (limite da
+//   Microsoft). Se cada abertura da aba Marketing gastasse uma, a cota
+//   morria antes do meio-dia e o painel quebrava. Por isso só a trigger
+//   chama (1/dia) e o dashboard lê a aba · instantâneo e sem cota.
+//   Mesma razão pro plano do agente: gerado 1×/dia (~22s, ~US$ 0,02) e
+//   gravado. Se fosse por abertura, seria 22s de espera e custo por clique.
+//
+// ⚠️ A API só devolve os ÚLTIMOS 1-3 DIAS. Não existe histórico do lado da
+//   Microsoft · é por isso que gravamos snapshot: sem ele o agente nunca
+//   consegue dizer "piorou", só "está assim".
+//
+// SETUP (uma vez): ?action=clarity-setup&key=...  (cria a trigger das 7h)
+//   Properties: CLARITY_TOKEN (Settings > Data Export no clarity.microsoft.com)
+//               ANTHROPIC_KEY (console.anthropic.com)
+// ================================================================
+
+const CLR_SHEET = 'CLARITY_HISTORICO';
+const CLR_API   = 'https://www.clarity.ms/export-data/api/v1/project-live-insights';
+const CLR_MODEL = 'claude-opus-4-8';
+const CLR_HEAD  = ['ts', 'data', 'sessoes', 'bots', 'paginas_por_sessao', 'scroll_medio_pct',
+                   'tempo_ativo_s', 'dead_pct', 'rage_pct', 'quickback_pct', 'scripterror_pct',
+                   'mobile_pct', 'top_pagina', 'top_referrer', 'plano_md'];
+
+function _clrSheet_() {
+  var ss = SpreadsheetApp.openById(MCP_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(CLR_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(CLR_SHEET);
+    sh.appendRow(CLR_HEAD);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// ---- 1. Puxa a API do Clarity e achata o retorno num objeto legível ----
+function _clarityFetch_(numOfDays) {
+  var token = _MCP.getProperty('CLARITY_TOKEN');
+  if (!token) throw new Error('CLARITY_TOKEN ausente nas Properties do script');
+  var url = CLR_API + '?numOfDays=' + (numOfDays || 3);
+  var resp = UrlFetchApp.fetch(url, {
+    headers: { Authorization: 'Bearer ' + token },
+    muteHttpExceptions: true
+  });
+  var code = resp.getResponseCode();
+  var body = resp.getContentText();
+  if (code >= 400) throw new Error('Clarity API ' + code + ': ' + body.substring(0, 300));
+  return JSON.parse(body);
+}
+
+function _clarityResumo_(raw) {
+  var o = { paginas: [], dispositivos: {}, navegadores: {} };
+  (raw || []).forEach(function(m) {
+    var n = m.metricName, info = m.information || [];
+    if (!info.length) return;
+    var first = info[0];
+    if (n === 'Traffic') {
+      o.sessoes = Number(first.totalSessionCount || 0);
+      o.bots = Number(first.totalBotSessionCount || 0);
+      o.paginasPorSessao = Math.round((first.pagesPerSessionPercentage || 0) * 100) / 100;
+    } else if (n === 'ScrollDepth') {
+      o.scrollMedio = Math.round((first.averageScrollDepth || 0) * 10) / 10;
+    } else if (n === 'EngagementTime') {
+      o.tempoAtivo = Number(first.activeTime || 0);
+      o.tempoTotal = Number(first.totalTime || 0);
+    } else if (n === 'DeadClickCount')   { o.dead = _clrPct_(first); }
+    else if (n === 'RageClickCount')     { o.rage = _clrPct_(first); }
+    else if (n === 'QuickbackClick')     { o.quickback = _clrPct_(first); }
+    else if (n === 'ScriptErrorCount')   { o.scriptError = _clrPct_(first); }
+    else if (n === 'ErrorClickCount')    { o.errorClick = _clrPct_(first); }
+    else if (n === 'PopularPages') {
+      o.paginas = info.slice(0, 5).map(function(r) { return { url: r.url, visitas: Number(r.visitsCount || 0) }; });
+    } else if (n === 'Device') {
+      info.forEach(function(r) { o.dispositivos[r.name] = Number(r.sessionsCount || 0); });
+    } else if (n === 'Browser') {
+      info.slice(0, 5).forEach(function(r) { o.navegadores[r.name] = Number(r.sessionsCount || 0); });
+    } else if (n === 'ReferrerUrl') {
+      o.topReferrer = { url: first.name, sessoes: Number(first.sessionsCount || 0) };
+    }
+  });
+  var mob = o.dispositivos.Mobile || 0;
+  o.mobilePct = o.sessoes ? Math.round(mob * 1000 / o.sessoes) / 10 : 0;
+  return o;
+}
+
+function _clrPct_(info) {
+  return { pct: info.sessionsWithMetricPercentage || 0, total: Number(info.subTotal || 0) };
+}
+
+// ---- 2. O agente: manda os números pro Claude e recebe o plano ----
+function _clarityAgente_(resumo, historico) {
+  var key = _MCP.getProperty('ANTHROPIC_KEY');
+  if (!key) return '_(ANTHROPIC_KEY ausente · plano não gerado)_';
+
+  var sistema = 'Você é analista de CRO da Paraser, clínica de fertilidade no Rio de Janeiro. ' +
+    'Recebe métricas do Microsoft Clarity do site paraser.com.br e propõe planos de ação.\n' +
+    'REGRAS DE ESCRITA: português do Brasil natural, como gente fala. NUNCA use travessões (— ou –); ' +
+    'use vírgula, ponto, parênteses ou "·".\n' +
+    'Seja específico e acionável: cada achado vira uma ação concreta que alguém executa amanhã. ' +
+    'Nada de conselho genérico de marketing.\n' +
+    'Se um número não sustenta uma conclusão, diga que não dá pra concluir em vez de inventar. ' +
+    'Se a variação vs. a semana passada for o mais relevante, lidere com ela.\n' +
+    'CONTEXTO: ~90% do tráfego é mobile. /contato/ é a página de conversão (formulário Fale Conosco). ' +
+    'O Google traz a maior parte das visitas. A clínica quer mais consultas agendadas.';
+
+  var user = 'Métricas do Clarity (últimos 3 dias):\n' + JSON.stringify(resumo, null, 1) + '\n\n' +
+    (historico && historico.length
+      ? 'Histórico dos últimos dias (pra você ver tendência):\n' + JSON.stringify(historico, null, 1) + '\n\n'
+      : 'Sem histórico ainda (primeira coleta). Não invente tendência.\n\n') +
+    'Escreva o plano de ação: no máximo 3 achados, do mais urgente ao menos. ' +
+    'Para cada um: o que o número mostra, por que importa pra clínica, e a ação concreta. ' +
+    'Máximo 200 palavras no total. Markdown simples.';
+
+  var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    // effort low + max_tokens curto: o UrlFetchApp corta em ~60s e a chamada
+    // medida ficou em ~22s. Não subir sem medir de novo.
+    payload: JSON.stringify({
+      model: CLR_MODEL,
+      max_tokens: 2000,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'low' },
+      system: sistema,
+      messages: [{ role: 'user', content: user }]
+    }),
+    muteHttpExceptions: true
+  });
+  var code = resp.getResponseCode();
+  if (code >= 400) {
+    Logger.log('Claude API ' + code + ': ' + resp.getContentText().substring(0, 300));
+    return '_(erro ao gerar plano: HTTP ' + code + ')_';
+  }
+  var data = JSON.parse(resp.getContentText());
+  if (data.stop_reason === 'refusal') return '_(o modelo recusou a análise)_';
+  var txt = '';
+  (data.content || []).forEach(function(b) { if (b.type === 'text') txt += b.text; });
+  return txt || '_(plano vazio)_';
+}
+
+// ---- 3. O que a trigger das 7h roda ----
+function coletarClarity() {
+  var resumo = _clarityResumo_(_clarityFetch_(3));
+  var hist = _clarityLerHistorico_(7);
+  var plano = _clarityAgente_(resumo, hist);
+  var topPag = resumo.paginas.length ? resumo.paginas[0].url + ' (' + resumo.paginas[0].visitas + ')' : '';
+  var row = [
+    new Date().toISOString(),
+    Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy'),
+    resumo.sessoes || 0,
+    resumo.bots || 0,
+    resumo.paginasPorSessao || 0,
+    resumo.scrollMedio || 0,
+    resumo.tempoAtivo || 0,
+    resumo.dead ? resumo.dead.pct : 0,
+    resumo.rage ? resumo.rage.pct : 0,
+    resumo.quickback ? resumo.quickback.pct : 0,
+    resumo.scriptError ? resumo.scriptError.pct : 0,
+    resumo.mobilePct || 0,
+    topPag,
+    resumo.topReferrer ? resumo.topReferrer.url : '',
+    plano
+  ];
+  _clrSheet_().appendRow(row);
+  Logger.log('Clarity coletado: ' + resumo.sessoes + ' sessões, plano com ' + plano.length + ' chars');
+  return row;
+}
+
+// ---- 4. Leitura (o dashboard só usa isto · zero cota, instantâneo) ----
+function _clarityLerHistorico_(dias) {
+  var sh = _clrSheet_();
+  var data = sh.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  var head = data[0];
+  var out = [];
+  for (var i = Math.max(1, data.length - dias); i < data.length; i++) {
+    var rec = {};
+    head.forEach(function(h, j) { if (h !== 'plano_md' && h !== 'ts') rec[h] = data[i][j]; });
+    out.push(rec);
+  }
+  return out;
+}
+
+function _clarity_() {
+  var sh = _clrSheet_();
+  var data = sh.getDataRange().getValues();
+  if (data.length <= 1) {
+    return { ok: true, hasData: false, msg: 'Sem coleta ainda. Roda ?action=clarity-now ou espera a trigger das 7h.' };
+  }
+  var head = data[0];
+  var last = data[data.length - 1];
+  var rec = {};
+  head.forEach(function(h, j) { rec[h] = last[j]; });
+
+  // variação vs ~7 dias atrás (só quando já existe histórico suficiente)
+  var ref = data.length >= 8 ? data[data.length - 8] : null;
+  var delta = null;
+  if (ref) {
+    delta = {};
+    ['sessoes', 'scroll_medio_pct', 'tempo_ativo_s', 'scripterror_pct', 'dead_pct'].forEach(function(c) {
+      var j = head.indexOf(c);
+      if (j >= 0 && typeof last[j] === 'number' && typeof ref[j] === 'number') {
+        delta[c] = Math.round((last[j] - ref[j]) * 10) / 10;
+      }
+    });
+  }
+  return { ok: true, hasData: true, atual: rec, delta: delta, dias: data.length - 1 };
+}
+
+function _claritySetup_() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'coletarClarity') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('coletarClarity').timeBased().atHour(7).everyDays(1).create();
+  return {
+    ok: true,
+    trigger: 'coletarClarity 7h/dia',
+    clarityToken: _MCP.getProperty('CLARITY_TOKEN') ? 'ok' : 'AUSENTE',
+    anthropicKey: _MCP.getProperty('ANTHROPIC_KEY') ? 'ok' : 'AUSENTE'
+  };
+}
+
+
 // ---- Web app ----
+// POST: grava Properties (segredos vão no BODY, nunca na URL · a URL fica em log)
+function doPost(e) {
+  var json = function(o) {
+    return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+  };
+  var body;
+  try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
+  catch (err) { return json({ ok: false, error: 'body inválido' }); }
+  if (body.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
+  if (body.action !== 'set-props') return json({ ok: false, error: 'ação desconhecida' });
+  var gravadas = [];
+  Object.keys(body.props || {}).forEach(function(k) {
+    _MCP.setProperty(k, String(body.props[k]));
+    gravadas.push(k);
+  });
+  return json({ ok: true, gravadas: gravadas });  // nunca devolve o valor
+}
+
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var json = function(o) {
@@ -1182,6 +1437,9 @@ function doGet(e) {
   };
   if (p.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
   try {
+    if (p.action === 'clarity')       return json(_clarity_());
+    if (p.action === 'clarity-now')   return json({ ok: true, row: coletarClarity() });
+    if (p.action === 'clarity-setup') return json(_claritySetup_());
     if (p.action === 'marketing-now')     return json(_marketingNow_());
     if (p.action === 'marketing-funnel')  return json(_marketingFunnel_());
     if (p.action === 'marketing-setup')   return json(_marketingSetup_());

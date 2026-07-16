@@ -4514,9 +4514,24 @@
                 </div>
             </div>
 
+            <!-- Clarity: números coletados 1×/dia + plano de ação do agente -->
+            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+                    <h3 style="margin:0;font-size:15px;color:var(--text)">🔥 Comportamento do visitante (Clarity)</h3>
+                    <span id="clrQuando" style="color:var(--muted);font-size:12px"></span>
+                </div>
+                <p style="color:var(--muted);font-size:12px;margin:0 0 14px 0">
+                    Coletado 1× ao dia (7h). A API da Microsoft só devolve os últimos 3 dias e permite 10 chamadas/dia, por isso guardamos o histórico aqui.
+                </p>
+                <div id="clrKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px"></div>
+                <div id="clrPlano" style="background:var(--bg);border:1px solid var(--border);border-left:3px solid #a855f7;border-radius:8px;padding:14px;font-size:13px;line-height:1.6;color:var(--text)">
+                    <span style="color:var(--muted)">Carregando plano de ação…</span>
+                </div>
+            </div>
+
             <!-- Clarity / Pixel quick links -->
             <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px">
-                <h3 style="margin:0 0 14px 0;font-size:15px;color:var(--text)">🔥 Comportamento do visitante (Clarity) + Eventos (Pixel)</h3>
+                <h3 style="margin:0 0 14px 0;font-size:15px;color:var(--text)">🔎 Ir aos painéis (heatmap, gravações, Pixel)</h3>
                 <p style="color:var(--muted);font-size:13px;margin:0 0 14px 0">
                     Heatmaps e gravações de sessão só dentro do painel da Microsoft. Use estes botões pra navegar rápido:
                 </p>
@@ -16511,10 +16526,69 @@ GONAPEPTYL,56`;
             if (v == null || isNaN(v)) return '—';
             return Number(v).toFixed(2) + '%';
         }
+        // ---- Clarity: lê o que a trigger das 7h já gravou (não chama a API da
+        // Microsoft daqui: são só 10 chamadas/dia e o painel gastaria a cota) ----
+        function _clrSeta(v, invertido) {
+            if (v == null || v === 0) return '';
+            const bom = invertido ? v < 0 : v > 0;
+            const cor = bom ? '#22c55e' : '#ef4444';
+            return ' <span style="color:' + cor + ';font-size:11px">' + (v > 0 ? '▲' : '▼') + Math.abs(v) + '</span>';
+        }
+        function _clrKpi(label, valor, delta, invertido) {
+            return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px">' +
+                '<div style="color:var(--muted);font-size:11px;margin-bottom:2px">' + label + '</div>' +
+                '<div style="font-size:17px;font-weight:600;color:var(--text)">' + valor + _clrSeta(delta, invertido) + '</div></div>';
+        }
+        async function loadAndRenderClarity() {
+            const kpis = document.getElementById('clrKpis');
+            const plano = document.getElementById('clrPlano');
+            const quando = document.getElementById('clrQuando');
+            if (!kpis) return;
+            try {
+                const r = await fetch(MKT_WEBAPP_URL + '?action=clarity&key=paraser2026').then(r => r.json());
+                if (!r.ok || !r.hasData) {
+                    kpis.innerHTML = '';
+                    plano.innerHTML = '<span style="color:var(--muted)">' + ((r && r.msg) || 'Sem coleta ainda.') + '</span>';
+                    return;
+                }
+                const a = r.atual, d = r.delta || {};
+                // o Sheets converte "16/07/2026" em Date e o JSON devolve ISO — reformata
+                let quandoTxt = a.data;
+                if (typeof quandoTxt === 'string' && quandoTxt.indexOf('T') > 0) {
+                    const dt = new Date(quandoTxt);
+                    if (!isNaN(dt)) quandoTxt = dt.toLocaleDateString('pt-BR');
+                }
+                quando.textContent = 'coletado ' + quandoTxt + ' · ' + r.dias + (r.dias === 1 ? ' dia' : ' dias') + ' de histórico';
+                // deltas com invertido=true: subir é RUIM (erro, dead click)
+                kpis.innerHTML =
+                    _clrKpi('Sessões (3d)', a.sessoes, d.sessoes, false) +
+                    _clrKpi('Erro de script', a.scripterror_pct + '%', d.scripterror_pct, true) +
+                    _clrKpi('Dead clicks', a.dead_pct + '%', d.dead_pct, true) +
+                    _clrKpi('Rage clicks', a.rage_pct + '%', null, true) +
+                    _clrKpi('Scroll médio', a.scroll_medio_pct + '%', d.scroll_medio_pct, false) +
+                    _clrKpi('Tempo ativo', a.tempo_ativo_s + 's', d.tempo_ativo_s, false) +
+                    _clrKpi('Mobile', a.mobile_pct + '%', null, false);
+                const md = (a.plano_md || '').toString();
+                plano.innerHTML = md
+                    ? md.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                        .replace(/^## (.*)$/gm, '<div style="font-weight:600;margin-bottom:8px">$1</div>')
+                        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+                        .replace(/\n/g, '<br>')
+                    : '<span style="color:var(--muted)">Sem plano gerado nesta coleta.</span>';
+                if (r.dias < 8) {
+                    plano.innerHTML += '<div style="color:var(--muted);font-size:11px;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">' +
+                        'As setas de variação (vs. 7 dias atrás) aparecem a partir do ' + (8 - r.dias) + 'º dia de coleta.</div>';
+                }
+            } catch (e) {
+                plano.innerHTML = '<span style="color:var(--muted)">Não deu pra carregar o Clarity: ' + e.message + '</span>';
+            }
+        }
+
         async function loadAndRenderMarketing(forceRefresh) {
             if (_mktLoaded && !forceRefresh) return;
             const errEl = document.getElementById('mktError');
             errEl.style.display = 'none';
+            loadAndRenderClarity();  // independente: não trava se a Meta falhar
             try {
                 const [nowResp, funnelResp] = await Promise.all([
                     fetch(MKT_WEBAPP_URL + '?action=marketing-now&key=paraser2026').then(r => r.json()),
