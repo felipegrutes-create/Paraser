@@ -1438,6 +1438,8 @@ function doGet(e) {
   if (p.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
   try {
     if (p.action === 'prof-names')    return json({ ok: true, profs: _feegowProfNames_() });
+                  return json({ ok: true, procurando: alvo3, endpoints: achados3 });
+    }
                 if (p.action === 'clarity')       return json(_clarity_());
     if (p.action === 'clarity-now')   return json({ ok: true, row: coletarClarity() });
     if (p.action === 'clarity-setup') return json(_claritySetup_());
