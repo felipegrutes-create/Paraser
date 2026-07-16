@@ -2842,7 +2842,6 @@
         </div>
 
         <button class="tab" onclick="showSection('sec-marketing',this)">📊 Marketing</button>
-        <button class="tab" onclick="showSection('sec-estrutura',this)">🧩 Estrutura</button>
         <button class="tab" id="tab-uso" style="display:none" onclick="showSection('sec-uso',this)">🔐 Uso</button>
     </div>
 
@@ -4541,6 +4540,75 @@
                     <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=849546694121439" target="_blank" rel="noopener" style="background:#1877f2;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📣 Ads Manager (campanhas)</a>
                 </div>
             </div>
+            <!-- Estrutura (movida pra dentro de Marketing em 16/07) -->
+            <div id="sec-estrutura" style="margin-top:28px">
+            <!-- Intro amigável -->
+            <div class="est-intro">
+                <h2>🏭 A máquina que vira anúncio em paciente</h2>
+                <p>Cada peça abaixo pega o dado, faz o trabalho dela e passa pra próxima — <b style="color:var(--text)">sozinha, sem você fazer nada</b>. Da pessoa que vê o anúncio até quem agenda a consulta. Os números são <b style="color:var(--text)">reais</b>.</p>
+                <div class="est-meta">
+                    <span class="est-pill">🟢 Tudo no automático</span>
+                    <span id="estFetchedAt" style="color:var(--muted);font-size:12px"></span>
+                    <button class="est-refresh" onclick="loadAndRenderEstrutura(true)">🔄 Atualizar</button>
+                </div>
+            </div>
+
+            <!-- Navegação de mês -->
+            <div class="est-monthnav">
+                <button class="est-navbtn" onclick="estMonthShift(-1)" title="Mês anterior">◀</button>
+                <span id="estMonthLabel" class="est-monthlabel">—</span>
+                <button class="est-navbtn" id="estMonthNext" onclick="estMonthShift(1)" title="Próximo mês">▶</button>
+            </div>
+
+            <div id="estError" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;padding:14px 18px;border-radius:8px;margin-bottom:18px;font-size:13px"></div>
+
+            <!-- BLOCO A — A MÁQUINA -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>⚙️ A Máquina</h3><span>como tudo se liga, peça por peça</span></div>
+                <div id="estMachine" class="est-machine">
+                    <div style="color:var(--muted);text-align:center;padding:24px;width:100%">Carregando…</div>
+                </div>
+            </div>
+
+            <!-- BLOCO B — O RESULTADO -->
+            <div class="est-block">
+                <div class="est-block-h">
+                    <h3>📈 O Resultado</h3>
+                    <span>de cada pessoa que vê o anúncio, quantas viram paciente</span>
+                    <span id="estFunnelTime" style="margin-left:auto;color:var(--muted);font-size:11px"></span>
+                </div>
+                <div id="estFunnelBody" class="est-funnel">
+                    <div style="color:var(--muted);text-align:center;padding:24px">Carregando…</div>
+                </div>
+                <div id="estNote" class="est-note"></div>
+            </div>
+
+            <!-- BLOCO C — PRODUÇÃO DA CLÍNICA -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>🏥 Produção da Clínica</h3><span>volume realizado no mês</span></div>
+                <div id="estProducao" class="est-prod">
+                    <div style="color:var(--muted);padding:16px">Carregando…</div>
+                </div>
+                <div class="est-prodnote">ⓘ Volume realizado no mês, de pacientes que entraram em meses variados (a jornada FIV leva semanas a meses). Não é conversão direta dos anúncios deste mês.</div>
+            </div>
+
+            <!-- BLOCO D — RECONCILIAÇÃO FINANCEIRA -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>💰 Faturamento × Valor de Tabela</h3><span>de onde vem a diferença</span></div>
+                <div id="estReconc" class="est-reconc">
+                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
+                </div>
+            </div>
+
+            <!-- BLOCO E — RECEBIMENTO POR CANAL -->
+            <div class="est-block">
+                <div class="est-block-h"><h3>💳 Recebimento por canal</h3><span>quanto entrou por Rede, PIX e dinheiro</span></div>
+                <div id="estRecebimento">
+                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
+                </div>
+                <div class="est-prodnote">⚠️ Recebido <b>conforme o Feegow</b> (já capado por fatura). Mesmo assim fica <b>acima do apurado real</b> — cartão parcelado conta cheio de uma vez, e há taxas/estornos. Pro número liquidado de verdade, é preciso integrar <b>Rede + Itaú</b> (Nível 2).</div>
+            </div>
+            </div>
         </section>
 
         <!-- ===== ESTRUTURA: a máquina + o resultado ===== -->
@@ -4687,74 +4755,6 @@
                 #sec-estrutura .est-bkvalor{font-size:10.5px}
             }
         </style>
-        <section id="sec-estrutura" class="section">
-            <!-- Intro amigável -->
-            <div class="est-intro">
-                <h2>🏭 A máquina que vira anúncio em paciente</h2>
-                <p>Cada peça abaixo pega o dado, faz o trabalho dela e passa pra próxima — <b style="color:var(--text)">sozinha, sem você fazer nada</b>. Da pessoa que vê o anúncio até quem agenda a consulta. Os números são <b style="color:var(--text)">reais</b>.</p>
-                <div class="est-meta">
-                    <span class="est-pill">🟢 Tudo no automático</span>
-                    <span id="estFetchedAt" style="color:var(--muted);font-size:12px"></span>
-                    <button class="est-refresh" onclick="loadAndRenderEstrutura(true)">🔄 Atualizar</button>
-                </div>
-            </div>
-
-            <!-- Navegação de mês -->
-            <div class="est-monthnav">
-                <button class="est-navbtn" onclick="estMonthShift(-1)" title="Mês anterior">◀</button>
-                <span id="estMonthLabel" class="est-monthlabel">—</span>
-                <button class="est-navbtn" id="estMonthNext" onclick="estMonthShift(1)" title="Próximo mês">▶</button>
-            </div>
-
-            <div id="estError" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;padding:14px 18px;border-radius:8px;margin-bottom:18px;font-size:13px"></div>
-
-            <!-- BLOCO A — A MÁQUINA -->
-            <div class="est-block">
-                <div class="est-block-h"><h3>⚙️ A Máquina</h3><span>como tudo se liga, peça por peça</span></div>
-                <div id="estMachine" class="est-machine">
-                    <div style="color:var(--muted);text-align:center;padding:24px;width:100%">Carregando…</div>
-                </div>
-            </div>
-
-            <!-- BLOCO B — O RESULTADO -->
-            <div class="est-block">
-                <div class="est-block-h">
-                    <h3>📈 O Resultado</h3>
-                    <span>de cada pessoa que vê o anúncio, quantas viram paciente</span>
-                    <span id="estFunnelTime" style="margin-left:auto;color:var(--muted);font-size:11px"></span>
-                </div>
-                <div id="estFunnelBody" class="est-funnel">
-                    <div style="color:var(--muted);text-align:center;padding:24px">Carregando…</div>
-                </div>
-                <div id="estNote" class="est-note"></div>
-            </div>
-
-            <!-- BLOCO C — PRODUÇÃO DA CLÍNICA -->
-            <div class="est-block">
-                <div class="est-block-h"><h3>🏥 Produção da Clínica</h3><span>volume realizado no mês</span></div>
-                <div id="estProducao" class="est-prod">
-                    <div style="color:var(--muted);padding:16px">Carregando…</div>
-                </div>
-                <div class="est-prodnote">ⓘ Volume realizado no mês, de pacientes que entraram em meses variados (a jornada FIV leva semanas a meses). Não é conversão direta dos anúncios deste mês.</div>
-            </div>
-
-            <!-- BLOCO D — RECONCILIAÇÃO FINANCEIRA -->
-            <div class="est-block">
-                <div class="est-block-h"><h3>💰 Faturamento × Valor de Tabela</h3><span>de onde vem a diferença</span></div>
-                <div id="estReconc" class="est-reconc">
-                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
-                </div>
-            </div>
-
-            <!-- BLOCO E — RECEBIMENTO POR CANAL -->
-            <div class="est-block">
-                <div class="est-block-h"><h3>💳 Recebimento por canal</h3><span>quanto entrou por Rede, PIX e dinheiro</span></div>
-                <div id="estRecebimento">
-                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
-                </div>
-                <div class="est-prodnote">⚠️ Recebido <b>conforme o Feegow</b> (já capado por fatura). Mesmo assim fica <b>acima do apurado real</b> — cartão parcelado conta cheio de uma vez, e há taxas/estornos. Pro número liquidado de verdade, é preciso integrar <b>Rede + Itaú</b> (Nível 2).</div>
-            </div>
-        </section>
 
         <!-- Modal Pagamento Caixa -->
         <div class="fin-modal-overlay" id="cxPayModal" onclick="if(event.target===this)closeCxPayModal()">
@@ -6409,7 +6409,7 @@
             'sec-resumo': ['admin'], 'sec-fin': ['admin'], 'sec-cr': ['admin'], 'sec-caixa': ['admin'],
             'sec-repasses': ['admin'], 'sec-socios': ['admin'], 'sec-medicamentos': ['admin'],
             'sec-exec': ['admin'], 'sec-estoque': ['admin'],
-            'sec-marketing': ['admin'], 'sec-estrutura': ['admin'], 'sec-uso': ['admin'],
+            'sec-marketing': ['admin'], 'sec-uso': ['admin'],  // sec-estrutura virou parte de sec-marketing (16/07)
         };
         function prSession() { return window.PR_SESSION || null; }
         function prPapel()   { return (prSession() || {}).papel || ''; }
@@ -6582,8 +6582,8 @@
             if (id === 'sec-exec')    loadAndRenderExec();
             if (id === 'sec-estoque') loadAndRenderEstoque();
             if (id === 'sec-cr') loadAndRenderCR();
-            if (id === 'sec-marketing') loadAndRenderMarketing(false);
-            if (id === 'sec-estrutura') loadAndRenderEstrutura(false);
+            // Estrutura agora mora dentro de Marketing (16/07): abrir Marketing carrega as duas
+            if (id === 'sec-marketing') { loadAndRenderMarketing(false); loadAndRenderEstrutura(false); }
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
             if (id === 'sec-meta') renderMetaBar();

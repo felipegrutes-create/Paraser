@@ -1437,7 +1437,8 @@ function doGet(e) {
   };
   if (p.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
   try {
-    if (p.action === 'clarity')       return json(_clarity_());
+    if (p.action === 'prof-names')    return json({ ok: true, profs: _feegowProfNames_() });
+                if (p.action === 'clarity')       return json(_clarity_());
     if (p.action === 'clarity-now')   return json({ ok: true, row: coletarClarity() });
     if (p.action === 'clarity-setup') return json(_claritySetup_());
     if (p.action === 'marketing-now')     return json(_marketingNow_());
