@@ -16789,7 +16789,7 @@ GONAPEPTYL,56`;
                         <div style="background:linear-gradient(90deg,#00d4aa,#a855f7);height:100%;width:${pct}%;transition:width .4s"></div>
                     </div>
                 </div>`;
-            }).join('');
+            }).join('') + _funnelSubHtml(d.funnelSub);
         }
 
         // ===== Estrutura (a máquina + o resultado) =====
@@ -16851,7 +16851,7 @@ GONAPEPTYL,56`;
                 'Cliques': 'Clicaram',
                 'Conversas WhatsApp': 'Chamaram no WhatsApp',
                 'Contact (Pixel)': 'Chamaram no WhatsApp',
-                'Schedule (CAPI)': 'Agendaram consulta',
+                'Schedule (CAPI)': 'Agendaram (qualquer tipo)',
                 'Cadastro completo': 'Se cadastraram',
                 'Marcações 1ª vez': 'Marcaram a 1ª consulta',
                 'Consultas 1ª vez': 'Vieram na 1ª consulta',
@@ -16859,6 +16859,15 @@ GONAPEPTYL,56`;
                 'Procedimento (Feegow)': 'Fizeram o procedimento'
             };
             return m[label] || label;
+        }
+        // Recorte da última etapa do funil: as marcações de 1ª vez são um PEDAÇO dos
+        // agendamentos (1ª vez ⊂ todos), então aparecem indentadas, não como etapa nova.
+        function _funnelSubHtml(sub) {
+            if (!sub || sub.value == null) return '';
+            const p = sub.conv != null ? ` · <span style="color:#4ade80">${sub.conv.toFixed(1).replace('.', ',')}% dos agendamentos</span>` : '';
+            return `<div style="margin:8px 0 2px 22px;padding:9px 13px;border-left:2px solid var(--accent);border-radius:0 8px 8px 0;background:var(--bg);font-size:12.5px;color:var(--muted);line-height:1.45">
+                ↳ destes, <b style="color:var(--text)">${_mktFmtInt(sub.value)}</b> foram <b style="color:var(--text)">1ª consulta</b> <span style="opacity:.8">(novos pacientes)</span>${p}
+            </div>`;
         }
         function _estRenderFunnel(d) {
             const body = document.getElementById('estFunnelBody');
@@ -16891,7 +16900,7 @@ GONAPEPTYL,56`;
                     </div>
                     ${conv}
                 </div>`;
-            }).join('');
+            }).join('') + _funnelSubHtml(d.funnelSub);
         }
         function _estFmtBRL(n) {
             n = Math.round(Number(n) || 0);

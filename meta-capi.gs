@@ -1056,12 +1056,14 @@ function _marketingFunnel_() {
     var o = {}; head.forEach(function(h, i) { o[h] = r[i]; }); return o;
   });
 
-  // Espelha o funil "O Resultado": a ponta é MARCAÇÕES de 1ª vez (agendadas),
-  // não atendidas. Calculado ao vivo (mês corrente, mesma regra e janela até o
-  // fim do mês de _mkt1aMarcadas_), e o funil TERMINA aqui (sem etapa FIV).
+  // Espelha o funil "O Resultado": termina em "Agendaram" e mostra as marcações de
+  // 1ª vez como RECORTE (funnelSub) — 1ª vez é um pedaço dos agendamentos, não etapa
+  // depois. Marcadas ao vivo (mês corrente, até fim do mês, _mkt1aMarcadas_). Saíram
+  // as etapas "Cadastro completo" (era atendido, não cadastro) e "Procedimentos FIV".
   var ms = _mktMonthStart_();
   var fimMes = new Date(ms.getFullYear(), ms.getMonth() + 1, 0, 23, 59, 59);
   var marcadas1a = _mkt1aMarcadas_(ms, fimMes);
+  var schedNum = Number(rec.schedule_capi || 0);
 
   return {
     ok: true,
@@ -1072,10 +1074,9 @@ function _marketingFunnel_() {
       { label: 'Impressões Meta',      value: Number(rec.impressions || 0),         conv: null },
       { label: 'Cliques',              value: Number(rec.clicks || 0),              conv: rec.impressions ? (rec.clicks / rec.impressions * 100) : null },
       { label: 'Conversas WhatsApp',   value: Number(rec.contacts_pixel || 0),      conv: rec.clicks ? (rec.contacts_pixel / rec.clicks * 100) : null },
-      { label: 'Schedule (CAPI)',      value: Number(rec.schedule_capi || 0),       conv: rec.contacts_pixel ? (rec.schedule_capi / rec.contacts_pixel * 100) : null },
-      { label: 'Cadastro completo',    value: Number(rec.complete_reg_capi || 0),   conv: rec.schedule_capi ? (rec.complete_reg_capi / rec.schedule_capi * 100) : null },
-      { label: 'Marcações 1ª vez',     value: marcadas1a,                           conv: rec.complete_reg_capi ? (marcadas1a / rec.complete_reg_capi * 100) : null }
-    ]
+      { label: 'Schedule (CAPI)',      value: schedNum,                             conv: rec.contacts_pixel ? (schedNum / rec.contacts_pixel * 100) : null }
+    ],
+    funnelSub: { value: marcadas1a, conv: schedNum ? (marcadas1a / schedNum * 100) : null }
   };
 }
 
@@ -1216,14 +1217,16 @@ function _estruturaMonth_(ym) {
       lookalike: _audInfo_('120242388972990375'),
       engajados: _audInfo_('120247022590510375')
     },
-    // Funil de CAPTAÇÃO do mês (mesma turma, defasagem de dias/semanas) — termina nas MARCAÇÕES de 1ª vez
+    // Funil de CAPTAÇÃO do mês (mesma turma, defasagem de dias/semanas) — termina em
+    // "Agendaram" (qualquer consulta). As marcações de 1ª vez vêm como RECORTE (funnelSub):
+    // 1ª vez é um pedaço dos agendamentos (1ª vez ⊂ todos), não uma etapa depois.
     funnelSteps: [
       { label: 'Impressões Meta',    value: ins.impressions, conv: null },
       { label: 'Cliques',            value: ins.clicks,      conv: pct(ins.clicks, ins.impressions) },
       { label: 'Conversas WhatsApp', value: ins.contact,     conv: pct(ins.contact, ins.clicks) },
-      { label: 'Schedule (CAPI)',    value: schedule,        conv: pct(schedule, ins.contact) },
-      { label: 'Marcações 1ª vez',   value: marcadas1a,      conv: pct(marcadas1a, schedule) }
+      { label: 'Schedule (CAPI)',    value: schedule,        conv: pct(schedule, ins.contact) }
     ],
+    funnelSub: { value: marcadas1a, conv: pct(marcadas1a, schedule) },
     // PRODUÇÃO da clínica no mês (volume; pacientes entraram em meses variados — NÃO é conversão deste mês)
     producao: { atendidos: byType.total, fiv: byType.fiv, atendidosBreakdown: byType.atendidosBreakdown, fivPorMedico: byType.fivPorMedico, outrosDetalhe: byType.outrosDetalhe }
   };
