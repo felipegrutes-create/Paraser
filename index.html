@@ -4505,7 +4505,7 @@
             <!-- Funil -->
             <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:24px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-                    <h3 style="margin:0;font-size:15px;color:var(--text)">Funil completo (mês corrente)</h3>
+                    <h3 style="margin:0;font-size:15px;color:var(--text)">💰 Anúncios · Funil completo (mês corrente)</h3>
                     <span id="mktFunnelTime" style="color:var(--muted);font-size:11px"></span>
                 </div>
                 <div id="mktFunnelBody" style="display:flex;flex-direction:column;gap:10px">
@@ -4525,6 +4525,20 @@
                 <div id="clrKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px"></div>
                 <div id="clrPlano" style="background:var(--bg);border:1px solid var(--border);border-left:3px solid #a855f7;border-radius:8px;padding:14px;font-size:13px;line-height:1.6;color:var(--text)">
                     <span style="color:var(--muted)">Carregando plano de ação…</span>
+                </div>
+            </div>
+
+            <!-- Funil do SITE (orgânico + direto) · os funis 💰 acima são de anúncio -->
+            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+                    <h3 style="margin:0;font-size:15px;color:var(--text)">🌱 Funil do site (navegação orgânica + direta)</h3>
+                    <span id="fsQuando" style="color:var(--muted);font-size:12px"></span>
+                </div>
+                <p style="color:var(--muted);font-size:12px;margin:0 0 14px 0">
+                    Os funis 💰 medem quem veio de anúncio; este mede quem navega no site. Janela: últimos 3 dias (a mesma do Clarity, pras etapas serem comparáveis entre si).
+                </p>
+                <div id="fsCorpo" style="display:flex;flex-direction:column;gap:10px">
+                    <div style="color:var(--muted);text-align:center;padding:12px">Carregando…</div>
                 </div>
             </div>
 
@@ -4573,7 +4587,7 @@
             <!-- BLOCO B — O RESULTADO -->
             <div class="est-block">
                 <div class="est-block-h">
-                    <h3>📈 O Resultado</h3>
+                    <h3>📈 O Resultado · 💰 Anúncios</h3>
                     <span>de cada pessoa que vê o anúncio, quantas viram paciente</span>
                     <span id="estFunnelTime" style="margin-left:auto;color:var(--muted);font-size:11px"></span>
                 </div>
@@ -16584,11 +16598,54 @@ GONAPEPTYL,56`;
             }
         }
 
+        // ---- Funil do site: sessões → /contato/ → contatos (dados próprios + Clarity) ----
+        function _fsLinha(rotulo, valor, base, cor, extra) {
+            const pct = (base && valor != null) ? Math.round(valor * 1000 / base) / 10 : null;
+            const larg = (base && valor != null) ? Math.max(3, Math.round(valor * 100 / base)) : 3;
+            const vtxt = valor == null ? '—' : _mktFmtInt(valor);
+            return '<div>' +
+                '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">' +
+                  '<span style="color:var(--text)">' + rotulo + (extra ? ' <span style="color:var(--muted);font-size:11px">' + extra + '</span>' : '') + '</span>' +
+                  '<span style="color:var(--text);font-weight:600">' + vtxt +
+                  (pct != null && pct < 100 ? ' <span style="color:var(--muted);font-weight:400;font-size:11px">(' + String(pct).replace('.', ',') + '%)</span>' : '') +
+                  '</span></div>' +
+                '<div style="background:var(--bg);border-radius:6px;height:10px;overflow:hidden">' +
+                  '<div style="width:' + larg + '%;height:100%;background:' + cor + ';border-radius:6px"></div></div></div>';
+        }
+        async function loadAndRenderFunilSite() {
+            const corpo = document.getElementById('fsCorpo');
+            const quando = document.getElementById('fsQuando');
+            if (!corpo) return;
+            try {
+                const f = await fetch(MKT_WEBAPP_URL + '?action=funil-site&key=paraser2026').then(r => r.json());
+                if (!f.ok) { corpo.innerHTML = '<div style="color:var(--muted)">Sem dados ainda.</div>'; return; }
+                const c3 = f.contatos3d || {};
+                const wpp = c3.whatsapp_botao || 0, form = c3.formulario || 0;
+                const contatos = wpp + form;
+                const tot = f.contatosTotal || {};
+                const totSoma = Object.values(tot).reduce((s, v) => s + v, 0);
+                let dt = f.coletadoEm;
+                if (typeof dt === 'string' && dt.indexOf('T') > 0) { const d = new Date(dt); if (!isNaN(d)) dt = d.toLocaleDateString('pt-BR'); }
+                quando.textContent = 'Clarity coletado ' + (dt || '?');
+                corpo.innerHTML =
+                    _fsLinha('Visitaram o site', f.sessoes, f.sessoes, '#34d399') +
+                    _fsLinha('Chegaram na página de contato', f.contato, f.sessoes, '#38bdf8') +
+                    _fsLinha('Viraram contato', contatos, f.sessoes, '#a855f7',
+                        '· 💬 ' + wpp + ' botão WhatsApp · 📝 ' + form + ' formulário') +
+                    '<div style="color:var(--muted);font-size:11px;border-top:1px solid var(--border);padding-top:8px">' +
+                    'Contagem própria (testes excluídos) · desde 17/07/2026: ' + _mktFmtInt(totSoma) + ' contato' + (totSoma === 1 ? '' : 's') + ' no total. ' +
+                    'O clique no botão do WhatsApp passou a ser contado em 17/07 à tarde.</div>';
+            } catch (e) {
+                corpo.innerHTML = '<div style="color:var(--muted)">Não deu pra carregar: ' + e.message + '</div>';
+            }
+        }
+
         async function loadAndRenderMarketing(forceRefresh) {
             if (_mktLoaded && !forceRefresh) return;
             const errEl = document.getElementById('mktError');
             errEl.style.display = 'none';
-            loadAndRenderClarity();  // independente: não trava se a Meta falhar
+            loadAndRenderClarity();   // independentes: não travam se a Meta falhar
+            loadAndRenderFunilSite();
             try {
                 const [nowResp, funnelResp] = await Promise.all([
                     fetch(MKT_WEBAPP_URL + '?action=marketing-now&key=paraser2026').then(r => r.json()),

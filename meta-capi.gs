@@ -1219,7 +1219,7 @@ const CLR_API   = 'https://www.clarity.ms/export-data/api/v1/project-live-insigh
 const CLR_MODEL = 'claude-opus-4-8';
 const CLR_HEAD  = ['ts', 'data', 'sessoes', 'bots', 'paginas_por_sessao', 'scroll_medio_pct',
                    'tempo_ativo_s', 'dead_pct', 'rage_pct', 'quickback_pct', 'scripterror_pct',
-                   'mobile_pct', 'top_pagina', 'top_referrer', 'plano_md'];
+                   'mobile_pct', 'top_pagina', 'top_referrer', 'plano_md', 'contato_visitas'];
 
 function _clrSheet_() {
   var ss = SpreadsheetApp.openById(MCP_SPREADSHEET_ID);
@@ -1229,7 +1229,34 @@ function _clrSheet_() {
     sh.appendRow(CLR_HEAD);
     sh.setFrozenRows(1);
   }
+  // migração: planilha criada antes da coluna contato_visitas (16ª)
+  if (sh.getLastColumn() < CLR_HEAD.length) {
+    sh.getRange(1, CLR_HEAD.length).setValue(CLR_HEAD[CLR_HEAD.length - 1]);
+  }
   return sh;
+}
+
+// ---- Contador próprio de ações do site (funil): cliques no botão WhatsApp
+// e formulários enviados. GA4 até registra, mas o dashboard não consegue ler
+// de lá; esta aba é a fonte que o funil do site lê. -------------------------
+const SITE_LEADS_SHEET = 'LEADS_SITE';
+
+function _siteLeadsSheet_() {
+  var ss = SpreadsheetApp.openById(MCP_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(SITE_LEADS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(SITE_LEADS_SHEET);
+    sh.appendRow(['ts', 'canal', 'nome', 'telefone', 'email', 'mensagem', 'pagina']);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _siteHit_(canal, nome, tel, mail, msg, pagina) {
+  try {
+    _siteLeadsSheet_().appendRow([new Date().toISOString(), canal || '?',
+      nome || '', tel || '', mail || '', (msg || '').substring(0, 300), pagina || '']);
+  } catch (e) { Logger.log('siteHit: ' + e); }
 }
 
 // ---- 1. Puxa a API do Clarity e achata o retorno num objeto legível ----
@@ -1344,6 +1371,8 @@ function coletarClarity() {
   var hist = _clarityLerHistorico_(7);
   var plano = _clarityAgente_(resumo, hist);
   var topPag = resumo.paginas.length ? resumo.paginas[0].url + ' (' + resumo.paginas[0].visitas + ')' : '';
+  var contatoVisitas = 0;
+  resumo.paginas.forEach(function(pg) { if ((pg.url || '').indexOf('/contato') >= 0) contatoVisitas = pg.visitas; });
   var row = [
     new Date().toISOString(),
     Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy'),
@@ -1359,7 +1388,8 @@ function coletarClarity() {
     resumo.mobilePct || 0,
     topPag,
     resumo.topReferrer ? resumo.topReferrer.url : '',
-    plano
+    plano,
+    contatoVisitas
   ];
   _clrSheet_().appendRow(row);
   Logger.log('Clarity coletado: ' + resumo.sessoes + ' sessões, plano com ' + plano.length + ' chars');
@@ -1407,6 +1437,43 @@ function _clarity_() {
   return { ok: true, hasData: true, atual: rec, delta: delta, dias: data.length - 1 };
 }
 
+// ---- Funil do site: sessões (Clarity 3d) → /contato/ → contatos (nossos logs) ----
+// Janela dos 3 ÚLTIMOS DIAS de propósito: é a janela nativa do Clarity, então
+// as 3 etapas ficam comparáveis entre si (não somamos janelas que se sobrepõem).
+function _funilSite_() {
+  var out = { ok: true, janela: 'últimos 3 dias' };
+  // etapa 1 e 2: último snapshot do Clarity
+  var sh = _clrSheet_();
+  var data = sh.getDataRange().getValues();
+  if (data.length > 1) {
+    var head = data[0], last = data[data.length - 1];
+    var ix = function(c) { return head.indexOf(c); };
+    out.sessoes = Number(last[ix('sessoes')] || 0);
+    out.contato = ix('contato_visitas') >= 0 ? Number(last[ix('contato_visitas')] || 0) : null;
+    out.coletadoEm = last[ix('data')];
+  } else {
+    out.sessoes = null; out.contato = null;
+  }
+  // etapa 3: contagem dos nossos registros (LEADS_SITE)
+  var ls = _siteLeadsSheet_();
+  var rows = ls.getDataRange().getValues();
+  var corte3d = Date.now() - 3 * 24 * 3600 * 1000;
+  var w3 = { formulario: 0, whatsapp_botao: 0 }, tot = { formulario: 0, whatsapp_botao: 0 };
+  for (var i = 1; i < rows.length; i++) {
+    var canal = String(rows[i][1] || '');
+    var nome = String(rows[i][2] || '');
+    if (nome.toUpperCase().indexOf('TESTE') >= 0) continue;  // testes não contam
+    if (!(canal in tot)) tot[canal] = 0;
+    tot[canal]++;
+    var ts = new Date(rows[i][0]).getTime();
+    if (ts >= corte3d) { if (!(canal in w3)) w3[canal] = 0; w3[canal]++; }
+  }
+  out.contatos3d = w3;
+  out.contatosTotal = tot;
+  out.desde = '17/07/2026';
+  return out;
+}
+
 function _claritySetup_() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'coletarClarity') ScriptApp.deleteTrigger(t);
@@ -1429,8 +1496,17 @@ function doPost(e) {
   };
   var body;
   try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
-  catch (err) { return json({ ok: false, error: 'body inválido' }); }
+  catch (err) { body = {}; }
+  // sendBeacon manda POST com corpo vazio e parâmetros na URL (botão WhatsApp)
+  var q = (e && e.parameter) || {};
+  if (!body.action && q.action) body = q;
   if (body.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
+
+  // Batida leve do site (clique no botão flutuante de WhatsApp)
+  if (body.action === 'site-hit') {
+    _siteHit_(body.c || 'whatsapp_botao', '', '', '', '', body.p || '');
+    return json({ ok: true });
+  }
 
   // Lead do formulário do site (CF7 → hook PHP → aqui).
   // POR QUE SERVER-SIDE: a Meta descarta TODO evento de browser deste site
@@ -1444,6 +1520,9 @@ function doPost(e) {
     var lMsg  = String(body.mensagem || '').substring(0, 500);
     var lUrl  = String(body.url || 'https://paraser.com.br/contato/');
     var out2  = { ok: true };
+
+    // 0) Registra na aba LEADS_SITE (é daqui que o funil do site lê)
+    _siteHit_('formulario', lNome, lTel, lMail, lMsg, lUrl);
 
     // 1) Aviso no WhatsApp da SDR (sai pela linha das confirmações)
     try {
@@ -1507,6 +1586,19 @@ function doGet(e) {
   if (p.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
   try {
     if (p.action === 'prof-names')    return json({ ok: true, profs: _feegowProfNames_() });
+    if (p.action === 'funil-site')    return json(_funilSite_());
+    if (p.action === 'leads-site-limpar-testes') {
+      // remove registros de teste (nome com TESTE ou página de sonda)
+      var lsx = _siteLeadsSheet_();
+      var vx = lsx.getDataRange().getValues();
+      var rem = 0;
+      for (var ix2 = vx.length - 1; ix2 >= 1; ix2--) {
+        var nm2 = String(vx[ix2][2] || '').toUpperCase();
+        var pg2 = String(vx[ix2][6] || '');
+        if (nm2.indexOf('TESTE') >= 0 || /^\/(teste|t\d|modo-beacon)/.test(pg2)) { lsx.deleteRow(ix2 + 1); rem++; }
+      }
+      return json({ ok: true, removidos: rem });
+    }
     if (p.action === 'clarity')       return json(_clarity_());
     if (p.action === 'clarity-now')   return json({ ok: true, row: coletarClarity() });
     if (p.action === 'clarity-setup') return json(_claritySetup_());
