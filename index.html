@@ -2841,7 +2841,15 @@
             </div>
         </div>
 
-        <button class="tab" onclick="showSection('sec-marketing',this)">📊 Marketing</button>
+        <div class="tab-group" id="group-mkt">
+            <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-mkt',event)">📊 Marketing <span class="tab-group-arrow">▾</span></button>
+            <div class="tab-dropdown">
+                <button class="tab-dropdown-item" onclick="showMktPane('anuncios')">💰 Anúncios</button>
+                <button class="tab-dropdown-item" onclick="showMktPane('site')">🌱 Site</button>
+                <button class="tab-dropdown-item" onclick="showMktPane('comp')">🔥 Comportamento</button>
+                <button class="tab-dropdown-item" onclick="showMktPane('maquina')">🏭 A Máquina</button>
+            </div>
+        </div>
         <button class="tab" id="tab-uso" style="display:none" onclick="showSection('sec-uso',this)">🔐 Uso</button>
     </div>
 
@@ -4465,6 +4473,7 @@
 
             <div id="mktError" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;padding:14px 18px;border-radius:8px;margin-bottom:18px;font-size:13px"></div>
 
+            <div class="mkt-pane" id="mktpane-anuncios">
             <!-- subtópico -->
             <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
                 <span style="font-size:16px;font-weight:700;color:var(--text)">💰 Anúncios <span style="color:var(--muted);font-weight:400;font-size:12px">· aquisição paga: Meta Ads</span></span>
@@ -4518,6 +4527,8 @@
                 </div>
             </div>
 
+            </div>
+            <div class="mkt-pane" id="mktpane-site" style="display:none">
             <!-- subtópico -->
             <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
                 <span style="font-size:16px;font-weight:700;color:var(--text)">🌱 Site <span style="color:var(--muted);font-weight:400;font-size:12px">· aquisição orgânica e direta</span></span>
@@ -4537,6 +4548,8 @@
                 </div>
             </div>
 
+            </div>
+            <div class="mkt-pane" id="mktpane-comp" style="display:none">
             <!-- subtópico -->
             <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
                 <span style="font-size:16px;font-weight:700;color:var(--text)">🔥 Comportamento <span style="color:var(--muted);font-weight:400;font-size:12px">· por que convertem, ou não</span></span>
@@ -4569,6 +4582,8 @@
                     <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=849546694121439" target="_blank" rel="noopener" style="background:#1877f2;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📣 Ads Manager (campanhas)</a>
                 </div>
             </div>
+            </div>
+            <div class="mkt-pane" id="mktpane-maquina" style="display:none">
             <!-- subtópico -->
             <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
                 <span style="font-size:16px;font-weight:700;color:var(--text)">🏭 A máquina completa <span style="color:var(--muted);font-weight:400;font-size:12px">· do anúncio ao dinheiro, mês a mês</span></span>
@@ -4641,6 +4656,7 @@
                     <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
                 </div>
                 <div class="est-prodnote">⚠️ Recebido <b>conforme o Feegow</b> (já capado por fatura). Mesmo assim fica <b>acima do apurado real</b> — cartão parcelado conta cheio de uma vez, e há taxas/estornos. Pro número liquidado de verdade, é preciso integrar <b>Rede + Itaú</b> (Nível 2).</div>
+            </div>
             </div>
             </div>
         </section>
@@ -6389,6 +6405,7 @@
         let _dirtyDoadoras = false, _dirtyKanban = false;
 
         const SECTION_GROUP = {
+            'sec-marketing':     'group-mkt',
             'sec-meta':          'group-crm',
             'sec-pend':          'group-crm',
             'sec-arquivo-morto': 'group-crm',
@@ -6621,7 +6638,7 @@
             if (id === 'sec-estoque') loadAndRenderEstoque();
             if (id === 'sec-cr') loadAndRenderCR();
             // Estrutura agora mora dentro de Marketing (16/07): abrir Marketing carrega as duas
-            if (id === 'sec-marketing') { loadAndRenderMarketing(false); loadAndRenderEstrutura(false); }
+            if (id === 'sec-marketing') _mktSetPane(_mktPaneAtual);  // mostra o subtópico atual e carrega só a parte dele
             if (id === 'sec-doadoras' && _dirtyDoadoras) { _dirtyDoadoras = false; renderDoadoras(); }
             if (id === 'sec-pend' && _dirtyKanban) { _dirtyKanban = false; renderKanban(); }
             if (id === 'sec-meta') renderMetaBar();
@@ -16664,12 +16681,33 @@ GONAPEPTYL,56`;
             }
         }
 
+        // ---- Subtópicos da aba Marketing (dropdown do menu) ----
+        // Cada item do dropdown mostra um painel e carrega SÓ a parte dele (lazy).
+        let _mktPaneAtual = 'anuncios';
+        function showMktPane(id) {
+            _mktPaneAtual = id;
+            showSection('sec-marketing', null);  // mostra a seção + destaca o grupo; o loader chama _mktSetPane(id)
+            document.querySelectorAll('.tab-group').forEach(g => g.classList.remove('open'));
+        }
+        function _mktSetPane(id) {
+            _mktPaneAtual = id;
+            document.querySelectorAll('#sec-marketing .mkt-pane').forEach(p => p.style.display = 'none');
+            const pane = document.getElementById('mktpane-' + id);
+            if (pane) pane.style.display = '';
+            // destaca o item do dropdown
+            document.querySelectorAll('#group-mkt .tab-dropdown-item').forEach(b => b.classList.remove('active'));
+            document.querySelector(`#group-mkt .tab-dropdown-item[onclick*="'${id}'"]`)?.classList.add('active');
+            // carrega só a parte deste painel
+            if (id === 'anuncios') loadAndRenderMarketing(false);
+            else if (id === 'site') loadAndRenderFunilSite();
+            else if (id === 'comp') loadAndRenderClarity();
+            else if (id === 'maquina') loadAndRenderEstrutura(false);
+        }
+
         async function loadAndRenderMarketing(forceRefresh) {
             if (_mktLoaded && !forceRefresh) return;
             const errEl = document.getElementById('mktError');
             errEl.style.display = 'none';
-            loadAndRenderClarity();   // independentes: não travam se a Meta falhar
-            loadAndRenderFunilSite();
             try {
                 const [nowResp, funnelResp] = await Promise.all([
                     fetch(MKT_WEBAPP_URL + '?action=marketing-now&key=paraser2026').then(r => r.json()),
