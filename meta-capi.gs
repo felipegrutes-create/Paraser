@@ -1431,6 +1431,65 @@ function doPost(e) {
   try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
   catch (err) { return json({ ok: false, error: 'body inválido' }); }
   if (body.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
+
+  // Lead do formulário do site (CF7 → hook PHP → aqui).
+  // POR QUE SERVER-SIDE: a Meta descarta TODO evento de browser deste site
+  // além do PageView (restrição de categoria saúde · comprovado 17/07/2026,
+  // Performance API: 1 única req a facebook.com/tr na sessão). O CAPI passa
+  // (Schedule/CompleteRegistration chegam todo dia). Browser não é opção.
+  if (body.action === 'lead-site') {
+    var lNome = String(body.nome || '').substring(0, 120);
+    var lTel  = String(body.telefone || '').replace(/\D/g, '');
+    var lMail = String(body.email || '').trim().toLowerCase();
+    var lMsg  = String(body.mensagem || '').substring(0, 500);
+    var lUrl  = String(body.url || 'https://paraser.com.br/contato/');
+    var out2  = { ok: true };
+
+    // 1) Aviso no WhatsApp da SDR (sai pela linha das confirmações)
+    try {
+      var sdrTel = _MCP.getProperty('SDR_WPP') || '552130344130';
+      var telLink = lTel ? ('55' + lTel.replace(/^55/, '')) : '';
+      var txt = '🌐 *Lead do site!*\n' +
+        '👤 ' + (lNome || 'sem nome') + '\n' +
+        '📞 ' + (lTel || 'sem telefone') + (telLink ? ('  ·  wa.me/' + telLink) : '') + '\n' +
+        '✉️ ' + (lMail || 'sem e-mail') + '\n' +
+        '💬 ' + (lMsg || '(sem mensagem)');
+      var zURL = 'https://api.z-api.io/instances/' + _MCP.getProperty('ZAPI_INSTANCE_ID') +
+                 '/token/' + _MCP.getProperty('ZAPI_TOKEN') + '/send-text';
+      var zHead = {};
+      if (_MCP.getProperty('ZAPI_CLIENT_TOKEN')) zHead['Client-Token'] = _MCP.getProperty('ZAPI_CLIENT_TOKEN');
+      var zResp = UrlFetchApp.fetch(zURL, {
+        method: 'post', contentType: 'application/json', headers: zHead,
+        payload: JSON.stringify({ phone: sdrTel, message: txt }), muteHttpExceptions: true
+      });
+      out2.whatsapp = { http: zResp.getResponseCode() };
+    } catch (eZap) { out2.whatsapp = { erro: String(eZap).substring(0, 150) }; }
+
+    // 2) Lead via CAPI (com email+telefone hasheados: match melhor que browser)
+    try {
+      var userData = {};
+      if (lMail) userData.em = [mcpSha256(mcpNormEmail(lMail))];
+      if (lTel)  userData.ph = [mcpSha256(mcpNormPhone(lTel))];
+      var ev = {
+        event_name: 'Lead',
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: 'leadsite_' + Date.now(),
+        action_source: 'website',
+        event_source_url: lUrl,
+        user_data: userData,
+        custom_data: { content_name: 'Formulario Contato' }
+      };
+      var cResp = UrlFetchApp.fetch('https://graph.facebook.com/' + MCP_API_VERSION + '/' + MCP_DATASET_ID + '/events', {
+        method: 'post', contentType: 'application/json',
+        payload: JSON.stringify({ data: [ev], access_token: MCP_ACCESS_TOKEN }),
+        muteHttpExceptions: true
+      });
+      out2.capi = { http: cResp.getResponseCode(), body: cResp.getContentText().substring(0, 120) };
+    } catch (eCapi) { out2.capi = { erro: String(eCapi).substring(0, 150) }; }
+
+    return json(out2);
+  }
+
   if (body.action !== 'set-props') return json({ ok: false, error: 'ação desconhecida' });
   var gravadas = [];
   Object.keys(body.props || {}).forEach(function(k) {
