@@ -6499,6 +6499,10 @@
                 sec = document.createElement('section');
                 sec.id = 'sec-uso'; sec.className = 'section';
                 (document.getElementById('sec-vg') || document.body).parentNode.appendChild(sec);
+                // o cache de seções do showSection foi montado antes deste
+                // sec-uso existir — invalida pra ele recapturar COM o Uso,
+                // senão o Uso não é escondido ao trocar de aba (fica grudado)
+                _cachedSections = null;
             }
             const s = prSession();
             if (!s || s.papel !== 'admin') { sec.innerHTML = '<div style="padding:24px;color:var(--muted)">Acesso restrito.</div>'; return; }
