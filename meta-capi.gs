@@ -880,9 +880,19 @@ function _mktCountByType_(sinceDate, untilDate) {
       { headers: { 'x-access-token': MCP_FEEGOW_TOKEN }, muteHttpExceptions: true });
     if (resp.getResponseCode() >= 400) return out;
     var content = (JSON.parse(resp.getContentText()).content) || [];
-    out.total = content.length;
     var names = _feegowProcNames_();
     var profs = _feegowProfNames_();
+    // Exclui médicos FORA DO QUADRO da produção da Paraser. São médicos migrados
+    // da clínica que se fundiu (ex: 502 = Alejandro Narvaez, 505, 511): fazem
+    // exames na estrutura, mas a receita é deles, não da clínica. "Fora do quadro"
+    // = professional_id que não está na lista oficial de profissionais do Feegow
+    // (os ~20 ativos). Auto-mantém: novo migrado sai sozinho; médico novo de
+    // verdade entra na lista e conta. Guarda: se a lista falhou (mapa vazio), NÃO
+    // filtra (mostra inflado em vez de zerar). Sem profissional (id vazio) fica.
+    if (Object.keys(profs).length > 0) {
+      content = content.filter(function(a) { return !a.profissional_id || profs[a.profissional_id]; });
+    }
+    out.total = content.length;
     var cats = {}, fivMed = {}, outros = {}, catsVal = {}, fivMedVal = {}, outrosVal = {};
     content.forEach(function(a) {
       var v = _parseBRL_(a.valor);
@@ -1438,9 +1448,7 @@ function doGet(e) {
   if (p.key !== MKT_AUTH_KEY) return json({ ok: false, error: 'unauthorized' });
   try {
     if (p.action === 'prof-names')    return json({ ok: true, profs: _feegowProfNames_() });
-                  return json({ ok: true, procurando: alvo3, endpoints: achados3 });
-    }
-                if (p.action === 'clarity')       return json(_clarity_());
+    if (p.action === 'clarity')       return json(_clarity_());
     if (p.action === 'clarity-now')   return json({ ok: true, row: coletarClarity() });
     if (p.action === 'clarity-setup') return json(_claritySetup_());
     if (p.action === 'marketing-now')     return json(_marketingNow_());
