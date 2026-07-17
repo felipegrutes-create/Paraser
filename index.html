@@ -4641,22 +4641,9 @@
                 <div class="est-prodnote">ⓘ Volume realizado no mês, de pacientes que entraram em meses variados (a jornada FIV leva semanas a meses). Não é conversão direta dos anúncios deste mês.</div>
             </div>
 
-            <!-- BLOCO D — RECONCILIAÇÃO FINANCEIRA -->
-            <div class="est-block">
-                <div class="est-block-h"><h3>💰 Faturamento × Valor de Tabela</h3><span>de onde vem a diferença</span></div>
-                <div id="estReconc" class="est-reconc">
-                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
-                </div>
-            </div>
-
-            <!-- BLOCO E — RECEBIMENTO POR CANAL -->
-            <div class="est-block">
-                <div class="est-block-h"><h3>💳 Recebimento por canal</h3><span>quanto entrou por Rede, PIX e dinheiro</span></div>
-                <div id="estRecebimento">
-                    <div style="color:var(--muted);padding:14px;font-size:13px">—</div>
-                </div>
-                <div class="est-prodnote">⚠️ Recebido <b>conforme o Feegow</b> (já capado por fatura). Mesmo assim fica <b>acima do apurado real</b> — cartão parcelado conta cheio de uma vez, e há taxas/estornos. Pro número liquidado de verdade, é preciso integrar <b>Rede + Itaú</b> (Nível 2).</div>
-            </div>
+            <!-- Financeiro (Faturamento × Tabela + Recebimento por canal) removido em 17/07:
+                 vinha do Feegow e superestimava (cartão ~R$63k acima da Rede real).
+                 O número real do dinheiro que entrou vive no Resumo Financeiro. -->
             </div>
             </div>
         </section>
@@ -17047,8 +17034,7 @@ GONAPEPTYL,56`;
                 _estRenderMachine(resp);
                 _estRenderFunnel(resp);
                 _estRenderProducao(resp.producao);
-                const valorTabela = ((resp.producao && resp.producao.atendidosBreakdown) || []).reduce((s, b) => s + (b.valor || 0), 0);
-                _estLoadReconc(ym, valorTabela);  // não-bloqueante
+                // financeiro (Faturamento × Tabela + Recebimento por canal) removido da aba em 17/07 · vive no Resumo Financeiro
                 const note = document.getElementById('estNote');
                 const fs = resp.funnelSteps || [];
                 const semRastreio = !resp.isCurrent && fs[3] && fs[3].value === 0;  // "Agendaram" (Schedule/CAPI)
