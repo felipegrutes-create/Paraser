@@ -944,6 +944,43 @@ function _mktCountByType_(sinceDate, untilDate) {
   return out;
 }
 
+// Conta MARCAÇÕES de consulta de 1ª vez num período (todos os status, menos
+// as desistências). Diferente de _mktCountByType_ (que só olha status_id=3 =
+// atendido): aqui a pergunta é "quantas 1ª consultas foram MARCADAS na agenda",
+// então pega todos os status e tira só os de desistência:
+//   11 = Desmarcado pelo paciente, 15 = Remarcado, 22 = Cancelado pelo profissional
+// (Remarcado sai pra não contar 2× quando o paciente troca de data.) is_cancelado
+// exclui por garantia. Mesmo filtro "fora do quadro" e mesma regra de 1ª vez do
+// resto do funil, pra os números baterem.
+function _mkt1aMarcadas_(sinceDate, untilDate) {
+  if (!MCP_FEEGOW_TOKEN) return 0;
+  var until = untilDate || new Date();
+  var fmt = function(d) { return Utilities.formatDate(d, 'America/Sao_Paulo', 'yyyy-MM-dd'); };
+  var DESISTIU = { 11: 1, 15: 1, 22: 1 };
+  var n = 0;
+  try {
+    var resp = UrlFetchApp.fetch(MCP_FEEGOW_BASE + '/appoints/search?data_start=' + fmt(sinceDate) + '&data_end=' + fmt(until) + '&per_page=1000',
+      { headers: { 'x-access-token': MCP_FEEGOW_TOKEN }, muteHttpExceptions: true });
+    if (resp.getResponseCode() >= 400) return 0;
+    var content = (JSON.parse(resp.getContentText()).content) || [];
+    var names = _feegowProcNames_();
+    var profs = _feegowProfNames_();
+    if (Object.keys(profs).length > 0) {
+      content = content.filter(function(a) { return !a.profissional_id || profs[a.profissional_id]; });
+    }
+    content.forEach(function(a) {
+      if (a.is_cancelado) return;
+      if (DESISTIU[Number(a.status_id)]) return;
+      var nm = (names[a.procedimento_id] || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toUpperCase();
+      var isUSG = nm.indexOf('USG') >= 0;
+      var isCons = nm.indexOf('CONSULTA') >= 0;
+      var is1a = isCons && !isUSG && (nm.indexOf('1A VEZ') >= 0 || nm.indexOf('PRIMEIRA') >= 0);
+      if (is1a) n++;
+    });
+  } catch (e) {}
+  return n;
+}
+
 // Início do mês corrente (fuso São Paulo, à meia-noite local)
 function _mktMonthStart_() {
   var s = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM') + '-01T00:00:00';
@@ -1151,13 +1188,17 @@ function _mktCountCapiRange_(eventName, since, until) {
 function _estruturaMonth_(ym) {
   var b = _ymBounds_(ym);
   var cache = CacheService.getScriptCache();
-  var key = 'estrut8_' + b.ym;
+  var key = 'estrut9_' + b.ym;
   var hit = cache.get(key);
   if (hit) { try { return JSON.parse(hit); } catch (e) {} }
   var ins      = _mktAccountInsightsRange_(b.since, b.until);
   var schedule = _mktCountCapiRange_('Schedule', b.since, b.until);
   var cadastro = _mktCountCapiRange_('CompleteRegistration', b.since, b.until);
   var byType   = _mktCountByType_(b.since, b.until);
+  // Marcações vão até o FIM do mês (não só até hoje): uma 1ª consulta já marcada
+  // pra dia 25 conta como marcação hoje. Atendidos (byType) ficam até hoje, óbvio.
+  var fimMes = new Date(Number(b.ym.slice(0, 4)), Number(b.ym.slice(5, 7)), 0, 23, 59, 59);
+  var marcadas1a = _mkt1aMarcadas_(b.since, fimMes);
   var pageview = _datasetEventCountSince_('PageView', b.since, b.until);
   var pct = function(a, base) { return base ? (a / base * 100) : null; };
   var result = {
@@ -1169,13 +1210,13 @@ function _estruturaMonth_(ym) {
       lookalike: _audInfo_('120242388972990375'),
       engajados: _audInfo_('120247022590510375')
     },
-    // Funil de CAPTAÇÃO do mês (mesma turma, defasagem de dias/semanas) — termina na 1ª consulta
+    // Funil de CAPTAÇÃO do mês (mesma turma, defasagem de dias/semanas) — termina nas MARCAÇÕES de 1ª vez
     funnelSteps: [
       { label: 'Impressões Meta',    value: ins.impressions, conv: null },
       { label: 'Cliques',            value: ins.clicks,      conv: pct(ins.clicks, ins.impressions) },
       { label: 'Conversas WhatsApp', value: ins.contact,     conv: pct(ins.contact, ins.clicks) },
       { label: 'Schedule (CAPI)',    value: schedule,        conv: pct(schedule, ins.contact) },
-      { label: 'Consultas 1ª vez',   value: byType.consultas1aVez, conv: pct(byType.consultas1aVez, schedule) }
+      { label: 'Marcações 1ª vez',   value: marcadas1a,      conv: pct(marcadas1a, schedule) }
     ],
     // PRODUÇÃO da clínica no mês (volume; pacientes entraram em meses variados — NÃO é conversão deste mês)
     producao: { atendidos: byType.total, fiv: byType.fiv, atendidosBreakdown: byType.atendidosBreakdown, fivPorMedico: byType.fivPorMedico, outrosDetalhe: byType.outrosDetalhe }
