@@ -1056,6 +1056,13 @@ function _marketingFunnel_() {
     var o = {}; head.forEach(function(h, i) { o[h] = r[i]; }); return o;
   });
 
+  // Espelha o funil "O Resultado": a ponta é MARCAÇÕES de 1ª vez (agendadas),
+  // não atendidas. Calculado ao vivo (mês corrente, mesma regra e janela até o
+  // fim do mês de _mkt1aMarcadas_), e o funil TERMINA aqui (sem etapa FIV).
+  var ms = _mktMonthStart_();
+  var fimMes = new Date(ms.getFullYear(), ms.getMonth() + 1, 0, 23, 59, 59);
+  var marcadas1a = _mkt1aMarcadas_(ms, fimMes);
+
   return {
     ok: true,
     hasData: true,
@@ -1067,8 +1074,7 @@ function _marketingFunnel_() {
       { label: 'Conversas WhatsApp',   value: Number(rec.contacts_pixel || 0),      conv: rec.clicks ? (rec.contacts_pixel / rec.clicks * 100) : null },
       { label: 'Schedule (CAPI)',      value: Number(rec.schedule_capi || 0),       conv: rec.contacts_pixel ? (rec.schedule_capi / rec.contacts_pixel * 100) : null },
       { label: 'Cadastro completo',    value: Number(rec.complete_reg_capi || 0),   conv: rec.schedule_capi ? (rec.complete_reg_capi / rec.schedule_capi * 100) : null },
-      { label: 'Consultas 1ª vez',     value: Number(rec.consultas_1avez || 0),     conv: rec.complete_reg_capi ? (rec.consultas_1avez / rec.complete_reg_capi * 100) : null },
-      { label: 'Procedimentos FIV',    value: Number(rec.procedimentos_fiv || 0),   conv: rec.consultas_1avez ? (rec.procedimentos_fiv / rec.consultas_1avez * 100) : null }
+      { label: 'Marcações 1ª vez',     value: marcadas1a,                           conv: rec.complete_reg_capi ? (marcadas1a / rec.complete_reg_capi * 100) : null }
     ]
   };
 }
