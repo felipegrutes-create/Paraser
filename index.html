@@ -4465,6 +4465,11 @@
 
             <div id="mktError" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;padding:14px 18px;border-radius:8px;margin-bottom:18px;font-size:13px"></div>
 
+            <!-- subtópico -->
+            <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
+                <span style="font-size:16px;font-weight:700;color:var(--text)">💰 Anúncios <span style="color:var(--muted);font-weight:400;font-size:12px">· aquisição paga: Meta Ads</span></span>
+                <div style="flex:1;height:1px;background:var(--border)"></div>
+            </div>
             <!-- KPIs -->
             <div class="kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px">
                 <div class="kpi-card"><div class="value" id="mktSpendToday">—</div><div class="label">Gasto hoje</div></div>
@@ -4513,6 +4518,30 @@
                 </div>
             </div>
 
+            <!-- subtópico -->
+            <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
+                <span style="font-size:16px;font-weight:700;color:var(--text)">🌱 Site <span style="color:var(--muted);font-weight:400;font-size:12px">· aquisição orgânica e direta</span></span>
+                <div style="flex:1;height:1px;background:var(--border)"></div>
+            </div>
+            <!-- Funil do SITE (orgânico + direto) · os funis 💰 acima são de anúncio -->
+            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+                    <h3 style="margin:0;font-size:15px;color:var(--text)">🌱 Funil do site (navegação orgânica + direta)</h3>
+                    <span id="fsQuando" style="color:var(--muted);font-size:12px"></span>
+                </div>
+                <p style="color:var(--muted);font-size:12px;margin:0 0 14px 0">
+                    Os funis 💰 medem quem veio de anúncio; este mede quem navega no site. Janela: últimos 3 dias (a mesma do Clarity, pras etapas serem comparáveis entre si).
+                </p>
+                <div id="fsCorpo" style="display:flex;flex-direction:column;gap:10px">
+                    <div style="color:var(--muted);text-align:center;padding:12px">Carregando…</div>
+                </div>
+            </div>
+
+            <!-- subtópico -->
+            <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
+                <span style="font-size:16px;font-weight:700;color:var(--text)">🔥 Comportamento <span style="color:var(--muted);font-weight:400;font-size:12px">· por que convertem, ou não</span></span>
+                <div style="flex:1;height:1px;background:var(--border)"></div>
+            </div>
             <!-- Clarity: números coletados 1×/dia + plano de ação do agente -->
             <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
@@ -4528,20 +4557,6 @@
                 </div>
             </div>
 
-            <!-- Funil do SITE (orgânico + direto) · os funis 💰 acima são de anúncio -->
-            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
-                    <h3 style="margin:0;font-size:15px;color:var(--text)">🌱 Funil do site (navegação orgânica + direta)</h3>
-                    <span id="fsQuando" style="color:var(--muted);font-size:12px"></span>
-                </div>
-                <p style="color:var(--muted);font-size:12px;margin:0 0 14px 0">
-                    Os funis 💰 medem quem veio de anúncio; este mede quem navega no site. Janela: últimos 3 dias (a mesma do Clarity, pras etapas serem comparáveis entre si).
-                </p>
-                <div id="fsCorpo" style="display:flex;flex-direction:column;gap:10px">
-                    <div style="color:var(--muted);text-align:center;padding:12px">Carregando…</div>
-                </div>
-            </div>
-
             <!-- Clarity / Pixel quick links -->
             <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:18px">
                 <h3 style="margin:0 0 14px 0;font-size:15px;color:var(--text)">🔎 Ir aos painéis (heatmap, gravações, Pixel)</h3>
@@ -4553,6 +4568,11 @@
                     <a href="https://business.facebook.com/events_manager2/list/dataset/920108941023871/overview" target="_blank" rel="noopener" style="background:#3b82f6;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📊 Pixel "Leads Paraser" no BM</a>
                     <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=849546694121439" target="_blank" rel="noopener" style="background:#1877f2;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">📣 Ads Manager (campanhas)</a>
                 </div>
+            </div>
+            <!-- subtópico -->
+            <div style="display:flex;align-items:center;gap:12px;margin:26px 0 16px">
+                <span style="font-size:16px;font-weight:700;color:var(--text)">🏭 A máquina completa <span style="color:var(--muted);font-weight:400;font-size:12px">· do anúncio ao dinheiro, mês a mês</span></span>
+                <div style="flex:1;height:1px;background:var(--border)"></div>
             </div>
             <!-- Estrutura (movida pra dentro de Marketing em 16/07) -->
             <div id="sec-estrutura" style="margin-top:28px">
