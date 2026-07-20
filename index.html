@@ -15100,6 +15100,24 @@
             return _execCartaoData;
         }
 
+        // Preenche o ano até dezembro com meses zerados (barras vazias) para ENCHER a tela.
+        // Uso exclusivo dos 2 gráficos de barra do Resumo — não mexe no _execCartaoData global
+        // (KPIs/média/outros gráficos seguem só com os meses reais). Meses preenchidos levam
+        // futuro:true → ficam FORA da média de meses fechados.
+        function _resPreencherAno(meses) {
+            if (!meses || !meses.length) return meses || [];
+            const byMes = {}; meses.forEach(x => byMes[x.mes] = x);
+            const anos = [...new Set(meses.map(x => x.mes.slice(0, 4)))];
+            const out = [];
+            anos.forEach(ano => {
+                for (let mo = 1; mo <= 12; mo++) {
+                    const mes = ano + '-' + ('0' + mo).slice(-2);
+                    out.push(byMes[mes] || { mes, rede: 0, pix: 0, mp: 0, parcial: false, futuro: true });
+                }
+            });
+            return out.sort((a, b) => a.mes < b.mes ? -1 : 1);
+        }
+
         // Gráfico Recebimentos por Mês (barras empilhadas Cartão + PIX). Vive no Resumo Financeiro.
         // Mês corrente = parcial (rótulo com *; PIX do BigQuery ao vivo, meses fechados do histórico).
         async function _execRenderCartaoMes() {
@@ -15111,13 +15129,13 @@
                 try { await resLoadRecebimentos(); }
                 catch(e) { _execCartaoData = []; if (sub) sub.textContent = '⚠ não foi possível carregar'; return; }
             }
-            const meses = _execCartaoData;
+            const meses = _resPreencherAno(_execCartaoData);
             if (!meses.length) { if (sub) sub.textContent = '⚠ sem dados'; return; }
             const labels   = meses.map(x => { const i = parseInt(x.mes.slice(5,7),10)-1; return _MONTHS_PT[i].slice(0,3) + '/' + x.mes.slice(2,4) + (x.parcial ? '*' : ''); });
             const redeData = meses.map(x => x.rede || 0);
             const pixData  = meses.map(x => x.pix  || 0);
             const mpData   = meses.map(x => x.mp   || 0);
-            const fechados = meses.filter(x => !x.parcial);
+            const fechados = meses.filter(x => !x.parcial && !x.futuro);
             const media = fechados.length ? fechados.reduce((s,x)=>s+(x.rede||0)+(x.pix||0)+(x.mp||0),0)/fechados.length : 0;
             const temParcial = meses.some(x => x.parcial);
             if (sub) sub.textContent = (fechados.length ? `média mensal (fechados): R$ ${media.toLocaleString('pt-BR',{maximumFractionDigits:0})}` : '')
@@ -15529,6 +15547,7 @@
         function _resRenderEntSai(receb, despMap) {
             const el = document.getElementById('resChartEntSai'); if (!el) return;
             if (_resCharts.entsai) { try{_resCharts.entsai.destroy();}catch(e){} }
+            receb = _resPreencherAno(receb);   // enche o ano até dezembro (barras vazias)
             const keys = [...new Set([...(receb || []).map(x => x.mes), ...Object.keys(despMap || {})])].sort();
             if (!keys.length) return;
             const ent = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) + (r.mp || 0) : 0; });
