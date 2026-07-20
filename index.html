@@ -15211,6 +15211,7 @@
         // RECEBIDO (cartão+PIX ao vivo) · FATURADO (Feegow, competência) · DESPESAS (extrato, sem retiradas).
         let _resDate = new Date();
         let _resDespesasMap = null; // 'YYYY-MM' → total de despesas pagas (reais)
+        let _resDespCatMap = null;  // 'YYYY-MM' → { categoria(Plano de Contas): total } — pro tooltip de composição
 
         function resNavMonth(dir) {
             const alvo = new Date(_resDate.getFullYear(), _resDate.getMonth() + dir, 1);
@@ -15220,7 +15221,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null;
+            _execCartaoData = null; _resDespesasMap = null; _resDespCatMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
@@ -15234,14 +15235,18 @@
                 const rows = await loadFinanceData();
                 src = processFinanceData(rows);
             }
-            const map = {};
+            const map = {}, cat = {};
             src.forEach(d => {
                 const p = (d.caixa || '').split('/'); // 'MM/2026'
                 if (p.length !== 2) return;
                 const key = p[1] + '-' + p[0];
                 map[key] = (map[key] || 0) + d.valor;
+                // composição por categoria (Plano de Contas) pro tooltip
+                const c = (d.categoria || '').trim() || 'Sem categoria';
+                (cat[key] = cat[key] || {})[c] = (cat[key][c] || 0) + d.valor;
             });
             _resDespesasMap = map;
+            _resDespCatMap = cat;
             return map;
         }
 
@@ -15555,6 +15560,13 @@
             if (!keys.length) return;
             const ent = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) + (r.mp || 0) : 0; });
             const sai = keys.map(k => despMap[k] || 0);
+            // Composição pro tooltip: entradas por fonte (cartão/PIX/dinheiro), saídas por categoria (Plano de Contas).
+            const entComp = keys.map(k => { const r = (receb || []).find(x => x.mes === k) || {}; return { rede: r.rede || 0, pix: r.pix || 0, mp: r.mp || 0 }; });
+            const saiComp = keys.map(k => {
+                const c = (_resDespCatMap && _resDespCatMap[k]) || {};
+                return Object.keys(c).map(cat => ({ cat, valor: c[cat] })).sort((a, b) => b.valor - a.valor);
+            });
+            const fmtR = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
             const labels = keys.map(k => { const i = parseInt(k.slice(5, 7), 10) - 1; return _MONTHS_PT[i].slice(0, 3) + '/' + k.slice(2, 4); });
             const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
             const entSaiLabels = {
@@ -15581,6 +15593,23 @@
                         legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
                         tooltip: { callbacks: {
                             label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                            // Composição da barra: Entradas = cartão/PIX/dinheiro; Saídas = top 5 categorias + outros.
+                            afterLabel: ctx => {
+                                const i = ctx.dataIndex;
+                                if (ctx.datasetIndex === 0) {
+                                    const b = entComp[i] || {}; const out = [];
+                                    if (b.rede) out.push('   Cartão (Rede): ' + fmtR(b.rede));
+                                    if (b.pix)  out.push('   PIX de pacientes: ' + fmtR(b.pix));
+                                    if (b.mp)   out.push('   Dinheiro: ' + fmtR(b.mp));
+                                    return out;
+                                }
+                                const arr = saiComp[i] || []; if (!arr.length) return '';
+                                const top = arr.slice(0, 5);
+                                const outros = arr.slice(5).reduce((s, x) => s + x.valor, 0);
+                                const out = top.map(x => '   ' + (x.cat.length > 26 ? x.cat.slice(0, 26) + '…' : x.cat) + ': ' + fmtR(x.valor));
+                                if (outros > 0) out.push('   outros: ' + fmtR(outros));
+                                return out;
+                            },
                             footer: items => { const e = items.find(i => i.datasetIndex === 0), s = items.find(i => i.datasetIndex === 1); if (!e || !s) return ''; return 'Resultado: R$ ' + (e.raw - s.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
                         } }
                     },
