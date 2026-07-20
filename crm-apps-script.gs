@@ -3426,6 +3426,17 @@ function wppNovosContatosJanela_(iniIso, fimIso, instanceId) {
   return rows.length ? Number(rows[0].f[0].v) : 0;
 }
 
+// Chaves das conversas cujo PRIMEIRO contato recebido cai na janela (contatos novos
+// do dia). Igual à contagem acima, mas devolve a lista pra atribuir por vendedora.
+function wppNovosContatosChaves_(iniIso, fimIso, instanceId) {
+  const rows = wppQuery_(
+    "SELECT chave FROM (SELECT COALESCE(NULLIF(JSON_EXTRACT_SCALAR(raw, '$.chatLid'), ''), chat_phone) chave, MIN(momento) primeiro " +
+    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE " + wppFiltroInst_(instanceId) + "GROUP BY chave) " +
+    "WHERE primeiro >= @ini AND primeiro < @fim",
+    [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
+  return rows.map(function (r) { return r.f[0].v; });
+}
+
 // Assinaturas "aqui é a <Nome>" nas enviadas dos últimos 30 dias até o fim da
 // janela: vira uma timeline por conversa, e cada mensagem enviada é atribuída
 // à última vendedora que assinou antes dela (as duas atendem via web, então o
@@ -3483,7 +3494,7 @@ function wppEhCortesia_(texto) {
 
 // Métricas do dia a partir das mensagens: volumes, 1ª resposta, vácuos e
 // atribuição por vendedora (via timeline de assinaturas).
-function wppMetricasDia_(msgs, assinaturas) {
+function wppMetricasDia_(msgs, assinaturas, novosSet) {
   const donoDe = function(chat, ts) {
     const lista = (assinaturas && assinaturas[chat]) || [];
     let dono = '';
@@ -3500,8 +3511,12 @@ function wppMetricasDia_(msgs, assinaturas) {
     if (legivel(m.chat_name)) c.nome = m.chat_name;
     else if (!c.nome && !m.from_me && legivel(m.sender_name)) c.nome = m.sender_name;
   });
+  const novos = novosSet || null;   // Set de chaves que são contato novo do dia (opcional)
   const porVend = {};
-  let enviadas = 0, recebidas = 0, web = 0, celular = 0, semDona = 0, totalMsgs = 0, conversas = 0;
+  const getV = function(nome) {
+    return porVend[nome] = porVend[nome] || { msgs: 0, chats: {}, resp: [], vacuos: 0, novos: 0, ini: 0, fim: 0 };
+  };
+  let enviadas = 0, recebidas = 0, web = 0, celular = 0, semDona = 0, totalMsgs = 0, conversas = 0, novosSemDona = 0;
   const semResposta = [], esperas = [];
   Object.keys(chats).forEach(function(tel) {
     const c = chats[tel], itens = c.itens;
@@ -3513,19 +3528,37 @@ function wppMetricasDia_(msgs, assinaturas) {
         enviadas++; if (m.device === 'web') web++; else if (m.device === 'celular') celular++;
         const dono = donoDe(m.chat_phone, m.ts);
         if (dono) {
-          const v = porVend[dono] = porVend[dono] || { msgs: 0, chats: {} };
+          const v = getV(dono);
           v.msgs++; v.chats[m.chat_phone] = true;
+          if (!v.ini || m.ts < v.ini) v.ini = m.ts;   // janela de atividade: 1ª e última
+          if (m.ts > v.fim) v.fim = m.ts;              // enviada dela no dia
         } else semDona++;
       }
       else recebidas++;
     });
     const ultima = itens[itens.length - 1];
-    if (!ultima.from_me && !wppEhCortesia_(ultima.texto)) semResposta.push(c.nome || tel);
-    // 1ª resposta: se a conversa do dia abriu com a paciente -> tempo até a 1ª enviada
+    // Dona da conversa (pra vácuo/novo): quem assinou por último até a última msg do dia.
+    const donaChat = donoDe(tel, ultima.ts);
+    // Vácuo: última msg é da paciente e não é cortesia -> atribui à dona da conversa.
+    if (!ultima.from_me && !wppEhCortesia_(ultima.texto)) {
+      semResposta.push(c.nome || tel);
+      if (donaChat) getV(donaChat).vacuos++;
+    }
+    // Contato novo do dia (chave veio da query de novos): atribui à dona, ou "sem dona".
+    if (novos && novos.has(tel)) {
+      if (donaChat) getV(donaChat).novos++; else novosSemDona++;
+    }
+    // 1ª resposta: se a conversa do dia abriu com a paciente -> tempo até a 1ª enviada.
     const idxIn = itens[0].from_me ? -1 : 0;
     if (idxIn >= 0) {
       for (let j = idxIn + 1; j < itens.length; j++) {
-        if (itens[j].from_me) { esperas.push({ seg: (itens[j].ts - itens[idxIn].ts) / 1000, nome: c.nome || tel }); break; }
+        if (itens[j].from_me) {
+          const seg = (itens[j].ts - itens[idxIn].ts) / 1000;
+          esperas.push({ seg: seg, nome: c.nome || tel });
+          const d = donoDe(tel, itens[j].ts);   // 1ª resposta atribuída a quem respondeu
+          if (d) getV(d).resp.push(seg);
+          break;
+        }
       }
     }
   });
@@ -3534,14 +3567,22 @@ function wppMetricasDia_(msgs, assinaturas) {
   const mediana = !nE ? 0 :
     (nE % 2 ? esperas[(nE - 1) / 2].seg : (esperas[nE / 2 - 1].seg + esperas[nE / 2].seg) / 2);
   const pior = nE ? esperas[nE - 1] : null;
+  const mediana_ = function(arr) {
+    if (!arr.length) return 0;
+    const a = arr.slice().sort(function(x, y) { return x - y; }), k = a.length;
+    return k % 2 ? a[(k - 1) / 2] : (a[k / 2 - 1] + a[k / 2]) / 2;
+  };
   const porVendedora = Object.keys(porVend).map(function(n) {
-    return { nome: n, msgs: porVend[n].msgs, conversas: Object.keys(porVend[n].chats).length };
+    const v = porVend[n];
+    return { nome: n, msgs: v.msgs, conversas: Object.keys(v.chats).length,
+      novos: v.novos, vacuos: v.vacuos, respMediana: mediana_(v.resp), respN: v.resp.length,
+      ini: v.ini, fim: v.fim };
   }).sort(function(a, b) { return b.msgs - a.msgs; });
   return {
     totalMsgs: totalMsgs, conversas: conversas,
     enviadas: enviadas, recebidas: recebidas, web: web, celular: celular,
     semResposta: semResposta, mediana: mediana, pior: pior, respostas: esperas.length,
-    porVendedora: porVendedora, semDona: semDona
+    porVendedora: porVendedora, semDona: semDona, novosSemDona: novosSemDona
   };
 }
 
@@ -3996,19 +4037,33 @@ function rodarRelatorioWhatsApp() {
 
   let assin = null;
   try { assin = wppAssinaturas_(j.fim, comInst); } catch (e) {}
-  const m = wppMetricasDia_(msgs, assin);
-  let novos = null;
-  try { novos = wppNovosContatosJanela_(j.ini, j.fim, comInst); } catch (e) {}
+  // Chaves dos contatos novos do dia -> pra atribuir "novos" por vendedora.
+  let novosChaves = null;
+  try { novosChaves = wppNovosContatosChaves_(j.ini, j.fim, comInst); } catch (e) {}
+  const novos = novosChaves === null ? null : novosChaves.length;
+  const m = wppMetricasDia_(msgs, assin, novosChaves ? new Set(novosChaves) : null);
   blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
     '*' + m.conversas + '* conversas' + (novos === null ? '' : ' · *' + novos + '* contatos novos') + '\n' +
     '📤 ' + m.enviadas + ' enviadas · 📥 ' + m.recebidas + ' recebidas\n' +
     '📱 celular ' + m.celular + ' · 💻 web ' + m.web } });
+  // 🏅 Placar por vendedora: msgs · conversas · novos · 1ª resposta · vácuos · janela de atividade.
   if (m.porVendedora.length) {
-    let linha = m.porVendedora.map(function(v) {
-      return '*' + v.nome + '* ' + v.msgs + ' msgs em ' + v.conversas + ' conversas';
-    }).join(' · ');
-    if (m.semDona) linha += ' · sem dona ' + m.semDona + ' (' + Math.round(m.semDona / m.enviadas * 100) + '%)';
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '👤 ' + linha } });
+    const hhmm = function (ms) { return ms ? Utilities.formatDate(new Date(ms), 'America/Sao_Paulo', 'HH:mm') : '--:--'; };
+    const linhas = m.porVendedora.map(function (v) {
+      let s = '*' + v.nome + '* · ' + v.msgs + ' msgs · ' + v.conversas + ' conv' +
+              ' · 🆕 ' + v.novos + ' novos';
+      if (v.respN) s += ' · ⏱️ 1ª resp. ' + wppFmtDur_(v.respMediana);
+      s += ' · 🕳️ ' + v.vacuos + ' vácuo' + (v.vacuos === 1 ? '' : 's');
+      if (v.ini) s += ' · 🕐 ' + hhmm(v.ini) + '–' + hhmm(v.fim);
+      return s;
+    });
+    let rod = '';
+    if (m.semDona) rod += 'sem dona ' + m.semDona + ' msgs (' + Math.round(m.semDona / m.enviadas * 100) + '%)';
+    if (m.novosSemDona) rod += (rod ? ' · ' : '') + m.novosSemDona + ' novo(s) sem dona';
+    blocks.push({ type: 'section', text: { type: 'mrkdwn',
+      text: '🏅 *Por vendedora*\n' + linhas.join('\n') + (rod ? '\n_' + rod + '_' : '') } });
+    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn',
+      text: 'não é ranking · números pra conversa, não pra cobrança automática' }] });
   }
   if (m.respostas) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
