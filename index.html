@@ -1319,6 +1319,9 @@
         .cr-val-pago    { color:#34d399; font-weight:600; }
         .cr-val-pendente{ color:#f87171; font-weight:600; }
         .cr-charts-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:20px 0; }
+        /* Resumo Financeiro: gráfico sozinho na linha ocupa a largura toda (as 2 colunas),
+           alinhado com a fileira de KPIs — senão ficava na metade esquerda. */
+        #sec-resumo .cr-charts-row > .chart-card:only-child { grid-column: 1 / -1; }
         .cr-composicao-card {
             background: linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(251,191,36,0.06) 60%, rgba(217,119,6,0.04) 100%) !important;
             border-color: rgba(245,158,11,0.35) !important;
