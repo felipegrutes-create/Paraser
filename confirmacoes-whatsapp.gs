@@ -709,12 +709,13 @@ var IDS_ONLINE_PROCS = [
 //   91  = 2ª Tec Embrion (variante antiga)
 // OUTROS (cirúrgico/clínico sem aviso):
 //   120 = Aspiração De Cisto | 127 = PRP | 147 = PESA | 88 = Colocação DIU
-//   87  = Coleta Preventivo  | 176 = Avaliação Doadora | 267,268 = FOT Receptora
+//   87  = Coleta Preventivo  | 267,268 = FOT Receptora
 // OBS: procId=75 ("USG PREPARO TEC 3 - Natural") NÃO entra aqui — vai p/ ULTRAS_TRATAMENTO.
+// OBS: procId=176 ("Avaliação Doadora" - Bianca) SAIU daqui em 20/07/2026 — passou a
+//      receber confirmação (recepção pediu); agora roteado em IDS_BIANCA_RECEPTORA.
 var IDS_SEM_CONFIRMACAO = [
   87, 88, 89, 90, 91, 93,
   120, 124, 127, 138, 139, 143, 147,
-  176,
   202, 225, 226, 227, 228, 232, 233, 234, 235, 236,
   258, 259, 264, 265, 267, 268,
   304, 305, 346
@@ -725,7 +726,8 @@ var IDS_SEM_CONFIRMACAO = [
 // procId=36:  CONVERSA DOADORA - Presencial   (Bianca 14/04/2026 11:00)
 // procId=322: CONVERSA RECEPTORA - Online     (Bianca 04/05/2026 08:30)
 // procId=323: CONVERSA DOADORA - Online       (Bianca 05/05/2026 08:30)
-var IDS_BIANCA_RECEPTORA = [35, 36, 322, 323];
+// procId=176: AVALIAÇÃO DOADORA - Presencial   (Bianca) — add 20/07/2026, recepção pediu confirmação
+var IDS_BIANCA_RECEPTORA = [35, 36, 176, 322, 323];
 
 // ================================================================
 // LÓGICA DE TEMPLATE
