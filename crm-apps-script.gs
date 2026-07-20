@@ -3839,10 +3839,21 @@ function wppContatosAtivos_(instanceId, limboDias, janelaDias, assinaturas) {
     "ANY_VALUE(IF(chat_name IS NOT NULL AND chat_name NOT LIKE '%@lid%', chat_name, NULL)) chat_nome, " +
     "ANY_VALUE(IF(from_me=FALSE AND sender_name IS NOT NULL AND sender_name NOT LIKE '%@lid%', sender_name, NULL)) pac_nome " +
     "FROM msgs GROUP BY chave), " +
-    "react AS (SELECT chave, MIN(momento) contato_ts, ARRAY_AGG(texto ORDER BY momento LIMIT 1)[OFFSET(0)] texto, " +
-    "MAX(TIMESTAMP_DIFF(momento, prev_m, DAY)) gap FROM seq " +
+    // brk = a mensagem que QUEBRA o silêncio (≥ limbo dias). É só o começo da abordagem.
+    "brk AS (SELECT chave, MIN(momento) contato_ts, MAX(TIMESTAMP_DIFF(momento, prev_m, DAY)) gap FROM seq " +
     "WHERE from_me=TRUE AND prev_m IS NOT NULL AND TIMESTAMP_DIFF(momento,prev_m,DAY) >= " + limbo + " " +
-    "AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + janela + " DAY) GROUP BY chave) " +
+    "AND momento >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL " + janela + " DAY) GROUP BY chave), " +
+    // 1ª resposta da paciente depois da reabertura — fecha a "rajada" da abordagem.
+    "resp1 AS (SELECT b.chave, MIN(s.momento) resp_ts FROM brk b JOIN seq s " +
+    "ON s.chave=b.chave AND s.from_me=FALSE AND s.momento > b.contato_ts GROUP BY b.chave), " +
+    // react.texto = TODAS as mensagens de saída da reabertura (não só a que quebra o silêncio),
+    // da 1ª até a paciente responder (ou 24h), unidas por ⏎. Senão a IA só via a saudação e
+    // acusava "só cumprimenta, sem próximo passo" mesmo quando o próximo passo vinha na msg seguinte.
+    "react AS (SELECT b.chave, b.contato_ts, b.gap, " +
+    "ARRAY_TO_STRING(ARRAY_AGG(s.texto IGNORE NULLS ORDER BY s.momento LIMIT 10), ' ⏎ ') texto FROM brk b " +
+    "LEFT JOIN resp1 r USING (chave) JOIN seq s ON s.chave=b.chave AND s.from_me=TRUE " +
+    "AND s.momento >= b.contato_ts AND (r.resp_ts IS NULL OR s.momento < r.resp_ts) " +
+    "AND s.momento < TIMESTAMP_ADD(b.contato_ts, INTERVAL 24 HOUR) GROUP BY b.chave, b.contato_ts, b.gap) " +
     "SELECT react.chave, COALESCE(n.chat_nome, n.pac_nome, 'paciente') nome, " +
     "UNIX_MILLIS(react.contato_ts) contato_ts, react.texto, react.gap, " +
     "EXISTS(SELECT 1 FROM seq s WHERE s.chave=react.chave AND s.from_me=FALSE AND s.momento>react.contato_ts) respondeu " +
@@ -3875,7 +3886,7 @@ function wppAvaliarAbordagem_(contatos) {
   if (!wppProps_().getProperty('ANTHROPIC_KEY')) return null;
   if (!contatos || !contatos.length) return null;
   const linhas = contatos.slice(0, 25).map(function(c) {
-    const t = String(c.texto || '').replace(/\n/g, ' ⏎ ').slice(0, 220);
+    const t = String(c.texto || '').replace(/\n/g, ' ⏎ ').slice(0, 600);
     return '- [' + (c.vendedora || '?') + '][' + (c.respondeu ? 'respondeu' : 'sem resposta') + ']: "' + t + '"';
   }).join('\n');
   const system =
