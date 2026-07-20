@@ -3586,6 +3586,28 @@ function wppMetricasDia_(msgs, assinaturas, novosSet) {
   };
 }
 
+// Bloco 🏅 do placar por pessoa (msgs · conversas · novos · 1ª resposta · vácuos ·
+// janela de atividade). Reutilizado no card comercial e no da recepção. `titulo` =
+// "Por vendedora" ou "Por recepcionista". Retorna [] se não há atribuição.
+function wppBlocosPlacar_(m, titulo) {
+  if (!m.porVendedora || !m.porVendedora.length) return [];
+  const hhmm = function (ms) { return ms ? Utilities.formatDate(new Date(ms), 'America/Sao_Paulo', 'HH:mm') : '--:--'; };
+  const linhas = m.porVendedora.map(function (v) {
+    let s = '*' + v.nome + '* · ' + v.msgs + ' msgs · ' + v.conversas + ' conv · 🆕 ' + v.novos + ' novos';
+    if (v.respN) s += ' · ⏱️ 1ª resp. ' + wppFmtDur_(v.respMediana);
+    s += ' · 🕳️ ' + v.vacuos + ' vácuo' + (v.vacuos === 1 ? '' : 's');
+    if (v.ini) s += ' · 🕐 ' + hhmm(v.ini) + '–' + hhmm(v.fim);
+    return s;
+  });
+  let rod = '';
+  if (m.semDona) rod += 'sem dona ' + m.semDona + ' msgs (' + Math.round(m.semDona / m.enviadas * 100) + '%)';
+  if (m.novosSemDona) rod += (rod ? ' · ' : '') + m.novosSemDona + ' novo(s) sem dona';
+  return [
+    { type: 'section', text: { type: 'mrkdwn', text: '🏅 *' + titulo + '*\n' + linhas.join('\n') + (rod ? '\n_' + rod + '_' : '') } },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'não é ranking · números pra conversa, não pra cobrança automática' }] }
+  ];
+}
+
 // =========================================================
 // WHATSAPP COMERCIAL — transcrição de áudios (Gemini)
 // As pacientes mandam áudio; sem isso a IA das 19h só vê "[audio]".
@@ -4047,24 +4069,7 @@ function rodarRelatorioWhatsApp() {
     '📤 ' + m.enviadas + ' enviadas · 📥 ' + m.recebidas + ' recebidas\n' +
     '📱 celular ' + m.celular + ' · 💻 web ' + m.web } });
   // 🏅 Placar por vendedora: msgs · conversas · novos · 1ª resposta · vácuos · janela de atividade.
-  if (m.porVendedora.length) {
-    const hhmm = function (ms) { return ms ? Utilities.formatDate(new Date(ms), 'America/Sao_Paulo', 'HH:mm') : '--:--'; };
-    const linhas = m.porVendedora.map(function (v) {
-      let s = '*' + v.nome + '* · ' + v.msgs + ' msgs · ' + v.conversas + ' conv' +
-              ' · 🆕 ' + v.novos + ' novos';
-      if (v.respN) s += ' · ⏱️ 1ª resp. ' + wppFmtDur_(v.respMediana);
-      s += ' · 🕳️ ' + v.vacuos + ' vácuo' + (v.vacuos === 1 ? '' : 's');
-      if (v.ini) s += ' · 🕐 ' + hhmm(v.ini) + '–' + hhmm(v.fim);
-      return s;
-    });
-    let rod = '';
-    if (m.semDona) rod += 'sem dona ' + m.semDona + ' msgs (' + Math.round(m.semDona / m.enviadas * 100) + '%)';
-    if (m.novosSemDona) rod += (rod ? ' · ' : '') + m.novosSemDona + ' novo(s) sem dona';
-    blocks.push({ type: 'section', text: { type: 'mrkdwn',
-      text: '🏅 *Por vendedora*\n' + linhas.join('\n') + (rod ? '\n_' + rod + '_' : '') } });
-    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn',
-      text: 'não é ranking · números pra conversa, não pra cobrança automática' }] });
-  }
+  blocks.push.apply(blocks, wppBlocosPlacar_(m, 'Por vendedora'));
   if (m.respostas) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
       '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
@@ -4205,14 +4210,27 @@ function rodarRelatorioRecepcao_() {
     _postRecepcaoSlack_(webhookUrl, blocks);
     return 'ok 0 reais';
   }
-  const m = wppMetricasDia_(reais, null);
+  // Atribuição por assinatura ("aqui é a Fulana") + contatos novos, igual ao comercial.
+  // Se as recepcionistas não assinam, a atribuição fica vazia e cai na dica mais abaixo.
+  let assin = null;
+  try { assin = wppAssinaturas_(j.fim, recInst); } catch (e) {}
+  let novosChaves = null;
+  try { novosChaves = wppNovosContatosChaves_(j.ini, j.fim, recInst); } catch (e) {}
+  const novos = novosChaves === null ? null : novosChaves.length;
+  const m = wppMetricasDia_(reais, assin, novosChaves ? new Set(novosChaves) : null);
   blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
-    '*' + m.conversas + '* conversas · 📤 ' + m.enviadas + ' · 📥 ' + m.recebidas + (fora ? '\n_(fora ' + fora + ' msgs de confirmação automática)_' : '') } });
+    '*' + m.conversas + '* conversas' + (novos === null ? '' : ' · *' + novos + '* novos') +
+    ' · 📤 ' + m.enviadas + ' · 📥 ' + m.recebidas + (fora ? '\n_(fora ' + fora + ' msgs de confirmação automática)_' : '') } });
   if (m.respostas) blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
     '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
     (m.pior && m.pior.seg > m.mediana ? ' · pior ' + wppFmtDur_(m.pior.seg) + ' (' + m.pior.nome + ')' : '') } });
   if (m.semResposta.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
     '⚠️ *' + m.semResposta.length + ' sem resposta:* ' + m.semResposta.slice(0, 8).join(', ') + (m.semResposta.length > 8 ? '…' : '') } });
+  // Placar por recepcionista — só aparece se a assinatura atribuir mensagens; senão, dica.
+  const placarRec = wppBlocosPlacar_(m, 'Por recepcionista');
+  if (placarRec.length) blocks.push.apply(blocks, placarRec);
+  else blocks.push({ type: 'context', elements: [{ type: 'mrkdwn',
+    text: '💡 pra ver o placar por recepcionista, cada uma pode assinar "aqui é a <nome>" ao responder' }] });
   // Leitura de IA (demandas / esperando / qualidade). Falha não derruba os números.
   try {
     const ia = wppAnaliseRecepcaoIA_(reais, j.ini);
