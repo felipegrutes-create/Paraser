@@ -4212,7 +4212,7 @@
             <!-- Entradas x Saídas -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes + dinheiro · saídas = despesas pagas (sem retiradas)</span></h3>
+                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes + dinheiro · saídas = despesas pagas (sem retiradas, empréstimos e partes relacionadas)</span></h3>
                     <canvas id="resChartEntSai" height="200"></canvas>
                 </div>
             </div>
@@ -11513,11 +11513,13 @@
                 if (!mesPad) continue;
                 const caixaKey = mesPad + '/2026';
 
-                // Exclui Empréstimo e Retirada de Sócios do Plano de Contas
+                // Exclui do Plano de Contas o que NÃO é despesa operacional real:
+                // Empréstimo, Retirada de Sócios e Parte Relacionada (movimento entre as empresas/sócios).
                 const plano = (r[iPlano] || '').toString().trim().toUpperCase()
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                 if (plano.includes('EMPR')) continue;
                 if (plano.includes('RETIRADA')) continue;
+                if (plano.includes('RELACIONAD')) continue; // Parte Relacionada: movimento entre empresas/sócios, não é despesa operacional
 
                 // Saídas (coluna G)
                 const saidaStr = (r[iSaidas] || '').toString().trim();
@@ -15312,7 +15314,7 @@
                 <div class="exec-kpi red">
                     <div class="exec-kpi-val">${R(k.despesas)}</div>
                     <div class="exec-kpi-label">📤 Despesas pagas</div>
-                    <div class="exec-kpi-bench">Extrato das 2 empresas, <b>sem</b> retiradas e empréstimos</div>
+                    <div class="exec-kpi-bench">Extrato das 2 empresas, <b>sem</b> retiradas, empréstimos e partes relacionadas</div>
                 </div>
                 <div class="exec-kpi ${resS}">
                     <div class="exec-kpi-val">${R(k.resultado)}</div>
