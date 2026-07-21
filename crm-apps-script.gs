@@ -225,6 +225,9 @@ function doGet(e) {
       return jsonOk({ ok: true, itens: itens });
     }
 
+    // Limpa duplicatas da fila PIX (rodar sob demanda quando acumular).
+    if (action === 'dedup_pixc') return jsonOk({ ok: true, removidas: dedupPixConferir_() });
+
     // Entradas manuais de card (paciente sem agenda, pedido pela recepção).
     if (action === 'get_entradas_manuais') return handleGetEntradasManuais();
 
@@ -2504,12 +2507,6 @@ function computarMetaMes_(mes) {
     lerRedeRecebimentos_().forEach(function(t){ if (noMes(diaToIso_(t.dia))) cartao += t.valor; });
   }
 
-  // Trava contra corrida: 2 chamadas simultâneas de get_meta liam a fila antes de
-  // uma ver o appendRow da outra e gravavam o MESMO PIX 2x (duplicata). O lock
-  // serializa a montagem da fila; dedupPixConferir_ limpa as duplicatas já criadas.
-  const pixLock = LockService.getScriptLock();
-  try { pixLock.waitLock(20000); } catch (e) {}
-  dedupPixConferir_();
   const shC = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
   const dd = shC.getDataRange().getValues();
   const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
@@ -2521,11 +2518,11 @@ function computarMetaMes_(mes) {
     if (feegowPacientePorCpf_(r.cpf, cache)) { pixLinkado += r.valor; return; }
     const ex = jaTem[String(r.fitid)];
     const status = ex ? String(ex[Hc.status]) : 'PENDENTE';
+    // jaTem marca o fitid recém-inserido na MESMA passada (evita 2 appends do mesmo PIX aqui).
     if (!ex) { shC.appendRow([r.fitid, r.data, r.valor, r.pagador, r.cpf, '', 'PENDENTE', '']); jaTem[String(r.fitid)] = true; }
     if (status === 'OK') pixLinkado += r.valor;
     else if (status !== 'DESCARTADO') { aConfValor += r.valor; aConfQtd++; }
   });
-  try { pixLock.releaseLock(); } catch (e) {}
 
   const porVendedora = comercialPorVendedora_(mes);
   let comercial = 0; porVendedora.forEach(function(x){ comercial += x.valor; });
@@ -2584,23 +2581,31 @@ function handleRemoveEntradaManual(body) {
 
 // Remove linhas duplicadas da fila (mesmo fitid em mais de uma linha), mantendo a
 // mais "decidida" (OK/DESCARTADO na frente de PENDENTE). Duplicatas vinham de corrida
-// no appendRow. Deleta de baixo pra cima pra não bagunçar os índices.
+// no appendRow. Reescreve a aba de uma vez (clear+setValues) — rápido mesmo com muitas.
+// NÃO é chamado no get_meta (seria lento a cada carga); rodar sob demanda (?action=dedup_pixc).
 function dedupPixConferir_() {
   const sh = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
   const dd = sh.getDataRange().getValues();
+  if (dd.length < 2) return 0;
   const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
-  const manter = {}; // fitid -> { row, decidido }
-  const apagar = [];
+  const idxDe = {}; // fitid -> índice em out
+  const out = [dd[0]];
+  let removidas = 0;
   for (let i = 1; i < dd.length; i++) {
     const fit = String(dd[i][Hc.fitid]);
-    if (!fit) continue;
+    if (!fit) { out.push(dd[i]); continue; }
     const decidido = (String(dd[i][Hc.status]) === 'OK' || String(dd[i][Hc.status]) === 'DESCARTADO');
-    if (!(fit in manter)) { manter[fit] = { row: i + 1, decidido: decidido }; continue; }
-    if (decidido && !manter[fit].decidido) { apagar.push(manter[fit].row); manter[fit] = { row: i + 1, decidido: decidido }; }
-    else apagar.push(i + 1);
+    if (!(fit in idxDe)) { idxDe[fit] = out.length; out.push(dd[i]); continue; }
+    removidas++;
+    const j = idxDe[fit];
+    const prevDecidido = (String(out[j][Hc.status]) === 'OK' || String(out[j][Hc.status]) === 'DESCARTADO');
+    if (decidido && !prevDecidido) out[j] = dd[i]; // fica com a versão mais decidida
   }
-  apagar.sort(function(a, b){ return b - a; }).forEach(function(r){ sh.deleteRow(r); });
-  return apagar.length;
+  if (removidas > 0) {
+    sh.clearContents();
+    sh.getRange(1, 1, out.length, out[0].length).setValues(out);
+  }
+  return removidas;
 }
 
 // Aprova (OK) ou descarta (DESCARTADO) um PIX da fila. Invalida o cache da meta.
