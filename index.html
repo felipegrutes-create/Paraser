@@ -4228,7 +4228,7 @@
             <!-- Folha (PJ + CLT) por mês + % sobre o recebido -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>👥 Folha (PJ + CLT) e % sobre o Recebido <span id="resFolhaSub" style="font-size:11px;font-weight:400;color:var(--muted)">salários CLT + PJ, encargos, benefícios, férias e rescisão (sem repasse médico) · linha = folha ÷ recebido do mês</span></h3>
+                    <h3>👥 Folha (PJ + CLT) e % sobre o Faturamento <span id="resFolhaSub" style="font-size:11px;font-weight:400;color:var(--muted)">salários CLT + PJ, encargos, benefícios, férias e rescisão (sem repasse médico) · linha = folha ÷ faturamento do mês</span></h3>
                     <canvas id="resChartFolha" height="200"></canvas>
                 </div>
             </div>
@@ -15793,10 +15793,34 @@
                     const mTop = chart.getDatasetMeta(1);
                     ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
                     chart.data.labels.forEach((_, i) => { const t = clt[i] + pj[i]; if (!t) return; const bar = mTop.data[i]; if (!bar) return; ctx.fillText('R$ ' + fmtK(t), bar.x, bar.y - 3); });
-                    // % em cada ponto da linha (dataset 2)
-                    const mLine = chart.getDatasetMeta(2);
-                    ctx.font = '700 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#fbbf24';
-                    mLine.data.forEach((pt, i) => { if (pct[i] == null) return; ctx.fillText(pct[i].toFixed(1).replace('.', ',') + '%', pt.x, pt.y - 7); });
+                    // % em cada ponto da linha (dataset 2) — badge escuro + sombra pra não apagar sobre as barras.
+                    const mLine = chart.getDatasetMeta(2), mTopBar = chart.getDatasetMeta(1);
+                    ctx.font = '700 11px Outfit, sans-serif'; ctx.textBaseline = 'middle';
+                    mLine.data.forEach((pt, i) => {
+                        if (pct[i] == null) return;
+                        const s = pct[i].toFixed(1).replace('.', ',') + '%';
+                        const w = ctx.measureText(s).width + 12, h = 17;
+                        const bx = pt.x - w / 2;
+                        let by = pt.y - 12 - h;                                   // acima do ponto
+                        const barTopY = (folha[i] && mTopBar.data[i]) ? mTopBar.data[i].y : null;
+                        if (barTopY != null && by < barTopY && by + h > barTopY - 15) by = pt.y + 12; // não cobre o total
+                        if (by < chart.chartArea.top + 2) by = pt.y + 12;         // se não couber, vai abaixo
+                        // badge com sombra
+                        ctx.save();
+                        ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+                        ctx.fillStyle = 'rgba(17,20,32,0.92)';
+                        const rr = 8;
+                        ctx.beginPath();
+                        ctx.moveTo(bx + rr, by);
+                        ctx.arcTo(bx + w, by, bx + w, by + h, rr);
+                        ctx.arcTo(bx + w, by + h, bx, by + h, rr);
+                        ctx.arcTo(bx, by + h, bx, by, rr);
+                        ctx.arcTo(bx, by, bx + w, by, rr);
+                        ctx.closePath(); ctx.fill();
+                        ctx.restore();
+                        ctx.fillStyle = '#fde047';                                // amarelo vivo
+                        ctx.fillText(s, pt.x, by + h / 2);
+                    });
                     ctx.restore();
                 }
             };
@@ -15843,7 +15867,7 @@
                 data: { labels, datasets: [
                     { label: 'CLT (salários + encargos + benefícios)', data: clt, backgroundColor: '#6366f1', borderRadius: 4, maxBarThickness: 48, yAxisID: 'y', stack: 'folha', order: 2 },
                     { label: 'PJ (salários)',                          data: pj,  backgroundColor: '#ec4899', borderRadius: 4, maxBarThickness: 48, yAxisID: 'y', stack: 'folha', order: 2 },
-                    { label: '% do recebido', data: pct, type: 'line', yAxisID: 'y1', borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#fbbf24', tension: 0.3, spanGaps: true, order: 1 }
+                    { label: '% do faturamento', data: pct, type: 'line', yAxisID: 'y1', borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#fbbf24', tension: 0.3, spanGaps: true, order: 1 }
                 ]},
                 options: {
                     responsive: true,
@@ -15851,7 +15875,7 @@
                         legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
                         tooltip: { callbacks: {
                             label: ctx => ctx.dataset.type === 'line'
-                                ? '  % do recebido: ' + (ctx.raw == null ? '—' : ctx.raw.toFixed(1).replace('.', ',') + '%')
+                                ? '  % do faturamento: ' + (ctx.raw == null ? '—' : ctx.raw.toFixed(1).replace('.', ',') + '%')
                                 : '  ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
                             footer: items => { const c = items.find(i => i.datasetIndex === 0), p = items.find(i => i.datasetIndex === 1); if (!c && !p) return ''; return 'Folha total: R$ ' + ((c ? c.raw : 0) + (p ? p.raw : 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
                         } }
