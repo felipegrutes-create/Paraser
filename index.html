@@ -14726,7 +14726,7 @@
             const meds = [...setM].sort((a,b) => a.localeCompare(b, 'pt-BR'));
             const cur = sel.value;
             sel.innerHTML = '<option value="">— Selecione um médico —</option>' +
-                meds.map(m => `<option value="${m}">${m}</option>`).join('');
+                meds.map(m => `<option value="${m}">${_tratMedico(m)} ${m}</option>`).join('');
             if (cur && meds.includes(cur)) sel.value = cur;
         }
 
@@ -14777,6 +14777,33 @@
             return { total, procs, byMonth, byMonthProcs, topProcs };
         }
 
+        // Tratamento Dr./Dra. pelo primeiro nome (a maioria do corpo clínico é feminino; homens listados).
+        const _MED_HOMENS = ['rodolfo','joselmo','mario','helce'];
+        function _tratMedico(nome){
+            const p = String(nome||'').trim().toLowerCase().split(/\s+/)[0];
+            return _MED_HOMENS.includes(p) ? 'Dr.' : 'Dra.';
+        }
+
+        // Repasse calculado por mês (mesmo modelo do sec-Repasses; base automática, sem os ajustes
+        // manuais mês a mês). Só pros médicos com modelo em REP_MEDICOS; sócios/sem-modelo → zeros.
+        function _medRepasseByMonth(medNome, ano){
+            const out = new Array(12).fill(0);
+            if (!_repRaw.length || !_repCols) return out;
+            const chave = repNorm_(medNome);
+            const md = REP_MEDICOS.find(m => chave.includes(m.m));
+            if (!md) return out;
+            for (let mes = 0; mes < 12; mes++){
+                const mesStr = ano + '-' + String(mes+1).padStart(2,'0');
+                const linhas = repLinhas_(md.m, mesStr);
+                if (!linhas.length) continue;
+                const calc = md.modelo === 'turno'    ? repCalcTurno_(linhas)
+                           : md.modelo === 'priscila' ? repCalcPriscila_(linhas, mesStr, md.m)
+                           :                            repCalcItem_(linhas, md.modelo, md.m, mesStr);
+                out[mes] = calc.total || 0;
+            }
+            return out;
+        }
+
         function _renderMedExec() {
             if (!_medExecMedico) return;
             const crFmtL = v => 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -14800,6 +14827,12 @@
             }
 
             const rAno = _medExecAno === 2025 ? r2025 : r2026;
+            // Repasse por mês (base automática do modelo) + margem (receita − repasse). O repasse nunca
+            // passa da receita do mês (a receita é a fonte Feegow, o repasse vem da agenda; se estourar, capa).
+            const repByMonth = _medRepasseByMonth(_medExecMedico, _medExecAno);
+            const repClamp = rAno.byMonth.map((rec, i) => Math.min(repByMonth[i] || 0, rec));
+            const margemByMonth = rAno.byMonth.map((rec, i) => Math.max(0, rec - repClamp[i]));
+            const temRepasse = repClamp.some(v => v > 0);
             document.getElementById('medExec-procs').textContent = rAno.procs.toLocaleString('pt-BR');
             document.getElementById('medExec-procs-lab').textContent = `Procedimentos em ${_medExecAno}`;
 
@@ -14824,25 +14857,40 @@
                     id: 'medExecBarLabels',
                     afterDatasetsDraw(chart) {
                         const ctx = chart.ctx;
-                        const meta = chart.getDatasetMeta(0);
-                        if (!meta || !meta.data) return;
+                        const mRep = chart.getDatasetMeta(0);                       // repasse (base) quando empilhado
+                        const mTopo = chart.getDatasetMeta(temRepasse ? 1 : 0);     // topo da barra (margem, ou única)
+                        if (!mTopo || !mTopo.data) return;
                         ctx.save();
                         ctx.textAlign = 'center';
-                        meta.data.forEach((bar, i) => {
+                        mTopo.data.forEach((bar, i) => {
                             const val = rAno.byMonth[i] || 0;
                             const nProcs = rAno.byMonthProcs[i] || 0;
                             if (val <= 0 && nProcs === 0) return;
                             const txt1 = val >= 1000 ? 'R$ ' + (val/1000).toFixed(1).replace('.0','') + 'k' : 'R$ ' + Math.round(val);
-                            const txt2 = nProcs + ' proc';
-                            // valor (acima)
+                            // total (acima da barra)
                             ctx.font = 'bold 11px Outfit, sans-serif';
                             ctx.fillStyle = '#e2e8f4';
                             ctx.textBaseline = 'bottom';
                             ctx.fillText(txt1, bar.x, bar.y - 14);
-                            // nº de procedimentos (logo abaixo do valor, ainda acima da barra)
                             ctx.font = '10px Outfit, sans-serif';
                             ctx.fillStyle = '#94a3b8';
-                            ctx.fillText(txt2, bar.x, bar.y - 2);
+                            ctx.fillText(nProcs + ' proc', bar.x, bar.y - 2);
+                            // repasse: valor + % dentro da fatia âmbar (base), se couber
+                            if (temRepasse && mRep && mRep.data[i]) {
+                                const repReal = repByMonth[i] || 0;   // valor REAL pago (pode estourar a receita → % > 100)
+                                if (repReal > 0) {
+                                    const yBase = chart.scales.y.getPixelForValue(0);
+                                    const yTop = mRep.data[i].y;       // topo da fatia âmbar (capada à receita)
+                                    if (yBase - yTop > 15) {
+                                        const pct = val > 0 ? Math.round(repReal / val * 100) : 0;
+                                        const rTxt = (repReal >= 1000 ? 'R$ ' + (repReal/1000).toFixed(1).replace('.0','') + 'k' : 'R$ ' + Math.round(repReal)) + ' · ' + pct + '%';
+                                        ctx.font = 'bold 9.5px Outfit, sans-serif';
+                                        ctx.fillStyle = '#231007';
+                                        ctx.textBaseline = 'middle';
+                                        ctx.fillText(rTxt, mRep.data[i].x, (yBase + yTop) / 2);
+                                    }
+                                }
+                            }
                         });
                         ctx.restore();
                     }
@@ -14851,28 +14899,35 @@
                     type: 'bar',
                     data: {
                         labels: _MESES_NOMES,
-                        datasets: [{
-                            data: rAno.byMonth,
-                            backgroundColor: _MESES_NOMES.map((_,i) => (i === new Date().getMonth() && _medExecAno === new Date().getFullYear()) ? '#10b981ee' : '#10b98199'),
-                            borderColor: '#10b981',
-                            borderWidth: 1.5, borderRadius: 5
-                        }]
+                        datasets: temRepasse ? [
+                            { label: 'Repasse pago', data: repClamp, backgroundColor: '#f59e0bdd', borderColor: '#f59e0b',
+                              borderWidth: 1, borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 5, bottomRight: 5 }, stack: 's' },
+                            { label: 'Margem da clínica', data: margemByMonth,
+                              backgroundColor: _MESES_NOMES.map((_,i) => (i === new Date().getMonth() && _medExecAno === new Date().getFullYear()) ? '#10b981ee' : '#10b98199'),
+                              borderColor: '#10b981', borderWidth: 1, borderRadius: { topLeft: 5, topRight: 5, bottomLeft: 0, bottomRight: 0 }, stack: 's' }
+                        ] : [
+                            { label: 'Receita', data: rAno.byMonth,
+                              backgroundColor: _MESES_NOMES.map((_,i) => (i === new Date().getMonth() && _medExecAno === new Date().getFullYear()) ? '#10b981ee' : '#10b98199'),
+                              borderColor: '#10b981', borderWidth: 1.5, borderRadius: 5 }
+                        ]
                     },
                     options: {
                         responsive: true,
                         layout: { padding: { top: 30 } },   // espaço pros labels acima das barras
                         plugins: {
-                            legend: { display: false },
-                            tooltip: { callbacks: { label: ctx => {
-                                const i = ctx.dataIndex;
-                                const v = rAno.byMonth[i] || 0;
-                                const n = rAno.byMonthProcs[i] || 0;
-                                return ' R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' · ' + n + ' procedimento' + (n===1?'':'s') + ' · clique para detalhar';
-                            } } }
+                            legend: { display: temRepasse, position: 'top', labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12, padding: 12, usePointStyle: true } },
+                            tooltip: { callbacks: {
+                                label: ctx => ' ' + (ctx.dataset.label || 'Receita') + ': R$ ' + (ctx.parsed.y||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),
+                                footer: items => {
+                                    const i = items[0].dataIndex;
+                                    const v = rAno.byMonth[i] || 0, n = rAno.byMonthProcs[i] || 0;
+                                    return 'Total: R$ ' + v.toLocaleString('pt-BR',{maximumFractionDigits:0}) + ' · ' + n + ' proc · clique p/ detalhar';
+                                }
+                            } }
                         },
                         scales: {
-                            x: { ticks: { color:'#6b7a99', font:{size:11} }, grid:{display:false} },
-                            y: { ticks: { color:'#6b7a99', font:{size:10}, callback: v => 'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, grid:{color:'rgba(255,255,255,0.04)'} }
+                            x: { stacked: true, ticks: { color:'#6b7a99', font:{size:11} }, grid:{display:false} },
+                            y: { stacked: true, ticks: { color:'#6b7a99', font:{size:10}, callback: v => 'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, grid:{color:'rgba(255,255,255,0.04)'} }
                         },
                         onHover(evt, elements) {
                             evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
