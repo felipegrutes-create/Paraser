@@ -2504,6 +2504,12 @@ function computarMetaMes_(mes) {
     lerRedeRecebimentos_().forEach(function(t){ if (noMes(diaToIso_(t.dia))) cartao += t.valor; });
   }
 
+  // Trava contra corrida: 2 chamadas simultâneas de get_meta liam a fila antes de
+  // uma ver o appendRow da outra e gravavam o MESMO PIX 2x (duplicata). O lock
+  // serializa a montagem da fila; dedupPixConferir_ limpa as duplicatas já criadas.
+  const pixLock = LockService.getScriptLock();
+  try { pixLock.waitLock(20000); } catch (e) {}
+  dedupPixConferir_();
   const shC = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
   const dd = shC.getDataRange().getValues();
   const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
@@ -2515,10 +2521,11 @@ function computarMetaMes_(mes) {
     if (feegowPacientePorCpf_(r.cpf, cache)) { pixLinkado += r.valor; return; }
     const ex = jaTem[String(r.fitid)];
     const status = ex ? String(ex[Hc.status]) : 'PENDENTE';
-    if (!ex) shC.appendRow([r.fitid, r.data, r.valor, r.pagador, r.cpf, '', 'PENDENTE', '']);
+    if (!ex) { shC.appendRow([r.fitid, r.data, r.valor, r.pagador, r.cpf, '', 'PENDENTE', '']); jaTem[String(r.fitid)] = true; }
     if (status === 'OK') pixLinkado += r.valor;
     else if (status !== 'DESCARTADO') { aConfValor += r.valor; aConfQtd++; }
   });
+  try { pixLock.releaseLock(); } catch (e) {}
 
   const porVendedora = comercialPorVendedora_(mes);
   let comercial = 0; porVendedora.forEach(function(x){ comercial += x.valor; });
@@ -2575,6 +2582,27 @@ function handleRemoveEntradaManual(body) {
   return jsonErr('id não encontrado');
 }
 
+// Remove linhas duplicadas da fila (mesmo fitid em mais de uma linha), mantendo a
+// mais "decidida" (OK/DESCARTADO na frente de PENDENTE). Duplicatas vinham de corrida
+// no appendRow. Deleta de baixo pra cima pra não bagunçar os índices.
+function dedupPixConferir_() {
+  const sh = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
+  const dd = sh.getDataRange().getValues();
+  const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
+  const manter = {}; // fitid -> { row, decidido }
+  const apagar = [];
+  for (let i = 1; i < dd.length; i++) {
+    const fit = String(dd[i][Hc.fitid]);
+    if (!fit) continue;
+    const decidido = (String(dd[i][Hc.status]) === 'OK' || String(dd[i][Hc.status]) === 'DESCARTADO');
+    if (!(fit in manter)) { manter[fit] = { row: i + 1, decidido: decidido }; continue; }
+    if (decidido && !manter[fit].decidido) { apagar.push(manter[fit].row); manter[fit] = { row: i + 1, decidido: decidido }; }
+    else apagar.push(i + 1);
+  }
+  apagar.sort(function(a, b){ return b - a; }).forEach(function(r){ sh.deleteRow(r); });
+  return apagar.length;
+}
+
 // Aprova (OK) ou descarta (DESCARTADO) um PIX da fila. Invalida o cache da meta.
 function handleConferirPix(body) {
   const fitid = String(body.fitid || '');
@@ -2583,15 +2611,19 @@ function handleConferirPix(body) {
   const sh = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
   const dd = sh.getDataRange().getValues();
   const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
+  // Marca TODAS as linhas com esse fitid (a fila pode ter duplicatas geradas por
+  // corrida no appendRow) — senão a duplicata continua PENDENTE e o item "volta".
+  let achou = 0;
   for (let i = 1; i < dd.length; i++) {
     if (String(dd[i][Hc.fitid]) === fitid) {
       sh.getRange(i + 1, Hc.status + 1).setValue(decisao);
       sh.getRange(i + 1, Hc.conferido_em + 1).setValue(new Date().toISOString());
-      PropertiesService.getScriptProperties().deleteProperty('META_CACHE');
-      return jsonOk({ ok: true, fitid: fitid, decisao: decisao });
+      achou++;
     }
   }
-  return jsonErr('fitid não encontrado');
+  if (!achou) return jsonErr('fitid não encontrado');
+  PropertiesService.getScriptProperties().deleteProperty('META_CACHE');
+  return jsonOk({ ok: true, fitid: fitid, decisao: decisao, linhas: achou });
 }
 
 // Setup das credenciais REDE (rodar via curl 1x; não retorna os valores).
