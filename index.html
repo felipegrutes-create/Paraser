@@ -4225,6 +4225,14 @@
                 </div>
             </div>
 
+            <!-- Folha (PJ + CLT) por mês + % sobre o recebido -->
+            <div class="cr-charts-row" style="margin-bottom:16px">
+                <div class="chart-card" style="flex:1">
+                    <h3>👥 Folha (PJ + CLT) e % sobre o Recebido <span id="resFolhaSub" style="font-size:11px;font-weight:400;color:var(--muted)">salários CLT + PJ, encargos, benefícios, férias e rescisão (sem repasse médico) · linha = folha ÷ recebido do mês</span></h3>
+                    <canvas id="resChartFolha" height="200"></canvas>
+                </div>
+            </div>
+
             <!-- Comparativo entre anos (controle manual META RECEITA) -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
@@ -15223,6 +15231,7 @@
         let _resDespesasMap = null; // 'YYYY-MM' → total de despesas pagas (reais)
         let _resDespCatMap = null;  // 'YYYY-MM' → { categoria(Plano de Contas): total } — pro tooltip de composição
         let _resRetiradaMap = null; // 'YYYY-MM' → total de Retirada dos Sócios (fica FORA das despesas; mostrada à parte)
+        let _resFolhaMap = null;    // 'YYYY-MM' → total de Folha (PJ+CLT: salários, encargos, benefícios, férias, rescisão)
 
         function resNavMonth(dir) {
             const alvo = new Date(_resDate.getFullYear(), _resDate.getMonth() + dir, 1);
@@ -15232,7 +15241,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null; _resDespCatMap = null; _resRetiradaMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null;
+            _execCartaoData = null; _resDespesasMap = null; _resDespCatMap = null; _resRetiradaMap = null; _resFolhaMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
@@ -15287,6 +15296,32 @@
             return map;
         }
 
+        // Folha (PJ + CLT) por mês. É um SUBCONJUNTO das despesas (não é excluída),
+        // então sai do finData. Categorias: salários (CLT e PJ), encargos (tributos folha),
+        // benefícios, férias e rescisão. NÃO inclui repasse médico nem bônus (decisão 20/07).
+        async function resFolhaPorMes() {
+            if (_resFolhaMap) return _resFolhaMap;
+            let src = finData;
+            if (!finDataLoaded) {
+                const rows = await loadFinanceData();
+                src = processFinanceData(rows);
+            }
+            const isFolha = c => {
+                const p = (c || '').toString().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+                return p.includes('SALARIO') || p.includes('FOLHA') || p.includes('BENEFICIO') || p.includes('FERIAS') || p.includes('RESCISAO');
+            };
+            const map = {};
+            src.forEach(d => {
+                if (!isFolha(d.categoria)) return;
+                const p = (d.caixa || '').split('/'); // 'MM/2026'
+                if (p.length !== 2) return;
+                const key = p[1] + '-' + p[0];
+                map[key] = (map[key] || 0) + d.valor;
+            });
+            _resFolhaMap = map;
+            return map;
+        }
+
         async function loadAndRenderResumo() {
             const lbl = document.getElementById('resMonthLabel');
             if (lbl) lbl.textContent = _MONTHS_PT[_resDate.getMonth()] + ' ' + _resDate.getFullYear();
@@ -15294,14 +15329,15 @@
             if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Carregando dados…</div>';
             const mesKey = _fgKey(_resDate);
 
-            // 6 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
-            const [receb, fg, desp, planF, dinQ, ret] = await Promise.all([
+            // 7 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
+            const [receb, fg, desp, planF, dinQ, ret, folha] = await Promise.all([
                 resLoadRecebimentos().catch(() => null),
                 fgLoadMonth(_resDate).catch(() => null),
                 resDespesasPorMes().catch(() => null),
                 _resLoadMpPlanF().catch(() => null),
                 _resLoadDinQuadro().catch(() => null),
                 resRetiradaPorMes().catch(() => null),
+                resFolhaPorMes().catch(() => null),
             ]);
 
             // Dinheiro em espécie: a fonte ÚNICA é o QUADRO (por paciente/CPF). Se o mês tem lançamento
@@ -15327,6 +15363,7 @@
             _execRenderCartaoMes();
             _resRenderEntSai(receb || [], desp || {});
             _resRenderEntSaiRet(receb || [], desp || {}, ret || {});
+            _resRenderFolha(receb || [], folha || {});
             _resRenderTaxasMes();
             _resRenderAnos();
             _resRenderCaixa();
@@ -15720,6 +15757,59 @@
                     scales: {
                         x: { stacked: true, ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
                         y: { stacked: true, grace: '10%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                },
+                plugins: [labelPlugin]
+            });
+        }
+
+        // Folha (PJ + CLT) por mês (barras) + % sobre o recebido do mês (linha, eixo direito).
+        function _resRenderFolha(receb, folhaMap) {
+            const el = document.getElementById('resChartFolha'); if (!el) return;
+            if (_resCharts.folha) { try{_resCharts.folha.destroy();}catch(e){} }
+            receb = _resPreencherAno(receb);   // enche o ano até dezembro
+            const keys = [...new Set([...(receb || []).map(x => x.mes), ...Object.keys(folhaMap || {})])].sort();
+            if (!keys.length) return;
+            const rec = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) + (r.mp || 0) : 0; });
+            const folha = keys.map(k => folhaMap[k] || 0);
+            const pct = keys.map((k, i) => (rec[i] > 0 && folha[i] > 0) ? (folha[i] / rec[i] * 100) : null);
+            const labels = keys.map(k => { const i = parseInt(k.slice(5, 7), 10) - 1; return _MONTHS_PT[i].slice(0, 3) + '/' + k.slice(2, 4); });
+            const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
+            const labelPlugin = {
+                id: 'folhaLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart; ctx.save(); ctx.textAlign = 'center';
+                    // R$ da folha em cima da barra
+                    const mBar = chart.getDatasetMeta(0);
+                    ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
+                    mBar.data.forEach((bar, i) => { if (!folha[i]) return; ctx.fillText('R$ ' + fmtK(folha[i]), bar.x, bar.y - 3); });
+                    // % em cada ponto da linha
+                    const mLine = chart.getDatasetMeta(1);
+                    ctx.font = '700 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#fbbf24';
+                    mLine.data.forEach((pt, i) => { if (pct[i] == null) return; ctx.fillText(pct[i].toFixed(1).replace('.', ',') + '%', pt.x, pt.y - 7); });
+                    ctx.restore();
+                }
+            };
+            _resCharts.folha = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [
+                    { label: 'Folha (PJ + CLT)', data: folha, backgroundColor: '#6366f1', borderRadius: 4, maxBarThickness: 46, yAxisID: 'y', order: 2 },
+                    { label: '% do recebido', data: pct, type: 'line', yAxisID: 'y1', borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#fbbf24', tension: 0.3, spanGaps: true, order: 1 }
+                ]},
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: { callbacks: {
+                            label: ctx => ctx.dataset.type === 'line'
+                                ? '  % do recebido: ' + (ctx.raw == null ? '—' : ctx.raw.toFixed(1).replace('.', ',') + '%')
+                                : '  Folha: R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                        } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
+                        y: { position: 'left', grace: '14%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                        y1: { position: 'right', min: 0, suggestedMax: 40, ticks: { color: '#fbbf24', font: { size: 10 }, callback: v => v + '%' }, grid: { display: false } }
                     }
                 },
                 plugins: [labelPlugin]
