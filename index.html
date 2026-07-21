@@ -15794,17 +15794,15 @@
                     ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
                     chart.data.labels.forEach((_, i) => { const t = clt[i] + pj[i]; if (!t) return; const bar = mTop.data[i]; if (!bar) return; ctx.fillText('R$ ' + fmtK(t), bar.x, bar.y - 3); });
                     // % em cada ponto da linha (dataset 2) — badge escuro + sombra pra não apagar sobre as barras.
-                    const mLine = chart.getDatasetMeta(2), mTopBar = chart.getDatasetMeta(1);
+                    const mLine = chart.getDatasetMeta(2);
                     ctx.font = '700 11px Outfit, sans-serif'; ctx.textBaseline = 'middle';
                     mLine.data.forEach((pt, i) => {
                         if (pct[i] == null) return;
                         const s = pct[i].toFixed(1).replace('.', ',') + '%';
                         const w = ctx.measureText(s).width + 12, h = 17;
                         const bx = pt.x - w / 2;
-                        let by = pt.y - 12 - h;                                   // acima do ponto
-                        const barTopY = (folha[i] && mTopBar.data[i]) ? mTopBar.data[i].y : null;
-                        if (barTopY != null && by < barTopY && by + h > barTopY - 15) by = pt.y + 12; // não cobre o total
-                        if (by < chart.chartArea.top + 2) by = pt.y + 12;         // se não couber, vai abaixo
+                        let by = pt.y + 12;                                       // ABAIXO do ponto (evita sobrepor os totais)
+                        if (by + h > chart.chartArea.bottom - 2) by = pt.y - 12 - h; // se estourar embaixo, volta pra cima
                         // badge com sombra
                         ctx.save();
                         ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
