@@ -14943,33 +14943,40 @@
                             ctx.font = '10px Outfit, sans-serif';
                             ctx.fillStyle = '#94a3b8';
                             ctx.fillText(nProcs + ' proc', bar.x, bar.y - 2);
-                            // repasse: valor (grande) + % numa bola clara, dentro da fatia âmbar (base)
+                            // repasse: valor (grande) + % numa bola clara, dentro da fatia âmbar (base).
+                            // Tamanhos adaptativos: fatia alta = tudo grande; fatia curta = compacto,
+                            // mas o valor aparece em todo mês que tiver espaço (só bola em barra bem baixa).
                             if (temRepasse && mRep && mRep.data[i]) {
                                 const repReal = repByMonth[i] || 0;   // valor REAL pago
                                 if (repReal > 0) {
                                     const yBase = chart.scales.y.getPixelForValue(0);
                                     const yTop = mRep.data[i].y;       // topo da fatia âmbar
                                     const h = yBase - yTop, cx = mRep.data[i].x, cy = (yBase + yTop) / 2;
-                                    if (h > 18) {
+                                    if (h > 19) {
                                         const pct = val > 0 ? Math.round(repReal / val * 100) : 0;
                                         const rTxt = repReal >= 1000 ? 'R$ ' + (repReal/1000).toFixed(1).replace('.0','') + 'k' : 'R$ ' + Math.round(repReal);
-                                        const temValor = h > 48;       // barra curta: mostra só a bola do %
-                                        const by = temValor ? cy + 13 : cy;
-                                        if (temValor) {                 // valor do repasse, bem maior
-                                            ctx.font = 'bold 13.5px Outfit, sans-serif';
+                                        let vf, cr, gap;
+                                        if (h > 46)      { vf = 13.5; cr = 14; gap = 3; }
+                                        else if (h > 34) { vf = 10.5; cr = 10; gap = 3; }
+                                        else if (h > 27) { vf = 9;    cr = 8;  gap = 2; }
+                                        else             { vf = 0;    cr = Math.min(9, h/2 - 1); gap = 0; } // só bola
+                                        const stackH = (vf ? vf + gap : 0) + cr * 2;
+                                        const top = cy - stackH / 2;
+                                        if (vf) {                       // valor do repasse, bem maior
+                                            ctx.font = 'bold ' + vf + 'px Outfit, sans-serif';
                                             ctx.fillStyle = '#231007';
                                             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                                            ctx.fillText(rTxt, cx, cy - 13);
+                                            ctx.fillText(rTxt, cx, top + vf / 2);
                                         }
                                         // bola do % (clara, contrasta com o âmbar)
-                                        const rad = Math.min(14, h/2 - 1);
-                                        ctx.beginPath(); ctx.arc(cx, by, rad, 0, Math.PI * 2);
+                                        const cirY = top + (vf ? vf + gap : 0) + cr;
+                                        ctx.beginPath(); ctx.arc(cx, cirY, cr, 0, Math.PI * 2);
                                         ctx.fillStyle = '#fffbeb'; ctx.fill();
                                         ctx.lineWidth = 1.5; ctx.strokeStyle = '#b45309'; ctx.stroke();
                                         ctx.fillStyle = '#7c2d12';
-                                        ctx.font = 'bold ' + (pct >= 100 ? 9 : 10.5) + 'px Outfit, sans-serif';
+                                        ctx.font = 'bold ' + Math.max(8, cr * (pct >= 100 ? 0.62 : 0.74)) + 'px Outfit, sans-serif';
                                         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                                        ctx.fillText(pct + '%', cx, by + 0.5);
+                                        ctx.fillText(pct + '%', cx, cirY + 0.5);
                                     }
                                 }
                             }
