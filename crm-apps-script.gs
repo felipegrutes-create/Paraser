@@ -227,6 +227,22 @@ function doGet(e) {
 
     // Limpa duplicatas da fila PIX (rodar sob demanda quando acumular).
     if (action === 'dedup_pixc') return jsonOk({ ok: true, removidas: dedupPixConferir_() });
+    // Remove da fila os PENDENTE que na verdade LINKAM por CPF no Feegow (entraram
+    // por engano numa recomputação com o Feegow instável — não deviam estar na fila).
+    if (action === 'limpar_pixc_linkados') {
+      const shL = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
+      const ddL = shL.getDataRange().getValues();
+      const HcL = {}; PIXC_HEADERS.forEach(function(h, i){ HcL[h] = i; });
+      const cacheL = {}; const apagarL = [];
+      for (let i = 1; i < ddL.length; i++) {
+        if (String(ddL[i][HcL.status]) !== 'PENDENTE') continue;
+        const cpfL = String(ddL[i][HcL.cpf] || '');
+        if (cpfL && feegowPacientePorCpf_(cpfL, cacheL)) apagarL.push(i + 1);
+      }
+      apagarL.sort(function(a, b){ return b - a; }).forEach(function(r){ shL.deleteRow(r); });
+      if (apagarL.length) PropertiesService.getScriptProperties().deleteProperty('META_CACHE');
+      return jsonOk({ ok: true, removidas: apagarL.length });
+    }
 
     // Entradas manuais de card (paciente sem agenda, pedido pela recepção).
     if (action === 'get_entradas_manuais') return handleGetEntradasManuais();

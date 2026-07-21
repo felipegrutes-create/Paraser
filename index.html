@@ -7241,6 +7241,9 @@
             const bars = ['metaBar', 'metaBarFull'].map(id => document.getElementById(id)).filter(Boolean);
             if (!bars.length || !CRM_SCRIPT_URL) return;
             const setAll = html => bars.forEach(b => b.innerHTML = html);
+            // Placeholder: quando o cache do servidor expira, o recálculo leva ~1 min.
+            // Sem isso a tela fica em branco e parece quebrada.
+            if (!bars[0].innerHTML.trim()) setAll('<div style="color:var(--muted);font-size:13px;padding:6px 0">⏳ Carregando a meta… (se o servidor estiver recalculando, pode levar até 1 min)</div>');
             try {
                 const mes = mesAtualMeta();
                 const res = await fetch(CRM_SCRIPT_URL + '?action=get_meta&mes=' + mes + (fresh ? '&fresh=1' : ''));
