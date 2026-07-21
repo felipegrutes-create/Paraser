@@ -15783,12 +15783,14 @@
                 id: 'folhaLabels',
                 afterDatasetsDraw(chart) {
                     const { ctx } = chart; ctx.save(); ctx.textAlign = 'center';
-                    // CLT (0) e PJ (1): valor DENTRO do segmento
-                    [0, 1].forEach(di => {
-                        const meta = chart.getDatasetMeta(di), arr = chart.data.datasets[di].data;
-                        ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff';
-                        meta.data.forEach((bar, i) => { const v = arr[i]; if (!v) return; if (Math.abs(bar.base - bar.y) < 14) return; ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base) / 2); });
-                    });
+                    // CLT (0) na base INFERIOR do seu segmento; PJ (1) na base SUPERIOR do seu.
+                    // Deixa o MEIO da barra livre pros badges de % (que ficam abaixo do ponto da linha).
+                    const mCLT = chart.getDatasetMeta(0), mPJ = chart.getDatasetMeta(1);
+                    ctx.font = '600 10px Outfit, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff';
+                    ctx.textBaseline = 'bottom';
+                    mCLT.data.forEach((bar, i) => { if (!clt[i]) return; if (Math.abs(bar.base - bar.y) < 16) return; ctx.fillText(fmtK(clt[i]), bar.x, bar.base - 4); });
+                    ctx.textBaseline = 'top';
+                    mPJ.data.forEach((bar, i) => { if (!pj[i]) return; if (Math.abs(bar.base - bar.y) < 16) return; ctx.fillText(fmtK(pj[i]), bar.x, bar.y + 4); });
                     // Total da folha no topo da pilha (topo = PJ, dataset 1)
                     const mTop = chart.getDatasetMeta(1);
                     ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
