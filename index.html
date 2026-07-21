@@ -14786,13 +14786,68 @@
 
         // Repasse calculado por mês (mesmo modelo do sec-Repasses; base automática, sem os ajustes
         // manuais mês a mês). Só pros médicos com modelo em REP_MEDICOS; sócios/sem-modelo → zeros.
+        // ── Repasse REAL pago × Produção a valor de tabela (Sumário Executivo por Médico) ──
+        // Alguns médicos têm modelo que a agenda não reproduz exato (Érica: base + R$65/USG
+        // + 40% complexas). Quando o Felipe confere o valor pago pela planilha do próprio
+        // médico, ele entra aqui como fonte da verdade e sobrepõe o cálculo da agenda.
+        // Conferido com o Felipe em 21/07/2026 (planilhas mensais da Dra. Érica).
+        const REP_REAL_MENSAL = {
+            'erica stein': { 2026: { 1: 20900, 2: 20862, 3: 21273, 4: 20426, 5: 11050, 6: 14190 } }
+        };
+        // Médicos cujo FAT bruto no Sumário é PRODUÇÃO a valor de tabela, não faturamento
+        // Feegow. Motivo (Érica): ~80% das USGs dela são acompanhamento de FIV, que entram
+        // R$0 no Feegow (estão dentro dos pacotes de FIV faturados nos sócios). Pra a barra
+        // repasse×margem fazer sentido, valoriza cada USG a preço de tabela; as de FIV/preparo/
+        // coito, que não têm preço avulso, entram como transvaginal (R$400).
+        const MED_PRODUCAO = { 'erica stein': true };
+        const USG_PROD_FALLBACK = 400;
+        function _medEhProducao(nome){
+            const c = repNorm_(nome);
+            return Object.keys(MED_PRODUCAO).some(k => c.includes(k));
+        }
+        function _medProdPrecoTabela_(procName){
+            const n = ((procName||'')+'').toUpperCase();
+            for (const k of Object.keys(_PROC_VALOR_CHEIO_FULL)) { if (n.includes(k)) return _PROC_VALOR_CHEIO_FULL[k]; }
+            return null;
+        }
+        // Produção (valor de tabela) por mês, na estrutura que o _renderMedExec espera.
+        function _medProducaoByMonth(medNome, ano){
+            const r = { byMonth: new Array(12).fill(0), byMonthProcs: new Array(12).fill(0), total: 0, procs: 0, topProcs: {} };
+            if (!_repRaw.length || !_repCols) return r;
+            const C = _repCols, chave = repNorm_(medNome);
+            const md = REP_MEDICOS.find(m => chave.includes(m.m));
+            if (!md) return r;
+            for (let mes = 0; mes < 12; mes++){
+                const mesStr = ano + '-' + String(mes+1).padStart(2,'0');
+                repLinhas_(md.m, mesStr).forEach(row => {
+                    const proc = repNorm_(row[C.proc]);
+                    if (!proc.includes('usg') || proc.includes('pacote')) return;
+                    const p = _medProdPrecoTabela_(row[C.proc]);
+                    const val = (p != null) ? p : USG_PROD_FALLBACK;
+                    r.byMonth[mes] += val; r.byMonthProcs[mes]++;
+                    r.total += val; r.procs++;
+                    const nome = String(row[C.proc]||'').trim();
+                    r.topProcs[nome] = (r.topProcs[nome]||0) + val;
+                });
+            }
+            return r;
+        }
+        // Sobrepõe o lado da RECEITA (produção) num resultado do _medExecCompute, mantendo a
+        // estrutura que o _renderMedExec espera. Só pros médicos de MED_PRODUCAO.
+        function _medMergeProducao(r, p){
+            r.byMonth = p.byMonth; r.byMonthProcs = p.byMonthProcs;
+            r.total = p.total; r.procs = p.procs; r.topProcs = p.topProcs;
+            return r;
+        }
         function _medRepasseByMonth(medNome, ano){
             const out = new Array(12).fill(0);
             if (!_repRaw.length || !_repCols) return out;
             const chave = repNorm_(medNome);
             const md = REP_MEDICOS.find(m => chave.includes(m.m));
             if (!md) return out;
+            const real = (REP_REAL_MENSAL[md.m] || {})[ano] || null;   // valor pago conferido (planilha do médico)
             for (let mes = 0; mes < 12; mes++){
+                if (real && real[mes+1] != null) { out[mes] = real[mes+1]; continue; }
                 const mesStr = ano + '-' + String(mes+1).padStart(2,'0');
                 const linhas = repLinhas_(md.m, mesStr);
                 if (!linhas.length) continue;
@@ -14809,6 +14864,15 @@
             const crFmtL = v => 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
             const r2025 = _medExecCompute(_medData2025, _medExecMedico);
             const r2026 = _medExecCompute(_medData2026, _medExecMedico);
+
+            // Érica & cia: o Feegow zera as USGs de FIV (estão nos pacotes dos sócios). Aqui
+            // o FAT vira PRODUÇÃO a valor de tabela pra a barra repasse×margem fazer sentido.
+            // O repasse continua o valor real pago (REP_REAL_MENSAL).
+            const _ehProducao = _medEhProducao(_medExecMedico);
+            if (_ehProducao) {
+                _medMergeProducao(r2025, _medProducaoByMonth(_medExecMedico, 2025));
+                _medMergeProducao(r2026, _medProducaoByMonth(_medExecMedico, 2026));
+            }
 
             document.getElementById('medExec-r2025').textContent = crFmtL(r2025.total);
             document.getElementById('medExec-r2026').textContent = crFmtL(r2026.total);
@@ -14842,7 +14906,11 @@
 
             // Status
             const stEl = document.getElementById('medExecStatus');
-            if (stEl) stEl.textContent = (r2025.total + r2026.total > 0) ? '' : 'Sem dados para este médico';
+            if (stEl) {
+                if (r2025.total + r2026.total <= 0) stEl.textContent = 'Sem dados para este médico';
+                else if (_ehProducao) stEl.textContent = '📊 Produção a valor de tabela: as USGs de acompanhamento de FIV entram como transvaginal (R$ 400), pois no Feegow vêm R$ 0 (estão dentro dos pacotes dos sócios). O repasse é o valor real pago pela planilha da médica.';
+                else stEl.textContent = '';
+            }
 
             // Pills de ano sincronizadas
             document.getElementById('medExecY2025')?.classList.toggle('active', _medExecAno === 2025);
