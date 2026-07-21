@@ -15306,17 +15306,19 @@
                 const rows = await loadFinanceData();
                 src = processFinanceData(rows);
             }
-            const isFolha = c => {
-                const p = (c || '').toString().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-                return p.includes('SALARIO') || p.includes('FOLHA') || p.includes('BENEFICIO') || p.includes('FERIAS') || p.includes('RESCISAO');
-            };
-            const map = {};
+            const norm = c => (c || '').toString().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            const isFolha = p => p.includes('SALARIO') || p.includes('FOLHA') || p.includes('BENEFICIO') || p.includes('FERIAS') || p.includes('RESCISAO');
+            const map = {}; // 'YYYY-MM' → { clt, pj }
             src.forEach(d => {
-                if (!isFolha(d.categoria)) return;
-                const p = (d.caixa || '').split('/'); // 'MM/2026'
-                if (p.length !== 2) return;
-                const key = p[1] + '-' + p[0];
-                map[key] = (map[key] || 0) + d.valor;
+                const p = norm(d.categoria);
+                if (!isFolha(p)) return;
+                const parts = (d.caixa || '').split('/'); // 'MM/2026'
+                if (parts.length !== 2) return;
+                const key = parts[1] + '-' + parts[0];
+                const m = map[key] = map[key] || { clt: 0, pj: 0 };
+                // PJ = "SALÁRIOS - PJ" (única categoria de folha com PJ). O resto (salários CLT,
+                // encargos, benefícios, férias, rescisão) é CLT.
+                if (p.includes('PJ')) m.pj += d.valor; else m.clt += d.valor;
             });
             _resFolhaMap = map;
             return map;
@@ -15771,7 +15773,9 @@
             const keys = [...new Set([...(receb || []).map(x => x.mes), ...Object.keys(folhaMap || {})])].sort();
             if (!keys.length) return;
             const rec = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) + (r.mp || 0) : 0; });
-            const folha = keys.map(k => folhaMap[k] || 0);
+            const clt = keys.map(k => (folhaMap[k] && folhaMap[k].clt) || 0);
+            const pj  = keys.map(k => (folhaMap[k] && folhaMap[k].pj)  || 0);
+            const folha = keys.map((k, i) => clt[i] + pj[i]);
             const pct = keys.map((k, i) => (rec[i] > 0 && folha[i] > 0) ? (folha[i] / rec[i] * 100) : null);
             const labels = keys.map(k => { const i = parseInt(k.slice(5, 7), 10) - 1; return _MONTHS_PT[i].slice(0, 3) + '/' + k.slice(2, 4); });
             const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
@@ -15779,37 +15783,66 @@
                 id: 'folhaLabels',
                 afterDatasetsDraw(chart) {
                     const { ctx } = chart; ctx.save(); ctx.textAlign = 'center';
-                    // R$ da folha em cima da barra
-                    const mBar = chart.getDatasetMeta(0);
+                    // CLT (0) e PJ (1): valor DENTRO do segmento
+                    [0, 1].forEach(di => {
+                        const meta = chart.getDatasetMeta(di), arr = chart.data.datasets[di].data;
+                        ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff';
+                        meta.data.forEach((bar, i) => { const v = arr[i]; if (!v) return; if (Math.abs(bar.base - bar.y) < 14) return; ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base) / 2); });
+                    });
+                    // Total da folha no topo da pilha (topo = PJ, dataset 1)
+                    const mTop = chart.getDatasetMeta(1);
                     ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
-                    mBar.data.forEach((bar, i) => { if (!folha[i]) return; ctx.fillText('R$ ' + fmtK(folha[i]), bar.x, bar.y - 3); });
-                    // % em cada ponto da linha
-                    const mLine = chart.getDatasetMeta(1);
+                    chart.data.labels.forEach((_, i) => { const t = clt[i] + pj[i]; if (!t) return; const bar = mTop.data[i]; if (!bar) return; ctx.fillText('R$ ' + fmtK(t), bar.x, bar.y - 3); });
+                    // % em cada ponto da linha (dataset 2)
+                    const mLine = chart.getDatasetMeta(2);
                     ctx.font = '700 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#fbbf24';
                     mLine.data.forEach((pt, i) => { if (pct[i] == null) return; ctx.fillText(pct[i].toFixed(1).replace('.', ',') + '%', pt.x, pt.y - 7); });
                     ctx.restore();
                 }
             };
-            // Linha de referência dos 20% (benchmark de serviços) — realce pedido.
+            // Linha de referência dos 20% + balão com seta numa área vazia (não pega em barra).
             const refLine20 = {
                 id: 'folhaRef20',
                 afterDatasetsDraw(chart) {
-                    const y1 = chart.scales.y1; if (!y1) return;
-                    const yPix = y1.getPixelForValue(20);
+                    const y1 = chart.scales.y1, xs = chart.scales.x; if (!y1 || !xs) return;
+                    const lineY = y1.getPixelForValue(20);
                     const { left, right } = chart.chartArea; const ctx = chart.ctx;
                     ctx.save();
+                    // tracejado
                     ctx.strokeStyle = 'rgba(226,232,240,0.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
-                    ctx.beginPath(); ctx.moveTo(left, yPix); ctx.lineTo(right, yPix); ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.font = '600 10px Outfit, sans-serif'; ctx.fillStyle = '#e2e8f4'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-                    ctx.fillText('20% · referência de mercado (serviços)', left + 6, yPix - 3);
+                    ctx.beginPath(); ctx.moveTo(left, lineY); ctx.lineTo(right, lineY); ctx.stroke(); ctx.setLineDash([]);
+                    // balão sobre os meses futuros (região vazia) + seta pro tracejado
+                    const txt = '20% · referência de mercado (serviços)';
+                    ctx.font = '600 10px Outfit, sans-serif';
+                    const tw = ctx.measureText(txt).width, bw = tw + 16, bh = 20;
+                    let bx = xs.getPixelForValue(9) - bw / 2;
+                    bx = Math.min(bx, right - bw - 4); bx = Math.max(bx, left + 4);
+                    const by = y1.getPixelForValue(34) - bh, ax = bx + bw / 2;
+                    // seta vertical do balão até o tracejado
+                    ctx.strokeStyle = 'rgba(226,232,240,0.85)'; ctx.lineWidth = 1.3;
+                    ctx.beginPath(); ctx.moveTo(ax, by + bh); ctx.lineTo(ax, lineY); ctx.stroke();
+                    ctx.fillStyle = 'rgba(226,232,240,0.85)';
+                    ctx.beginPath(); ctx.moveTo(ax, lineY); ctx.lineTo(ax - 4, lineY - 6); ctx.lineTo(ax + 4, lineY - 6); ctx.closePath(); ctx.fill();
+                    // caixa do balão
+                    const r = 6;
+                    ctx.fillStyle = 'rgba(30,41,59,0.96)'; ctx.strokeStyle = 'rgba(226,232,240,0.5)'; ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(bx + r, by);
+                    ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+                    ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+                    ctx.arcTo(bx, by + bh, bx, by, r);
+                    ctx.arcTo(bx, by, bx + bw, by, r);
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#e2e8f4'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(txt, bx + bw / 2, by + bh / 2);
                     ctx.restore();
                 }
             };
             _resCharts.folha = new Chart(el.getContext('2d'), {
                 type: 'bar',
                 data: { labels, datasets: [
-                    { label: 'Folha (PJ + CLT)', data: folha, backgroundColor: '#6366f1', borderRadius: 4, maxBarThickness: 46, yAxisID: 'y', order: 2 },
+                    { label: 'CLT (salários + encargos + benefícios)', data: clt, backgroundColor: '#6366f1', borderRadius: 4, maxBarThickness: 48, yAxisID: 'y', stack: 'folha', order: 2 },
+                    { label: 'PJ (salários)',                          data: pj,  backgroundColor: '#ec4899', borderRadius: 4, maxBarThickness: 48, yAxisID: 'y', stack: 'folha', order: 2 },
                     { label: '% do recebido', data: pct, type: 'line', yAxisID: 'y1', borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#fbbf24', tension: 0.3, spanGaps: true, order: 1 }
                 ]},
                 options: {
@@ -15819,12 +15852,13 @@
                         tooltip: { callbacks: {
                             label: ctx => ctx.dataset.type === 'line'
                                 ? '  % do recebido: ' + (ctx.raw == null ? '—' : ctx.raw.toFixed(1).replace('.', ',') + '%')
-                                : '  Folha: R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                                : '  ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                            footer: items => { const c = items.find(i => i.datasetIndex === 0), p = items.find(i => i.datasetIndex === 1); if (!c && !p) return ''; return 'Folha total: R$ ' + ((c ? c.raw : 0) + (p ? p.raw : 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
                         } }
                     },
                     scales: {
-                        x: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
-                        y: { position: 'left', grace: '14%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                        x: { stacked: true, ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
+                        y: { stacked: true, position: 'left', grace: '16%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } },
                         y1: { position: 'right', min: 0, suggestedMax: 40, ticks: { color: '#fbbf24', font: { size: 10 }, callback: v => v + '%' }, grid: { display: false } }
                     }
                 },
