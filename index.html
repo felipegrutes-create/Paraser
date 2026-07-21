@@ -14943,19 +14943,33 @@
                             ctx.font = '10px Outfit, sans-serif';
                             ctx.fillStyle = '#94a3b8';
                             ctx.fillText(nProcs + ' proc', bar.x, bar.y - 2);
-                            // repasse: valor + % dentro da fatia âmbar (base), se couber
+                            // repasse: valor (grande) + % numa bola clara, dentro da fatia âmbar (base)
                             if (temRepasse && mRep && mRep.data[i]) {
-                                const repReal = repByMonth[i] || 0;   // valor REAL pago (pode estourar a receita → % > 100)
+                                const repReal = repByMonth[i] || 0;   // valor REAL pago
                                 if (repReal > 0) {
                                     const yBase = chart.scales.y.getPixelForValue(0);
-                                    const yTop = mRep.data[i].y;       // topo da fatia âmbar (capada à receita)
-                                    if (yBase - yTop > 15) {
+                                    const yTop = mRep.data[i].y;       // topo da fatia âmbar
+                                    const h = yBase - yTop, cx = mRep.data[i].x, cy = (yBase + yTop) / 2;
+                                    if (h > 18) {
                                         const pct = val > 0 ? Math.round(repReal / val * 100) : 0;
-                                        const rTxt = (repReal >= 1000 ? 'R$ ' + (repReal/1000).toFixed(1).replace('.0','') + 'k' : 'R$ ' + Math.round(repReal)) + ' · ' + pct + '%';
-                                        ctx.font = 'bold 9.5px Outfit, sans-serif';
-                                        ctx.fillStyle = '#231007';
-                                        ctx.textBaseline = 'middle';
-                                        ctx.fillText(rTxt, mRep.data[i].x, (yBase + yTop) / 2);
+                                        const rTxt = repReal >= 1000 ? 'R$ ' + (repReal/1000).toFixed(1).replace('.0','') + 'k' : 'R$ ' + Math.round(repReal);
+                                        const temValor = h > 48;       // barra curta: mostra só a bola do %
+                                        const by = temValor ? cy + 13 : cy;
+                                        if (temValor) {                 // valor do repasse, bem maior
+                                            ctx.font = 'bold 13.5px Outfit, sans-serif';
+                                            ctx.fillStyle = '#231007';
+                                            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                                            ctx.fillText(rTxt, cx, cy - 13);
+                                        }
+                                        // bola do % (clara, contrasta com o âmbar)
+                                        const rad = Math.min(14, h/2 - 1);
+                                        ctx.beginPath(); ctx.arc(cx, by, rad, 0, Math.PI * 2);
+                                        ctx.fillStyle = '#fffbeb'; ctx.fill();
+                                        ctx.lineWidth = 1.5; ctx.strokeStyle = '#b45309'; ctx.stroke();
+                                        ctx.fillStyle = '#7c2d12';
+                                        ctx.font = 'bold ' + (pct >= 100 ? 9 : 10.5) + 'px Outfit, sans-serif';
+                                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                                        ctx.fillText(pct + '%', cx, by + 0.5);
                                     }
                                 }
                             }
