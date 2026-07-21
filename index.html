@@ -15790,6 +15790,22 @@
                     ctx.restore();
                 }
             };
+            // Linha de referência dos 20% (benchmark de serviços) — realce pedido.
+            const refLine20 = {
+                id: 'folhaRef20',
+                afterDatasetsDraw(chart) {
+                    const y1 = chart.scales.y1; if (!y1) return;
+                    const yPix = y1.getPixelForValue(20);
+                    const { left, right } = chart.chartArea; const ctx = chart.ctx;
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(226,232,240,0.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+                    ctx.beginPath(); ctx.moveTo(left, yPix); ctx.lineTo(right, yPix); ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.font = '600 10px Outfit, sans-serif'; ctx.fillStyle = '#e2e8f4'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+                    ctx.fillText('20% · referência de mercado (serviços)', left + 6, yPix - 3);
+                    ctx.restore();
+                }
+            };
             _resCharts.folha = new Chart(el.getContext('2d'), {
                 type: 'bar',
                 data: { labels, datasets: [
@@ -15812,7 +15828,7 @@
                         y1: { position: 'right', min: 0, suggestedMax: 40, ticks: { color: '#fbbf24', font: { size: 10 }, callback: v => v + '%' }, grid: { display: false } }
                     }
                 },
-                plugins: [labelPlugin]
+                plugins: [labelPlugin, refLine20]
             });
         }
 
