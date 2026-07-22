@@ -3559,6 +3559,23 @@ function wppEhCortesia_(texto) {
   return /^(muito\s+)?(obrigad[ao]s?|obg\w*|ok(ay)?|blz|beleza|de nada|nada|perfeito|combinado|maravilha|am[eé]m|valeu|👍|❤️|🥰|😊|🙏|✅)[\s!.,🙏👍✅❤️🥰😊🍃🦋☘️]*$/.test(t);
 }
 
+// A paciente PEDE resposta? (define o radar "pra retomar"). FORA: só agradeceu,
+// confirmou, avisou que chegou, mandou figurinha. DENTRO: tem pergunta ('?') ou
+// pedido/ação em aberto (marcar, cancelar, valor, exame, resultado, etc). Heurística
+// simples de propósito; erra pouco e reduz muito o ruído da lista.
+function wppPedeResposta_(texto) {
+  const raw = String(texto || '');
+  const t = raw.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+  if (!t) return false;
+  if (/^\[(figurinha|sticker|gif)\]$/.test(t)) return false;                 // figurinha não pede resposta
+  if (/^\[(imagem|documento|audio|video|outro)\]/.test(t)) return true;      // mídia (exame, foto) pede
+  if (/\?/.test(raw)) return true;                                           // pergunta
+  if (/\b(marcar|marcad|agendar|agend|remarcar|desmarcar|cancelar|quero|queria|gostaria|poderia|preciso|precis|duvida|quanto|valor|preco|disponiv|horario|quais|qual|quando|onde|recebeu|resultado|exame|receita|relatorio|atestado|laudo|encaminh|convenio|plano|aceita|funciona|ajuda|urgente|reclam|previsao|antecipar|estaciona)\b/.test(t)) return true;
+  if (/\b(obrigad|agradec)/.test(t)) return false;                           // agradecimento em qualquer posição
+  if (/^(muito |mto )?(obg|de nada|tudo bem|tudo certo|ta bom|tabom|ta otim|perfeito|combinado|ok|okay|blz|beleza|confirmad|confirmo|igualmente|amem|valeu|sim\b|certo\b|isso\b|claro\b|pode ser|abraco|ate |bom dia|boa tarde|boa noite|cheguei|ja cheguei|estou chegando|to chegando|estou subindo|estou a caminho|estou aqui|ja estou)/.test(t)) return false;
+  return t.length >= 25;                                                     // resto: só se for substancial
+}
+
 // ===== RADAR DE PACIENTES PRA RETOMAR =====
 // Conversas cuja ÚLTIMA mensagem é da paciente e não teve retorno da clínica na janela.
 // Foco na PACIENTE (não na funcionária): vira lista de trabalho, não cobrança. Tira
@@ -3943,11 +3960,13 @@ function wppChamarClaude_(systemPrompt, userPrompt) {
   const key = wppProps_().getProperty('ANTHROPIC_KEY');
   if (!key) return null;
   const model = wppProps_().getProperty('WPP_IA_MODEL') || 'claude-sonnet-5';
+  // 3000 cortava a leitura da recepção (JSON maior com os reconhecimentos). 5000 dá folga.
+  const maxTok = Number(wppProps_().getProperty('WPP_IA_MAX_TOKENS')) || 5000;
   const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
     payload: JSON.stringify({
-      model: model, max_tokens: 3000,
+      model: model, max_tokens: maxTok,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
     })
