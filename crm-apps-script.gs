@@ -3542,8 +3542,14 @@ function wppFmtDur_(seg) {
 // Conversa interna da equipe não é métrica comercial (lista configurável na
 // property WPP_IGNORAR, por trecho do nome do contato; default 'paraser').
 function wppEhInterno_(nome) {
-  const lista = (wppProps_().getProperty('WPP_IGNORAR') || 'paraser').toLowerCase().split(',');
-  const n = String(nome || '').toLowerCase();
+  const n = String(nome || '').toLowerCase().trim();
+  if (!n) return false;
+  // Médicos (a clínica salva como "Dr/Dra ...") e a enfermagem não são pacientes.
+  // O prefixo Dr/Dra é seguro: paciente não fica cadastrada assim (não pega uma
+  // paciente chamada Priscila/Bianca, só quem está salvo como "Dra Priscila").
+  if (/^dra?[\s.]/.test(n) || n.indexOf('enfermagem') !== -1) return true;
+  // Lista de ignorados: a Property (se houver) + fixos (clínica, lab Embrion, profissionais).
+  const lista = ((wppProps_().getProperty('WPP_IGNORAR') || 'paraser') + ',embrion,bruna ortiz').toLowerCase().split(',');
   return lista.some(function(t) { return t.trim() && n.indexOf(t.trim()) !== -1; });
 }
 // Encerramento de cortesia ("obrigada", "ok", emoji) não é vácuo de verdade.
