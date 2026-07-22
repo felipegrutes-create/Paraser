@@ -2821,6 +2821,10 @@ function rodarConciliacaoComSlack() {
   // Resumo do total 2x/dia (12h e 18h), se não postou por venda naquela rodada.
   const h = Number(Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'HH'));
   if ((h === 12 || h === 18) && (!r || !r.confirmadas)) notificarMetaSlack_([]);
+  // Fechamento do dia no #financeiro: a partir das 19h, 1x por dia (trava por data).
+  // Fica pendurado no gatilho horário — NÃO depende do trigger separado das 19h,
+  // que precisaria ser criado à mão no editor (e nunca foi).
+  if (h >= 19) { try { postarFechamentoUmaVezDia_(); } catch (eF) {} }
   return r;
 }
 
@@ -2834,12 +2838,22 @@ function setupTriggerConciliacao() {
   return 'ok';
 }
 
-// Fechamento do dia: além do gatilho horário, roda 1x às 19h. Concilia e posta
-// um card marcado como "🌙 Fechamento do dia" com o total consolidado.
-function rodarFechamentoDia() {
+// Posta o card "🌙 Fechamento do dia" no MÁXIMO 1x por dia (trava por data em Properties).
+// Chamado pelo gatilho horário (a partir das 19h) E pelo gatilho das 19h, se existir —
+// a trava garante um único card por dia mesmo que os dois disparem.
+function postarFechamentoUmaVezDia_() {
+  const hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('FECH_LAST_DATE') === hoje) return false; // já postou hoje
   const r = conciliarVendasFechadas_(false); // concilia sem postar; posto 1 card só, abaixo
   notificarMetaSlack_(r ? r.detalhes : [], true);
-  return r;
+  p.setProperty('FECH_LAST_DATE', hoje);
+  return true;
+}
+
+// Fechamento do dia: dispara o card do #financeiro. Idempotente (trava por data).
+function rodarFechamentoDia() {
+  return postarFechamentoUmaVezDia_();
 }
 
 // Cria o gatilho diário das 19h (NÃO remove o gatilho horário). RODAR 1x NO EDITOR.
