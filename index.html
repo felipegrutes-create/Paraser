@@ -14869,6 +14869,26 @@
             r.total = p.total; r.procs = p.procs; r.topProcs = p.topProcs;
             return r;
         }
+        // Itens de PRODUÇÃO (só as USGs do médico, a valor de tabela) de um mês — pro detalhe do
+        // clique na barra. Evita o faturamento Feegow por executante, que traria honorários de
+        // outros médicos (Rodolfo/Joselmo) que a Érica só executa.
+        function _medProducaoItensMes(medNome, ano, monthNum){
+            const out = [];
+            if (!_repRaw.length || !_repCols) return out;
+            const C = _repCols;
+            const md = REP_MEDICOS.find(m => repNorm_(medNome).includes(m.m));
+            if (!md) return out;
+            const mesStr = ano + '-' + String(monthNum).padStart(2,'0');
+            repLinhas_(md.m, mesStr).forEach(row => {
+                const proc = repNorm_(row[C.proc]);
+                if (!proc.includes('usg') || proc.includes('pacote')) return;
+                const pv = _medProdPrecoTabela_(row[C.proc]);
+                const val = (pv != null) ? pv : USG_PROD_FALLBACK;
+                out.push({ proc: String(row[C.proc]||'').trim(), valor: val, valorPago: val, valorPendente: 0,
+                           data: row[C.data]||'', paciente: String(row[C.pac]||'').trim() || '—', qtd: 1, status: 'pago' });
+            });
+            return out;
+        }
         function _medRepasseByMonth(medNome, ano){
             const out = new Array(12).fill(0);
             if (!_repRaw.length || !_repCols) return out;
@@ -15059,20 +15079,30 @@
                             const idx = elements[0].index;
                             if ((rAno.byMonthProcs[idx] || 0) === 0) return;
                             const monthNum = idx + 1;
-                            const data = _medExecAno === 2025 ? _medData2025 : _medData2026;
-                            if (!data) return;
-                            const agg = _aggregateMedicos(data);
-                            const allItems = (agg.itemsMap[_medExecMedico] || []);
-                            const monthItems = allItems.filter(it => {
-                                const dStr = it.data || '';
-                                const sep = dStr.includes('-') ? '-' : '/';
-                                const p = dStr.split(sep);
-                                return parseInt(p[1]) === monthNum;
-                            });
+                            const ehProd = _medEhProducao(_medExecMedico);
+                            let monthItems;
+                            if (ehProd) {
+                                // Érica: detalhe = PRODUÇÃO (as USGs dela a tabela), casa com a barra e
+                                // NÃO traz honorários do Rodolfo/Joselmo que ela só executa.
+                                monthItems = _medProducaoItensMes(_medExecMedico, _medExecAno, monthNum);
+                            } else {
+                                const data = _medExecAno === 2025 ? _medData2025 : _medData2026;
+                                if (!data) return;
+                                const agg = _aggregateMedicos(data);
+                                const allItems = (agg.itemsMap[_medExecMedico] || []);
+                                monthItems = allItems.filter(it => {
+                                    const dStr = it.data || '';
+                                    const sep = dStr.includes('-') ? '-' : '/';
+                                    const p = dStr.split(sep);
+                                    return parseInt(p[1]) === monthNum;
+                                });
+                            }
                             if (!monthItems.length) return;
-                            const key = _medExecMedico + ' — ' + _MESES_NOMES[idx] + '/' + _medExecAno;
+                            const key = _medExecMedico + ' — ' + _MESES_NOMES[idx] + '/' + _medExecAno + (ehProd ? ' · produção a tabela' : '');
                             window._crMedicosItemsMap = window._crMedicosItemsMap || {};
                             window._crMedicosItemsMap[key] = monthItems;
+                            window._crMedicosProducao = window._crMedicosProducao || {};
+                            window._crMedicosProducao[key] = ehProd;
                             openCrMedicoDetail(key);
                         }
                     },
@@ -18100,26 +18130,52 @@ GONAPEPTYL,56`;
             });
             const procEntries = Object.entries(procSums).sort((a,b) => b[1] - a[1]);
 
+            const _isProd = !!(window._crMedicosProducao || {})[medName];
             document.getElementById('finModalTitle').textContent = medName;
-            document.getElementById('finModalSubtitle').innerHTML =
-                `${items.length} lançamentos &nbsp;·&nbsp; ` +
-                `Faturado: <strong>${crFmtL(totalFat)}</strong> &nbsp;·&nbsp; ` +
-                `Recebido: <strong style="color:#34d399">${crFmtL(totalPago)}</strong> &nbsp;·&nbsp; ` +
-                `Pendente: <strong style="color:#f87171">${crFmtL(totalPend)}</strong>`;
+            document.getElementById('finModalSubtitle').innerHTML = _isProd
+                ? `${items.length} USGs &nbsp;·&nbsp; Produção a valor de tabela: <strong>${crFmtL(totalFat)}</strong> <span style="color:var(--muted);font-weight:400">&nbsp;·&nbsp; USGs de acompanhamento de FIV entram R$&nbsp;400 · não é faturamento Feegow</span>`
+                : `${items.length} lançamentos &nbsp;·&nbsp; ` +
+                  `Faturado: <strong>${crFmtL(totalFat)}</strong> &nbsp;·&nbsp; ` +
+                  `Recebido: <strong style="color:#34d399">${crFmtL(totalPago)}</strong> &nbsp;·&nbsp; ` +
+                  `Pendente: <strong style="color:#f87171">${crFmtL(totalPend)}</strong>`;
 
-            document.getElementById('finModalTheadRow').innerHTML =
-                '<th>Procedimento</th>' +
-                '<th style="text-align:center;width:40px">Qtd</th>' +
-                '<th style="text-align:right;width:110px">Faturado</th>' +
-                '<th style="text-align:right;width:110px">Recebido</th>' +
-                '<th style="text-align:right;width:90px">Pendente</th>' +
-                '<th style="text-align:right;width:52px">%</th>';
+            document.getElementById('finModalTheadRow').innerHTML = _isProd
+                ? '<th>Procedimento (USG)</th>' +
+                  '<th style="text-align:center;width:40px">Qtd</th>' +
+                  '<th style="text-align:right;width:130px">Valor produção</th>' +
+                  '<th style="width:0"></th><th style="width:0"></th><th style="width:0"></th>'
+                : '<th>Procedimento</th>' +
+                  '<th style="text-align:center;width:40px">Qtd</th>' +
+                  '<th style="text-align:right;width:110px">Faturado</th>' +
+                  '<th style="text-align:right;width:110px">Recebido</th>' +
+                  '<th style="text-align:right;width:90px">Pendente</th>' +
+                  '<th style="text-align:right;width:52px">%</th>';
 
             document.getElementById('finModalBody').innerHTML = procEntries.map(([proc, fat], gi) => {
                 const pago = procPago[proc] || 0;
                 const pend = Math.max(0, fat - pago);
                 const pct  = fat > 0 ? ((pago / fat) * 100).toFixed(0) : 0;
                 const detailItems = (procDetail[proc] || []).sort((a,b) => (b.data||'').localeCompare(a.data||''));
+
+                if (_isProd) {
+                    const dRows = detailItems.map(d => `<tr class="fin-detail-row">
+                        <td style="padding-left:28px;color:var(--muted);font-size:11px;white-space:nowrap">${(d.data||'').replace(/-/g,'/')}</td>
+                        <td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis">${d.paciente}</td>
+                        <td class="fin-val" style="font-size:11px">${crFmtL(d.valor)}</td>
+                    </tr>`).join('');
+                    return `<tr class="fin-group-row" style="cursor:pointer" onclick="toggleFinDetail(${gi})">
+                        <td style="font-weight:600;padding:10px 12px" title="${proc}"><span id="fin-arrow-${gi}" style="display:inline-block;transition:transform .2s;margin-right:6px">▶</span>${proc}</td>
+                        <td style="text-align:center;color:var(--muted)">${detailItems.length}x</td>
+                        <td class="fin-val" style="padding:10px 12px">${crFmtL(fat)}</td>
+                        <td></td><td></td><td></td>
+                    </tr>
+                    <tr id="fin-detail-${gi}" style="display:none"><td colspan="6" style="padding:0">
+                        <table class="fin-table" style="background:rgba(255,255,255,0.02)">
+                            <thead><tr><th style="padding-left:28px">Data</th><th>Paciente</th><th style="text-align:right">Valor produção</th></tr></thead>
+                            <tbody>${dRows}</tbody>
+                        </table>
+                    </td></tr>`;
+                }
 
                 const detailRows = detailItems.map(d => {
                     const stBadge = d.status === 'pago'
