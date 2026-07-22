@@ -2178,9 +2178,15 @@ function _blocoSemanalSlack_(mes) {
     const sem = recebSemanal_(mes, false);
     if (!sem || !sem.length) return null;
     const kf = function(v) { v = Number(v) || 0; return v >= 1000 ? Math.round(v / 1000) + 'k' : Math.round(v); };
-    let l = '📅 *Por semana*\n';
+    const tot = function(s) { return (Number(s.rede) || 0) + (Number(s.pix) || 0); };
+    const N = 8; // segmentos da barra; a maior semana enche a barra toda
+    const max = Math.max.apply(null, sem.map(tot)) || 1;
+    const bar = function(v) { const c = Math.min(N, Math.max(v > 0 ? 1 : 0, Math.round(v / max * N))); return '🟦'.repeat(c) + '⬜'.repeat(N - c); };
+    const totalMes = sem.reduce(function(a, s) { return a + tot(s); }, 0);
+    let l = '📅 *Por semana*   ·   total do mês *R$ ' + kf(totalMes) + '*\n';
     sem.forEach(function(s) {
-      l += '• ' + s.iniBR + ' a ' + s.fimBR + ':  💳 ' + kf(s.rede) + ' · 📥 ' + kf(s.pix) + (s.parcial ? '  _(em andamento)_' : '') + '\n';
+      const t = tot(s);
+      l += '`' + s.iniBR + ' a ' + s.fimBR + '`  ' + bar(t) + '  *R$ ' + kf(t) + '*   💳 ' + kf(s.rede) + ' · 📥 ' + kf(s.pix) + (s.parcial ? '  _(em andamento)_' : '') + '\n';
     });
     return { type: 'section', text: { type: 'mrkdwn', text: l.trim() } };
   } catch (e) { return null; }
