@@ -2543,13 +2543,26 @@ function notificarMetaSlack_(novas, fechamento) {
     payload: JSON.stringify({ blocks: blocks, text: '📊 Meta ' + mesPorExtenso_(mes) + ': ' + fmt(m.total) + ' de ' + fmt(m.meta) })
   });
   // Canal EXTRA só do 🌙 Fechamento do dia (19h): posta o MESMO card, sem tirar do #comercial.
-  // Blindado: sem webhook configurado ou erro na entrega não derruba o post principal.
+  // Prefere o BOT (SLACK_BOT_TOKEN + SLACK_FECHAMENTO_CHANNEL); cai pro webhook se só ele
+  // estiver setado. Blindado: sem config ou erro na entrega não derruba o post principal.
   if (fechamento) {
-    const whFech = PropertiesService.getScriptProperties().getProperty('SLACK_FECHAMENTO_WEBHOOK');
-    if (whFech) {
-      try { UrlFetchApp.fetch(whFech, { method: 'post', contentType: 'application/json',
-        payload: JSON.stringify({ blocks: blocks, text: '🌙 Fechamento do dia · ' + mesPorExtenso_(mes) + ': ' + fmt(m.total) + ' de ' + fmt(m.meta) }) }); } catch (e) {}
-    }
+    const pF = PropertiesService.getScriptProperties();
+    const canalF = pF.getProperty('SLACK_FECHAMENTO_CHANNEL');
+    const botF = pF.getProperty('SLACK_BOT_TOKEN');
+    const whFech = pF.getProperty('SLACK_FECHAMENTO_WEBHOOK');
+    const textF = '🌙 Fechamento do dia · ' + mesPorExtenso_(mes) + ': ' + fmt(m.total) + ' de ' + fmt(m.meta);
+    try {
+      if (canalF && botF) {
+        UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+          method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+          headers: { Authorization: 'Bearer ' + botF },
+          payload: JSON.stringify({ channel: canalF, blocks: blocks, text: textF })
+        });
+      } else if (whFech) {
+        UrlFetchApp.fetch(whFech, { method: 'post', contentType: 'application/json',
+          payload: JSON.stringify({ blocks: blocks, text: textF }) });
+      }
+    } catch (e) {}
   }
 }
 
@@ -3202,10 +3215,12 @@ function handleWppAdmin(params) {
       if (params.channel) p.setProperty('SLACK_RECEPCAO_CHANNEL', String(params.channel));
       return jsonOk({ ok: true, tem_token: !!p.getProperty('SLACK_BOT_TOKEN'), canal: p.getProperty('SLACK_RECEPCAO_CHANNEL') || '' });
     }
-    if (op === 'set_slack_fechamento') { // canal EXTRA só do 🌙 Fechamento do dia (19h). ?webhook= / ?off=1 remove
-      if (params.off) { p.deleteProperty('SLACK_FECHAMENTO_WEBHOOK'); return jsonOk({ ok: true, removido: true }); }
+    if (op === 'set_slack_fechamento') { // canal EXTRA só do 🌙 Fechamento do dia (19h). ?channel= (bot) OU ?webhook= · ?off=1 remove · ?test=1 posta agora
+      if (params.off) { p.deleteProperty('SLACK_FECHAMENTO_WEBHOOK'); p.deleteProperty('SLACK_FECHAMENTO_CHANNEL'); return jsonOk({ ok: true, removido: true }); }
+      if (params.channel) p.setProperty('SLACK_FECHAMENTO_CHANNEL', String(params.channel).trim());
       if (params.webhook) p.setProperty('SLACK_FECHAMENTO_WEBHOOK', String(params.webhook).trim());
-      return jsonOk({ ok: true, configurado: !!p.getProperty('SLACK_FECHAMENTO_WEBHOOK') });
+      if (params.test) { try { notificarMetaSlack_([], true); } catch (e) { return jsonErr('post falhou: ' + e); } }
+      return jsonOk({ ok: true, canal: p.getProperty('SLACK_FECHAMENTO_CHANNEL') || '', temWebhook: !!p.getProperty('SLACK_FECHAMENTO_WEBHOOK'), testado: !!params.test });
     }
     if (op === 'test_recepcao') return jsonOk({ resultado: rodarRelatorioRecepcao_() });
     if (op === 'test_ativos') { // contatos ativos (números; NÃO posta no Slack)
