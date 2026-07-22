@@ -3439,6 +3439,14 @@ function wppFiltroInst_(instanceId, alias) {
   return i ? " AND " + (alias ? alias + '.' : '') + "instance_id = '" + i + "' " : "";
 }
 
+// Exclui o que NÃO é atendimento a paciente: o feed de Status/Stories (status@broadcast,
+// que sozinho chegava a ~76% das "recebidas" da recepção) e grupos de WhatsApp (@g.us).
+// Sem isto o volume, o "sem resposta" e o radar da recepção ficam inflados.
+function wppExclNaoPaciente_(alias) {
+  const a = alias ? alias + '.' : '';
+  return " AND " + a + "chat_phone NOT LIKE '%broadcast%' AND " + a + "chat_phone NOT LIKE '%@g.us' ";
+}
+
 // Mensagens da janela, deduplicadas por message_id, em ordem cronológica (ms).
 function wppMensagensJanela_(iniIso, fimIso, instanceId) {
   // COALESCE com a tabela de transcrições: áudio transcrito entra com o texto
@@ -3455,7 +3463,7 @@ function wppMensagensJanela_(iniIso, fimIso, instanceId) {
               : "SUBSTR(ANY_VALUE(m.texto), 1, 400) texto ") +
     "FROM " + WPP_BQ_REF + " m " +
     (comTrans ? "LEFT JOIN " + WPP_BQ_TRANS + " t ON t.message_id = m.message_id " : "") +
-    "WHERE m.momento >= @ini AND m.momento < @fim " + wppFiltroInst_(instanceId, 'm') +
+    "WHERE m.momento >= @ini AND m.momento < @fim " + wppFiltroInst_(instanceId, 'm') + wppExclNaoPaciente_('m') +
     "GROUP BY m.message_id ORDER BY ts",
     [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
   return rows.map(function(r) {
@@ -3473,7 +3481,7 @@ function wppMensagensJanela_(iniIso, fimIso, instanceId) {
 function wppNovosContatosJanela_(iniIso, fimIso, instanceId) {
   const rows = wppQuery_(
     "SELECT COUNT(*) FROM (SELECT COALESCE(NULLIF(JSON_EXTRACT_SCALAR(raw, '$.chatLid'), ''), chat_phone) chave, MIN(momento) primeiro " +
-    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE " + wppFiltroInst_(instanceId) + "GROUP BY chave) " +
+    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE " + wppFiltroInst_(instanceId) + wppExclNaoPaciente_('') + "GROUP BY chave) " +
     "WHERE primeiro >= @ini AND primeiro < @fim",
     [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
   return rows.length ? Number(rows[0].f[0].v) : 0;
@@ -3484,7 +3492,7 @@ function wppNovosContatosJanela_(iniIso, fimIso, instanceId) {
 function wppNovosContatosChaves_(iniIso, fimIso, instanceId) {
   const rows = wppQuery_(
     "SELECT chave FROM (SELECT COALESCE(NULLIF(JSON_EXTRACT_SCALAR(raw, '$.chatLid'), ''), chat_phone) chave, MIN(momento) primeiro " +
-    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE " + wppFiltroInst_(instanceId) + "GROUP BY chave) " +
+    "FROM " + WPP_BQ_REF + " WHERE from_me = FALSE " + wppFiltroInst_(instanceId) + wppExclNaoPaciente_('') + "GROUP BY chave) " +
     "WHERE primeiro >= @ini AND primeiro < @fim",
     [WPP_TS_PARAM_('ini', iniIso), WPP_TS_PARAM_('fim', fimIso)]);
   return rows.map(function (r) { return r.f[0].v; });
@@ -4052,7 +4060,7 @@ function wppContatosAtivos_(instanceId, limboDias, janelaDias, assinaturas) {
     "ANY_VALUE(m.chat_name) chat_name, ANY_VALUE(m.sender_name) sender_name, " +
     "ANY_VALUE(m.from_me) from_me, ANY_VALUE(m.momento) momento, " +
     "SUBSTR(ANY_VALUE(m.texto),1,300) texto, m.message_id " +
-    "FROM " + WPP_BQ_REF + " m WHERE 1=1 " + filtro +
+    "FROM " + WPP_BQ_REF + " m WHERE 1=1 " + filtro + wppExclNaoPaciente_('m') +
     "GROUP BY chave, m.message_id), " +
     "seq AS (SELECT chave, from_me, momento, texto, " +
     "LAG(momento) OVER (PARTITION BY chave ORDER BY momento) prev_m FROM msgs), " +
