@@ -257,6 +257,7 @@ function doGet(e) {
 
     if (action === 'wpp_admin') return handleWppAdmin(e.parameter);
     if (action === 'get_rede_mensal') return handleRedeMensal_(e.parameter); // vendas cartao por mes (grafico Analise Executiva)
+    if (action === 'get_receb_semanal') return handleRecebSemanal_(e.parameter); // cartao+PIX de pacientes por SEMANA do mes (grafico semanal)
     if (action === 'get_rede_caixa')  return handleRedeCaixa_(e.parameter);  // agenda de recebiveis futuros + taxas (Resumo)
     if (action === 'get_cartao_fatura') return handleCartaoFatura_();        // fatura do cartao importada (pasta no Drive)
 
@@ -2104,6 +2105,67 @@ function handleRedeMensal_(param) {
   p.setProperty('REDE_MENSAL_CACHE', JSON.stringify(cache));
   p.setProperty('PIX_MENSAL_HIST', JSON.stringify(pixHist));
   return jsonOk({ ok: true, meses: out });
+}
+
+// Recebimentos por SEMANA do mês (segunda a domingo): cartão (Rede) + PIX DE PACIENTES.
+// PIX usa a MESMA régua do computarMetaMes_ (Feegow por CPF ou status OK no PIX_A_Conferir),
+// então a soma das semanas bate com o PIX da Meta. Cache 20 min. ?fresh=1 recomputa.
+function handleRecebSemanal_(param) {
+  const tz = 'America/Sao_Paulo';
+  const mes = (param && param.mes) ? String(param.mes).slice(0, 7) : Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+  const pp = PropertiesService.getScriptProperties();
+  const fresh = !!(param && param.fresh);
+  if (!fresh) {
+    try { const c = JSON.parse(pp.getProperty('RECEB_SEMANAL_CACHE') || 'null');
+      if (c && c.mes === mes && (new Date().getTime() - (c.ts || 0)) <= 1200000)
+        return jsonOk({ ok: true, mes: mes, semanas: c.semanas, cache: true }); } catch (e) {}
+  }
+  const iniMesIso = inicioDoMesIso_(mes), fimMesIso = fimDoMesIso_(mes);
+  // segunda-feira (yyyy-MM-dd) da semana de uma data
+  const segDe = function(dstr) {
+    const d = new Date(String(dstr).slice(0, 10) + 'T12:00:00-03:00');
+    const wd = Number(Utilities.formatDate(d, tz, 'u')); // 1=seg..7=dom
+    const seg = new Date(d.getTime() - (wd - 1) * 86400000);
+    return Utilities.formatDate(seg, tz, 'yyyy-MM-dd');
+  };
+  const bk = {}; const get = function(k) { if (!bk[k]) bk[k] = { rede: 0, pix: 0 }; return bk[k]; };
+  // Cartão (Rede) — cada transação tem data de venda
+  try { redeVendasPeriodo_(redeToken_(), iniMesIso, fimMesIso).forEach(function(t) {
+    if (t.data) get(segDe(normData_(t.data))).rede += Number(t.valor) || 0; }); } catch (e) {}
+  // PIX de pacientes — mesma qualificação do pixLinkado do computarMetaMes_. Robusto
+  // por-linha: uma falha de CPF no Feegow não zera o bloco todo.
+  try {
+    const shC = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
+    const dd = shC.getDataRange().getValues();
+    const Hc = {}; PIXC_HEADERS.forEach(function(h, i) { Hc[h] = i; });
+    const jaTem = {}; for (let i = 1; i < dd.length; i++) jaTem[String(dd[i][Hc.fitid])] = dd[i];
+    const cache = {};
+    lerPixRecebimentos_(iniMesIso, fimMesIso).forEach(function(r) {
+      try {
+        if (String(normData_(r.data)).slice(0, 7) !== mes) return;
+        let ok = false;
+        try { if (feegowPacientePorCpf_(r.cpf, cache)) ok = true; } catch (eF) {}
+        if (!ok) { const ex = jaTem[String(r.fitid)]; if (ex && String(ex[Hc.status]) === 'OK') ok = true; }
+        if (ok) get(segDe(normData_(r.data))).pix += Number(r.valor) || 0;
+      } catch (eR) {}
+    });
+  } catch (e) {}
+  // Enumera as semanas que tocam o mês, até hoje (mês corrente) ou fim do mês
+  const hojeMes = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+  const ateIso = (mes === hojeMes) ? Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd') : fimMesIso;
+  const segFim = segDe(ateIso);
+  const out = []; let cur = new Date(segDe(iniMesIso) + 'T12:00:00-03:00');
+  const end = new Date(segFim + 'T12:00:00-03:00'); let guard = 0;
+  while (cur.getTime() <= end.getTime() && guard++ < 12) {
+    const k = Utilities.formatDate(cur, tz, 'yyyy-MM-dd');
+    const dom = new Date(cur.getTime() + 6 * 86400000);
+    const b = bk[k] || { rede: 0, pix: 0 };
+    out.push({ semana: k, iniBR: Utilities.formatDate(cur, tz, 'dd/MM'), fimBR: Utilities.formatDate(dom, tz, 'dd/MM'),
+      label: Utilities.formatDate(cur, tz, 'dd/MM'), rede: b.rede, pix: b.pix, parcial: (k === segFim) });
+    cur = new Date(cur.getTime() + 7 * 86400000);
+  }
+  try { pp.setProperty('RECEB_SEMANAL_CACHE', JSON.stringify({ mes: mes, ts: new Date().getTime(), semanas: out })); } catch (e) {}
+  return jsonOk({ ok: true, mes: mes, semanas: out });
 }
 
 // PIX comercial do mês corrente: usa o META_CACHE se estiver fresco (o get_meta o mantém);

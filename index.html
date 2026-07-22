@@ -4210,6 +4210,14 @@
                 </div>
             </div>
 
+            <!-- Faturamento por SEMANA do mês (Cartão Rede + PIX de pacientes) -->
+            <div class="cr-charts-row" style="margin-bottom:16px">
+                <div class="chart-card" style="flex:1">
+                    <h3>📅 Faturamento por Semana — Cartão (Rede) + PIX de pacientes <span id="execCartaoSemSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <canvas id="execChartCartaoSemana" height="200"></canvas>
+                </div>
+            </div>
+
             <!-- Entradas x Saídas -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
@@ -15290,6 +15298,78 @@
             return out.sort((a, b) => a.mes < b.mes ? -1 : 1);
         }
 
+        // Gráfico Faturamento por SEMANA do mês (barras empilhadas Cartão Rede + PIX de pacientes).
+        // Mesma régua de PIX da Meta (soma das semanas = PIX do mês). Do CRM get_receb_semanal.
+        async function _execRenderCartaoSemana() {
+            const el = document.getElementById('execChartCartaoSemana'); if (!el) return;
+            if (_resCharts.cartaoSem) { try{_resCharts.cartaoSem.destroy();}catch(e){} }
+            const sub = document.getElementById('execCartaoSemSub');
+            if (sub) sub.textContent = 'carregando…';
+            let semanas;
+            try {
+                const resp = await fetch(`${CRM_SCRIPT_URL}?action=get_receb_semanal`);
+                const j = await resp.json();
+                if (!j.ok) throw new Error(j.error || 'falhou');
+                semanas = j.semanas || [];
+            } catch(e) { if (sub) sub.textContent = '⚠ não foi possível carregar'; return; }
+            if (!semanas.length) { if (sub) sub.textContent = '⚠ sem dados'; return; }
+            const labels   = semanas.map(x => x.label + (x.parcial ? '*' : ''));
+            const redeData = semanas.map(x => x.rede || 0);
+            const pixData  = semanas.map(x => x.pix  || 0);
+            const fechadas = semanas.filter(x => !x.parcial);
+            const media = fechadas.length ? fechadas.reduce((s,x)=>s+(x.rede||0)+(x.pix||0),0)/fechadas.length : 0;
+            if (sub) sub.textContent = (fechadas.length ? `média semanal (fechadas): R$ ${media.toLocaleString('pt-BR',{maximumFractionDigits:0})}` : '')
+                + (semanas.some(x=>x.parcial) ? ' · * semana em andamento' : '');
+            const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
+            const semLabelPlugin = {
+                id: 'semLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart; ctx.save(); ctx.textAlign = 'center';
+                    chart.data.datasets.forEach((ds, di) => {
+                        const meta = chart.getDatasetMeta(di);
+                        ctx.font = '600 11px Outfit, sans-serif'; ctx.textBaseline = 'middle';
+                        ctx.fillStyle = ['#053b33', '#ffffff'][di] || '#ffffff';
+                        meta.data.forEach((bar, i) => {
+                            const v = ds.data[i]; if (!v) return;
+                            const h = Math.abs(bar.base - bar.y); if (h < 18) return;
+                            ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base) / 2);
+                        });
+                    });
+                    const meta1 = chart.getDatasetMeta(chart.data.datasets.length - 1);
+                    ctx.font = '600 11px Outfit, sans-serif'; ctx.fillStyle = '#e2e8f4'; ctx.textBaseline = 'bottom';
+                    chart.data.labels.forEach((_, i) => {
+                        const total = chart.data.datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0);
+                        if (!total) return; const bar = meta1.data[i]; if (!bar) return;
+                        ctx.fillText('R$ ' + fmtK(total), bar.x, bar.y - 4);
+                    });
+                    ctx.restore();
+                }
+            };
+            _resCharts.cartaoSem = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [
+                    { label:'Cartão (Rede)',      data: redeData, backgroundColor:'#00d4aa', borderRadius:4, maxBarThickness:70 },
+                    { label:'PIX de pacientes',   data: pixData,  backgroundColor:'#6366f1', borderRadius:4, maxBarThickness:70 }
+                ] },
+                options: {
+                    responsive:true,
+                    plugins: {
+                        legend:{ labels:{ color:'#9ca3af', font:{size:11} } },
+                        tooltip:{ callbacks:{
+                            title: items => { const s = semanas[items[0].dataIndex]; return s ? `Semana de ${s.iniBR} a ${s.fimBR}` : ''; },
+                            label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2}),
+                            footer: items => { const t = items.reduce((s,i)=>s+i.raw,0); return 'Total: R$ ' + t.toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+                        } }
+                    },
+                    scales: {
+                        x: { stacked:true, ticks:{color:'#6b7a99',font:{size:11}}, grid:{display:false} },
+                        y: { stacked:true, grace:'8%', ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} }
+                    }
+                },
+                plugins: [semLabelPlugin]
+            });
+        }
+
         // Gráfico Recebimentos por Mês (barras empilhadas Cartão + PIX). Vive no Resumo Financeiro.
         // Mês corrente = parcial (rótulo com *; PIX do BigQuery ao vivo, meses fechados do histórico).
         async function _execRenderCartaoMes() {
@@ -15514,6 +15594,7 @@
                 parcial: rec ? !!rec.parcial : false
             });
             _execRenderCartaoMes();
+            _execRenderCartaoSemana();
             _resRenderEntSai(receb || [], desp || {});
             _resRenderEntSaiRet(receb || [], desp || {}, ret || {});
             _resRenderFolha(receb || [], folha || {});
