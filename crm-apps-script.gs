@@ -4267,9 +4267,11 @@ function wppAnaliseRecepcaoIA_(msgs, iniIso) {
   const system =
     'Você é analista do atendimento da RECEPÇÃO da Paraser, clínica de fertilidade no Rio de Janeiro. ' +
     'Recebe a transcrição das conversas de WhatsApp da recepção com pacientes. As confirmações automáticas de consulta já foram removidas — foque no ATENDIMENTO real. ' +
+    'A EQUIPE DA RECEPÇÃO lê este relatório: seja justo e COMECE reconhecendo o esforço concreto delas (acolhimento, agilidade, caso resolvido, paciente bem orientada). Não foque só em problemas. ' +
     'Responda APENAS com JSON válido (sem markdown), neste formato: ' +
-    '{"resumo":"2-3 frases sobre o dia da recepção","demandas":[{"tipo":"...","vezes":1}],' +
-    '"esperando":[{"paciente":"...","assunto":"...","desde":"..."}],"qualidade":[{"conversa":"...","observacao":"..."}],"destaque":"algo bom no atendimento, ou string vazia"}. ' +
+    '{"resumo":"2-3 frases sobre o dia da recepção, começando pelo que foi bem","reconhecimentos":[{"pessoa":"nome de quem assinou, ou vazio","fez":"o que fez de bom, curto e concreto"}],"demandas":[{"tipo":"...","vezes":1}],' +
+    '"esperando":[{"paciente":"...","assunto":"...","desde":"..."}],"qualidade":[{"conversa":"...","observacao":"..."}]}. ' +
+    'Máximo 3 reconhecimentos (credite mais de uma pessoa quando houver mérito; use o nome que assinou "aqui é a Fulana"; se ninguém se destacou, lista vazia). ' +
     'demandas: agrupe por TIPO com contagem. Tipos comuns: agendamento, remarcação, resultado/exame, financeiro/contrato, dúvida clínica, documento/nota fiscal, medicação, outro. Máximo 7. ' +
     'esperando: paciente que fez pergunta/pedido e NÃO teve retorno da recepção dentro do que você vê (a pergunta é a última mensagem da conversa, sem resposta da clínica depois). Máximo 5. ' +
     'Se a recepção está claramente AGUARDANDO UM TERCEIRO (laboratório, médico, contabilidade, convênio) ou a própria paciente, NÃO é falha — descreva como pendência, não como "não respondeu". ' +
@@ -4290,6 +4292,18 @@ function wppBlocosRecepcaoIA_(ia) {
   const corta = function (s, n) { s = String(s == null ? '' : s).replace(/<!/g, '< !'); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
   const blocks = [];
   if (ia.resumo) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: corta(ia.resumo, 2800) } });
+  // 🌟 Reconhecimentos primeiro: a leitura lidera pelo que foi bem, não pela cobrança.
+  // Compat: se o modelo devolver o "destaque" antigo (string única), vira um reconhecimento.
+  let recs = (ia.reconhecimentos || []).slice(0, 3).filter(function (r) { return r && (r.pessoa || r.vendedora || r.fez); });
+  if (!recs.length && ia.destaque) recs = [{ pessoa: '', fez: ia.destaque }];
+  if (recs.length) {
+    let l = '🌟 *Reconhecimentos*\n';
+    recs.forEach(function (r) {
+      const quem = r.pessoa || r.vendedora || '';
+      l += '• ' + (quem ? '*' + corta(quem, 40) + '*: ' : '') + corta(r.fez || '', 200) + '\n';
+    });
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: l.trim() } });
+  }
   const dem = (ia.demandas || []).slice(0, 7).filter(function (d) { return d && d.tipo; });
   if (dem.length) blocks.push({ type: 'section', text: { type: 'mrkdwn',
     text: '📋 *Demandas:* ' + dem.map(function (d) { return corta(d.tipo, 40) + ' (' + (Number(d.vezes) || 1) + ')'; }).join(' · ') } });
@@ -4301,11 +4315,10 @@ function wppBlocosRecepcaoIA_(ia) {
   }
   const qual = (ia.qualidade || []).slice(0, 3).filter(function (q) { return q && (q.conversa || q.observacao); });
   if (qual.length) {
-    let l = '⚠️ *Qualidade*\n';
+    let l = '🔎 *Pra acompanhar*\n';
     qual.forEach(function (q) { l += '• ' + corta(q.conversa || '?', 70) + ': ' + corta(q.observacao, 180) + '\n'; });
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: l.trim() } });
   }
-  if (ia.destaque) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '🌟 ' + corta(ia.destaque, 500) } });
   return blocks;
 }
 
