@@ -3597,8 +3597,8 @@ function wppPraRetomar_(msgs) {
   Object.keys(chats).forEach(function(tel) {
     const c = chats[tel], ult = c.itens[c.itens.length - 1];
     if (ult.from_me) return;                 // última é da clínica → já respondida
-    if (wppEhInterno_(c.nome)) return;       // conversa interna
-    if (wppEhCortesia_(ult.texto)) return;   // "ok/obrigada" → não precisa retomar
+    if (wppEhInterno_(c.nome)) return;       // conversa interna / médico / outra clínica
+    if (!wppPedeResposta_(ult.texto)) return; // só agradeceu/confirmou/chegou → não precisa retomar
     itens.push({
       nome: c.nome || tel,
       desde: Utilities.formatDate(new Date(ult.ts), 'America/Sao_Paulo', 'dd/MM HH:mm'),
