@@ -14800,7 +14800,15 @@
         // médico, ele entra aqui como fonte da verdade e sobrepõe o cálculo da agenda.
         // Conferido com o Felipe em 21/07/2026 (planilhas mensais da Dra. Érica).
         const REP_REAL_MENSAL = {
-            'erica stein': { 2026: { 1: 20900, 2: 20862, 3: 21273, 4: 20426, 5: 11050, 6: 14190 } }
+            'erica stein': { 2026: { 1: 20900, 2: 20862, 3: 21273, 4: 20426, 5: 11050, 6: 14190 } },
+            // Priscila, Marcelle, Bruna: valor REAL pago (levantamento do CONTAS A PAGAR, remapeado
+            // p/ competência — a coluna de cada mês é a competência do mês ANTERIOR). Jan-Mai; junho
+            // fica calculado (1º mês fechado pelo sistema, não mexer); julho ainda não veio no contas
+            // a pagar (cai na fatura de agosto). Conferido c/ Felipe 22/07/2026: o calculado subestimava
+            // muito (Priscila calculava ~metade do real).
+            'priscila': { 2026: { 1: 1060, 2: 8136, 3: 20267.50, 4: 15777.50, 5: 27350.25 } },
+            'marcelle': { 2026: { 1: 4315, 2: 3272.60, 3: 11494, 4: 8255, 5: 10028 } },
+            'bruna':    { 2026: { 1: 1067.50, 2: 2180, 3: 5260.50, 4: 5315.50, 5: 6255.50 } }
         };
         // Médicos cujo FAT bruto no Sumário é PRODUÇÃO a valor de tabela, não faturamento
         // Feegow. Motivo (Érica): ~80% das USGs dela são acompanhamento de FIV, que entram
