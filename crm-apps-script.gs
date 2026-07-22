@@ -2111,14 +2111,17 @@ function handleRedeMensal_(param) {
 // PIX usa a MESMA régua do computarMetaMes_ (Feegow por CPF ou status OK no PIX_A_Conferir),
 // então a soma das semanas bate com o PIX da Meta. Cache 20 min. ?fresh=1 recomputa.
 function handleRecebSemanal_(param) {
+  const mes = (param && param.mes) ? String(param.mes).slice(0, 7) : Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
+  return jsonOk({ ok: true, mes: mes, semanas: recebSemanal_(mes, !!(param && param.fresh)) });
+}
+// Núcleo reutilizável: recebimentos por semana do mês (Rede + PIX de pacientes). Cache 20min.
+// Usado pelo endpoint get_receb_semanal (dashboard) e pelo bloco semanal do card da Meta (Slack).
+function recebSemanal_(mes, fresh) {
   const tz = 'America/Sao_Paulo';
-  const mes = (param && param.mes) ? String(param.mes).slice(0, 7) : Utilities.formatDate(new Date(), tz, 'yyyy-MM');
   const pp = PropertiesService.getScriptProperties();
-  const fresh = !!(param && param.fresh);
   if (!fresh) {
     try { const c = JSON.parse(pp.getProperty('RECEB_SEMANAL_CACHE') || 'null');
-      if (c && c.mes === mes && (new Date().getTime() - (c.ts || 0)) <= 1200000)
-        return jsonOk({ ok: true, mes: mes, semanas: c.semanas, cache: true }); } catch (e) {}
+      if (c && c.mes === mes && (new Date().getTime() - (c.ts || 0)) <= 1200000) return c.semanas; } catch (e) {}
   }
   const iniMesIso = inicioDoMesIso_(mes), fimMesIso = fimDoMesIso_(mes);
   // segunda-feira (yyyy-MM-dd) da semana de uma data
@@ -2165,7 +2168,22 @@ function handleRecebSemanal_(param) {
     cur = new Date(cur.getTime() + 7 * 86400000);
   }
   try { pp.setProperty('RECEB_SEMANAL_CACHE', JSON.stringify({ mes: mes, ts: new Date().getTime(), semanas: out })); } catch (e) {}
-  return jsonOk({ ok: true, mes: mes, semanas: out });
+  return out;
+}
+
+// Bloco Slack (Block Kit) com a quebra por semana do mês — cartão (Rede) + PIX de pacientes.
+// Entra no card da Meta. Blindado: qualquer falha devolve null e o card sai sem ele.
+function _blocoSemanalSlack_(mes) {
+  try {
+    const sem = recebSemanal_(mes, false);
+    if (!sem || !sem.length) return null;
+    const kf = function(v) { v = Number(v) || 0; return v >= 1000 ? Math.round(v / 1000) + 'k' : Math.round(v); };
+    let l = '📅 *Por semana*\n';
+    sem.forEach(function(s) {
+      l += '• ' + s.iniBR + ' a ' + s.fimBR + ':  💳 ' + kf(s.rede) + ' · 📥 ' + kf(s.pix) + (s.parcial ? '  _(em andamento)_' : '') + '\n';
+    });
+    return { type: 'section', text: { type: 'mrkdwn', text: l.trim() } };
+  } catch (e) { return null; }
 }
 
 // PIX comercial do mês corrente: usa o META_CACHE se estiver fresco (o get_meta o mantém);
@@ -2509,6 +2527,9 @@ function notificarMetaSlack_(novas, fechamento) {
   if (m.aConferirValor > 0) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '⏳ *A conferir:* ' + fmt(m.aConferirValor) + ' · ' + m.aConferirQtd + ' PIX sem link no Feegow (dar ok no painel)' } });
   }
+  // Quebra por semana do mês (cartão Rede + PIX de pacientes). Blindado: null = sai sem o bloco.
+  const bSem = _blocoSemanalSlack_(mes);
+  if (bSem) { blocks.push({ type: 'divider' }); blocks.push(bSem); }
   blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '💳 cartão ' + fmt(m.cartao) + ' · 📥 PIX ' + fmt(m.pixLinkado) + (m.dinheiro > 0 ? ' · 💵 dinheiro ' + fmt(m.dinheiro) : '') + ' · atualizado ' + hora } ] });
 
   UrlFetchApp.fetch(webhookUrl, {
