@@ -3545,6 +3545,51 @@ function wppEhCortesia_(texto) {
   return /^(muito\s+)?(obrigad[ao]s?|obg\w*|ok(ay)?|blz|beleza|de nada|nada|perfeito|combinado|maravilha|am[eé]m|valeu|👍|❤️|🥰|😊|🙏|✅)[\s!.,🙏👍✅❤️🥰😊🍃🦋☘️]*$/.test(t);
 }
 
+// ===== RADAR DE PACIENTES PRA RETOMAR =====
+// Conversas cuja ÚLTIMA mensagem é da paciente e não teve retorno da clínica na janela.
+// Foco na PACIENTE (não na funcionária): vira lista de trabalho, não cobrança. Tira
+// internas e encerramentos de cortesia ("ok/obrigada"). Mais antiga primeiro (mais urgente).
+function wppPraRetomar_(msgs) {
+  const chats = {};
+  msgs.forEach(function(m) {
+    const c = chats[m.chat_phone] = chats[m.chat_phone] || { nome: '', itens: [] };
+    c.itens.push(m);
+    const leg = function(s) { return s && s.indexOf('@lid') === -1; };
+    if (leg(m.chat_name)) c.nome = m.chat_name;
+    else if (!c.nome && !m.from_me && leg(m.sender_name)) c.nome = m.sender_name;
+  });
+  const itens = [];
+  Object.keys(chats).forEach(function(tel) {
+    const c = chats[tel], ult = c.itens[c.itens.length - 1];
+    if (ult.from_me) return;                 // última é da clínica → já respondida
+    if (wppEhInterno_(c.nome)) return;       // conversa interna
+    if (wppEhCortesia_(ult.texto)) return;   // "ok/obrigada" → não precisa retomar
+    itens.push({
+      nome: c.nome || tel,
+      desde: Utilities.formatDate(new Date(ult.ts), 'America/Sao_Paulo', 'dd/MM HH:mm'),
+      previa: String(ult.texto || ('[' + ult.tipo + ']')).replace(/\n+/g, ' ').slice(0, 70),
+      ts: ult.ts
+    });
+  });
+  itens.sort(function(a, b) { return a.ts - b.ts; });
+  return itens;
+}
+
+// Bloco 📋 do radar (entra no card no lugar da linha seca de "sem resposta").
+function wppBlocosPraRetomar_(itens) {
+  if (!itens || !itens.length) return [{ type: 'section', text: { type: 'mrkdwn', text: '✅ Nenhuma paciente esperando resposta.' } }];
+  const corta = function(s, n) { s = String(s == null ? '' : s).replace(/<!/g, '< !'); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+  let l = '📋 *Pacientes pra retomar* (' + itens.length + ')\n';
+  itens.slice(0, 15).forEach(function(x) {
+    l += '• *' + corta(x.nome, 40) + '* _(desde ' + x.desde + ')_: ' + corta(x.previa, 70) + '\n';
+  });
+  if (itens.length > 15) l += '_… e mais ' + (itens.length - 15) + '_\n';
+  return [
+    { type: 'section', text: { type: 'mrkdwn', text: l.trim() } },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'quem mandou a última mensagem e ainda não teve retorno · retomar hoje' }] }
+  ];
+}
+
 // Métricas do dia a partir das mensagens: volumes, 1ª resposta, vácuos e
 // atribuição por vendedora (via timeline de assinaturas).
 function wppMetricasDia_(msgs, assinaturas, novosSet) {
@@ -4193,13 +4238,8 @@ function rodarRelatorioWhatsApp() {
       '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
       (m.pior && m.pior.seg > m.mediana ? ' · pior ' + wppFmtDur_(m.pior.seg) + ' (' + m.pior.nome + ')' : '') } });
   }
-  if (m.semResposta.length) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
-      '⚠️ *' + m.semResposta.length + ' sem resposta:* ' +
-      m.semResposta.slice(0, 6).join(', ') + (m.semResposta.length > 6 ? '…' : '') } });
-  } else {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '✅ Nenhuma conversa no vácuo.' } });
-  }
+  // 📋 Radar: pacientes cuja última mensagem ficou sem retorno (lista de trabalho, não cobrança).
+  blocks.push.apply(blocks, wppBlocosPraRetomar_(wppPraRetomar_(msgs)));
   blocks.push({ type: 'context', elements: [{ type: 'mrkdwn',
     text: 'dia comercial: ontem 19h → hoje 19h · atualizado ' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'HH:mm') }] });
   post(blocks, '💬 WhatsApp: ' + m.conversas + ' conversas, ' + m.semResposta.length + ' sem resposta');
@@ -4355,8 +4395,8 @@ function rodarRelatorioRecepcao_() {
   if (m.respostas) blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
     '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
     (m.pior && m.pior.seg > m.mediana ? ' · pior ' + wppFmtDur_(m.pior.seg) + ' (' + m.pior.nome + ')' : '') } });
-  if (m.semResposta.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
-    '⚠️ *' + m.semResposta.length + ' sem resposta:* ' + m.semResposta.slice(0, 8).join(', ') + (m.semResposta.length > 8 ? '…' : '') } });
+  // 📋 Radar: pacientes cuja última mensagem ficou sem retorno (lista de trabalho, não cobrança).
+  blocks.push.apply(blocks, wppBlocosPraRetomar_(wppPraRetomar_(reais)));
   // Placar por recepcionista — só aparece se a assinatura atribuir mensagens; senão, dica.
   const placarRec = wppBlocosPlacar_(m, 'Por recepcionista');
   if (placarRec.length) blocks.push.apply(blocks, placarRec);
