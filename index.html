@@ -13734,6 +13734,17 @@
                     + (ajB.porFora || []).reduce((s, x) => s + (Number(x.val) || 0), 0)
                     + (ajB.medicacoes || []).reduce((s, x) => s + (Number(x.val) || 0), 0);
                 brutoTotal += brutoMed;
+                // Pra Érica (MED_PRODUCAO) a barra do ranking mostra PRODUÇÃO a valor de tabela: o Feegow
+                // dela é ~R$0 nas USGs de FIV (dentro dos pacotes dos sócios), então o bruto Feegow a
+                // subestima. O total bruto acima segue Feegow (real, sem contar em dobro) — a produção só
+                // vale pra posição/valor da barra dela no ranking.
+                let brutoRank = brutoMed;
+                if (_medEhProducao(md.m)) {
+                    const _anoR = parseInt(_repMes.slice(0, 4), 10), _miR = parseInt(_repMes.slice(5, 7), 10) - 1;
+                    const _pr = _medProducaoByMonth(md.m, _anoR);
+                    const _pv = (_pr && _pr.byMonth) ? (_pr.byMonth[_miR] || 0) : 0;
+                    if (_pv > 0) brutoRank = _pv;
+                }
                 const nomeReal = linhas[0][C.prof] || md.m;
                 const calc = md.modelo === 'turno' ? repCalcTurno_(linhas)
                            : md.modelo === 'priscila' ? repCalcPriscila_(linhas, _repMes, md.m)
@@ -13746,7 +13757,7 @@
                 const temStatusExtra = !!REP_STATUS_EXTRA[md.m];
                 const naoFechados = temStatusExtra ? linhas.filter(r => repNorm_(r[C.sta]) !== 'atendido').length : 0;
                 const nIncluidos = linhas.filter(repInclui_).length;
-                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, bruto: brutoMed, calc, chave: md.m, temStatusExtra, naoFechados, nIncluidos });
+                resultados.push({ nome: nomeReal, modelo: md.modelo, cobertura: md.cobertura, base, total: calc.total, bruto: brutoRank, ehProducao: _medEhProducao(md.m), calc, chave: md.m, temStatusExtra, naoFechados, nIncluidos });
             });
             resultados.sort((a, b) => b.total - a.total);
 
@@ -13764,18 +13775,21 @@
             const RANK_PAL = ['#c084fc', '#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#22d3ee', '#f87171', '#a3e635', '#fb923c', '#e879f9', '#60a5fa', '#4ade80'];
             const rankBruto = resultados.slice().filter(r => r.bruto > 0).sort((a, b) => b.bruto - a.bruto);
             const maxBruto = rankBruto.length ? rankBruto[0].bruto : 1;
+            const rankTotal = rankBruto.reduce((s, r) => s + r.bruto, 0) || 1;  // base do % do ranking (usa produção da Érica)
+            const temProducaoRank = rankBruto.some(r => r.ehProducao);
             const rkMesEl = document.getElementById('repRankingMes');
             if (rkMesEl) rkMesEl.textContent = repMesNomeCompleto_(_repMes) + ' · ordenado pelo faturamento bruto';
             const rkEl = document.getElementById('repRanking');
             if (rkEl) rkEl.innerHTML = rankBruto.length ? rankBruto.map((r, i) => {
                 const cor = RANK_PAL[i % RANK_PAL.length];
                 const pctBar = Math.max(3, r.bruto / maxBruto * 100);
-                const pctTot = brutoTotal > 0 ? (r.bruto / brutoTotal * 100) : 0;
+                const pctTot = rankTotal > 0 ? (r.bruto / rankTotal * 100) : 0;
+                const prodTag = r.ehProducao ? ' <span style="font-size:9px;font-weight:700;color:#c084fc;background:rgba(192,132,252,.14);padding:1px 5px;border-radius:4px;vertical-align:middle" title="Valor de PRODUÇÃO a tabela: as USGs de FIV da Érica entram R$0 no Feegow (estão nos pacotes dos sócios), então o Feegow bruto dela a subestima.">produção*</span>' : '';
                 return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:11px">
                     <div style="width:22px;flex:none;text-align:right;font-weight:800;font-size:14px;color:${i < 3 ? cor : 'var(--muted)'}">${i + 1}</div>
                     <div style="flex:1;min-width:0">
                         <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:4px">
-                            <span style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${repEsc_(r.nome)}</span>
+                            <span style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${repEsc_(r.nome)}${prodTag}</span>
                             <span style="white-space:nowrap;color:var(--muted)"><b style="color:#fff">${repFmt_(r.bruto)}</b> · ${pctTot.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span>
                         </div>
                         <div style="height:8px;border-radius:5px;background:rgba(255,255,255,0.05);overflow:hidden">
@@ -13783,7 +13797,7 @@
                         </div>
                     </div>
                 </div>`;
-            }).join('') : '<p style="color:var(--muted);font-size:13px">Sem faturamento no mês selecionado.</p>';
+            }).join('') + (temProducaoRank ? '<p style="color:var(--muted);font-size:10.5px;margin:4px 0 0;line-height:1.4">* <b style="color:#c084fc">produção</b>: a Érica é ultrassonografista pura e ~80% das USGs dela (acompanhamento de FIV) entram R$0 no Feegow, pois estão nos pacotes dos sócios. Aqui ela aparece a valor de produção (tabela). O KPI "FAT Bruto" acima segue o Feegow real.</p>' : '') : '<p style="color:var(--muted);font-size:13px">Sem faturamento no mês selecionado.</p>';
 
             tabelaEl.innerHTML = !resultados.length
                 ? '<p style="color:var(--muted)">Nenhum atendimento no mês.</p>'
