@@ -4344,11 +4344,11 @@ function wppAnaliseRecepcaoIA_(msgs, iniIso) {
   const system =
     'Você é analista do atendimento da RECEPÇÃO da Paraser, clínica de fertilidade no Rio de Janeiro. ' +
     'Recebe a transcrição das conversas de WhatsApp da recepção com pacientes. As confirmações automáticas de consulta já foram removidas — foque no ATENDIMENTO real. ' +
-    'A EQUIPE DA RECEPÇÃO lê este relatório: seja justo e COMECE reconhecendo o esforço concreto delas (acolhimento, agilidade, caso resolvido, paciente bem orientada). Não foque só em problemas. ' +
+    'A EQUIPE DA RECEPÇÃO lê este relatório: seja justo e COMECE reconhecendo o esforço concreto do time (acolhimento, agilidade, caso resolvido, paciente bem orientada). Não foque só em problemas. ' +
     'Responda APENAS com JSON válido (sem markdown), neste formato: ' +
-    '{"resumo":"2-3 frases sobre o dia da recepção, começando pelo que foi bem","reconhecimentos":[{"pessoa":"nome de quem assinou, ou vazio","fez":"o que fez de bom, curto e concreto"}],"demandas":[{"tipo":"...","vezes":1}],' +
+    '{"resumo":"2-3 frases sobre o dia da recepção, começando pelo que foi bem","reconhecimentos":["algo bom que a EQUIPE fez hoje, frase curta e concreta"],"demandas":[{"tipo":"...","vezes":1}],' +
     '"esperando":[{"paciente":"...","assunto":"...","desde":"..."}],"qualidade":[{"conversa":"...","observacao":"..."}]}. ' +
-    'Máximo 3 reconhecimentos (credite mais de uma pessoa quando houver mérito; use o nome que assinou "aqui é a Fulana"; se ninguém se destacou, lista vazia). ' +
+    'Máximo 3 reconhecimentos. A recepção é acompanhada como EQUIPE: fale do time/do atendimento e NUNCA cite nome de pessoa. Se não houve nada a destacar, lista vazia. ' +
     'demandas: agrupe por TIPO com contagem. Tipos comuns: agendamento, remarcação, resultado/exame, financeiro/contrato, dúvida clínica, documento/nota fiscal, medicação, outro. Máximo 7. ' +
     'esperando: paciente que fez pergunta/pedido e NÃO teve retorno da recepção dentro do que você vê (a pergunta é a última mensagem da conversa, sem resposta da clínica depois). Máximo 5. ' +
     'Se a recepção está claramente AGUARDANDO UM TERCEIRO (laboratório, médico, contabilidade, convênio) ou a própria paciente, NÃO é falha — descreva como pendência, não como "não respondeu". ' +
@@ -4369,16 +4369,14 @@ function wppBlocosRecepcaoIA_(ia) {
   const corta = function (s, n) { s = String(s == null ? '' : s).replace(/<!/g, '< !'); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
   const blocks = [];
   if (ia.resumo) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: corta(ia.resumo, 2800) } });
-  // 🌟 Reconhecimentos primeiro: a leitura lidera pelo que foi bem, não pela cobrança.
-  // Compat: se o modelo devolver o "destaque" antigo (string única), vira um reconhecimento.
-  let recs = (ia.reconhecimentos || []).slice(0, 3).filter(function (r) { return r && (r.pessoa || r.vendedora || r.fez); });
-  if (!recs.length && ia.destaque) recs = [{ pessoa: '', fez: ia.destaque }];
+  // 🌟 Reconhecimentos do TIME (recepção é acompanhada como equipe, sem citar nome).
+  // Aceita string (formato novo) ou objeto antigo, mas sempre ignora o nome.
+  let recs = (ia.reconhecimentos || []).slice(0, 3).map(function (r) {
+    return typeof r === 'string' ? r : (r && (r.fez || r.oquefez || '')); }).filter(Boolean);
+  if (!recs.length && ia.destaque) recs = [String(ia.destaque)];
   if (recs.length) {
-    let l = '🌟 *Reconhecimentos*\n';
-    recs.forEach(function (r) {
-      const quem = r.pessoa || r.vendedora || '';
-      l += '• ' + (quem ? '*' + corta(quem, 40) + '*: ' : '') + corta(r.fez || '', 200) + '\n';
-    });
+    let l = '🌟 *Reconhecimentos (equipe)*\n';
+    recs.forEach(function (r) { l += '• ' + corta(r, 200) + '\n'; });
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: l.trim() } });
   }
   const dem = (ia.demandas || []).slice(0, 7).filter(function (d) { return d && d.tipo; });
@@ -4429,16 +4427,13 @@ function rodarRelatorioRecepcao_() {
   blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
     '*' + m.conversas + '* conversas' + (novos === null ? '' : ' · *' + novos + '* novos') +
     ' · 📤 ' + m.enviadas + ' · 📥 ' + m.recebidas + (fora ? '\n_(fora ' + fora + ' msgs de confirmação automática)_' : '') } });
+  // Recepção é medida como EQUIPE (combinado com o time em 22/07): tempo do time, sem
+  // apontar a pessoa "pior". Só a mediana geral.
   if (m.respostas) blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
-    '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
-    (m.pior && m.pior.seg > m.mediana ? ' · pior ' + wppFmtDur_(m.pior.seg) + ' (' + m.pior.nome + ')' : '') } });
+    '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) + ' _(equipe)_' } });
   // 📋 Radar: pacientes cuja última mensagem ficou sem retorno (lista de trabalho, não cobrança).
   blocks.push.apply(blocks, wppBlocosPraRetomar_(wppPraRetomar_(reais)));
-  // Placar por recepcionista — só aparece se a assinatura atribuir mensagens; senão, dica.
-  const placarRec = wppBlocosPlacar_(m, 'Por recepcionista');
-  if (placarRec.length) blocks.push.apply(blocks, placarRec);
-  else blocks.push({ type: 'context', elements: [{ type: 'mrkdwn',
-    text: '💡 pra ver o placar por recepcionista, cada uma pode assinar "aqui é a <nome>" ao responder' }] });
+  // SEM placar por recepcionista: a recepção é acompanhada como equipe, não indivíduo.
   // Leitura de IA (demandas / esperando / qualidade). Falha não derruba os números.
   try {
     const ia = wppAnaliseRecepcaoIA_(reais, j.ini);
