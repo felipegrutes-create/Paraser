@@ -3661,6 +3661,56 @@ function wppBlocosPlacar_(m, titulo) {
   ];
 }
 
+// ===== FECHAMENTOS DO DIA por vendedora =====
+// O que cada vendedora MARCOU como venda fechada dentro da janela do relatório
+// (aba Vendas_Fechadas). Credita no mesmo dia, antes de casar com Rede/PIX: por
+// isso separa ✅ CONFIRMADA de ⏳ a conferir (AGUARDANDO). Responde à queixa
+// "fechei tratamento e não apareceu" — o fechamento vive no fluxo comercial, não
+// nas conversas que a leitura por IA enxerga.
+function wppFechamentosDia_(iniIso, fimIso) {
+  const iniMs = new Date(iniIso).getTime(), fimMs = new Date(fimIso).getTime();
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(VENDAS_FECHADAS_SHEET);
+  if (!sh || sh.getLastRow() < 2) return { total: 0, valor: 0, confirmadas: 0, porVendedora: [] };
+  const data = sh.getDataRange().getValues();
+  const H = {}; VF_HEADERS.forEach(function(h, i) { H[h] = i; });
+  const porVend = {};
+  let total = 0, valorTot = 0, confTot = 0;
+  for (let i = 1; i < data.length; i++) {
+    const ts = new Date(data[i][H.timestamp]).getTime();   // timestamp = quando a vendedora marcou
+    if (isNaN(ts) || ts < iniMs || ts >= fimMs) continue;
+    const nome = String(data[i][H.vendedora] || '').trim() || '(sem nome)';
+    const valor = Number(data[i][H.valor]) || 0;
+    const conf = String(data[i][H.status] || '').toUpperCase().indexOf('CONFIRM') >= 0;
+    const v = porVend[nome] = porVend[nome] || { n: 0, conf: 0, valor: 0 };
+    v.n++; v.valor += valor; if (conf) v.conf++;
+    total++; valorTot += valor; if (conf) confTot++;
+  }
+  return {
+    total: total, valor: valorTot, confirmadas: confTot,
+    porVendedora: Object.keys(porVend)
+      .map(function(n) { return { nome: n, n: porVend[n].n, conf: porVend[n].conf, valor: porVend[n].valor }; })
+      .sort(function(a, b) { return b.valor - a.valor; })
+  };
+}
+
+// Bloco 💰 dos fechamentos do dia (entra no card de números, logo após o placar).
+function wppBlocosFechamentos_(f) {
+  if (!f || !f.total) return [];
+  const fmt = function(v) { return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); };
+  const linhas = f.porVendedora.map(function(v) {
+    const pend = v.n - v.conf;
+    let tag = '';
+    if (v.conf) tag += ' · ✅ ' + v.conf;
+    if (pend) tag += ' · ⏳ ' + pend + ' a conferir';
+    return '*' + v.nome + '* · ' + v.n + ' venda' + (v.n === 1 ? '' : 's') + ' · ' + fmt(v.valor) + tag;
+  });
+  return [
+    { type: 'section', text: { type: 'mrkdwn',
+      text: '💰 *Fechamentos de hoje* (' + f.total + ' · ' + fmt(f.valor) + ')\n' + linhas.join('\n') } },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'quem marcou venda hoje · ⏳ ainda vai casar com Rede/PIX' }] }
+  ];
+}
+
 // =========================================================
 // WHATSAPP COMERCIAL — transcrição de áudios (Gemini)
 // As pacientes mandam áudio; sem isso a IA das 19h só vê "[audio]".
@@ -3870,10 +3920,12 @@ function wppAnaliseIA_(msgs, assinaturas, iniIso) {
   const system =
     'Você é analista comercial da Paraser, clínica de fertilidade no Rio de Janeiro. ' +
     'Vai receber a transcrição das conversas de WhatsApp do dia entre a clínica e pacientes. ' +
+    'As VENDEDORAS leem este relatório: seja justo e COMECE reconhecendo o esforço concreto delas (bom acolhimento, contorno de objeção, follow-up, agilidade, venda encaminhada). Não foque só em problemas. ' +
     'Responda APENAS com JSON válido (sem markdown, sem cercas de código), neste formato: ' +
-    '{"resumo":"2-3 frases sobre o dia comercial","leads_quentes":[{"nome":"...","motivo":"...","acao":"próximo passo objetivo"}],' +
-    '"objecoes":[{"tema":"...","vezes":1}],"qualidade":[{"conversa":"...","problema":"..."}],"destaque":"algo bom que uma vendedora fez, ou string vazia"}. ' +
-    'Máximo 4 leads_quentes (só quem demonstrou intenção real de fechar/agendar), 5 objecoes, 3 qualidade (pergunta ignorada, resposta fria, vácuo). ' +
+    '{"resumo":"2-3 frases sobre o dia comercial, começando pelo que foi bem","reconhecimentos":[{"vendedora":"nome de quem assinou","fez":"o que fez de bom, curto e concreto"}],' +
+    '"leads_quentes":[{"nome":"...","motivo":"...","acao":"próximo passo objetivo"}],' +
+    '"objecoes":[{"tema":"...","vezes":1}],"qualidade":[{"conversa":"...","problema":"..."}]}. ' +
+    'Máximo 3 reconhecimentos (credite mais de uma vendedora quando houver mérito; use o nome que assinou "aqui é a Fulana"; se ninguém se destacou, lista vazia), 4 leads_quentes (só quem demonstrou intenção real de fechar/agendar), 5 objecoes, 3 qualidade (pergunta ignorada, resposta fria, vácuo). ' +
     'CONTEXTO ANTES DE JULGAR "qualidade": você vê só um RECORTE da conversa (o dia de hoje + poucas mensagens anteriores), não o histórico completo. ' +
     'Se a vendedora está claramente AGUARDANDO UM TERCEIRO — retorno de laboratório (ex: DASA), da contabilidade, de um médico, do plano/convênio, ou a decisão/resposta da própria paciente — então NÃO é vácuo, pergunta ignorada nem resposta fria: é uma pendência legítima em andamento, e NÃO deve entrar em "qualidade". ' +
     'Também não conte como falha uma conversa que a própria transcrição mostra já resolvida/encaminhada. Só aponte em "qualidade" quando a vendedora, por conta própria, deixou a paciente sem resposta ou respondeu mal, e ainda assim na dúvida prefira NÃO apontar (pode faltar contexto anterior). ' +
@@ -3905,6 +3957,17 @@ function wppBlocosIA_(ia) {
   };
   const blocks = [{ type: 'header', text: { type: 'plain_text', text: '🧠 WhatsApp · Leitura do dia', emoji: true } }];
   if (ia.resumo) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: corta(ia.resumo, 2800) } });
+  // 🌟 Reconhecimentos primeiro: a leitura lidera pelo que foi bem, não pela cobrança.
+  // Compat: se o modelo devolver o "destaque" antigo (string única), vira um reconhecimento.
+  let recs = (ia.reconhecimentos || []).slice(0, 3).filter(function(r) { return r && (r.vendedora || r.fez); });
+  if (!recs.length && ia.destaque) recs = [{ vendedora: '', fez: ia.destaque }];
+  if (recs.length) {
+    let l = '🌟 *Reconhecimentos*\n';
+    recs.forEach(function(r) {
+      l += '• ' + (r.vendedora ? '*' + corta(r.vendedora, 40) + '*: ' : '') + corta(r.fez || '', 200) + '\n';
+    });
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: l.trim() } });
+  }
   const leads = (ia.leads_quentes || []).slice(0, 4).filter(function(x) { return x && (x.nome || x.motivo); });
   if (leads.length) {
     let l = '🔥 *Leads quentes*\n';
@@ -3920,11 +3983,10 @@ function wppBlocosIA_(ia) {
   }
   const qualidade = (ia.qualidade || []).slice(0, 3).filter(function(q) { return q && (q.conversa || q.problema); });
   if (qualidade.length) {
-    let l = '⚠️ *Atenção*\n';
+    let l = '🔎 *Pra acompanhar*\n';
     qualidade.forEach(function(q) { l += '• ' + corta(q.conversa || '?', 80) + ': ' + corta(q.problema, 200) + '\n'; });
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: l.trim() } });
   }
-  if (ia.destaque) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '🌟 ' + corta(ia.destaque, 500) } });
   blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: 'leitura automática por IA · confira antes de agir' }] });
   return blocks;
 }
@@ -4123,6 +4185,9 @@ function rodarRelatorioWhatsApp() {
     '📱 celular ' + m.celular + ' · 💻 web ' + m.web } });
   // 🏅 Placar por vendedora: msgs · conversas · novos · 1ª resposta · vácuos · janela de atividade.
   blocks.push.apply(blocks, wppBlocosPlacar_(m, 'Por vendedora'));
+  // 💰 Fechamentos do dia por vendedora (venda marcada na aba Vendas_Fechadas na janela).
+  // Blindado: erro aqui nunca derruba o card de números.
+  try { blocks.push.apply(blocks, wppBlocosFechamentos_(wppFechamentosDia_(j.ini, j.fim))); } catch (eF) {}
   if (m.respostas) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text:
       '⏱️ *1ª resposta:* mediana ' + wppFmtDur_(m.mediana) +
