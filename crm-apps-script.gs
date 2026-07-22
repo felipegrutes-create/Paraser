@@ -3542,12 +3542,16 @@ function wppFmtDur_(seg) {
 // Conversa interna da equipe não é métrica comercial (lista configurável na
 // property WPP_IGNORAR, por trecho do nome do contato; default 'paraser').
 function wppEhInterno_(nome) {
-  const n = String(nome || '').toLowerCase().trim();
+  const n = String(nome || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
   if (!n) return false;
   // Médicos (a clínica salva como "Dr/Dra ...") e a enfermagem não são pacientes.
   // O prefixo Dr/Dra é seguro: paciente não fica cadastrada assim (não pega uma
   // paciente chamada Priscila/Bianca, só quem está salvo como "Dra Priscila").
   if (/^dra?[\s.]/.test(n) || n.indexOf('enfermagem') !== -1) return true;
+  // Outras clínicas, laboratórios e profissionais parceiros (não são pacientes). Palavras
+  // com \b onde uma paciente poderia colidir (Nicoleta→coleta, Sabino→sabin, Studio).
+  if (/(clinica|consultorio|laboratorio|recepcao|prescritor|acupunturista|nutricionista|nutri\)|fleury|pardini)/.test(n)) return true;
+  if (/\b(coleta|studio|sabin|dasa)\b/.test(n)) return true;
   // Lista de ignorados: a Property (se houver) + fixos (clínica, lab Embrion, profissionais).
   const lista = ((wppProps_().getProperty('WPP_IGNORAR') || 'paraser') + ',embrion,bruna ortiz').toLowerCase().split(',');
   return lista.some(function(t) { return t.trim() && n.indexOf(t.trim()) !== -1; });
