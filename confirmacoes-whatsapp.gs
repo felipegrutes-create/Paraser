@@ -2009,6 +2009,22 @@ function doGet(e) {
     slackPostReag('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
     return ContentService.createTextOutput(JSON.stringify({ ok: true, wa: waT })).setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'slack-diag' && params.key === 'paraser2026') {
+    var diag = { canalAlvo: CF_SLACK_CHANNEL_REAG };
+    try {
+      var auth = JSON.parse(UrlFetchApp.fetch('https://slack.com/api/auth.test',
+        { method: 'post', headers: { Authorization: 'Bearer ' + CF_SLACK_TOKEN }, muteHttpExceptions: true }).getContentText());
+      diag.app = auth.user || '?'; diag.appId = auth.user_id || auth.bot_id || '';
+    } catch (e) { diag.authErro = e.message; }
+    try {
+      var lst = JSON.parse(UrlFetchApp.fetch('https://slack.com/api/conversations.list?limit=1000&exclude_archived=true&types=public_channel,private_channel',
+        { headers: { Authorization: 'Bearer ' + CF_SLACK_TOKEN } }).getContentText());
+      diag.canaisReag = (lst.channels || []).filter(function (c) { return c.name.indexOf('reagend') >= 0; })
+        .map(function (c) { return { nome: c.name, appEhMembro: !!c.is_member }; });
+      diag.reagExiste = diag.canaisReag.length > 0;
+    } catch (e) { diag.listErro = e.message; }
+    return ContentService.createTextOutput(JSON.stringify(diag)).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'dump-pendentes' && params.key === 'paraser2026') {
     var ps = pendentesSheet_();
     var pout = { total: 0, rows: [] };
