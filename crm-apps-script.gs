@@ -775,6 +775,22 @@ function handleGetFinancial(params) {
   var ds2 = ds.split('/').reverse().join('-');
   var de2 = de.split('/').reverse().join('-');
 
+  // Cache de servidor (gzip): o Feegow leva 5-9s por janela e várias telas batem aqui
+  // (Exec, Sócios, Médicos, Repasses, boot), muitas vezes pedindo o MESMO período.
+  // Período fechado (fim < hoje) não muda → 6h; período que inclui hoje → 10 min.
+  // Compartilhado entre todos os usuários do dashboard. ?nocache=1 fura (depurar).
+  var finCacheKey = 'fin_v1_' + ds2 + '_' + de2;
+  var finTtl = de2 < Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd') ? 21600 : 600;
+  if (!params.nocache) {
+    try {
+      var finHit = CacheService.getScriptCache().get(finCacheKey);
+      if (finHit) {
+        var unz = Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(finHit), 'application/x-gzip')).getDataAsString();
+        return ContentService.createTextOutput(unz).setMimeType(ContentService.MimeType.JSON);
+      }
+    } catch (eCache) { /* cache corrompido → segue pro Feegow */ }
+  }
+
   var reqHeaders = { 'x-access-token': FEEGOW_API_TOKEN };
   var base = FEEGOW_API_BASE;
 
@@ -798,7 +814,7 @@ function handleGetFinancial(params) {
   }
 
   var invoices = (invoicesData && invoicesData.content) ? invoicesData.content : [];
-  if (!invoices.length) return jsonOk({ success: true, total: 0, data: [] });
+  if (!invoices.length) return finCacheSave_(finCacheKey, finTtl, { success: true, total: 0, data: [] });
 
   // Passo 2: carregar cache de nomes (pacientes, procedimentos, produtos)
   var CACHE_SHEET = 'Cache_Nomes';
@@ -971,7 +987,17 @@ function handleGetFinancial(params) {
     return out;
   });
 
-  return jsonOk({ success: true, total: result.length, data: result });
+  return finCacheSave_(finCacheKey, finTtl, { success: true, total: result.length, data: result });
+}
+
+// Salva a resposta do get_financial no cache (gzip+base64; CacheService limita a
+// ~100KB por chave — se não couber, só devolve sem cachear) e retorna o JSON.
+function finCacheSave_(key, ttl, obj) {
+  try {
+    var b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(obj))).getBytes());
+    if (b64.length < 95000) CacheService.getScriptCache().put(key, b64, ttl);
+  } catch (e) { /* payload grande demais ou gzip falhou → segue sem cache */ }
+  return jsonOk(obj);
 }
 
 function handleDeleteDonor(body) {

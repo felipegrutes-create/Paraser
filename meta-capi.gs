@@ -1080,6 +1080,25 @@ function _marketingFunnel_() {
   };
 }
 
+// Cache do funil e do "now" (a tela Marketing levava ~40s a cada abertura: a
+// contagem de 1ª vez ao vivo bate no Feegow /appoints/search do mês inteiro).
+// Funil: 15 min (o snapshot vem de planilha 2x/dia; só a contagem é viva).
+// Now: 5 min (gasto do dia na Meta reporta com atraso maior que isso).
+// ?nocache=1 fura o cache pra depurar.
+function _mktCached_(cacheKey, ttlSec, builder, nocache) {
+  var c = CacheService.getScriptCache();
+  if (!nocache) {
+    var hit = c.get(cacheKey);
+    if (hit) { try { var o = JSON.parse(hit); o.cached = true; return o; } catch (e) {} }
+  }
+  var out = builder();
+  if (out && out.ok) {
+    out.cachedAt = new Date().toISOString();
+    try { c.put(cacheKey, JSON.stringify(out), ttlSec); } catch (e) {}
+  }
+  return out;
+}
+
 // ---- ESTRUTURA: dados da "máquina" (públicos ao vivo + eventos) ----
 function _datasetEventCount_(eventName, days) {
   try {
@@ -1652,8 +1671,8 @@ function doGet(e) {
     if (p.action === 'clarity')       return json(_clarity_());
     if (p.action === 'clarity-now')   return json({ ok: true, row: coletarClarity() });
     if (p.action === 'clarity-setup') return json(_claritySetup_());
-    if (p.action === 'marketing-now')     return json(_marketingNow_());
-    if (p.action === 'marketing-funnel')  return json(_marketingFunnel_());
+    if (p.action === 'marketing-now')     return json(_mktCached_('mkt_now_v1',    300, _marketingNow_,    p.nocache));
+    if (p.action === 'marketing-funnel')  return json(_mktCached_('mkt_funnel_v1', 900, _marketingFunnel_, p.nocache));
     if (p.action === 'marketing-setup')   return json(_marketingSetup_());
     if (p.action === 'estrutura-month')   return json(_estruturaMonth_(p.ym));
     if (p.action === 'marketing-snapshot-now') return json({ ok: true, row: gravarFunilSnapshot() });
