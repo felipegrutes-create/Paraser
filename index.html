@@ -2736,10 +2736,21 @@
       function unlock(){ if (lock) lock.remove(); }
       // Modo "só Mapa de Salas" (mapa-salas.html → ?only=salas): acesso direto, sem login.
       if (/[?&]only=salas\b/.test(location.search)) { try { document.body.classList.add('only-salas'); } catch(e){} unlock(); return; }
-      // Sessão já ativa? (fecha e reabre o navegador = pede login de novo; sessionStorage)
+      // Sessão salva? Fica no localStorage por 30 dias (renova a cada login): fechar e
+      // reabrir o navegador NÃO pede senha de novo. Sair pelo botão apaga. Trocar a senha
+      // do usuário na aba Usuarios invalida o token guardado nos endpoints que validam.
+      var TRINTA_DIAS = 30 * 24 * 60 * 60 * 1000;
       try {
-        var raw = sessionStorage.getItem('pr_session');
-        if (raw) { var s = JSON.parse(raw); if (s && s.token && s.usuario) { window.PR_SESSION = s; unlock(); return; } }
+        var raw = localStorage.getItem('pr_session') || sessionStorage.getItem('pr_session'); // sessionStorage: migra quem estava logado antes desta versão
+        if (raw) {
+          var s = JSON.parse(raw);
+          var valida = s && s.token && s.usuario && (!s.salvoEm || (Date.now() - s.salvoEm) < TRINTA_DIAS);
+          if (valida) {
+            if (!s.salvoEm) { s.salvoEm = Date.now(); try { localStorage.setItem('pr_session', JSON.stringify(s)); } catch(e){} }
+            window.PR_SESSION = s; unlock(); return;
+          }
+          try { localStorage.removeItem('pr_session'); sessionStorage.removeItem('pr_session'); } catch(e){}
+        }
       } catch(e){}
       var INP = 'width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;box-sizing:border-box';
       render('');
@@ -2778,7 +2789,7 @@
           .then(function(r){ return r.json(); })
           .then(function(j){
             if (j && j.ok && j.token) {
-              try { sessionStorage.setItem('pr_session', JSON.stringify({ usuario:j.usuario, nome:j.nome, papel:j.papel, token:j.token })); } catch(e){}
+              try { localStorage.setItem('pr_session', JSON.stringify({ usuario:j.usuario, nome:j.nome, papel:j.papel, token:j.token, salvoEm: Date.now() })); } catch(e){}
               location.reload();
             } else { render((j && j.erro) || 'Usuário ou senha inválidos.'); }
           })
@@ -6500,7 +6511,7 @@
             logUso('abriu_area', id, '');
         }
         function prLogout() {
-            try { sessionStorage.removeItem('pr_session'); } catch(e){}
+            try { localStorage.removeItem('pr_session'); sessionStorage.removeItem('pr_session'); } catch(e){}
             location.reload();
         }
         // Aplica o bloqueio por função: esconde nav não permitida, mostra badge do usuário, ajusta seção ativa.
