@@ -2038,6 +2038,34 @@ function doGet(e) {
     slackPostReag('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
     return ContentService.createTextOutput(JSON.stringify({ ok: true, wa: waT })).setMimeType(ContentService.MimeType.JSON);
   }
+  // Busca no histórico do Slack (canais atendimento + reagendamento) mensagens que
+  // citam um nome, nos últimos N dias. Serve pra achar QUANDO a paciente clicou
+  // reagendar/confirmar (o sistema posta na hora do clique). ts = horário exato.
+  if (params.action === 'slack-busca' && params.key === 'paraser2026') {
+    var alvoS = String(params.nome || '').toUpperCase();
+    var dias = Number(params.dias) || 40;
+    var oldest = Math.floor((Date.now() - dias * 86400000) / 1000);
+    var canais = params.canal ? [params.canal] : [CF_SLACK_CHANNEL, CF_SLACK_CHANNEL_REAG];
+    var achados = [];
+    canais.forEach(function (cn) {
+      try {
+        var cid = slackGetChannelId(cn); if (!cid) return;
+        var cursor = '', volta = 0;
+        do {
+          var u = 'https://slack.com/api/conversations.history?channel=' + cid + '&limit=200&oldest=' + oldest + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+          var j = JSON.parse(UrlFetchApp.fetch(u, { headers: { Authorization: 'Bearer ' + CF_SLACK_TOKEN } }).getContentText());
+          if (!j.ok) { achados.push({ canal: cn, erro: j.error }); break; }
+          (j.messages || []).forEach(function (m) {
+            if ((m.text || '').toUpperCase().indexOf(alvoS) >= 0)
+              achados.push({ canal: cn, quando: Utilities.formatDate(new Date(Number(m.ts) * 1000), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm:ss'), texto: String(m.text || '').slice(0, 220) });
+          });
+          cursor = (j.response_metadata && j.response_metadata.next_cursor) || '';
+        } while (cursor && ++volta < 12);
+      } catch (e) { achados.push({ canal: cn, erro: e.message }); }
+    });
+    achados.sort(function (a, b) { return String(a.quando || '') < String(b.quando || '') ? -1 : 1; });
+    return ContentService.createTextOutput(JSON.stringify({ nome: alvoS, dias: dias, achados: achados }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'slack-diag' && params.key === 'paraser2026') {
     var diag = { canalAlvo: CF_SLACK_CHANNEL_REAG };
     try {
