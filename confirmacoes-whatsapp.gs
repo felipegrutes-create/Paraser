@@ -1940,6 +1940,35 @@ function doGet(e) {
       .createTextOutput(JSON.stringify(_diagConfirmacoes(), null, 2))
       .setMimeType(ContentService.MimeType.JSON);
   }
+  // Investiga uma paciente pelo nome: log de confirmação + fila de pendentes +
+  // status atual no Feegow (a API não expõe QUEM desmarcou, só o tipo pelo status).
+  if (params.action === 'investigar' && params.key === 'paraser2026') {
+    var alvo = String(params.nome || '').toUpperCase().trim();
+    var inv = { nome: alvo, log: [], pendentes: [], feegow: [] };
+    var ssi = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+    var shL = ssi.getSheetByName(CF_LOG_SHEET);
+    if (shL && shL.getLastRow() > 1) shL.getDataRange().getValues().forEach(function (r, i) {
+      if (i > 0 && String(r[1]).toUpperCase().indexOf(alvo) >= 0)
+        inv.log.push({ ts: r[0], paciente: r[1], prof: r[2], proc: r[3], procId: r[4], tel: r[5], template: r[6], status: r[7] });
+    });
+    var shPe = ssi.getSheetByName(CF_PENDENTES_SHEET);
+    if (shPe && shPe.getLastRow() > 1) shPe.getDataRange().getValues().forEach(function (r, i) {
+      if (i > 0 && String(r[2]).toUpperCase().indexOf(alvo) >= 0)
+        inv.pendentes.push({ ts: r[0], tel: r[1], paciente: r[2], agId: r[3], data: r[4], status: r[5] });
+    });
+    var STN = { 1: 'Marcado-não confirmado', 3: 'Atendido', 6: 'Não compareceu', 7: 'Marcado-confirmado', 11: 'Desmarcado pelo PACIENTE', 15: 'Remarcado', 22: 'Cancelado pelo PROFISSIONAL/recepção' };
+    var vistos = {};
+    inv.pendentes.forEach(function (p) { if (p.agId) vistos[p.agId] = true; });
+    Object.keys(vistos).forEach(function (agId) {
+      try {
+        var a = (JSON.parse(UrlFetchApp.fetch(CF_FEEGOW_BASE + '/appoints/search?agendamento_id=' + agId,
+          { headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true }).getContentText()).content || [])[0] || {};
+        inv.feegow.push({ agId: agId, data: a.data, hora: a.horario, procId: a.procedimento_id, status_id: a.status_id,
+          status: STN[a.status_id] || a.status_id, agendado_por: a.agendado_por, agendado_em: a.agendado_em, notas: a.notas || '' });
+      } catch (e) { inv.feegow.push({ agId: agId, erro: e.message }); }
+    });
+    return ContentService.createTextOutput(JSON.stringify(inv, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  }
   // Liga o fan-out pro monitor: guarda a URL de ingestão + liga o notify-sent.
   // Devolve o instance_id (pra rotular a recepção no monitor). ?url= vazio só liga o notify.
   if (params.action === 'set_monitor' && params.key === 'paraser2026') {
