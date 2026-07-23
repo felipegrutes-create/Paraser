@@ -85,6 +85,14 @@ function doGet(e) {
     if (action === 'wpp_busca') {
       return handleWppBusca(e.parameter);
     }
+    // Diagnóstico do envio do 🌙 Fechamento do dia pro canal do financeiro.
+    if (action === 'fech_diag') {
+      return handleFechDiag(e.parameter);
+    }
+    // Força o 🌙 Fechamento do dia agora (respeita a trava por data).
+    if (action === 'rodar_fechamento') {
+      return jsonOk({ ok: true, entregue: rodarFechamentoDia() });
+    }
 
     // Grade de Horários — salas por médico+dia (compartilhado entre todos os aparelhos)
     if (action === 'grade_salas_get') {
@@ -2581,19 +2589,54 @@ function notificarMetaSlack_(novas, fechamento) {
     const botF = pF.getProperty('SLACK_BOT_TOKEN');
     const whFech = pF.getProperty('SLACK_FECHAMENTO_WEBHOOK');
     const textF = '🌙 Fechamento do dia · ' + mesPorExtenso_(mes) + ': ' + fmt(m.total) + ' de ' + fmt(m.meta);
+    let entregue = false;
     try {
       if (canalF && botF) {
-        UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+        const rF = UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
           method: 'post', contentType: 'application/json', muteHttpExceptions: true,
           headers: { Authorization: 'Bearer ' + botF },
           payload: JSON.stringify({ channel: canalF, blocks: blocks, text: textF })
         });
+        try { entregue = JSON.parse(rF.getContentText()).ok === true; } catch (e2) {}
+        if (!entregue) Logger.log('Fechamento Slack (bot) falhou: ' + rF.getContentText().slice(0, 150));
       } else if (whFech) {
-        UrlFetchApp.fetch(whFech, { method: 'post', contentType: 'application/json',
+        const rW = UrlFetchApp.fetch(whFech, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
           payload: JSON.stringify({ blocks: blocks, text: textF }) });
+        entregue = rW.getResponseCode() >= 200 && rW.getResponseCode() < 300;
+        if (!entregue) Logger.log('Fechamento Slack (webhook) falhou: HTTP ' + rW.getResponseCode());
+      } else {
+        Logger.log('Fechamento: sem canal/bot nem webhook configurado.');
       }
-    } catch (e) {}
+    } catch (e) { Logger.log('Fechamento Slack erro: ' + e.message); }
+    return entregue;   // quem chama (postarFechamentoUmaVezDia_) só trava a data se entregou
   }
+}
+
+// Diagnóstico: mostra a config do canal do financeiro, a trava de data e (com
+// ?teste=1) faz um post real pra ver o erro exato do Slack (ex: not_in_channel).
+function handleFechDiag(params) {
+  const p = PropertiesService.getScriptProperties();
+  const canal = p.getProperty('SLACK_FECHAMENTO_CHANNEL') || '';
+  const bot = p.getProperty('SLACK_BOT_TOKEN') || '';
+  const wh = p.getProperty('SLACK_FECHAMENTO_WEBHOOK') || '';
+  const out = { canal: canal || '(vazio)', temBotToken: !!bot, temWebhook: !!wh,
+                FECH_LAST_DATE: p.getProperty('FECH_LAST_DATE') || '(nunca)',
+                usaria: (canal && bot) ? 'BOT' : (wh ? 'WEBHOOK' : 'NADA CONFIGURADO') };
+  if (String(params.teste) === '1') {
+    if (canal && bot) {
+      const r = UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+        method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        headers: { Authorization: 'Bearer ' + bot },
+        payload: JSON.stringify({ channel: canal, text: '🧪 Teste de diagnóstico do Fechamento do dia.' }) });
+      try { const j = JSON.parse(r.getContentText()); out.testeBot = { ok: j.ok, error: j.error || null, channel: j.channel || null }; }
+      catch (e) { out.testeBot = { raw: r.getContentText().slice(0, 150) }; }
+    } else if (wh) {
+      const r2 = UrlFetchApp.fetch(wh, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        payload: JSON.stringify({ text: '🧪 Teste de diagnóstico do Fechamento do dia (webhook).' }) });
+      out.testeWebhook = { http: r2.getResponseCode(), body: r2.getContentText().slice(0, 100) };
+    }
+  }
+  return jsonOk(out);
 }
 
 function somaConfirmadoMes_(mes) {
@@ -2876,9 +2919,11 @@ function postarFechamentoUmaVezDia_() {
   const p = PropertiesService.getScriptProperties();
   if (p.getProperty('FECH_LAST_DATE') === hoje) return false; // já postou hoje
   const r = conciliarVendasFechadas_(false); // concilia sem postar; posto 1 card só, abaixo
-  notificarMetaSlack_(r ? r.detalhes : [], true);
-  p.setProperty('FECH_LAST_DATE', hoje);
-  return true;
+  const entregue = notificarMetaSlack_(r ? r.detalhes : [], true);
+  if (entregue) { p.setProperty('FECH_LAST_DATE', hoje); return true; }
+  // NÃO trava se não entregou: reenvia no próximo disparo horário (era o bug do "não foi enviado").
+  Logger.log('Fechamento NÃO entregue no #financeiro — vai tentar de novo na próxima hora.');
+  return false;
 }
 
 // Fechamento do dia: dispara o card do #financeiro. Idempotente (trava por data).
