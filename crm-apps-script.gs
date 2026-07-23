@@ -81,6 +81,10 @@ function doGet(e) {
     if (action === 'get_financial') {
       return handleGetFinancial(e.parameter);
     }
+    // Busca mensagens de um número no banco do monitor (whatsapp.mensagens).
+    if (action === 'wpp_busca') {
+      return handleWppBusca(e.parameter);
+    }
 
     // Grade de Horários — salas por médico+dia (compartilhado entre todos os aparelhos)
     if (action === 'grade_salas_get') {
@@ -2994,6 +2998,32 @@ function jsonErr(msg) {
 // =========================================================
 const WPP_BQ_DATASET = 'whatsapp';
 const WPP_BQ_TABLE = 'mensagens';
+
+// Busca mensagens de um número no banco do monitor (whatsapp.mensagens), pra
+// investigar QUANDO uma mensagem foi enviada/recebida (ex: horário do reagendamento).
+// ?action=wpp_busca&phone=5521...&contem=reagend (contem é opcional, filtra o texto).
+function handleWppBusca(params) {
+  const phone = String(params.phone || '').replace(/\D/g, '');
+  if (phone.length < 8) return jsonErr('phone obrigatório (só dígitos)');
+  const termo = phone.slice(-9); // últimos 9 dígitos pra casar formatos
+  const sql =
+    "SELECT FORMAT_TIMESTAMP('%d/%m/%Y %H:%M:%S', momento, 'America/Sao_Paulo') AS quando, " +
+    "from_me, chat_name, SUBSTR(texto, 0, 220) AS texto " +
+    "FROM " + WPP_BQ_REF + " WHERE chat_phone LIKE @like " +
+    (params.contem ? "AND UPPER(texto) LIKE @contem " : "") +
+    "ORDER BY momento";
+  const qp = [{ name: 'like', parameterType: { type: 'STRING' }, parameterValue: { value: '%' + termo } }];
+  if (params.contem) qp.push({ name: 'contem', parameterType: { type: 'STRING' }, parameterValue: { value: '%' + String(params.contem).toUpperCase() + '%' } });
+  const req = { query: sql, useLegacySql: false, parameterMode: 'NAMED', timeoutMs: 30000, queryParameters: qp };
+  let res = BigQuery.Jobs.query(req, BQ_PROJECT);
+  const jobId = res.jobReference.jobId, loc = res.jobReference.location;
+  let t = 0;
+  while (!res.jobComplete) { if (++t > 30) return jsonErr('BQ timeout'); Utilities.sleep(1000); res = BigQuery.Jobs.getQueryResults(BQ_PROJECT, jobId, { location: loc, timeoutMs: 30000 }); }
+  const msgs = (res.rows || []).map(function (r) {
+    return { quando: r.f[0].v, from_me: r.f[1].v === 'true' || r.f[1].v === true, chat_name: r.f[2].v, texto: r.f[3].v };
+  });
+  return jsonOk({ ok: true, phone: phone, total: msgs.length, msgs: msgs });
+}
 const WPP_BQ_REF = '`' + BQ_PROJECT + '.' + WPP_BQ_DATASET + '.' + WPP_BQ_TABLE + '`';
 const WPP_BQ_TRANS = '`' + BQ_PROJECT + '.' + WPP_BQ_DATASET + '.transcricoes`';
 const WPP_FALHAS_SHEET = 'WhatsApp_Falhas';
