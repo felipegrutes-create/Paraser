@@ -2025,6 +2025,17 @@ function doGet(e) {
     } catch (e) { diag.listErro = e.message; }
     return ContentService.createTextOutput(JSON.stringify(diag)).setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'primeira-usg-sim' && params.key === 'paraser2026') {
+    return ContentService.createTextOutput(JSON.stringify(_simularPrimeiraUsg_(Number(params.limit) || 30))).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'backfill-usg' && params.key === 'paraser2026') {
+    return ContentService.createTextOutput(JSON.stringify(backfillHistoricoUSG(Number(params.meses) || 24))).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'setup-primeira-usg' && params.key === 'paraser2026') {
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'notificarPrimeiraUSG') ScriptApp.deleteTrigger(t); });
+    ScriptApp.newTrigger('notificarPrimeiraUSG').timeBased().atHour(7).everyDays(1).inTimezone('America/Sao_Paulo').create();
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, trigger: 'notificarPrimeiraUSG diário 7h' })).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'dump-pendentes' && params.key === 'paraser2026') {
     var ps = pendentesSheet_();
     var pout = { total: 0, rows: [] };
@@ -2525,6 +2536,157 @@ function slackPostReag(texto) {
     slackPost('⚠️ (não consegui postar no #' + CF_SLACK_CHANNEL_REAG +
               ' — crie o canal e adicione o app da clínica)\n' + texto, CF_SLACK_CHANNEL);
   }
+}
+
+// Post no #comercial (mesmo bot). Fallback pro #atendimento se o app não estiver no canal.
+function slackPostComercial(texto) {
+  if (!slackPost(texto, CF_SLACK_CHANNEL_COMERCIAL)) {
+    slackPost('⚠️ (não consegui postar no #' + CF_SLACK_CHANNEL_COMERCIAL +
+              ' — adicione o app da clínica ao canal)\n' + texto, CF_SLACK_CHANNEL);
+  }
+}
+
+// ================================================================
+// PRIMEIRA USG — avisa o #comercial no dia em que a paciente faz a
+// PRIMEIRA USG dela na clínica (marco de início de tratamento).
+// Roda 1x/dia de manhã (trigger notificarPrimeiraUSG). Uma vez por
+// paciente na vida (aba de controle Primeira_USG_Avisadas).
+// ================================================================
+var CF_SLACK_CHANNEL_COMERCIAL = 'comercial';
+// Base de pacientes que JÁ fizeram USG (até ontem). A API do Feegow não deixa
+// buscar histórico por paciente_id (dá 409), então mantemos a base aqui: um
+// backfill inicial varre os meses passados; o diário compara e vai crescendo.
+var CF_USG_HIST_SHEET = 'USG_Pacientes_Historico';
+// procIds que contam como "fazer USG" (execução de imagem). Exclui PACOTE (cobrança),
+// punção/TEC (não é USG). Fonte: /procedures/list (jul/2026).
+var USG_PROC_IDS = [4,5,6,7,8,9, 11,12,13,14,15,16, 17,18,19,20,21,22,23,
+  25,26,27,28,29,30,31, 40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,
+  57,58,59,60,61,62,64,65,66,67, 73,74,75, 100,122,153,167,171,174,
+  244,245,246,263, 402,403,404,405,406,407,408,409,410,411,412,413,414,
+  50230,50231,50232,50233,50234,50235,50243];
+var STATUS_CANCELADO   = [11, 15, 22];       // no histórico, USG cancelada/remarcada não conta
+var STATUS_FORA_HOJE   = [6, 11, 15, 22];    // hoje, ignora não-compareceu + cancelados
+
+function _ehUSG_(procId) { return USG_PROC_IDS.indexOf(Number(procId)) >= 0; }
+function _dataFeegowISO_(d) { var p = String(d || '').split('-'); return p.length === 3 ? p[2] + '-' + p[1] + '-' + p[0] : String(d); }
+// USG de MEIO de ciclo (2º..6º, TEC/ERA 2-3, 2/3 pós beta): implica exame anterior,
+// então nunca é "primeira USG" (protege contra dado da base incompleto/errado).
+function _procMeioDeCiclo_(nome) {
+  var n = String(nome || '').toUpperCase();
+  return /\b[2-6]\s*[º°]/.test(n) || /\b[23]\s*P[ÓO]S\s*BETA/.test(n) || /(TEC|ERA)\s*[23]\b/.test(n);
+}
+
+// Busca appoints/search por período (dd-mm-yyyy) e opcionalmente paciente.
+// Devolve array (pode ser vazio) ou null se falhou de vez (não confundir com vazio).
+function _appointsBuscar_(dsFeegow, deFeegow, pacienteId) {
+  var url = CF_FEEGOW_BASE + '/appoints/search?data_start=' + dsFeegow + '&data_end=' + deFeegow +
+            '&per_page=1000' + (pacienteId ? '&paciente_id=' + pacienteId : '');
+  for (var t = 0; t < 3; t++) {
+    try {
+      var r = UrlFetchApp.fetch(url, { headers: { 'x-access-token': CF_FEEGOW_TOKEN }, muteHttpExceptions: true });
+      if (r.getResponseCode() === 200) {
+        var j = JSON.parse(r.getContentText());
+        return (Array.isArray(j.content) ? j.content : []).filter(function (a) { return a && typeof a === 'object'; });
+      }
+    } catch (e) {}
+    Utilities.sleep(1500);
+  }
+  return null;
+}
+
+// --- Base histórica de quem já fez USG (aba, um paciente_id por linha) ---
+function _usgHistSheet_() {
+  var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(CF_USG_HIST_SHEET);
+  if (!sh) { sh = ss.insertSheet(CF_USG_HIST_SHEET); sh.appendRow(['PacienteID']); sh.setFrozenRows(1); }
+  return sh;
+}
+function _usgHistSet_() {
+  var sh = _usgHistSheet_(), set = {};
+  if (sh.getLastRow() < 2) return set;
+  sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().forEach(function (r) { if (r[0] !== '') set[String(r[0])] = true; });
+  return set;
+}
+function _usgHistAdd_(sh, ids) {
+  if (!ids.length) return;
+  sh.getRange(sh.getLastRow() + 1, 1, ids.length, 1).setValues(ids.map(function (x) { return [x]; }));
+}
+
+// Pacientes DISTINTOS com USG ativa hoje → { paciente_id: agendamento }
+function _pacientesUsgHoje_(hojeFeegow) {
+  var hoje = _appointsBuscar_(hojeFeegow, hojeFeegow);
+  if (hoje === null) return null;
+  var pac = {};
+  hoje.forEach(function (a) {
+    if (!_ehUSG_(a.procedimento_id)) return;
+    if (STATUS_FORA_HOJE.indexOf(Number(a.status_id)) >= 0) return;
+    if (_procMeioDeCiclo_(resolveNomeProc(a))) return;   // 2º+ implica exame anterior → não é a 1ª
+    if (!pac[a.paciente_id]) pac[a.paciente_id] = a;
+  });
+  return pac;
+}
+
+// Backfill: varre os últimos N meses (sem paciente_id) e registra na base todos os
+// pacientes que já fizeram USG ATÉ ONTEM. Roda uma vez no setup. Idempotente.
+function backfillHistoricoUSG(meses) {
+  meses = meses || 36;
+  var tz = 'America/Sao_Paulo';
+  var ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
+  var ontemISO = Utilities.formatDate(ontem, tz, 'yyyy-MM-dd');
+  var sh = _usgHistSheet_(), jaTem = _usgHistSet_(), novos = {};
+  var d = new Date();
+  for (var i = 0; i < meses; i++) {
+    var ano = d.getFullYear(), mes = d.getMonth() + 1, ult = new Date(ano, mes, 0).getDate();
+    var ags = _appointsBuscar_('01-' + pad2(mes) + '-' + ano, pad2(ult) + '-' + pad2(mes) + '-' + ano);
+    if (ags) ags.forEach(function (a) {
+      if (_ehUSG_(a.procedimento_id) && STATUS_CANCELADO.indexOf(Number(a.status_id)) < 0 &&
+          _dataFeegowISO_(a.data) <= ontemISO && !jaTem[a.paciente_id]) novos[a.paciente_id] = true;
+    });
+    d.setMonth(d.getMonth() - 1);
+    Utilities.sleep(400);
+  }
+  var ids = Object.keys(novos);
+  _usgHistAdd_(sh, ids);
+  Logger.log('backfillHistoricoUSG: +' + ids.length + ' pacientes na base (' + meses + ' meses).');
+  return { adicionados: ids.length, totalBase: Object.keys(jaTem).length + ids.length };
+}
+
+// Diário: avisa o #comercial quem faz a PRIMEIRA USG hoje (não está na base) e
+// adiciona esses pacientes à base (pra não reavaliar amanhã).
+function notificarPrimeiraUSG() {
+  if (!CF_FEEGOW_TOKEN) return;
+  var tz = 'America/Sao_Paulo';
+  var hojeFeegow = Utilities.formatDate(new Date(), tz, 'dd-MM-yyyy');
+  var pac = _pacientesUsgHoje_(hojeFeegow);
+  if (pac === null) { Logger.log('notificarPrimeiraUSG: Feegow não respondeu.'); return; }
+  var base = _usgHistSet_(), sh = _usgHistSheet_(), novos = [];
+  Object.keys(pac).forEach(function (pid) {
+    if (base[pid]) return;                          // já fez USG antes → não é a primeira
+    var ag = pac[pid], p = getPatientData(pid);
+    var proc = resolveNomeProc(ag) || ('procId ' + ag.procedimento_id);
+    var prof = carregarProfissionais()[ag.profissional_id] || '';
+    slackPostComercial('🔬 *Primeira USG* — ' + (p.nome || ('paciente ' + pid)) +
+      ' faz a *primeira USG* dela hoje (' + proc + (prof ? ' · ' + prof : '') +
+      ' às ' + formatHora(ag.horario || '') + ').\nMarco de início de tratamento — vale acompanhar. 💜');
+    novos.push(pid);                                // primeira USG → entra na base
+  });
+  _usgHistAdd_(sh, novos);
+  Logger.log('notificarPrimeiraUSG: ' + novos.length + ' primeira(s) USG de ' + Object.keys(pac).length + ' com USG hoje.');
+}
+
+// DRY-RUN: quem receberia HOJE, sem postar nem gravar. Rápido (1 chamada + base).
+function _simularPrimeiraUsg_(limit) {
+  var tz = 'America/Sao_Paulo';
+  var hojeISO = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var hojeFeegow = Utilities.formatDate(new Date(), tz, 'dd-MM-yyyy');
+  var pac = _pacientesUsgHoje_(hojeFeegow);
+  if (pac === null) return { erro: 'Feegow não respondeu' };
+  var base = _usgHistSet_(), ids = Object.keys(pac), out = [];
+  ids.slice(0, limit || 30).forEach(function (pid) {
+    var p = getPatientData(pid);
+    out.push({ paciente: p.nome || pid, proc: resolveNomeProc(pac[pid]), veredito: base[pid] ? 'ja fez antes' : 'PRIMEIRA USG' });
+  });
+  return { data: hojeISO, totalPacientesUsgHoje: ids.length, baseTamanho: Object.keys(base).length, amostra: out };
 }
 
 // ----------------------------------------------------------------
