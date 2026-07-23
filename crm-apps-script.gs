@@ -82,15 +82,16 @@ function doGet(e) {
       return handleGetFinancial(e.parameter);
     }
     // Busca mensagens de um número no banco do monitor (whatsapp.mensagens).
-    if (action === 'wpp_busca') {
+    // Protegido por key: expõe conversas de pacientes (a URL do CRM é pública).
+    if (action === 'wpp_busca' && e.parameter.key === 'paraser2026') {
       return handleWppBusca(e.parameter);
     }
     // Diagnóstico do envio do 🌙 Fechamento do dia pro canal do financeiro.
-    if (action === 'fech_diag') {
+    if (action === 'fech_diag' && e.parameter.key === 'paraser2026') {
       return handleFechDiag(e.parameter);
     }
     // Força o 🌙 Fechamento do dia agora. ?force=1 limpa a trava do dia antes.
-    if (action === 'rodar_fechamento') {
+    if (action === 'rodar_fechamento' && e.parameter.key === 'paraser2026') {
       if (String(e.parameter.force) === '1') PropertiesService.getScriptProperties().deleteProperty('FECH_LAST_DATE');
       const ent = rodarFechamentoDia();
       return jsonOk({ ok: true, entregue: ent, erro: PropertiesService.getScriptProperties().getProperty('FECH_LAST_ERROR') || null });
