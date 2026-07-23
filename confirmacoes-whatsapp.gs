@@ -133,6 +133,15 @@ const TMPL = {
     'Caso tenha exames peço que envie para o nosso setor de enfermagem, dessa forma iremos anexar ao sistema com mais agilidade. Segue o email: exames@paraser.com.br\n\n' +
     'Podemos confirmar? 💜',
 
+  // Consulta PRESENCIAL do Dr. Rodolfo em SÃO PAULO (endereço próprio, sem QR/link).
+  RODOLFO_SP:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua consulta PRESENCIAL com o Dr. Rodolfo, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    'Caso tenha exames peço que envie para o nosso setor de enfermagem, dessa forma iremos anexar ao sistema com mais agilidade. Segue o email: exames@paraser.com.br\n\n' +
+    'ENDEREÇO:\n' +
+    'Av. Indianópolis, 171 - Indianópolis, São Paulo - SP\n\n' +
+    'Podemos confirmar?',
+
   HELCE_PRESENCIAL:
     'Olá! Tudo bem?\n' +
     'Passando para confirmar a sua consulta PRESENCIAL com o Dr. Helce Ribeiro, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -362,7 +371,7 @@ function enviarConfirmacoes() {
       sendWhatsApp(phone, msg);
       Utilities.sleep(2500);
 
-      if (qrLink && !tmplKey.endsWith('_ONLINE')) {
+      if (qrLink && !tmplKey.endsWith('_ONLINE') && !TMPL_SEM_LINK[tmplKey]) {
         var qrMsg = fillTemplate(TMPL.QR_CODE, { DATA_VISITA: dataStr, LINK_QR: qrLink });
         sendWhatsApp(phone, qrMsg);
         Utilities.sleep(1500);
@@ -372,7 +381,8 @@ function enviarConfirmacoes() {
 
       // Confirmação por LINK (os botões do WhatsApp foram bloqueados pela Meta).
       // Só pra quem ainda NÃO confirmou (status != 7). Clicou no link → confirmarFeegow.
-      if (Number(ag.status_id) !== 7) {
+      // TMPL_SEM_LINK (ex: RODOLFO_SP) não recebe link — confirmação é manual (recepção).
+      if (Number(ag.status_id) !== 7 && !TMPL_SEM_LINK[tmplKey]) {
         var agId = ag.agendamento_id || ag.id || ag.agenda_id;
         if (agId) {
           sendWhatsApp(phone, _msgConfirmacaoLink(agId));
@@ -729,6 +739,18 @@ var IDS_SEM_CONFIRMACAO = [
 // procId=176: AVALIAÇÃO DOADORA - Presencial   (Bianca) — add 20/07/2026, recepção pediu confirmação
 var IDS_BIANCA_RECEPTORA = [35, 36, 176, 322, 323];
 
+// Consultas do Dr. Rodolfo em SÃO PAULO (endereço próprio, Av. Indianópolis).
+// Recebem o template RODOLFO_SP e NÃO recebem link nenhum (nem o QR do prédio
+// do Rio, nem o link de confirmação) — pedido do Felipe 23/07/2026.
+// 168 = CONSULTA 1° VEZ - DR. RODOLFO (SP) - Presencial
+// 396 = CONSULTA DE RETORNO (São Paulo) - DR. RODOLFO SALVATO
+// (248 = 1ª VEZ (SP) - Online já cai em RODOLFO_ONLINE, sem endereço/QR)
+var IDS_RODOLFO_SP = [168, 396];
+
+// Templates cuja mensagem já é auto-suficiente: NÃO enviar QR do prédio nem
+// link de confirmação depois deles (atendimento fora da sede do Rio).
+var TMPL_SEM_LINK = { RODOLFO_SP: true };
+
 // ================================================================
 // LÓGICA DE TEMPLATE
 // Prioridade: procId especial > nome do proc (se vier) > profissional
@@ -753,6 +775,7 @@ function resolveTemplateKey(ag) {
   if (prof.includes('KATIA') || prof.includes('CHAMORRO')) return 'KATIA_PRESENCIAL';
 
   // --- 1. IDs especiais hardcoded (mais confiável) ---
+  if (IDS_RODOLFO_SP.indexOf(procId)        >= 0) return 'RODOLFO_SP';   // consulta do Rodolfo em SP
   if (IDS_INJURIA.indexOf(procId)           >= 0) return 'INJURIA';
   if (IDS_OBSTETRICA.indexOf(procId)        >= 0) return 'ULTRAS_OBSTETRICA';
   if (IDS_ULTRAS_TRATAMENTO.indexOf(procId) >= 0) return 'ULTRAS_TRATAMENTO';
