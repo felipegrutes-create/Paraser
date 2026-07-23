@@ -371,7 +371,7 @@ function enviarConfirmacoes() {
       sendWhatsApp(phone, msg);
       Utilities.sleep(2500);
 
-      if (qrLink && !tmplKey.endsWith('_ONLINE') && !TMPL_SEM_LINK[tmplKey]) {
+      if (qrLink && !tmplKey.endsWith('_ONLINE') && !TMPL_SEM_QR_PREDIO[tmplKey]) {
         var qrMsg = fillTemplate(TMPL.QR_CODE, { DATA_VISITA: dataStr, LINK_QR: qrLink });
         sendWhatsApp(phone, qrMsg);
         Utilities.sleep(1500);
@@ -381,8 +381,7 @@ function enviarConfirmacoes() {
 
       // Confirmação por LINK (os botões do WhatsApp foram bloqueados pela Meta).
       // Só pra quem ainda NÃO confirmou (status != 7). Clicou no link → confirmarFeegow.
-      // TMPL_SEM_LINK (ex: RODOLFO_SP) não recebe link — confirmação é manual (recepção).
-      if (Number(ag.status_id) !== 7 && !TMPL_SEM_LINK[tmplKey]) {
+      if (Number(ag.status_id) !== 7) {
         var agId = ag.agendamento_id || ag.id || ag.agenda_id;
         if (agId) {
           sendWhatsApp(phone, _msgConfirmacaoLink(agId));
@@ -740,16 +739,17 @@ var IDS_SEM_CONFIRMACAO = [
 var IDS_BIANCA_RECEPTORA = [35, 36, 176, 322, 323];
 
 // Consultas do Dr. Rodolfo em SÃO PAULO (endereço próprio, Av. Indianópolis).
-// Recebem o template RODOLFO_SP e NÃO recebem link nenhum (nem o QR do prédio
-// do Rio, nem o link de confirmação) — pedido do Felipe 23/07/2026.
+// Recebem o template RODOLFO_SP e NÃO recebem o QR Code de acesso ao prédio
+// (a catraca é da sede do Rio) — pedido do Felipe 23/07/2026. O link de
+// confirmação/remarcação continua sendo enviado normalmente.
 // 168 = CONSULTA 1° VEZ - DR. RODOLFO (SP) - Presencial
 // 396 = CONSULTA DE RETORNO (São Paulo) - DR. RODOLFO SALVATO
 // (248 = 1ª VEZ (SP) - Online já cai em RODOLFO_ONLINE, sem endereço/QR)
 var IDS_RODOLFO_SP = [168, 396];
 
-// Templates cuja mensagem já é auto-suficiente: NÃO enviar QR do prédio nem
-// link de confirmação depois deles (atendimento fora da sede do Rio).
-var TMPL_SEM_LINK = { RODOLFO_SP: true };
+// Templates que NÃO recebem o QR Code de acesso ao prédio do Rio (atendimento
+// fora da sede). A confirmação/remarcação por link segue normal.
+var TMPL_SEM_QR_PREDIO = { RODOLFO_SP: true };
 
 // ================================================================
 // LÓGICA DE TEMPLATE
