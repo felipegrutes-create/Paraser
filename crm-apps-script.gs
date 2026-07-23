@@ -89,9 +89,11 @@ function doGet(e) {
     if (action === 'fech_diag') {
       return handleFechDiag(e.parameter);
     }
-    // Força o 🌙 Fechamento do dia agora (respeita a trava por data).
+    // Força o 🌙 Fechamento do dia agora. ?force=1 limpa a trava do dia antes.
     if (action === 'rodar_fechamento') {
-      return jsonOk({ ok: true, entregue: rodarFechamentoDia() });
+      if (String(e.parameter.force) === '1') PropertiesService.getScriptProperties().deleteProperty('FECH_LAST_DATE');
+      const ent = rodarFechamentoDia();
+      return jsonOk({ ok: true, entregue: ent, erro: PropertiesService.getScriptProperties().getProperty('FECH_LAST_ERROR') || null });
     }
 
     // Grade de Horários — salas por médico+dia (compartilhado entre todos os aparelhos)
@@ -2589,7 +2591,7 @@ function notificarMetaSlack_(novas, fechamento) {
     const botF = pF.getProperty('SLACK_BOT_TOKEN');
     const whFech = pF.getProperty('SLACK_FECHAMENTO_WEBHOOK');
     const textF = '🌙 Fechamento do dia · ' + mesPorExtenso_(mes) + ': ' + fmt(m.total) + ' de ' + fmt(m.meta);
-    let entregue = false;
+    let entregue = false, erroF = '';
     try {
       if (canalF && botF) {
         const rF = UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
@@ -2597,17 +2599,17 @@ function notificarMetaSlack_(novas, fechamento) {
           headers: { Authorization: 'Bearer ' + botF },
           payload: JSON.stringify({ channel: canalF, blocks: blocks, text: textF })
         });
-        try { entregue = JSON.parse(rF.getContentText()).ok === true; } catch (e2) {}
-        if (!entregue) Logger.log('Fechamento Slack (bot) falhou: ' + rF.getContentText().slice(0, 150));
+        const bodyF = rF.getContentText();
+        try { entregue = JSON.parse(bodyF).ok === true; } catch (e2) {}
+        if (!entregue) erroF = 'bot: ' + bodyF.slice(0, 220);
       } else if (whFech) {
         const rW = UrlFetchApp.fetch(whFech, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
           payload: JSON.stringify({ blocks: blocks, text: textF }) });
         entregue = rW.getResponseCode() >= 200 && rW.getResponseCode() < 300;
-        if (!entregue) Logger.log('Fechamento Slack (webhook) falhou: HTTP ' + rW.getResponseCode());
-      } else {
-        Logger.log('Fechamento: sem canal/bot nem webhook configurado.');
-      }
-    } catch (e) { Logger.log('Fechamento Slack erro: ' + e.message); }
+        if (!entregue) erroF = 'webhook HTTP ' + rW.getResponseCode() + ': ' + rW.getContentText().slice(0, 150);
+      } else { erroF = 'sem canal/bot nem webhook configurado'; }
+    } catch (e) { erroF = 'exception: ' + e.message; }
+    if (!entregue) { try { PropertiesService.getScriptProperties().setProperty('FECH_LAST_ERROR', erroF + ' @ ' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM HH:mm')); } catch (_e) {} }
     return entregue;   // quem chama (postarFechamentoUmaVezDia_) só trava a data se entregou
   }
 }
