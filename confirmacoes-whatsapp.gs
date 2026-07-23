@@ -21,6 +21,9 @@ const CF_ZAPI_TOKEN        = _P.getProperty('ZAPI_TOKEN');
 const CF_ZAPI_CLIENT_TOKEN = _P.getProperty('ZAPI_CLIENT_TOKEN');
 const CF_SLACK_TOKEN       = _P.getProperty('SLACK_TOKEN');
 const CF_SLACK_CHANNEL     = 'atendimento';
+const CF_SLACK_CHANNEL_REAG = 'reagendamento';  // pedidos de reagendamento vão pra cá (não #atendimento)
+// WhatsApp que a paciente recebe ao pedir reagendamento (link ou resposta).
+const MSG_REAGENDAMENTO = 'Recebemos seu pedido de reagendamento! 💜 Estamos no aguardo para te oferecer um novo horário. A recepção vai entrar em contato com você em breve.';
 const CF_SPREADSHEET_ID    = _P.getProperty('SPREADSHEET_ID');
 const CF_CONFIG_SHEET      = 'Config';
 const CF_QR_LINK_CELL      = 'B1';
@@ -2003,7 +2006,7 @@ function doGet(e) {
   }
   if (params.action === 'test-slack' && params.key === 'paraser2026') {
     var waT = formatPhone(params.phone || '5521984341020');
-    slackPost('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
+    slackPostReag('🧪 [TESTE] 🔄 *Pediu reagendar (link)* — Paciente de Teste (agendamento 99999).\n📲 <https://wa.me/' + waT + '|Chamar a paciente no WhatsApp>');
     return ContentService.createTextOutput(JSON.stringify({ ok: true, wa: waT })).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'dump-pendentes' && params.key === 'paraser2026') {
@@ -2275,8 +2278,8 @@ function processarResposta(phone, answer) {
     }
   } else { // NAO
     marcarPendente(pend.row, 'REAGENDAR');
-    sendWhatsApp(phone, 'Sem problema! 💜 A recepção vai te chamar pra encontrar um novo horário.');
-    slackPost('🔄 *Pediu pra reagendar* — ' + (pend.nome || phone) +
+    sendWhatsApp(phone, MSG_REAGENDAMENTO);
+    slackPostReag('🔄 *Pediu pra reagendar* — ' + (pend.nome || phone) +
               ' (agendamento ' + pend.agId + '). Recepção: entrar em contato.');
   }
 }
@@ -2412,19 +2415,21 @@ function _reagendarViaLink(agId, token) {
     return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
   }
   var pend = _acharPendentePorAg_(agId);
-  if (pend && pend.status === 'REAGENDAR') { // já pediu reagendar antes — não duplica o aviso no Slack
-    return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
-  }
+  var jaAvisado = pend && pend.status === 'REAGENDAR'; // já pediu antes → não duplica o Slack
   if (pend) marcarPendente(pend.row, 'REAGENDAR');
-  var waReag = (pend && pend.tel) ? formatPhone(pend.tel) : null;
+  // WhatsApp pra paciente: SEMPRE (mesmo se ela clicar de novo) — antes pulava no re-clique.
   if (pend && pend.tel) {
-    try { sendWhatsApp(pend.tel, 'Recebemos seu pedido de reagendamento. 💜 A recepção vai te chamar pra achar um novo horário.'); }
-    catch (e) { slackPost('⚠️ Pedido reagendar (ag ' + agId + ') mas falhou ao mandar WhatsApp de aviso: ' + e.message); }
+    try { sendWhatsApp(pend.tel, MSG_REAGENDAMENTO); }
+    catch (e) { slackPostReag('⚠️ Pedido reagendar (ag ' + agId + ') mas falhou ao mandar WhatsApp de aviso: ' + e.message); }
   }
-  slackPost('🔄 *Pediu reagendar (link)* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
-            ' (agendamento ' + agId + ').' +
-            (waReag ? '\n📲 <https://wa.me/' + waReag + '|Chamar a paciente no WhatsApp>'
-                    : ' Recepção: contatar.'));
+  // Slack: só na 1ª vez, no canal #reagendamento (não spammar a recepção a cada re-clique).
+  if (!jaAvisado) {
+    var waReag = (pend && pend.tel) ? formatPhone(pend.tel) : null;
+    slackPostReag('🔄 *Pediu reagendar (link)* — ' + ((pend && pend.nome) || ('ag ' + agId)) +
+              ' (agendamento ' + agId + ').' +
+              (waReag ? '\n📲 <https://wa.me/' + waReag + '|Chamar a paciente no WhatsApp>'
+                      : ' Recepção: contatar.'));
+  }
   return { emoji:'🔄', titulo:'Pedido recebido', msg:'A recepção vai te chamar pra achar um novo horário. 💜' };
 }
 
@@ -2478,20 +2483,31 @@ function marcarPendente(row, novoStatus) {
 // ----------------------------------------------------------------
 // Slack — post simples no canal de atendimento
 // ----------------------------------------------------------------
-function slackPost(texto) {
+function slackPost(texto, canal) {
   try {
-    if (!CF_SLACK_TOKEN) return;
-    var channelId = slackGetChannelId(CF_SLACK_CHANNEL);
-    if (!channelId) return;
-    UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
+    if (!CF_SLACK_TOKEN) return false;
+    var channelId = slackGetChannelId(canal || CF_SLACK_CHANNEL);
+    if (!channelId) return false;
+    var resp = UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
       method:             'post',
       contentType:        'application/json; charset=utf-8',
       headers:            { Authorization: 'Bearer ' + CF_SLACK_TOKEN },
       payload:            JSON.stringify({ channel: channelId, text: texto }),
       muteHttpExceptions: true
     });
+    try { return JSON.parse(resp.getContentText()).ok === true; } catch (e) { return true; }
   } catch (err) {
     Logger.log('slackPost erro: ' + err.message);
+    return false;
+  }
+}
+
+// Reagendamento → canal #reagendamento. Se ele não existir / o app não estiver
+// no canal, o post falha; aí cai no #atendimento com um aviso (nunca perde).
+function slackPostReag(texto) {
+  if (!slackPost(texto, CF_SLACK_CHANNEL_REAG)) {
+    slackPost('⚠️ (não consegui postar no #' + CF_SLACK_CHANNEL_REAG +
+              ' — crie o canal e adicione o app da clínica)\n' + texto, CF_SLACK_CHANNEL);
   }
 }
 
