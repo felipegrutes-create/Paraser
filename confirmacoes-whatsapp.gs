@@ -2031,6 +2031,10 @@ function doGet(e) {
   if (params.action === 'backfill-usg' && params.key === 'paraser2026') {
     return ContentService.createTextOutput(JSON.stringify(backfillHistoricoUSG(Number(params.meses) || 24))).setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'primeira-usg-run' && params.key === 'paraser2026') {
+    notificarPrimeiraUSG();
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, msg: 'notificarPrimeiraUSG executada' })).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'setup-primeira-usg' && params.key === 'paraser2026') {
     ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'notificarPrimeiraUSG') ScriptApp.deleteTrigger(t); });
     ScriptApp.newTrigger('notificarPrimeiraUSG').timeBased().atHour(7).everyDays(1).inTimezone('America/Sao_Paulo').create();
