@@ -15731,12 +15731,12 @@
                 afterDatasetsDraw(chart) {
                     const { ctx } = chart; ctx.save();
                     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                    ctx.font = '600 8px Outfit, sans-serif';
+                    ctx.font = '700 12px Outfit, sans-serif';
                     chart.data.datasets.forEach((ds, di) => {
                         ctx.fillStyle = coresBar[di];
                         chart.getDatasetMeta(di).data.forEach((bar, i) => {
                             const t = fmtBar(ds.data[i]); if (!t) return;
-                            ctx.fillText(t, bar.x, bar.y - 2);
+                            ctx.fillText(t, bar.x, bar.y - 4);
                         });
                     });
                     ctx.restore();
