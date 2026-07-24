@@ -15719,10 +15719,8 @@
 
             // Sem barra totalizadora — o total fica nos KPIs acima. Assim a escala se ajusta aos
             // valores mensais (max ~87k) e as barras dos meses ficam visuais, não achatadas.
-            const labels   = meses.map(m => m.label);
-            const gerada   = meses.map(m => m.economiaGerada);
-            const comissao = meses.map(m => m.comissaoDacto);
-            const liquida  = meses.map(m => m.economiaLiquida);
+            const labels = meses.map(m => m.label);
+            const gerada = meses.map(m => m.economiaGerada);   // só a Economia Gerada no gráfico (comissão e líquida ficam no detalhe/KPIs)
             // rótulo abreviado (k): 1 casa com vírgula abaixo de 10 mil, inteiro acima
             const fmtBar = v => !v ? '' : (v >= 10000 ? (v / 1000).toFixed(0) + 'k' : (v / 1000).toFixed(1).replace('.', ',') + 'k');
 
@@ -15749,9 +15747,7 @@
             _resCharts.economia = new Chart(el.getContext('2d'), {
                 type: 'bar',
                 data: { labels, datasets: [
-                    { label: 'Economia Gerada',  data: gerada,   backgroundColor: '#6ee7b7', borderRadius: 3, maxBarThickness: 22 },
-                    { label: 'Comissão Dacto',   data: comissao, backgroundColor: '#fbbf24', borderRadius: 3, maxBarThickness: 22 },
-                    { label: 'Economia Líquida', data: liquida,  backgroundColor: '#059669', borderRadius: 3, maxBarThickness: 22 }
+                    { label: 'Economia Gerada', data: gerada, backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 48 }
                 ] },
                 options: {
                     responsive: true,
