@@ -4210,7 +4210,10 @@
                 </div>
             </div>
 
-            <!-- Entradas × Saídas por Mês — PRIMEIRO gráfico da subaba, com o card do resultado do mês acima das barras -->
+            <!-- KPIs do mês (barra de cards) — no INÍCIO da subaba, cada um com etiqueta do CONCEITO (recebido ≠ faturado ≠ despesas) -->
+            <div id="resKpiGrid" class="exec-grid" style="margin-bottom:24px"></div>
+
+            <!-- Entradas × Saídas por Mês — com o card do resultado do mês acima das barras -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
                     <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes + dinheiro · saídas = despesas pagas (sem retiradas, empréstimos e partes relacionadas)</span></h3>
@@ -4218,9 +4221,6 @@
                     <canvas id="resChartEntSai" height="200"></canvas>
                 </div>
             </div>
-
-            <!-- KPIs do mês, cada um com etiqueta do CONCEITO (recebido ≠ faturado ≠ despesas) -->
-            <div id="resKpiGrid" class="exec-grid" style="margin-bottom:24px"></div>
 
             <!-- Recebimentos ao vivo (cartão + PIX), o único caixa real do app -->
             <div class="cr-charts-row" style="margin-bottom:16px">
