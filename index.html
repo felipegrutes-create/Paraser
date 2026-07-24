@@ -2844,7 +2844,7 @@
         <div class="tab-group" id="group-fin">
             <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-fin',event)">Financeiro <span class="tab-group-arrow">▾</span></button>
             <div class="tab-dropdown">
-                <button class="tab-dropdown-item" onclick="showSection('sec-resumo',null)">📊 Resumo Financeiro</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-resumo',null)">📊 Resultado Financeiro</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-fin',null)">💰 Financeiro</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
@@ -4200,8 +4200,8 @@
 
         <!-- RESUMO FINANCEIRO — como está o dinheiro da clínica agora? -->
         <section id="sec-resumo" class="section">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
-                <p class="section-title" style="margin:0">📊 Resumo Financeiro</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;position:sticky;top:108px;z-index:50;background:var(--bg);padding:12px 0;margin-bottom:14px;border-bottom:1px solid var(--border)">
+                <p class="section-title" style="margin:0">📊 Resultado Financeiro</p>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                     <button class="cr-nav-btn" onclick="resNavMonth(-1)">‹</button>
                     <span id="resMonthLabel" style="font-size:15px;font-weight:600;min-width:130px;text-align:center">—</span>
@@ -6568,7 +6568,7 @@
         }
 
         // ===== Relatório "Uso do Sistema" (só admin) =====
-        const USO_AREA_NOMES = { 'sec-vg':'Visão Geral','sec-pv':'1ª Vez','sec-txconv':'TX Conversão','sec-ret':'Retorno','sec-doadoras':'Fluxo Pacientes','sec-pend':'Cards Pacientes','sec-meta':'Meta','sec-arquivo-morto':'Arquivo Morto','sec-salas':'Mapa de Salas','sec-resumo':'Resumo Financeiro','sec-fin':'Financeiro','sec-cr':'Contas a Receber','sec-caixa':'Médicos','sec-repasses':'Repasses','sec-socios':'Sócios','sec-medicamentos':'Medicamentos','sec-exec':'Análise Executiva','sec-estoque':'Estoque','sec-marketing':'Marketing','sec-estrutura':'Estrutura','sec-uso':'Uso do Sistema' };
+        const USO_AREA_NOMES = { 'sec-vg':'Visão Geral','sec-pv':'1ª Vez','sec-txconv':'TX Conversão','sec-ret':'Retorno','sec-doadoras':'Fluxo Pacientes','sec-pend':'Cards Pacientes','sec-meta':'Meta','sec-arquivo-morto':'Arquivo Morto','sec-salas':'Mapa de Salas','sec-resumo':'Resultado Financeiro','sec-fin':'Financeiro','sec-cr':'Contas a Receber','sec-caixa':'Médicos','sec-repasses':'Repasses','sec-socios':'Sócios','sec-medicamentos':'Medicamentos','sec-exec':'Análise Executiva','sec-estoque':'Estoque','sec-marketing':'Marketing','sec-estrutura':'Estrutura','sec-uso':'Uso do Sistema' };
         const USO_ACAO_NOMES = { 'marcar_venda':'Marcou venda','editar_meta':'Editou meta','lancar_dinheiro':'Lançou dinheiro','remover_dinheiro':'Removeu dinheiro','salvar_card':'Salvou card','apagar_card':'Apagou card','entrada_manual':'Entrada manual','mover_card':'Moveu card' };
         function _usoAreaNome(id) { return USO_AREA_NOMES[id] || id; }
         let _usoDias = 30;
