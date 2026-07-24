@@ -15637,12 +15637,12 @@
                                 label: ctx => {
                                     const tot = ctx.chart.data.datasets.reduce((s, d) => s + (d.data[ctx.dataIndex] || 0), 0);
                                     const pct = tot ? (ctx.raw / tot * 100) : 0;
-                                    return '  ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                                    return '  ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                         + '  ·  ' + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
                                 },
                                 footer: items => {
                                     const t = items.reduce((s, i) => s + i.raw, 0);
-                                    return 'Total recebido: R$ ' + t.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                    return 'Total recebido: R$ ' + t.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                 }
                             }
                         }
