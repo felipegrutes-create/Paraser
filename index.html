@@ -4280,6 +4280,23 @@
                     <canvas id="resChartTaxasMes" height="200"></canvas>
                 </div>
             </div>
+
+            <!-- ECONOMIA TRIBUTÁRIA (Equiparação Hospitalar) — dados da contabilidade, aba IMPOSTOS - ECONOMIA da FLUXO DE CX -->
+            <div class="cr-charts-row" style="margin-bottom:20px">
+                <div class="chart-card" style="flex:1;border:1px solid rgba(16,185,129,0.35);background:linear-gradient(180deg,rgba(16,185,129,0.06),transparent)">
+                    <h3 style="color:#34d399">💚 Economia Tributária — Equiparação Hospitalar
+                        <span style="font-size:11px;font-weight:400;color:var(--muted)">economia de imposto gerada pela estrutura tributária · fonte: contabilidade</span></h3>
+                    <div id="econKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0 18px"></div>
+                    <canvas id="resChartEconomia" height="210"></canvas>
+                    <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+                            <span style="font-size:13px;font-weight:600">🔎 Detalhe do mês:</span>
+                            <select id="econMesSel" onchange="econRenderDetalhe()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:inherit"></select>
+                        </div>
+                        <div id="econDetalhe"></div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- ESTOQUE MEDICAMENTOS -->
@@ -15537,7 +15554,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null; _resDespCatMap = null; _resRetiradaMap = null; _resFolhaMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null;
+            _execCartaoData = null; _resDespesasMap = null; _resDespCatMap = null; _resRetiradaMap = null; _resFolhaMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null; _econData = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
@@ -15666,6 +15683,128 @@
             _resRenderTaxasMes();
             _resRenderAnos();
             _resRenderCaixa();
+            resRenderEconomia();
+        }
+
+        // ===== Economia Tributária (Equiparação Hospitalar) — aba IMPOSTOS - ECONOMIA da planilha
+        // FLUXO DE CX, servida pelo CRM (get_economia_tributaria). Preenchida pela contabilidade.
+        // Verde = economia. 3 séries por mês (gerada, comissão, líquida) + barra totalizadora da
+        // líquida no fim. Busca 1x por sessão (resReload zera _econData pra recarregar).
+        let _econData = null;
+        async function resRenderEconomia() {
+            const el = document.getElementById('resChartEconomia'); if (!el) return;
+            if (!_econData) {
+                try {
+                    const resp = await fetch(`${CRM_SCRIPT_URL}?action=get_economia_tributaria`);
+                    const j = await resp.json();
+                    if (!j.ok) throw new Error(j.error || 'falhou');
+                    _econData = j;
+                } catch (e) { console.warn('economia tributária:', e.message); return; }
+            }
+            const meses = _econData.meses || [], tot = _econData.totais || {};
+            if (!meses.length) return;
+            const R = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const kpis = document.getElementById('econKpis');
+            if (kpis) kpis.innerHTML =
+                `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:12px 14px">
+                    <div style="font-size:18px;font-weight:700;color:#10b981">${R(tot.economiaGerada)}</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px">💰 Economia Gerada (total)</div></div>
+                 <div style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.22);border-radius:10px;padding:12px 14px">
+                    <div style="font-size:18px;font-weight:700;color:#f59e0b">${R(tot.comissaoDacto)}</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px">🤝 Comissão Dacto (total)</div></div>
+                 <div style="background:rgba(5,150,105,0.12);border:1px solid rgba(16,185,129,0.4);border-radius:10px;padding:12px 14px">
+                    <div style="font-size:18px;font-weight:700;color:#34d399">${R(tot.economiaLiquida)}</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px">✅ Economia Líquida (total)</div></div>`;
+
+            const labels   = meses.map(m => m.label).concat(['TOTAL']);
+            const gerada   = meses.map(m => m.economiaGerada).concat([null]);
+            const comissao = meses.map(m => m.comissaoDacto).concat([null]);
+            const liquida  = meses.map(m => m.economiaLiquida).concat([tot.economiaLiquida]);
+            const fmtK = v => v == null ? '' : (v >= 1000000 ? (v / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + 'M' : (v / 1000).toFixed(0) + 'k');
+
+            // Rótulo só na barra totalizadora (destaque). Os meses ficam no tooltip pra não poluir.
+            const totalLabel = {
+                id: 'econTotalLabel',
+                afterDatasetsDraw(chart) {
+                    const last = chart.data.labels.length - 1;
+                    const bar = chart.getDatasetMeta(2).data[last]; if (!bar) return;
+                    const v = chart.data.datasets[2].data[last]; if (!v) return;
+                    const { ctx } = chart; ctx.save();
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                    ctx.font = '700 13px Outfit, sans-serif'; ctx.fillStyle = '#10b981';
+                    ctx.fillText('R$ ' + fmtK(v), bar.x, bar.y - 5);
+                    ctx.restore();
+                }
+            };
+
+            if (_resCharts.economia) { try { _resCharts.economia.destroy(); } catch (e) {} }
+            _resCharts.economia = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [
+                    { label: 'Economia Gerada',  data: gerada,   backgroundColor: '#6ee7b7', borderRadius: 3, maxBarThickness: 22 },
+                    { label: 'Comissão Dacto',   data: comissao, backgroundColor: '#fbbf24', borderRadius: 3, maxBarThickness: 22 },
+                    { label: 'Economia Líquida', data: liquida,  backgroundColor: '#059669', borderRadius: 3, maxBarThickness: 22 }
+                ] },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': R$ ' + (ctx.raw || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#6b7a99', font: { size: 10 } }, grid: { display: false } },
+                        y: { grace: '10%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                },
+                plugins: [totalLabel]
+            });
+
+            const sel = document.getElementById('econMesSel');
+            if (sel) {
+                const prev = sel.value;
+                const comDados = meses.map((m, i) => ({ m, i })).filter(x => x.m.economiaGerada > 0);
+                sel.innerHTML = comDados.map(x => `<option value="${x.i}">${x.m.label}</option>`).join('');
+                if (prev && comDados.some(x => String(x.i) === prev)) sel.value = prev;      // preserva a escolha
+                else if (comDados.length) sel.value = comDados[comDados.length - 1].i;        // default = último com dados
+            }
+            econRenderDetalhe();
+        }
+
+        // Detalhe geral do mês escolhido no dropdown — todos os números da aba IMPOSTOS - ECONOMIA.
+        function econRenderDetalhe() {
+            const box = document.getElementById('econDetalhe'); if (!box || !_econData) return;
+            const sel = document.getElementById('econMesSel');
+            const idx = sel ? parseInt(sel.value, 10) : 0;
+            const m = _econData.meses[idx]; if (!m) return;
+            const R = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const P = v => (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+            const row = (lbl, val, cor) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><span style="color:var(--muted);font-size:12px">${lbl}</span><span style="font-weight:600;font-size:12px${cor ? ';color:' + cor : ''}">${val}</span></div>`;
+            const head = t => `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#34d399;font-weight:700;margin:14px 0 4px">${t}</div>`;
+            box.innerHTML =
+                `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px">
+                    <div>
+                        ${head('Base')}
+                        ${row('Faturamento Instituto', R(m.faturamento))}
+                        ${row('Total de despesas dedutíveis', R(m.despesas))}
+                        ${head('Lucro Presumido')}
+                        ${row('Imposto sobre o faturamento', R(m.impPresumido))}
+                        ${row('% dos impostos sobre o faturamento', P(m.pctPresumido))}
+                        ${head('Lucro Real')}
+                        ${row('Imposto sobre o faturamento', R(m.impReal))}
+                        ${row('% dos impostos sobre o faturamento', P(m.pctReal))}
+                    </div>
+                    <div>
+                        ${head('Equiparação Hospitalar')}
+                        ${row('Tributo a recolher com equiparação', R(m.tributoComEquip))}
+                        ${row('Tributo devido sem equiparação', R(m.tributoSemEquip))}
+                        ${row('Diferença', R(m.diferenca), m.diferenca < 0 ? '#f87171' : '')}
+                        ${head('Resultado')}
+                        ${row('Economia gerada', R(m.economiaGerada), '#10b981')}
+                        ${row('Comissão Dacto', R(m.comissaoDacto), '#f59e0b')}
+                        ${row('Economia líquida', R(m.economiaLiquida), '#34d399')}
+                    </div>
+                </div>`;
         }
 
         function _resRenderKPIs(k) {

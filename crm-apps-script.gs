@@ -81,6 +81,10 @@ function doGet(e) {
     if (action === 'get_financial') {
       return handleGetFinancial(e.parameter);
     }
+    // Economia tributária (aba IMPOSTOS - ECONOMIA da planilha FLUXO DE CX) → Resumo Financeiro
+    if (action === 'get_economia_tributaria') {
+      return handleGetEconomiaTributaria(e.parameter);
+    }
     // Busca mensagens de um número no banco do monitor (whatsapp.mensagens).
     // Protegido por key: expõe conversas de pacientes (a URL do CRM é pública).
     if (action === 'wpp_busca' && e.parameter.key === 'paraser2026') {
@@ -775,6 +779,63 @@ function handleTestFinancial(params) {
   return ContentService
     .createTextOutput(JSON.stringify(results, null, 2))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// =========================================================
+// Economia Tributária — lê a aba "IMPOSTOS - ECONOMIA" da planilha FLUXO DE CX (preenchida
+// pela contabilidade: estrutura de equiparação hospitalar → economia de tributo). Serve o
+// Resumo Financeiro do dashboard. O CRM roda como paraser (dona da FLUXO CX), então openById ok.
+// Âncora de ano: a 1ª linha de dados é JUNHO/2025 (informado pela gestão) e o ano vira a cada
+// dez→jan. Acesse via ?action=get_economia_tributaria (&nocache=1 fura o cache).
+// =========================================================
+var FLUXO_CX_SS_ID = '1uthRnuWMk2A26dZ8GaMXinuvPyxY50EH8RX85NemXwg';
+var ECON_MES_NUM = { 'JANEIRO':1,'FEVEREIRO':2,'MARÇO':3,'MARCO':3,'ABRIL':4,'MAIO':5,'JUNHO':6,'JULHO':7,'AGOSTO':8,'SETEMBRO':9,'OUTUBRO':10,'NOVEMBRO':11,'DEZEMBRO':12 };
+var ECON_MES_ABREV = ['','jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+function handleGetEconomiaTributaria(params) {
+  var CK = 'economia_trib_v1';
+  if (!params || !params.nocache) {
+    var hit = CacheService.getScriptCache().get(CK);
+    if (hit) return ContentService.createTextOutput(hit).setMimeType(ContentService.MimeType.JSON);
+  }
+  var sh;
+  try {
+    sh = SpreadsheetApp.openById(FLUXO_CX_SS_ID).getSheetByName('IMPOSTOS - ECONOMIA');
+  } catch (err) {
+    return jsonErr('sem acesso à planilha FLUXO DE CX: ' + err.message);
+  }
+  if (!sh) return jsonErr('aba "IMPOSTOS - ECONOMIA" não encontrada');
+
+  var vals = sh.getRange('A4:N40').getValues();
+  var toN = function (x) { var n = Number(x); return isFinite(n) ? n : 0; };
+  var meses = [];
+  var ano = 2025, mesAnt = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var r = vals[i];
+    var nome = String(r[1] || '').trim().toUpperCase();
+    if (!nome) continue;
+    if (nome.indexOf('TOTA') === 0) break;      // linha TOTAIS encerra os meses
+    var num = ECON_MES_NUM[nome];
+    if (!num) continue;
+    if (mesAnt && num < mesAnt) ano++;          // virada de ano (dez → jan)
+    mesAnt = num;
+    meses.push({
+      mes: nome, ano: ano, num: num, label: ECON_MES_ABREV[num] + '/' + String(ano).slice(2),
+      faturamento: toN(r[2]), despesas: toN(r[3]),
+      impPresumido: toN(r[4]), pctPresumido: toN(r[5]),
+      impReal: toN(r[6]), pctReal: toN(r[7]),
+      tributoComEquip: toN(r[8]), tributoSemEquip: toN(r[9]), diferenca: toN(r[10]),
+      economiaGerada: toN(r[11]), comissaoDacto: toN(r[12]), economiaLiquida: toN(r[13])
+    });
+  }
+  var tot = function (k) { return meses.reduce(function (s, m) { return s + m[k]; }, 0); };
+  var payload = JSON.stringify({
+    ok: true,
+    meses: meses,
+    totais: { economiaGerada: tot('economiaGerada'), comissaoDacto: tot('comissaoDacto'), economiaLiquida: tot('economiaLiquida') }
+  });
+  CacheService.getScriptCache().put(CK, payload, 3600);   // 1h — muda ~1x/mês
+  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
 }
 
 // =========================================================
