@@ -214,6 +214,15 @@ const TMPL = {
     'A consulta será realizada através de chamada de vídeo no Whatsapp\n\n' +
     'Podemos confirmar? 💜',
 
+  // "Conversa Receptora" genérica (procId 50241): o MESMO procedimento é usado pra
+  // presencial e online, e a Feegow não distingue (telemedicina sempre false, local_id
+  // não separa). Então o texto é neutro — não afirma endereço nem videochamada; a
+  // paciente já sabe o modo pelo agendamento.
+  BIANCA_RECEPTORA:
+    'Olá! Tudo bem?\n' +
+    'Passando para confirmar sua conversa com a Dra. Bianca Salvato, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
+    'Podemos confirmar? 💜',
+
   SARA_PRESENCIAL:
     'Olá! Tudo bem?\n' +
     'Passando para confirmar sua consulta PRESENCIAL com a psicóloga Sara, {DIA_SEMANA} ({DATA}) às {HORA}.\n\n' +
@@ -740,6 +749,10 @@ var IDS_SEM_CONFIRMACAO = [
 // procId=323: CONVERSA DOADORA - Online       (Bianca 05/05/2026 08:30)
 // procId=176: AVALIAÇÃO DOADORA - Presencial   (Bianca) — add 20/07/2026, recepção pediu confirmação
 var IDS_BIANCA_RECEPTORA = [35, 36, 176, 322, 323];
+// "Conversa Receptora" genérica (Bianca) — pode ser presencial OU online no mesmo
+// procId, então usa o template neutro BIANCA_RECEPTORA (sem afirmar o modo).
+// 50241 = Conversa Receptora (sem sufixo). Add 24/07/2026, pedido do Felipe.
+var IDS_CONVERSA_RECEPTORA_GEN = [50241];
 
 // Consultas do Dr. Rodolfo em SÃO PAULO (endereço próprio, Av. Indianópolis).
 // Recebem o template RODOLFO_SP e NÃO recebem o QR Code de acesso ao prédio
@@ -783,6 +796,7 @@ function resolveTemplateKey(ag) {
   if (IDS_OBSTETRICA.indexOf(procId)        >= 0) return 'ULTRAS_OBSTETRICA';
   if (IDS_ULTRAS_TRATAMENTO.indexOf(procId) >= 0) return 'ULTRAS_TRATAMENTO';
   if (IDS_JOSELMO_RADIO.indexOf(procId)     >= 0) return 'JOSELMO_RADIOFREQUENCIA';
+  if (IDS_CONVERSA_RECEPTORA_GEN.indexOf(procId) >= 0) return 'BIANCA_RECEPTORA';       // genérica (pres. ou online)
   if (IDS_BIANCA_RECEPTORA.indexOf(procId)  >= 0) return 'BIANCA_RECEPTORA_' + modal;
   if (IDS_SARA.indexOf(procId)              >= 0) return 'SARA_' + modal;
 
@@ -2065,6 +2079,28 @@ function doGet(e) {
     });
     achados.sort(function (a, b) { return String(a.quando || '') < String(b.quando || '') ? -1 : 1; });
     return ContentService.createTextOutput(JSON.stringify({ nome: alvoS, dias: dias, achados: achados }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  }
+  // Lê o histórico de mensagens de um número no Z-API (chat-messages). Serve pra achar
+  // QUANDO o sistema respondeu "recebemos seu pedido de reagendamento" (= horário do clique).
+  if (params.action === 'zapi-msgs' && params.key === 'paraser2026') {
+    var phz = String(params.phone || '').replace(/\D/g, '');
+    var amount = Number(params.amount) || 120;
+    var uz = 'https://api.z-api.io/instances/' + CF_ZAPI_INSTANCE_ID + '/token/' + CF_ZAPI_TOKEN + '/chat-messages/' + phz + '?amount=' + amount;
+    var hz = {}; if (CF_ZAPI_CLIENT_TOKEN) hz['Client-Token'] = CF_ZAPI_CLIENT_TOKEN;
+    var rz = UrlFetchApp.fetch(uz, { headers: hz, muteHttpExceptions: true });
+    var outz = { phone: phz, http: rz.getResponseCode() };
+    try {
+      var arr = JSON.parse(rz.getContentText());
+      if (!Array.isArray(arr)) { outz.raw = rz.getContentText().slice(0, 400); }
+      else {
+        var filtro = String(params.contem || '').toUpperCase();
+        outz.msgs = arr.map(function (m) {
+          var txt = (m.text && (m.text.message || m.text)) || m.message || m.body || m.caption || (m.buttonsResponseMessage && m.buttonsResponseMessage.message) || '';
+          return { quando: m.momment ? Utilities.formatDate(new Date(Number(m.momment)), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm:ss') : '', fromMe: m.fromMe, tipo: m.type, texto: String(txt).slice(0, 160) };
+        }).filter(function (m) { return !filtro || m.texto.toUpperCase().indexOf(filtro) >= 0; });
+      }
+    } catch (e) { outz.erro = e.message; outz.raw = rz.getContentText().slice(0, 400); }
+    return ContentService.createTextOutput(JSON.stringify(outz, null, 2)).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'slack-diag' && params.key === 'paraser2026') {
     var diag = { canalAlvo: CF_SLACK_CHANNEL_REAG };
