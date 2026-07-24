@@ -4225,7 +4225,13 @@
             <!-- Recebimentos ao vivo (cartão + PIX), o único caixa real do app -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>💳 Receita Recebida por Mês — Cartão (Rede) + PIX + Dinheiro <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+                        <h3 style="margin:0">💳 Receita Recebida por Mês <span id="execCartaoSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                        <div style="display:inline-flex;border:1px solid var(--border);border-radius:9px;padding:2px;flex-shrink:0">
+                            <button id="btnReceitaPagto" onclick="resSetReceitaView('pagto')" style="border:none;border-radius:7px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--accent);color:#00110d">Meios de Pagto</button>
+                            <button id="btnReceitaSvc" onclick="resSetReceitaView('servico')" style="border:none;border-radius:7px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;background:transparent;color:var(--muted)">Procedimentos</button>
+                        </div>
+                    </div>
                     <canvas id="execChartCartaoMes" height="200"></canvas>
                 </div>
             </div>
@@ -15453,9 +15459,26 @@
             });
         }
 
+        // ===== Toggle da Receita Recebida: "Meios de Pagto" (padrão) × "Procedimentos" (por serviço) =====
+        let _resReceitaView = 'pagto';
+        let _execReceitaSvc = null;   // { 'YYYY-MM': {Consultas, Honorários, Medicação, Exames, Procedimentos, Outros} } faturado (Feegow)
+        let _execReceitaSvcAno = null;
+        function resSetReceitaView(v) {
+            _resReceitaView = v;
+            const bp = document.getElementById('btnReceitaPagto'), bs = document.getElementById('btnReceitaSvc');
+            if (bp && bs) {
+                bp.style.background = v === 'pagto' ? 'var(--accent)' : 'transparent';
+                bp.style.color = v === 'pagto' ? '#00110d' : 'var(--muted)';
+                bs.style.background = v === 'servico' ? 'var(--accent)' : 'transparent';
+                bs.style.color = v === 'servico' ? '#00110d' : 'var(--muted)';
+            }
+            _execRenderCartaoMes();
+        }
+
         // Gráfico Recebimentos por Mês (barras empilhadas Cartão + PIX). Vive no Resumo Financeiro.
         // Mês corrente = parcial (rótulo com *; PIX do BigQuery ao vivo, meses fechados do histórico).
         async function _execRenderCartaoMes() {
+            if (_resReceitaView === 'servico') return _execRenderReceitaSvc();
             const el = document.getElementById('execChartCartaoMes'); if (!el) return;
             if (_resCharts.cartao) { try{_resCharts.cartao.destroy();}catch(e){} }
             const sub = document.getElementById('execCartaoSub');
@@ -15538,6 +15561,88 @@
             });
         }
 
+        // Visão "Procedimentos": o recebido de cada mês (que bate com o banco) rateado pela
+        // proporção do que foi FATURADO por grupo de serviço no mês (Feegow). Soma dos grupos = recebido,
+        // então o total de cada barra é idêntico à visão "Meios de Pagto". Busca 1x por ano (lazy).
+        async function _execRenderReceitaSvc() {
+            const el = document.getElementById('execChartCartaoMes'); if (!el) return;
+            if (_resCharts.cartao) { try { _resCharts.cartao.destroy(); } catch(e){} }
+            const sub = document.getElementById('execCartaoSub');
+            if (!_execCartaoData) {
+                if (sub) sub.textContent = 'carregando…';
+                try { await resLoadRecebimentos(); } catch(e) { if (sub) sub.textContent = '⚠ não foi possível carregar'; return; }
+            }
+            const ano = _resDate.getFullYear();
+            if (!_execReceitaSvc || _execReceitaSvcAno !== ano) {
+                if (sub) sub.textContent = 'carregando receita por serviço…';
+                try {
+                    const r = await fetch(`${CRM_SCRIPT_URL}?action=get_receita_por_servico&ano=${ano}`);
+                    const j = await r.json();
+                    if (!j.ok) throw new Error(j.error || 'falhou');
+                    _execReceitaSvc = {}; (j.meses || []).forEach(m => { _execReceitaSvc[m.mes] = m.grupos; });
+                    _execReceitaSvcAno = ano;
+                } catch(e) { if (sub) sub.textContent = '⚠ não foi possível carregar a receita por serviço'; return; }
+            }
+            const meses = _resPreencherAno(_execCartaoData);
+            const GRUPOS = ['Consultas', 'Honorários', 'Medicação', 'Exames', 'Procedimentos', 'Outros'];
+            const CORES  = { 'Consultas':'#00d4aa', 'Honorários':'#6366f1', 'Medicação':'#f59e0b', 'Exames':'#22d3ee', 'Procedimentos':'#a855f7', 'Outros':'#64748b' };
+            const labels = meses.map(x => { const i = parseInt(x.mes.slice(5,7),10)-1; return _MONTHS_PT[i].slice(0,3) + '/' + x.mes.slice(2,4) + (x.parcial ? '*' : ''); });
+            // rateio: recebido do mês × (grupo faturado ÷ total faturado do mês) → soma dos grupos = recebido
+            const datasets = GRUPOS.map(g => ({
+                label: g, backgroundColor: CORES[g], borderRadius: 4, maxBarThickness: 64,
+                data: meses.map(x => {
+                    const rec = (x.rede||0) + (x.pix||0) + (x.mp||0);
+                    const grp = _execReceitaSvc[x.mes]; if (!grp || !rec) return 0;
+                    const tot = GRUPOS.reduce((s,k) => s + (grp[k]||0), 0); if (!tot) return 0;
+                    return rec * (grp[g]||0) / tot;
+                })
+            }));
+            if (sub) sub.textContent = 'recebido do mês (bate com o caixa) rateado pela composição do faturamento por serviço · * mês em andamento';
+            const fmtK = v => v >= 1000000 ? (v/1000000).toLocaleString('pt-BR',{maximumFractionDigits:2}) + 'M' : (v/1000).toFixed(0) + 'k';
+            const svcLabelPlugin = {
+                id: 'svcLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart; ctx.save(); ctx.textAlign = 'center';
+                    ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'middle';
+                    chart.data.datasets.forEach((ds, di) => {
+                        const meta = chart.getDatasetMeta(di);
+                        meta.data.forEach((bar, i) => {
+                            const v = ds.data[i]; if (!v) return;
+                            const h = Math.abs(bar.base - bar.y); if (h < 20) return;
+                            ctx.fillStyle = '#ffffff'; ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base)/2);
+                        });
+                    });
+                    const meta1 = chart.getDatasetMeta(chart.data.datasets.length - 1);
+                    ctx.font = '600 11px Outfit, sans-serif'; ctx.fillStyle = '#e2e8f4'; ctx.textBaseline = 'bottom';
+                    chart.data.labels.forEach((_, i) => {
+                        const total = chart.data.datasets.reduce((s, ds) => s + (ds.data[i]||0), 0);
+                        if (!total) return; const bar = meta1.data[i]; if (!bar) return;
+                        ctx.fillText('R$ ' + fmtK(total), bar.x, bar.y - 4);
+                    });
+                    ctx.restore();
+                }
+            };
+            _resCharts.cartao = new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: { callbacks: {
+                            label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2}),
+                            footer: items => { const t = items.reduce((s,i)=>s+i.raw,0); return 'Total recebido: R$ ' + t.toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+                        } }
+                    },
+                    scales: {
+                        x: { stacked:true, ticks:{color:'#6b7a99',font:{size:11}}, grid:{display:false} },
+                        y: { stacked:true, grace:'8%', ticks:{color:'#6b7a99',font:{size:10},callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}, grid:{color:'rgba(255,255,255,0.04)'} }
+                    }
+                },
+                plugins: [svcLabelPlugin]
+            });
+        }
+
         // ===================== RESUMO FINANCEIRO (sec-resumo) =====================
         // Responde: "como está o dinheiro da clínica agora?" — 3 fontes, cada uma com etiqueta de conceito:
         // RECEBIDO (cartão+PIX ao vivo) · FATURADO (Feegow, competência) · DESPESAS (extrato, sem retiradas).
@@ -15555,7 +15660,7 @@
             loadAndRenderResumo();
         }
         function resReload() {
-            _execCartaoData = null; _resDespesasMap = null; _resDespCatMap = null; _resRetiradaMap = null; _resFolhaMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null; _econData = null;
+            _execCartaoData = null; _resDespesasMap = null; _resDespCatMap = null; _resRetiradaMap = null; _resFolhaMap = null; _resAnosData = null; _resMpPlanF = null; _resDinQuadro = null; _resCaixaData = null; _econData = null; _execReceitaSvc = null;
             delete _fgMonthCache[_fgKey(_resDate)]; delete _execCache[_fgKey(_resDate)];
             loadAndRenderResumo();
         }
