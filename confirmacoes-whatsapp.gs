@@ -833,6 +833,15 @@ function resolveTemplateKey(ag) {
   if (prof.includes('MAGALI'))                                       return 'MAGALI_'    + modal;
   if (prof.includes('GRAZIELA') || prof.includes('NUTRI'))          return 'NUTRI_'     + modal;
   if (prof.includes('SARA'))                                        return 'SARA_'      + modal;
+  // Bianca (receptoras/doadoras): fallback por NOME pra fechar o gap — todo procId novo
+  // dela caía em null silencioso (aconteceu com 176 e 50241). Só chega aqui o que não
+  // casou nas listas/regras acima (exames/honorários já barrados na seção 2). Usa o modo
+  // se o nome disser; senão o texto neutro (não arrisca endereço/vídeo errado).
+  if (prof.includes('BIANCA')) {
+    if (proc.indexOf('ONLINE') >= 0)     return 'BIANCA_RECEPTORA_ONLINE';
+    if (proc.indexOf('PRESENCIAL') >= 0) return 'BIANCA_RECEPTORA_PRESENCIAL';
+    return 'BIANCA_RECEPTORA';
+  }
   // Érica faz só exames; qualquer procId não identificado → tratamento
   if (prof.includes('ERICA') || prof.includes('ÉRICA'))             return 'ULTRAS_TRATAMENTO';
 
