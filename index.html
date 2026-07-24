@@ -15627,12 +15627,25 @@
                 data: { labels, datasets },
                 options: {
                     responsive: true,
+                    interaction: { mode: 'index', intersect: false },   // hover no mês mostra TODOS os grupos
                     plugins: {
                         legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
-                        tooltip: { callbacks: {
-                            label: ctx => ' ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2}),
-                            footer: items => { const t = items.reduce((s,i)=>s+i.raw,0); return 'Total recebido: R$ ' + t.toLocaleString('pt-BR',{minimumFractionDigits:2}); }
-                        } }
+                        tooltip: {
+                            filter: item => item.raw > 0,                // não lista grupos zerados
+                            itemSort: (a, b) => b.raw - a.raw,           // maior primeiro
+                            callbacks: {
+                                label: ctx => {
+                                    const tot = ctx.chart.data.datasets.reduce((s, d) => s + (d.data[ctx.dataIndex] || 0), 0);
+                                    const pct = tot ? (ctx.raw / tot * 100) : 0;
+                                    return '  ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                                        + '  ·  ' + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+                                },
+                                footer: items => {
+                                    const t = items.reduce((s, i) => s + i.raw, 0);
+                                    return 'Total recebido: R$ ' + t.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                }
+                            }
+                        }
                     },
                     scales: {
                         x: { stacked:true, ticks:{color:'#6b7a99',font:{size:11}}, grid:{display:false} },
