@@ -15717,23 +15717,30 @@
                     <div style="font-size:18px;font-weight:700;color:#34d399">${R(tot.economiaLiquida)}</div>
                     <div style="font-size:11px;color:var(--muted);margin-top:2px">✅ Economia Líquida (total)</div></div>`;
 
-            const labels   = meses.map(m => m.label).concat(['TOTAL']);
-            const gerada   = meses.map(m => m.economiaGerada).concat([null]);
-            const comissao = meses.map(m => m.comissaoDacto).concat([null]);
-            const liquida  = meses.map(m => m.economiaLiquida).concat([tot.economiaLiquida]);
-            const fmtK = v => v == null ? '' : (v >= 1000000 ? (v / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + 'M' : (v / 1000).toFixed(0) + 'k');
+            // Sem barra totalizadora — o total fica nos KPIs acima. Assim a escala se ajusta aos
+            // valores mensais (max ~87k) e as barras dos meses ficam visuais, não achatadas.
+            const labels   = meses.map(m => m.label);
+            const gerada   = meses.map(m => m.economiaGerada);
+            const comissao = meses.map(m => m.comissaoDacto);
+            const liquida  = meses.map(m => m.economiaLiquida);
+            // rótulo abreviado (k): 1 casa com vírgula abaixo de 10 mil, inteiro acima
+            const fmtBar = v => !v ? '' : (v >= 10000 ? (v / 1000).toFixed(0) + 'k' : (v / 1000).toFixed(1).replace('.', ',') + 'k');
 
-            // Rótulo só na barra totalizadora (destaque). Os meses ficam no tooltip pra não poluir.
-            const totalLabel = {
-                id: 'econTotalLabel',
+            // Rótulo abreviado em cima de CADA barra, na cor da própria série.
+            const coresBar = ['#6ee7b7', '#fbbf24', '#059669'];
+            const barLabels = {
+                id: 'econBarLabels',
                 afterDatasetsDraw(chart) {
-                    const last = chart.data.labels.length - 1;
-                    const bar = chart.getDatasetMeta(2).data[last]; if (!bar) return;
-                    const v = chart.data.datasets[2].data[last]; if (!v) return;
                     const { ctx } = chart; ctx.save();
                     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                    ctx.font = '700 13px Outfit, sans-serif'; ctx.fillStyle = '#10b981';
-                    ctx.fillText('R$ ' + fmtK(v), bar.x, bar.y - 5);
+                    ctx.font = '600 8px Outfit, sans-serif';
+                    chart.data.datasets.forEach((ds, di) => {
+                        ctx.fillStyle = coresBar[di];
+                        chart.getDatasetMeta(di).data.forEach((bar, i) => {
+                            const t = fmtBar(ds.data[i]); if (!t) return;
+                            ctx.fillText(t, bar.x, bar.y - 2);
+                        });
+                    });
                     ctx.restore();
                 }
             };
@@ -15757,7 +15764,7 @@
                         y: { grace: '10%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
                     }
                 },
-                plugins: [totalLabel]
+                plugins: [barLabels]
             });
 
             const sel = document.getElementById('econMesSel');
