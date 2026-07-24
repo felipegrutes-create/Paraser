@@ -85,6 +85,10 @@ function doGet(e) {
     if (action === 'get_economia_tributaria') {
       return handleGetEconomiaTributaria(e.parameter);
     }
+    // Receita FATURADA por grupo de serviço, por mês (pro rateio do recebido no Resumo Financeiro)
+    if (action === 'get_receita_por_servico') {
+      return handleReceitaPorServico(e.parameter);
+    }
     // Busca mensagens de um número no banco do monitor (whatsapp.mensagens).
     // Protegido por key: expõe conversas de pacientes (a URL do CRM é pública).
     if (action === 'wpp_busca' && e.parameter.key === 'paraser2026') {
@@ -836,6 +840,64 @@ function handleGetEconomiaTributaria(params) {
   });
   CacheService.getScriptCache().put(CK, payload, 3600);   // 1h — muda ~1x/mês
   return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
+}
+
+// =========================================================
+// Receita FATURADA por grupo de serviço, por mês. Usada pela visão "Procedimentos" do
+// gráfico de Receita Recebida (o front rateia o recebido real pela proporção destes grupos,
+// pra o total bater com o banco). Reusa handleGetFinancial (Feegow) e agrega por grupo.
+// Cache por mês: fechados 6h, mês corrente 15min. Acesse: ?action=get_receita_por_servico&ano=2026
+// =========================================================
+function _grupoServico_(it) {
+  var nome = String(it.nomeResolvido || it.descricao || '').toUpperCase();
+  if (it.tipo === 'M') return 'Medicação';               // medicamento
+  if (nome.indexOf('CONSULTA') >= 0) return 'Consultas';
+  if (nome.indexOf('HONORAR') >= 0 || nome.indexOf('HONORÁR') >= 0) return 'Honorários';
+  if (nome.indexOf('MEDICA') >= 0) return 'Medicação';   // "MEDICAÇÃO E PREPARO" etc. (tipo S)
+  if (nome.indexOf('USG') >= 0 || nome.indexOf('ULTRA') >= 0) return 'Exames';
+  if (it.tipo === 'S' || it.tipo === 'K') return 'Procedimentos';
+  return 'Outros';
+}
+
+function _agregaServicoMes_(ano, m) {
+  var mm = ('0' + m).slice(-2);
+  var ultimo = new Date(Number(ano), m, 0).getDate();
+  var ds = '01/' + mm + '/' + ano;
+  var de = ('0' + ultimo).slice(-2) + '/' + mm + '/' + ano;
+  var faturas = [];
+  try { faturas = (JSON.parse(handleGetFinancial({ data_start: ds, data_end: de }).getContent()).data) || []; } catch (e) { faturas = []; }
+  var g = { 'Consultas': 0, 'Honorários': 0, 'Medicação': 0, 'Exames': 0, 'Procedimentos': 0, 'Outros': 0 };
+  faturas.forEach(function (inv) {
+    (inv.itens || []).forEach(function (it) {
+      if (it.is_cancelado) return;
+      var v = (Number(it.valor) || 0) - (Number(it.desconto) || 0) + (Number(it.acrescimo) || 0);  // centavos
+      if (v <= 0) return;
+      g[_grupoServico_(it)] += v;
+    });
+  });
+  // centavos → reais
+  Object.keys(g).forEach(function (k) { g[k] = Math.round(g[k]) / 100; });
+  return g;
+}
+
+function handleReceitaPorServico(params) {
+  var ano = String((params && params.ano) || new Date().getFullYear());
+  var hoje = new Date();
+  var mesAtual = (String(hoje.getFullYear()) === ano) ? (hoje.getMonth() + 1) : 12;
+  var cache = CacheService.getScriptCache();
+  var meses = [];
+  for (var m = 1; m <= mesAtual; m++) {
+    var mk = ano + '-' + ('0' + m).slice(-2);
+    var ck = 'recsvc_' + mk + '_v1';
+    var grupos = null;
+    if (!(params && params.nocache)) { var hit = cache.get(ck); if (hit) { try { grupos = JSON.parse(hit); } catch (e) {} } }
+    if (!grupos) {
+      grupos = _agregaServicoMes_(ano, m);
+      try { cache.put(ck, JSON.stringify(grupos), (m < mesAtual) ? 21600 : 900); } catch (e) {}
+    }
+    meses.push({ mes: mk, grupos: grupos });
+  }
+  return jsonOk({ ok: true, meses: meses });
 }
 
 // =========================================================
