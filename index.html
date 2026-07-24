@@ -15670,13 +15670,20 @@
             const despesas = (desp && desp[mesKey] != null) ? desp[mesKey] : null;
             const resultado = (recebido != null && despesas != null) ? recebido - despesas : null;
 
+            // Acumulado do ANO (do mês selecionado): soma entradas e saídas de todos os meses daquele ano.
+            const anoStr = String(_resDate.getFullYear());
+            let entAno = null, saiAno = null;
+            if (receb) { entAno = 0; receb.forEach(x => { if (x.mes && x.mes.slice(0, 4) === anoStr) entAno += (x.rede || 0) + (x.pix || 0) + (x.mp || 0); }); }
+            if (desp)  { saiAno = 0; Object.keys(desp).forEach(k => { if (k.slice(0, 4) === anoStr) saiAno += desp[k]; }); }
+            const resAno = (entAno != null && saiAno != null) ? entAno - saiAno : null;
+
             _resRenderKPIs({
                 recebido, despesas, resultado,
                 faturado: m ? m.fat / 100 : null,
                 aReceber: m ? m.pend / 100 : null,
                 parcial: rec ? !!rec.parcial : false
             });
-            _resRenderMesResultado(recebido, despesas, resultado, rec ? !!rec.parcial : false);
+            _resRenderResultadoAno(entAno, saiAno, resAno, _resDate.getFullYear());
             _execRenderCartaoMes();
             _execRenderCartaoSemana();
             _resRenderEntSai(receb || [], desp || {});
@@ -15845,30 +15852,28 @@
                 </div>`;
         }
 
-        // Card do resultado do mês (R$ + margem %), acima do gráfico Entradas × Saídas.
-        // Resultado = recebido − despesas do mês selecionado. Margem = resultado ÷ recebido.
-        function _resRenderMesResultado(recebido, despesas, resultado, parcial) {
+        // Card do resultado ACUMULADO do ano (R$ + margem %), acima do gráfico Entradas × Saídas.
+        // Soma todas as entradas menos todas as saídas pagas do ano (até o mês corrente). Margem = ÷ entradas.
+        function _resRenderResultadoAno(entAno, saiAno, resAno, ano) {
             const box = document.getElementById('resMesResultado'); if (!box) return;
-            if (resultado == null) { box.innerHTML = ''; return; }
-            const mesLabel = _MONTHS_PT[_resDate.getMonth()] + ' ' + _resDate.getFullYear();
-            const pos = resultado >= 0;
+            if (resAno == null) { box.innerHTML = ''; return; }
+            const pos = resAno >= 0;
             const cor = pos ? '#10b981' : '#f87171';
             const bg  = pos ? 'rgba(16,185,129,0.10)' : 'rgba(248,113,113,0.10)';
             const bd  = pos ? 'rgba(16,185,129,0.35)' : 'rgba(248,113,113,0.35)';
-            const margem = (recebido && recebido > 0) ? (resultado / recebido * 100) : null;
+            const margem = (entAno && entAno > 0) ? (resAno / entAno * 100) : null;
             const R = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const parc = parcial ? ' <span style="font-size:11px;color:#f59e0b;font-weight:600">(mês em andamento)</span>' : '';
             box.innerHTML =
                 `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 20px">
                     <div style="display:flex;align-items:center;gap:12px">
                         <span style="font-size:24px">${pos ? '📈' : '📉'}</span>
                         <div>
-                            <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700">Resultado de ${mesLabel}${parc}</div>
-                            <div style="font-size:12px;color:var(--muted)">o que sobrou: entradas menos saídas pagas do mês</div>
+                            <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700">Resultado acumulado ${ano}</div>
+                            <div style="font-size:12px;color:var(--muted)">entradas menos saídas pagas, somando o ano todo até agora</div>
                         </div>
                     </div>
                     <div style="display:flex;align-items:baseline;gap:16px">
-                        <span style="font-size:27px;font-weight:800;color:${cor}">${pos ? '' : '−'}${R(resultado)}</span>
+                        <span style="font-size:27px;font-weight:800;color:${cor}">${pos ? '' : '−'}${R(resAno)}</span>
                         ${margem != null ? `<span style="font-size:21px;font-weight:700;color:${cor}">${margem.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span>` : ''}
                     </div>
                 </div>`;
