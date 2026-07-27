@@ -2112,7 +2112,9 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify(outz, null, 2)).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'slack-diag' && params.key === 'paraser2026') {
-    var diag = { canalAlvo: CF_SLACK_CHANNEL_REAG };
+    // ?canal=comercial (ou qualquer pedaço do nome) — default: reagendamento
+    var busca = String(params.canal || 'reagend').toLowerCase();
+    var diag = { canalAlvo: busca };
     try {
       var auth = JSON.parse(UrlFetchApp.fetch('https://slack.com/api/auth.test',
         { method: 'post', headers: { Authorization: 'Bearer ' + CF_SLACK_TOKEN }, muteHttpExceptions: true }).getContentText());
@@ -2121,10 +2123,18 @@ function doGet(e) {
     try {
       var lst = JSON.parse(UrlFetchApp.fetch('https://slack.com/api/conversations.list?limit=1000&exclude_archived=true&types=public_channel,private_channel',
         { headers: { Authorization: 'Bearer ' + CF_SLACK_TOKEN } }).getContentText());
-      diag.canaisReag = (lst.channels || []).filter(function (c) { return c.name.indexOf('reagend') >= 0; })
-        .map(function (c) { return { nome: c.name, appEhMembro: !!c.is_member }; });
-      diag.reagExiste = diag.canaisReag.length > 0;
+      diag.canais = (lst.channels || []).filter(function (c) { return c.name.toLowerCase().indexOf(busca) >= 0; })
+        .map(function (c) { return { nome: c.name, id: c.id, privado: !!c.is_private, appEhMembro: !!c.is_member }; });
+      diag.existe = diag.canais.length > 0;
     } catch (e) { diag.listErro = e.message; }
+    if (params.entrar === '1' && diag.canais && diag.canais.length) {
+      diag.entrou = slackEntrarNoCanal(diag.canais[0].nome);
+      diag.entrarErro = CF_SLACK_ULTIMO_ERRO;
+    }
+    if (params.postar === '1' && diag.canais && diag.canais.length) {
+      diag.postou = slackPost('🧪 teste de post do app (diagnóstico)', diag.canais[0].nome);
+      diag.postarErro = CF_SLACK_ULTIMO_ERRO;
+    }
     return ContentService.createTextOutput(JSON.stringify(diag)).setMimeType(ContentService.MimeType.JSON);
   }
   if (params.action === 'primeira-usg-sim' && params.key === 'paraser2026') {
@@ -2616,11 +2626,15 @@ function marcarPendente(row, novoStatus) {
 // ----------------------------------------------------------------
 // Slack — post simples no canal de atendimento
 // ----------------------------------------------------------------
+// Último motivo de falha do slackPost (o diag lê isso — antes o erro do Slack
+// sumia e a gente só via "não consegui postar", sem saber por quê).
+var CF_SLACK_ULTIMO_ERRO = '';
+
 function slackPost(texto, canal) {
   try {
-    if (!CF_SLACK_TOKEN) return false;
+    if (!CF_SLACK_TOKEN) { CF_SLACK_ULTIMO_ERRO = 'sem SLACK_TOKEN'; return false; }
     var channelId = slackGetChannelId(canal || CF_SLACK_CHANNEL);
-    if (!channelId) return false;
+    if (!channelId) { CF_SLACK_ULTIMO_ERRO = 'canal não encontrado'; return false; }
     var resp = UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
       method:             'post',
       contentType:        'application/json; charset=utf-8',
@@ -2628,28 +2642,56 @@ function slackPost(texto, canal) {
       payload:            JSON.stringify({ channel: channelId, text: texto }),
       muteHttpExceptions: true
     });
-    try { return JSON.parse(resp.getContentText()).ok === true; } catch (e) { return true; }
+    try {
+      var j = JSON.parse(resp.getContentText());
+      if (j.ok !== true) CF_SLACK_ULTIMO_ERRO = j.error || 'erro desconhecido';
+      return j.ok === true;
+    } catch (e) { return true; }
   } catch (err) {
+    CF_SLACK_ULTIMO_ERRO = err.message;
     Logger.log('slackPost erro: ' + err.message);
     return false;
   }
 }
 
-// Reagendamento → canal #reagendamento. Se ele não existir / o app não estiver
-// no canal, o post falha; aí cai no #atendimento com um aviso (nunca perde).
-function slackPostReag(texto) {
-  if (!slackPost(texto, CF_SLACK_CHANNEL_REAG)) {
-    slackPost('⚠️ (não consegui postar no #' + CF_SLACK_CHANNEL_REAG +
-              ' — crie o canal e adicione o app da clínica)\n' + texto, CF_SLACK_CHANNEL);
-  }
+// O app entra sozinho no canal (só canal PÚBLICO; canal privado precisa de convite).
+// Sem isso, todo canal novo exigia um /invite manual antes do primeiro post.
+function slackEntrarNoCanal(canal) {
+  try {
+    if (!CF_SLACK_TOKEN) return false;
+    var id = slackGetChannelId(canal);
+    if (!id) return false;
+    var j = JSON.parse(UrlFetchApp.fetch('https://slack.com/api/conversations.join', {
+      method:             'post',
+      contentType:        'application/json; charset=utf-8',
+      headers:            { Authorization: 'Bearer ' + CF_SLACK_TOKEN },
+      payload:            JSON.stringify({ channel: id }),
+      muteHttpExceptions: true
+    }).getContentText());
+    if (j.ok !== true) CF_SLACK_ULTIMO_ERRO = 'join: ' + (j.error || '?');
+    return j.ok === true || j.error === 'already_in_channel';
+  } catch (e) { CF_SLACK_ULTIMO_ERRO = 'join: ' + e.message; return false; }
 }
 
-// Post no #comercial (mesmo bot). Fallback pro #atendimento se o app não estiver no canal.
+// Posta no canal pedido. Se falhar por o app não estar lá, ENTRA no canal e
+// tenta de novo; só cai no #atendimento (com o motivo) se nem isso resolver.
+function slackPostCanal_(texto, canal, dica) {
+  if (slackPost(texto, canal)) return true;
+  var motivo = CF_SLACK_ULTIMO_ERRO;
+  if (slackEntrarNoCanal(canal) && slackPost(texto, canal)) return true;
+  slackPost('⚠️ (não consegui postar no #' + canal + ' · ' + (CF_SLACK_ULTIMO_ERRO || motivo) +
+            ' · ' + dica + ')\n' + texto, CF_SLACK_CHANNEL);
+  return false;
+}
+
+// Reagendamento → canal #reagendamento.
+function slackPostReag(texto) {
+  return slackPostCanal_(texto, CF_SLACK_CHANNEL_REAG, 'crie o canal e adicione o app da clínica');
+}
+
+// Post no #comercial (mesmo bot).
 function slackPostComercial(texto) {
-  if (!slackPost(texto, CF_SLACK_CHANNEL_COMERCIAL)) {
-    slackPost('⚠️ (não consegui postar no #' + CF_SLACK_CHANNEL_COMERCIAL +
-              ' — adicione o app da clínica ao canal)\n' + texto, CF_SLACK_CHANNEL);
-  }
+  return slackPostCanal_(texto, CF_SLACK_CHANNEL_COMERCIAL, 'adicione o app da clínica ao canal');
 }
 
 // ================================================================
