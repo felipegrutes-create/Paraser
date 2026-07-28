@@ -12703,7 +12703,23 @@
             const [cm, cy] = curKey.split('/');
             const curVal = cy + cm;
 
-            const allReceita = await loadReceitaFromLancamentos();
+            // Receita ao vivo (cartão Rede + PIX + dinheiro), a MESMA fonte da aba Resultado
+            // Financeiro, pra as duas não mostrarem resultados diferentes. Antes vinha da linha
+            // 43 do Budget_Consolidado, preenchida à mão: jan-jun batia, mas o mês corrente ia
+            // na frente do que a Rede liquidou (jul/26: 822.611 na planilha x 798.061 ao vivo).
+            // Se a carga ao vivo falhar, cai no Budget em vez de zerar a receita.
+            let allReceita;
+            try {
+                allReceita = {};
+                (await _finRecebimentosAoVivo()).forEach(x => {
+                    if (!x || !x.mes || x.mes.slice(0, 4) !== '2026') return;
+                    allReceita[x.mes.slice(5, 7) + '/2026'] = (x.rede || 0) + (x.pix || 0) + (x.mp || 0);
+                });
+                if (!Object.keys(allReceita).length) throw new Error('sem meses ao vivo');
+            } catch (e) {
+                console.warn('Receita ao vivo falhou, usando o Budget_Consolidado:', e);
+                allReceita = await loadReceitaFromLancamentos();
+            }
 
             // Despesas por mês do finData (mesmo filtro do dashboard: Tipo=Saída, sem EMPR, sem RETIRADA)
             const despesaByMonth = {};
@@ -15782,23 +15798,13 @@
             const mesKey = _fgKey(_resDate);
 
             // 7 fontes em paralelo; cada uma falha sozinha sem derrubar a tela (KPI vira —)
-            const [receb, fg, desp, planF, dinQ, ret, folha] = await Promise.all([
-                resLoadRecebimentos().catch(() => null),
+            const [receb, fg, desp, ret, folha] = await Promise.all([
+                _finRecebimentosAoVivo().catch(() => null),
                 fgLoadMonth(_resDate).catch(() => null),
                 resDespesasPorMes().catch(() => null),
-                _resLoadMpPlanF().catch(() => null),
-                _resLoadDinQuadro().catch(() => null),
                 resRetiradaPorMes().catch(() => null),
                 resFolhaPorMes().catch(() => null),
             ]);
-
-            // Dinheiro em espécie: a fonte ÚNICA é o QUADRO (por paciente/CPF). Se o mês tem lançamento
-            // no quadro, usa ele; senão cai no histórico da planilha (coluna REDE/MP − Rede API) pra não
-            // perder os meses antigos que a analista lançava por lá.
-            if (receb) receb.forEach(x => {
-                if (dinQ && dinQ[x.mes] != null) x.mp = dinQ[x.mes];
-                else x.mp = Math.max(0, ((planF && planF[x.mes]) || 0) - (x.rede || 0));
-            });
 
             const rec = receb ? receb.find(x => x.mes === mesKey) : null;
             const recebido = rec ? (rec.rede || 0) + (rec.pix || 0) + (rec.mp || 0) : null;
@@ -16048,6 +16054,24 @@
             });
             _resMpPlanF = map;
             return map;
+        }
+
+        // Recebimento ao vivo por mês, JÁ com o dinheiro em espécie no campo mp. É a fonte de
+        // entrada das DUAS abas (Resultado Financeiro e Contas a Pagar), pra elas não voltarem a
+        // divergir. O mp vem zerado do get_rede_mensal: quem preenche é o quadro de dinheiro
+        // (fonte única, por paciente) e, nos meses antigos sem quadro, a coluna REDE/MP da
+        // META RECEITA menos a Rede da API.
+        async function _finRecebimentosAoVivo() {
+            const [receb, planF, dinQ] = await Promise.all([
+                resLoadRecebimentos(),
+                _resLoadMpPlanF().catch(() => ({})),
+                _resLoadDinQuadro().catch(() => ({}))
+            ]);
+            (receb || []).forEach(x => {
+                if (dinQ && dinQ[x.mes] != null) x.mp = dinQ[x.mes];
+                else x.mp = Math.max(0, ((planF && planF[x.mes]) || 0) - (x.rede || 0));
+            });
+            return receb || [];
         }
 
         // Comparativo de anos — lê o CONTROLE MANUAL da aba META RECEITA (FIN_SHEET):
