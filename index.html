@@ -4222,22 +4222,11 @@
                 </div>
             </div>
 
-            <!-- Faturamento 2025 × 2026 em dumbbell: cada mês é um traço ligando os dois anos.
-                 O comprimento do traço é a diferença e a cor dele é a direção. -->
+            <!-- Comparativo entre anos (controle manual META RECEITA) -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
-                        <h3 style="margin:0">🎯 Faturamento 2025 × 2026 — o vão de cada mês <span id="resDumbSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
-                        <!-- legenda em HTML: a nativa do Chart.js desenha a bolinha grande demais
-                             e o rótulo fica ilegível embaixo dela quando usePointStyle está ligado -->
-                        <span style="display:inline-flex;align-items:center;gap:14px;font-size:11px;color:var(--muted);flex-shrink:0">
-                            <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:9px;height:9px;border-radius:50%;background:#64748b"></i>2025</span>
-                            <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:12px;height:12px;border-radius:50%;background:#00d4aa"></i>2026</span>
-                        </span>
-                    </div>
-                    <!-- teto maior que o padrão (.chart-card canvas = 280px): dumbbell é uma
-                         linha por mês e com 12 meses 280px espreme demais -->
-                    <canvas id="resChartDumb" height="300" style="max-height:390px"></canvas>
+                    <h3>📅 Receita Recebida — 2025 × 2026 <span id="resAnosSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <canvas id="resChartAnos" height="200"></canvas>
                 </div>
             </div>
 
@@ -4276,14 +4265,6 @@
                 <div class="chart-card" style="flex:1">
                     <h3>👥 Folha (PJ + CLT) e % sobre o Faturamento <span id="resFolhaSub" style="font-size:11px;font-weight:400;color:var(--muted)">salários CLT + PJ, encargos, benefícios, férias e rescisão (sem repasse médico) · linha = folha ÷ faturamento do mês</span></h3>
                     <canvas id="resChartFolha" height="200"></canvas>
-                </div>
-            </div>
-
-            <!-- Comparativo entre anos (controle manual META RECEITA) -->
-            <div class="cr-charts-row" style="margin-bottom:16px">
-                <div class="chart-card" style="flex:1">
-                    <h3>📅 Receita Recebida — 2025 × 2026 <span id="resAnosSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
-                    <canvas id="resChartAnos" height="200"></canvas>
                 </div>
             </div>
 
@@ -15834,7 +15815,6 @@
             _resRenderEntSaiRet(receb || [], desp || {}, ret || {});
             _resRenderFolha(receb || [], folha || {});
             _resRenderTaxasMes();
-            _resRenderDumb();
             _resRenderAnos();
             _resRenderCaixa();
             resRenderEconomia();
@@ -16067,105 +16047,6 @@
             const br = s => { const v = parseFloat(String(s || '').replace(/[R$\s.]/g, '').replace(',', '.')); return isNaN(v) ? 0 : v; };
             _resAnosData = { m2026: (j.values[0] || []).map(br), m2025: (j.values[2] || []).map(br) };
             return _resAnosData;
-        }
-
-        // Mesmo dado do gráfico de barras 2025×2026 (reusa _resLoadAnos, sem fetch novo), mas
-        // em DUMBBELL: cada mês vira um traço ligando a bolinha de 2025 à de 2026. O comprimento
-        // do traço É a diferença e a cor dele é a direção, então o vão salta aos olhos sem
-        // precisar comparar altura de barra. Cinza = 2025 (contexto), accent = 2026 (o assunto).
-        // Eixo x truncado de propósito: em dumbbell a codificação é POSIÇÃO, e a escala linear
-        // preserva o comprimento do vão. O % fica numa canaleta reservada à direita.
-        async function _resRenderDumb() {
-            const el = document.getElementById('resChartDumb'); if (!el) return;
-            const sub = document.getElementById('resDumbSub');
-            let d;
-            try { d = await _resLoadAnos(); }
-            catch (e) { if (sub) sub.textContent = '⚠ não consegui ler o controle (META RECEITA)'; return; }
-            if (_resCharts.dumb) { try{_resCharts.dumb.destroy();}catch(e){} }
-
-            const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-            // Só meses em que os DOIS anos têm valor: senão o traço iria do zero até o topo.
-            const idx = MESES.map((_, i) => i).filter(i => d.m2026[i] > 0 && d.m2025[i] > 0);
-            if (!idx.length) { if (sub) sub.textContent = 'nenhum mês comparável ainda'; return; }
-            const labels = idx.map(i => MESES[i]);
-            const v25 = idx.map(i => d.m2025[i]);
-            const v26 = idx.map(i => d.m2026[i]);
-            const pct = v26.map((v, k) => (v - v25[k]) / v25[k] * 100);
-
-            const C25 = '#64748b', C26 = '#00d4aa', UP = '#34d399', DOWN = '#f87171', SURF = '#0d1427';
-            const fmt0 = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
-            const acima = pct.filter(p => p >= 0).length;
-            const saldo = v26.reduce((s, v, k) => s + (v - v25[k]), 0);
-            if (sub) sub.textContent = `${acima} de ${idx.length} meses acima de 2025 · saldo do período ${saldo >= 0 ? '+' : '−'}${fmt0(Math.abs(saldo))}`;
-
-            // Bordas arredondadas em 50k pra o eixo não terminar em "R$408k"/"R$1079k".
-            const todos = v25.concat(v26);
-            const lo = Math.min(...todos), hi = Math.max(...todos);
-            const folga = (hi - lo) * 0.12 || hi * 0.1, PASSO = 50000;
-            const xMin = Math.max(0, Math.floor((lo - folga) / PASSO) * PASSO);
-            const xMax = Math.ceil((hi + folga) / PASSO) * PASSO;
-
-            // Desenha as duas bolinhas de cada mês e o % na canaleta da direita. O anel de 2px
-            // na cor da superfície separa as bolinhas quando os dois anos ficam quase iguais.
-            const dumbPlugin = {
-                id: 'resDumbMarks',
-                afterDatasetsDraw(chart) {
-                    const { ctx } = chart, ex = chart.scales.x, ey = chart.scales.y;
-                    ctx.save();
-                    labels.forEach((_, k) => {
-                        const cy = ey.getPixelForValue(k);
-                        [[v25[k], C25, 5], [v26[k], C26, 6.5]].forEach(([val, cor, r]) => {
-                            ctx.beginPath();
-                            ctx.arc(ex.getPixelForValue(val), cy, r, 0, Math.PI * 2);
-                            ctx.fillStyle = cor; ctx.fill();
-                            ctx.lineWidth = 2; ctx.strokeStyle = SURF; ctx.stroke();
-                        });
-                        const p = pct[k];
-                        ctx.font = '700 11px Outfit, sans-serif';
-                        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-                        ctx.fillStyle = p >= 0 ? UP : DOWN;
-                        ctx.fillText((p >= 0 ? '▲ ' : '▼ ') + Math.abs(p).toFixed(0) + '%', chart.chartArea.right + 12, cy);
-                    });
-                    ctx.restore();
-                }
-            };
-
-            _resCharts.dumb = new Chart(el.getContext('2d'), {
-                type: 'bar',
-                data: { labels, datasets: [{
-                    label: 'vão',
-                    data: v26.map((v, k) => [v25[k], v]),   // barra flutuante = o traço do dumbbell
-                    backgroundColor: pct.map(p => p >= 0 ? UP : DOWN),
-                    borderSkipped: false, borderRadius: 2, barThickness: 3
-                }]},
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    layout: { padding: { right: 66, left: 4, top: 4 } },
-                    plugins: {
-                        legend: { display: false },   // legenda é HTML, no cabeçalho do card
-                        tooltip: {
-                            callbacks: {
-                                label: it => [' 2025: ' + fmt0(v25[it.dataIndex]), ' 2026: ' + fmt0(v26[it.dataIndex])],
-                                footer: items => {
-                                    const k = items[0].dataIndex, dif = v26[k] - v25[k];
-                                    return (dif >= 0 ? 'Acima de 2025 em ' : 'Abaixo de 2025 em ')
-                                        + fmt0(Math.abs(dif)) + ' (' + Math.abs(pct[k]).toFixed(1).replace('.', ',') + '%)';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            min: xMin, max: xMax,
-                            ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' },
-                            grid: { color: 'rgba(255,255,255,0.04)' }
-                        },
-                        y: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } }
-                    }
-                },
-                plugins: [dumbPlugin]
-            });
         }
 
         async function _resRenderAnos() {
