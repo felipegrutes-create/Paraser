@@ -15815,7 +15815,7 @@
             _resRenderEntSaiRet(receb || [], desp || {}, ret || {});
             _resRenderFolha(receb || [], folha || {});
             _resRenderTaxasMes();
-            _resRenderAnos();
+            _resRenderAnos(receb || []);
             _resRenderCaixa();
             resRenderEconomia();
         }
@@ -16049,7 +16049,11 @@
             return _resAnosData;
         }
 
-        async function _resRenderAnos() {
+        // 2026 vem das APIs (o MESMO receb do Entradas × Saídas: cartão Rede + PIX de pacientes +
+        // dinheiro), então os dois gráficos contam a mesma história. 2025 segue do controle manual
+        // da META RECEITA, única fonte com o ano fechado. Precisa receber o receb JÁ ajustado pelo
+        // loadAndRenderResumo (é lá que o dinheiro em espécie entra no campo mp).
+        async function _resRenderAnos(receb) {
             const el = document.getElementById('resChartAnos'); if (!el) return;
             const sub = document.getElementById('resAnosSub');
             let d;
@@ -16057,9 +16061,34 @@
             catch (e) { if (sub) sub.textContent = '⚠ não consegui ler o controle (META RECEITA)'; return; }
             if (_resCharts.anos) { try{_resCharts.anos.destroy();}catch(e){} }
             const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-            const t26 = d.m2026.reduce((s, v) => s + v, 0), t25 = d.m2025.reduce((s, v) => s + v, 0);
+
+            const vivo = new Array(12).fill(null), emAndamento = new Array(12).fill(false);
+            (receb || []).forEach(x => {
+                if (!x || !x.mes || x.mes.slice(0, 4) !== '2026') return;
+                const m = parseInt(x.mes.slice(5, 7), 10) - 1;
+                if (m < 0 || m > 11) return;
+                vivo[m] = (x.rede || 0) + (x.pix || 0) + (x.mp || 0);
+                emAndamento[m] = !!x.parcial;
+            });
+            // Se a carga ao vivo falhar, cai no controle manual em vez de esvaziar o gráfico.
+            const aoVivo = vivo.some(v => v != null);
+            const m26 = aoVivo ? vivo.map(v => v == null ? 0 : v) : d.m2026;
+            // Mês em andamento leva * : comparar um mês pela metade com o mês inteiro de 2025
+            // derruba o % e não quer dizer queda.
+            const labels = meses.map((m, i) => m + (emAndamento[i] ? '*' : ''));
+
+            // Acumulado só até o último mês que 2026 tem: somar 2025 inteiro contra 7 meses de
+            // 2026 parecia uma queda gigante que não existe.
+            const ate = m26.reduce((ult, v, i) => v > 0 ? i : ult, -1);
+            const soma = a => a.slice(0, ate + 1).reduce((s, v) => s + v, 0);
+            const t26 = soma(m26), t25 = soma(d.m2025);
             const fmtM = v => 'R$ ' + (v/1000000).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + 'M';
-            if (sub) sub.textContent = `controle manual (PIX de pacientes + cartão Rede/MP) · acumulado: 2026 ${fmtM(t26)} × 2025 ${fmtM(t25)}`;
+            const fonte = aoVivo
+                ? '2026 ao vivo (cartão Rede + PIX + dinheiro) × 2025 do controle manual'
+                : 'controle manual (PIX de pacientes + cartão Rede/MP)';
+            const periodo = ate >= 0 ? ` ${meses[0]}–${meses[ate]}` : '';
+            const nota = emAndamento.some(Boolean) ? ' · * mês em andamento' : '';
+            if (sub) sub.textContent = `${fonte} · acumulado${periodo}: 2026 ${fmtM(t26)} × 2025 ${fmtM(t25)}${nota}`;
             // % de variação ano contra ano em cima de cada par de barras (só meses que 2026 já tem valor)
             const yoyPlugin = {
                 id: 'resYoY',
@@ -16080,9 +16109,9 @@
             };
             _resCharts.anos = new Chart(el.getContext('2d'), {
                 type: 'bar',
-                data: { labels: meses, datasets: [
+                data: { labels, datasets: [
                     { label: '2025', data: d.m2025, backgroundColor: '#64748b', borderRadius: 4, maxBarThickness: 32 },
-                    { label: '2026', data: d.m2026, backgroundColor: '#00d4aa', borderRadius: 4, maxBarThickness: 32 }
+                    { label: '2026', data: m26, backgroundColor: '#00d4aa', borderRadius: 4, maxBarThickness: 32 }
                 ]},
                 options: {
                     responsive: true,
