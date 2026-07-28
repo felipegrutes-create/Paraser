@@ -2848,7 +2848,7 @@
             <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-fin',event)">Financeiro <span class="tab-group-arrow">▾</span></button>
             <div class="tab-dropdown">
                 <button class="tab-dropdown-item" onclick="showSection('sec-resumo',null)">📊 Resultado Financeiro</button>
-                <button class="tab-dropdown-item" onclick="showSection('sec-fin',null)">💰 Financeiro</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-fin',null)">💰 Contas a Pagar</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-cr',null)">💳 Contas a Receber</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-caixa',null)">👨‍⚕️ Médicos</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-repasses',null)">🧾 Repasses</button>
@@ -3824,7 +3824,7 @@
 
         <!-- FINANCEIRO -->
         <section id="sec-fin" class="section">
-            <p class="section-title">Painel Financeiro — Despesas e Pagamentos</p>
+            <p class="section-title">Contas a Pagar — Despesas e Pagamentos</p>
 
             <div class="kpi-grid" id="finKpiGrid">
                 <div class="kpi-card"><div class="value" id="fin-mes1">—</div><div class="label" id="fin-mes1-label">Mês Atual</div></div>
@@ -6586,7 +6586,7 @@
         }
 
         // ===== Relatório "Uso do Sistema" (só admin) =====
-        const USO_AREA_NOMES = { 'sec-vg':'Visão Geral','sec-pv':'1ª Vez','sec-txconv':'TX Conversão','sec-ret':'Retorno','sec-doadoras':'Fluxo Pacientes','sec-pend':'Cards Pacientes','sec-meta':'Meta','sec-arquivo-morto':'Arquivo Morto','sec-salas':'Mapa de Salas','sec-resumo':'Resultado Financeiro','sec-fin':'Financeiro','sec-cr':'Contas a Receber','sec-caixa':'Médicos','sec-repasses':'Repasses','sec-socios':'Sócios','sec-medicamentos':'Medicamentos','sec-exec':'Análise Executiva','sec-estoque':'Estoque','sec-marketing':'Marketing','sec-estrutura':'Estrutura','sec-uso':'Uso do Sistema' };
+        const USO_AREA_NOMES = { 'sec-vg':'Visão Geral','sec-pv':'1ª Vez','sec-txconv':'TX Conversão','sec-ret':'Retorno','sec-doadoras':'Fluxo Pacientes','sec-pend':'Cards Pacientes','sec-meta':'Meta','sec-arquivo-morto':'Arquivo Morto','sec-salas':'Mapa de Salas','sec-resumo':'Resultado Financeiro','sec-fin':'Contas a Pagar','sec-cr':'Contas a Receber','sec-caixa':'Médicos','sec-repasses':'Repasses','sec-socios':'Sócios','sec-medicamentos':'Medicamentos','sec-exec':'Análise Executiva','sec-estoque':'Estoque','sec-marketing':'Marketing','sec-estrutura':'Estrutura','sec-uso':'Uso do Sistema' };
         const USO_ACAO_NOMES = { 'marcar_venda':'Marcou venda','editar_meta':'Editou meta','lancar_dinheiro':'Lançou dinheiro','remover_dinheiro':'Removeu dinheiro','salvar_card':'Salvou card','apagar_card':'Apagou card','entrada_manual':'Entrada manual','mover_card':'Moveu card' };
         function _usoAreaNome(id) { return USO_AREA_NOMES[id] || id; }
         let _usoDias = 30;
@@ -15696,7 +15696,7 @@
             loadAndRenderResumo();
         }
 
-        // Despesas pagas por mês — mesma régua da aba Financeiro (LANÇAMENTOS+LANÇAMENTOS_I,
+        // Despesas pagas por mês — mesma régua da aba Contas a Pagar (LANÇAMENTOS+LANÇAMENTOS_I,
         // sem retiradas/empréstimos). Se o prefetch da sec-fin ainda não rodou, carrega sem mexer no estado dela.
         async function resDespesasPorMes() {
             if (_resDespesasMap) return _resDespesasMap;
@@ -16320,14 +16320,14 @@
             });
         }
 
-        // ===== Visões do Entradas × Saídas (as mesmas 4 do "Receita vs Despesas" da aba Financeiro) =====
+        // ===== Visões do Entradas × Saídas (as mesmas 4 do "Receita vs Despesas" da aba Contas a Pagar) =====
         //   geral   → saída = despesa paga do extrato (a régua do dashboard, barra vermelha única)
         //   negocio → Custo Fixo + Custo Variável        (Budget_Consolidado, por categoria)
         //   socios  → + Retirada de Sócios               (linha 47)
         //   sede    → + Investimento Nova Sede           (linha 46)
         // Atenção: as 3 visões decompostas NÃO somam a despesa da visão geral. São recortes
         // diferentes (o Budget é orçado por categoria, o geral é o extrato inteiro), exatamente
-        // como já acontece na aba Financeiro.
+        // como já acontece na aba Contas a Pagar.
         let resViewMode = 'geral';
         let _resBudgetCustos = null;              // { cf:{'2026-MM':v}, cv:{}, sc:{}, ns:{} }
         let _resLastReceb = null, _resLastDesp = null;   // pro botão re-renderizar sem recarregar tudo
