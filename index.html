@@ -16107,18 +16107,33 @@
                 const bd = pos ? 'rgba(16,185,129,0.35)' : 'rgba(248,113,113,0.35)';
                 const R = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const p1 = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                // Barras na MESMA escala (o maior dos dois anos = 100%), pra dar pra ver de relance
+                // o tamanho do que falta. 2026 no accent (é o assunto), 2025 em cinza (é o alvo).
+                const teto = Math.max(anual26, anual25) || 1;
+                const barra = (ano, valor, cor2, destaque) => `
+                    <span style="font-size:12px;font-weight:700;color:${destaque ? '#e2e8f4' : 'var(--muted)'};font-variant-numeric:tabular-nums">${ano}</span>
+                    <span style="display:block;height:10px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden">
+                        <i style="display:block;height:100%;width:${(valor / teto * 100).toFixed(1)}%;background:${cor2};border-radius:5px"></i>
+                    </span>
+                    <span style="font-size:12.5px;font-weight:700;color:${destaque ? '#e2e8f4' : 'var(--muted)'};font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap">${R(valor)}</span>`;
                 box.innerHTML =
-                    `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 20px">
-                        <div style="display:flex;align-items:center;gap:12px">
+                    `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px 24px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 20px">
+                        <div style="display:flex;align-items:center;gap:12px;flex:1 1 420px;min-width:300px">
                             <span style="font-size:24px">${pos ? '🏆' : '🎯'}</span>
-                            <div>
-                                <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700">Faturamento anual</div>
-                                <div style="font-size:12px;color:var(--muted)">2026 <b style="color:#e2e8f4">${R(anual26)}</b> contra o ano inteiro de 2025 <b style="color:#e2e8f4">${R(anual25)}</b>${pos ? '' : ' · falta isso pra empatar'}</div>
+                            <div style="flex:1">
+                                <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700;margin-bottom:7px">Faturamento anual</div>
+                                <div style="display:grid;grid-template-columns:auto minmax(90px,1fr) auto;gap:7px 10px;align-items:center">
+                                    ${barra('2026', anual26, '#00d4aa', true)}
+                                    ${barra('2025', anual25, '#64748b', false)}
+                                </div>
                             </div>
                         </div>
-                        <div style="display:flex;align-items:baseline;gap:16px">
-                            <span style="font-size:27px;font-weight:800;color:${cor}">${pos ? '+' : '−'}${R(dif)}</span>
-                            <span style="font-size:21px;font-weight:700;color:${cor}">${pos ? '+' : '−'}${p1(Math.abs(pctA))}%</span>
+                        <div style="text-align:right;flex-shrink:0">
+                            <div style="display:flex;align-items:baseline;gap:16px;justify-content:flex-end">
+                                <span style="font-size:27px;font-weight:800;color:${cor}">${pos ? '+' : '−'}${R(dif)}</span>
+                                <span style="font-size:21px;font-weight:700;color:${cor}">${pos ? '+' : '−'}${p1(Math.abs(pctA))}%</span>
+                            </div>
+                            <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${pos ? 'acima do ano inteiro de 2025' : 'falta pra empatar o ano inteiro de 2025'}</div>
                         </div>
                     </div>`;
             }
