@@ -4225,6 +4225,7 @@
                         <button class="res-view-btn" onclick="setResView('negocio',this)">Visão Negócio</button>
                         <button class="res-view-btn" onclick="setResView('socios',this)">Visão Sócios</button>
                         <button class="res-view-btn" onclick="setResView('sede',this)">Posição Consolidada</button>
+                        <button class="res-view-btn" onclick="setResView('caixa',this)">Caixa Completo</button>
                     </div>
                     <div id="resMesResultado" style="margin:6px 0 16px"></div>
                     <canvas id="resChartEntSai" height="200"></canvas>
@@ -15999,7 +16000,8 @@
                 geral:   'entradas menos tudo que saiu da conta (obra incluída), somando o ano todo até agora',
                 negocio: 'entradas menos custo fixo e variável · sem a obra e sem a retirada dos sócios',
                 socios:  'entradas menos custo fixo, variável e retirada dos sócios · sem a obra',
-                sede:    'entradas menos custo fixo, variável, sócios e obra da nova sede'
+                sede:    'entradas menos custo fixo, variável, sócios e obra da nova sede',
+                caixa:   'tudo acima MAIS a parcela do empréstimo do Itaú · o caixa completo do período'
             };
             box.innerHTML =
                 `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 20px">
@@ -16366,6 +16368,36 @@
             return _resBudgetCustos;
         }
 
+        // Parcela do empréstimo do Itaú (serviço da dívida). Não vem do Budget nem do
+        // processFinanceData (que descarta plano com EMPR): reparsa as linhas cruas, igual
+        // resRetiradaPorMes faz com a retirada. Só SAÍDA: as entradas desse plano são TBI
+        // (transferência entre contas Itaú), não parcela.
+        let _resParcelaMap = null;
+        async function _resParcelaEmprestimoPorMes() {
+            if (_resParcelaMap) return _resParcelaMap;
+            const rows = await loadFinanceData();
+            const mesesMap = { 'janeiro':'01','fevereiro':'02','marco':'03','abril':'04','maio':'05','junho':'06','julho':'07','agosto':'08','setembro':'09','outubro':'10','novembro':'11','dezembro':'12' };
+            const norm = v => (v || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const map = {};
+            for (let i = 1; i < rows.length; i++) {
+                const r = rows[i];
+                if (!r || r.length < 14) continue;
+                if (norm(r[9]) !== 'saida') continue;
+                const plano = norm(r[13]);
+                if (!plano.includes('emprestmo ita') && !plano.includes('emprestimo ita')) continue;
+                const mesPad = mesesMap[norm(r[10])];
+                if (!mesPad) continue;
+                let vs = (r[6] || '').toString().trim().replace(/[^\d,\.]/g, '');
+                if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                const valor = parseFloat(vs);
+                if (isNaN(valor) || valor <= 0) continue;
+                const k = '2026-' + mesPad;
+                map[k] = (map[k] || 0) + valor;
+            }
+            _resParcelaMap = map;
+            return map;
+        }
+
         async function setResView(mode, btn) {
             resViewMode = mode;
             document.querySelectorAll('.res-view-btn').forEach(b => b.classList.remove('active'));
@@ -16386,8 +16418,10 @@
             // Visão escolhida nos botões. Se o Budget falhar, cai na visão geral em vez de esvaziar.
             let custos = null;
             if (resViewMode !== 'geral') {
-                try { custos = await _resLoadBudgetCustos(); }
-                catch (e) { console.warn('Budget_Consolidado falhou, caindo na visão geral:', e); }
+                try {
+                    custos = Object.assign({}, await _resLoadBudgetCustos());
+                    if (resViewMode === 'caixa') custos.pi = await _resParcelaEmprestimoPorMes();
+                } catch (e) { console.warn('Budget_Consolidado falhou, caindo na visão geral:', e); custos = null; }
             }
             const serie = campo => keys.map(k => (custos[campo] || {})[k] || 0);
             // Fatias na ordem da pilha (de baixo pra cima), com as mesmas cores do Receita vs Despesas.
@@ -16395,10 +16429,12 @@
                 { key: 'cf', label: 'CF - Custo Fixo',      cor: 'rgba(245,158,11,0.85)', borda: '#f59e0b', txt: '#3b2a06' },
                 { key: 'cv', label: 'CV - Custo Variável',  cor: 'rgba(59,130,246,0.85)', borda: '#3b82f6', txt: '#ffffff' },
             ].concat(
-                (resViewMode === 'socios' || resViewMode === 'sede')
+                (resViewMode === 'socios' || resViewMode === 'sede' || resViewMode === 'caixa')
                     ? [{ key: 'sc', label: 'Sócio', cor: 'rgba(168,85,247,0.85)', borda: '#a855f7', txt: '#ffffff' }] : [],
-                resViewMode === 'sede'
-                    ? [{ key: 'ns', label: 'Nova Sede', cor: 'rgba(244,114,182,0.85)', borda: '#f472b6', txt: '#ffffff' }] : []
+                (resViewMode === 'sede' || resViewMode === 'caixa')
+                    ? [{ key: 'ns', label: 'Nova Sede', cor: 'rgba(244,114,182,0.85)', borda: '#f472b6', txt: '#ffffff' }] : [],
+                resViewMode === 'caixa'
+                    ? [{ key: 'pi', label: 'Parcela do empréstimo (Itaú)', cor: 'rgba(220,38,38,0.85)', borda: '#dc2626', txt: '#ffffff' }] : []
             );
             const saiSeries = fatias.map(f => serie(f.key));
             // Total da saída conforme a visão (é o que entra no badge de % e no resultado do ano).
