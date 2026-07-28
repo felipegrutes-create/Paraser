@@ -4226,6 +4226,7 @@
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
                     <h3>📅 Receita Recebida — 2025 × 2026 <span id="resAnosSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <div id="resAnosRegua" style="margin:6px 0 16px"></div>
                     <canvas id="resChartAnos" height="200"></canvas>
                 </div>
             </div>
@@ -16089,6 +16090,38 @@
             const periodo = ate >= 0 ? ` ${meses[0]}–${meses[ate]}` : '';
             const nota = emAndamento.some(Boolean) ? ' · * mês em andamento' : '';
             if (sub) sub.textContent = `${fonte} · acumulado${periodo}: 2026 ${fmtM(t26)} × 2025 ${fmtM(t25)}${nota}`;
+
+            // Régua do FAT. ANUAL, mesma conta da coluna V da META RECEITA: o que 2026 já fez no
+            // ano contra o ano INTEIRO de 2025 (V2−V4 e a variação). Não é o acumulado do
+            // subtítulo, que compara mês a mês equivalente: aqui o ponto é quanto ainda falta
+            // pra empatar o ano passado. Soma o mesmo 2026 das barras, pra régua e gráfico fecharem.
+            const box = document.getElementById('resAnosRegua');
+            if (box) {
+                const anual26 = m26.reduce((s, v) => s + v, 0);
+                const anual25 = d.m2025.reduce((s, v) => s + v, 0);
+                const dif = anual26 - anual25;
+                const pctA = anual25 ? dif / anual25 * 100 : 0;
+                const pos = dif >= 0;
+                const cor = pos ? '#10b981' : '#f87171';
+                const bg = pos ? 'rgba(16,185,129,0.10)' : 'rgba(248,113,113,0.10)';
+                const bd = pos ? 'rgba(16,185,129,0.35)' : 'rgba(248,113,113,0.35)';
+                const R = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const p1 = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                box.innerHTML =
+                    `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 20px">
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <span style="font-size:24px">${pos ? '🏆' : '🎯'}</span>
+                            <div>
+                                <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700">Faturamento anual</div>
+                                <div style="font-size:12px;color:var(--muted)">2026 <b style="color:#e2e8f4">${R(anual26)}</b> contra o ano inteiro de 2025 <b style="color:#e2e8f4">${R(anual25)}</b>${pos ? '' : ' · falta isso pra empatar'}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:baseline;gap:16px">
+                            <span style="font-size:27px;font-weight:800;color:${cor}">${pos ? '+' : '−'}${R(dif)}</span>
+                            <span style="font-size:21px;font-weight:700;color:${cor}">${pos ? '+' : '−'}${p1(Math.abs(pctA))}%</span>
+                        </div>
+                    </div>`;
+            }
             // % de variação ano contra ano em cima de cada par de barras (só meses que 2026 já tem valor)
             const yoyPlugin = {
                 id: 'resYoY',
