@@ -16001,7 +16001,7 @@
                 negocio: 'entradas menos custo fixo e variável · sem a obra e sem a retirada dos sócios',
                 socios:  'entradas menos custo fixo, variável e retirada dos sócios · sem a obra',
                 sede:    'entradas menos custo fixo, variável, sócios e obra da nova sede',
-                caixa:   'tudo acima MAIS a parcela do empréstimo do Itaú · o caixa completo do período'
+                caixa:   'tudo acima, MAIS o empréstimo tomado no banco (entrada) e a parcela paga (saída)'
             };
             box.innerHTML =
                 `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 20px">
@@ -16398,6 +16398,38 @@
             return map;
         }
 
+        // Empréstimo TOMADO no banco (entrada de caixa). Mesmo critério "banco" do painel de
+        // Sócios: descrição com CAPITAL DE GIRO / PARCELA GIRO, ou plano EMPRÉSTMO ITAÚ (as TBI
+        // de uso do limite). Sem isso o Caixa Completo mostraria a parcela saindo mas não os
+        // 600k que entraram em 02/01, e o resultado do ano ficaria falsamente negativo.
+        let _resEmprestimoMap = null;
+        async function _resEmprestimoTomadoPorMes() {
+            if (_resEmprestimoMap) return _resEmprestimoMap;
+            const rows = await loadFinanceData();
+            const mesesMap = { 'janeiro':'01','fevereiro':'02','marco':'03','abril':'04','maio':'05','junho':'06','julho':'07','agosto':'08','setembro':'09','outubro':'10','novembro':'11','dezembro':'12' };
+            const norm = v => (v || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const map = {};
+            for (let i = 1; i < rows.length; i++) {
+                const r = rows[i];
+                if (!r || r.length < 14) continue;
+                if (norm(r[9]) !== 'entrada') continue;
+                const desc = norm(r[1]), plano = norm(r[13]);
+                const ehBanco = desc.includes('capital de giro') || desc.includes('parcela giro')
+                    || plano.includes('emprestmo ita') || plano.includes('emprestimo ita');
+                if (!ehBanco) continue;
+                const mesPad = mesesMap[norm(r[10])];
+                if (!mesPad) continue;
+                let vs = (r[5] || '').toString().trim().replace(/[^\d,\.]/g, '');
+                if (vs.includes(',')) vs = vs.replace(/\./g, '').replace(',', '.');
+                const valor = parseFloat(vs);
+                if (isNaN(valor) || valor <= 0) continue;
+                const k = '2026-' + mesPad;
+                map[k] = (map[k] || 0) + valor;
+            }
+            _resEmprestimoMap = map;
+            return map;
+        }
+
         async function setResView(mode, btn) {
             resViewMode = mode;
             document.querySelectorAll('.res-view-btn').forEach(b => b.classList.remove('active'));
@@ -16420,7 +16452,10 @@
             if (resViewMode !== 'geral') {
                 try {
                     custos = Object.assign({}, await _resLoadBudgetCustos());
-                    if (resViewMode === 'caixa') custos.pi = await _resParcelaEmprestimoPorMes();
+                    if (resViewMode === 'caixa') {
+                        custos.pi = await _resParcelaEmprestimoPorMes();
+                        custos.et = await _resEmprestimoTomadoPorMes();
+                    }
                 } catch (e) { console.warn('Budget_Consolidado falhou, caindo na visão geral:', e); custos = null; }
             }
             const serie = campo => keys.map(k => (custos[campo] || {})[k] || 0);
@@ -16437,6 +16472,11 @@
                     ? [{ key: 'pi', label: 'Parcela do empréstimo (Itaú)', cor: 'rgba(220,38,38,0.85)', borda: '#dc2626', txt: '#ffffff' }] : []
             );
             const saiSeries = fatias.map(f => serie(f.key));
+            // Pilha de entrada: a receita comercial e, no Caixa Completo, o empréstimo tomado.
+            const fatiasEnt = [{ label: 'Entradas (recebido)', cor: '#00d4aa', borda: '#00d4aa', txt: '#04231d', data: ent }]
+                .concat((custos && resViewMode === 'caixa')
+                    ? [{ label: 'Empréstimo tomado (Itaú)', cor: 'rgba(99,102,241,0.85)', borda: '#6366f1', txt: '#ffffff', data: serie('et') }] : []);
+            const entTot = keys.map((_, i) => fatiasEnt.reduce((t, f) => t + f.data[i], 0));
             // Total da saída conforme a visão (é o que entra no badge de % e no resultado do ano).
             const saiTot = custos ? keys.map((_, i) => saiSeries.reduce((t, arr) => t + arr[i], 0)) : sai;
             // Composição pro tooltip: entradas por fonte (cartão/PIX/dinheiro), saídas por categoria (Plano de Contas).
@@ -16453,19 +16493,18 @@
                 afterDatasetsDraw(chart) {
                     const { ctx } = chart;
                     const dss = chart.data.datasets;
-                    const iSai = dss.map((d, i) => d.stack === 'saida' ? i : -1).filter(i => i >= 0);
-                    const mE = chart.getDatasetMeta(0);
-                    const mTopo = chart.getDatasetMeta(iSai[iSai.length - 1]);
+                    const idx = st => dss.map((d, i) => d.stack === st ? i : -1).filter(i => i >= 0);
+                    const iEnt = idx('entrada'), iSai = idx('saida');
+                    const mEnt = chart.getDatasetMeta(iEnt[iEnt.length - 1]);
+                    const mSai = chart.getDatasetMeta(iSai[iSai.length - 1]);
+                    const soma = (lista, i) => lista.reduce((t, di) => t + (dss[di].data[i] || 0), 0);
                     ctx.save(); ctx.textAlign = 'center';
 
-                    // valor no topo da barra de entradas
-                    ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
-                    mE.data.forEach((bar, i) => { const v = dss[0].data[i]; if (v) ctx.fillText(fmtK(v), bar.x, bar.y - 3); });
-
-                    // valor DENTRO de cada fatia (só quando a pilha tem mais de uma e a fatia cabe)
-                    if (iSai.length > 1) {
-                        ctx.textBaseline = 'middle';
-                        iSai.forEach(di => {
+                    // valor DENTRO de cada fatia, nas pilhas que têm mais de uma
+                    ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'middle';
+                    [iEnt, iSai].forEach(lista => {
+                        if (lista.length < 2) return;
+                        lista.forEach(di => {
                             const meta = chart.getDatasetMeta(di);
                             ctx.fillStyle = dss[di]._txt || '#ffffff';
                             meta.data.forEach((bar, i) => {
@@ -16474,23 +16513,23 @@
                                 ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base) / 2);
                             });
                         });
-                    }
-
-                    // total da saída no topo da pilha
-                    ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
-                    chart.data.labels.forEach((_, i) => {
-                        const tot = iSai.reduce((t, di) => t + (dss[di].data[i] || 0), 0);
-                        if (!tot) return;
-                        const bar = mTopo.data[i]; if (!bar) return;
-                        ctx.fillText(fmtK(tot), bar.x, bar.y - 3);
                     });
 
-                    // Badge do resultado do mês (margem % = (entradas − saídas) ÷ entradas), acima das barras.
+                    // total no topo de cada pilha
+                    ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
                     chart.data.labels.forEach((_, i) => {
-                        const e = dss[0].data[i] || 0;
-                        const sTot = iSai.reduce((t, di) => t + (dss[di].data[i] || 0), 0);
+                        [[iEnt, mEnt], [iSai, mSai]].forEach(([lista, meta]) => {
+                            const tot = soma(lista, i); if (!tot) return;
+                            const bar = meta.data[i]; if (!bar) return;
+                            ctx.fillText(fmtK(tot), bar.x, bar.y - 3);
+                        });
+                    });
+
+                    // Badge do resultado do mês (margem % = (entradas − saídas) ÷ entradas).
+                    chart.data.labels.forEach((_, i) => {
+                        const e = soma(iEnt, i), sTot = soma(iSai, i);
                         if (!e && !sTot) return;
-                        const bE = mE.data[i], bS = mTopo.data[i]; if (!bE || !bS) return;
+                        const bE = mEnt.data[i], bS = mSai.data[i]; if (!bE || !bS) return;
                         const res = e - sTot, marg = e > 0 ? (res / e * 100) : 0, pos = res >= 0;
                         const txt = (pos ? '▲ ' : '▼ ') + Math.abs(marg).toFixed(0) + '%';
                         ctx.font = '700 11px Outfit, sans-serif';
@@ -16508,7 +16547,12 @@
             _resCharts.entsai = new Chart(el.getContext('2d'), {
                 type: 'bar',
                 data: { labels, datasets: [
-                    { label: 'Entradas (recebido)', data: ent, backgroundColor: '#00d4aa', borderRadius: 4, maxBarThickness: 40, stack: 'entrada' },
+                    ...fatiasEnt.map((f, k) => ({
+                        label: f.label, data: f.data, backgroundColor: f.cor,
+                        ...(k > 0 ? { borderColor: f.borda, borderWidth: 1 } : {}),
+                        borderRadius: k === fatiasEnt.length - 1 ? 4 : 0,
+                        maxBarThickness: 40, stack: 'entrada', _txt: f.txt
+                    })),
                     ...(custos
                         ? fatias.map((f, k) => ({
                             label: f.label, data: saiSeries[k], backgroundColor: f.cor, borderColor: f.borda, borderWidth: 1,
@@ -16527,7 +16571,8 @@
                             // Composição da barra: Entradas = cartão/PIX/dinheiro; Saídas = top 5 categorias + outros.
                             afterLabel: ctx => {
                                 const i = ctx.dataIndex;
-                                if (ctx.datasetIndex === 0) {
+                                if (ctx.dataset.stack === 'entrada') {
+                                    if (ctx.datasetIndex !== 0) return '';   // fatia do empréstimo não tem composição
                                     const b = entComp[i] || {}; const out = [];
                                     if (b.rede) out.push('   Cartão (Rede): ' + fmtR(b.rede));
                                     if (b.pix)  out.push('   PIX de pacientes: ' + fmtR(b.pix));
@@ -16543,9 +16588,10 @@
                                 return out;
                             },
                             footer: items => {
-                                const e = items.find(i => i.datasetIndex === 0); if (!e) return '';
+                                const eTot = items.filter(i => i.dataset.stack === 'entrada').reduce((t, i) => t + i.raw, 0);
                                 const sTot = items.filter(i => i.dataset.stack === 'saida').reduce((t, i) => t + i.raw, 0);
-                                return 'Resultado: R$ ' + (e.raw - sTot).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                if (!eTot && !sTot) return '';
+                                return 'Resultado: R$ ' + (eTot - sTot).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             }
                         } }
                     },
@@ -16562,7 +16608,7 @@
             // Resultado acumulado do ano segue a visão ativa (entradas − saídas da visão).
             const anoStr = String(_resDate.getFullYear());
             let eAno = 0, sAno = 0;
-            keys.forEach((k, i) => { if (k.slice(0, 4) !== anoStr) return; eAno += ent[i]; sAno += saiTot[i]; });
+            keys.forEach((k, i) => { if (k.slice(0, 4) !== anoStr) return; eAno += entTot[i]; sAno += saiTot[i]; });
             _resRenderResultadoAno(eAno, sAno, eAno - sAno, _resDate.getFullYear());
         }
 
