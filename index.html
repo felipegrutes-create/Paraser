@@ -2226,7 +2226,10 @@
             font-weight: 500;
         }
         .dn-pending-btn:hover { background: rgba(0,212,170,0.2); }
-        .fin-view-btn {
+        /* .res-view-btn = mesmas visões no Resumo Financeiro. Classe própria de propósito:
+           setFinView limpa TODOS os .fin-view-btn da página, então reusar a classe faria os
+           dois grupos de botões apagarem o "active" um do outro. */
+        .fin-view-btn, .res-view-btn {
             padding: 6px 14px;
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -2237,8 +2240,8 @@
             cursor: pointer;
             transition: all .2s;
         }
-        .fin-view-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .fin-view-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 600; }
+        .fin-view-btn:hover, .res-view-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .fin-view-btn.active, .res-view-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 600; }
 
         /* ===== ANÁLISE EXECUTIVA CR ===== */
         .exec-grid {
@@ -4217,6 +4220,12 @@
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
                     <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes + dinheiro · saídas = despesas pagas (sem retiradas, empréstimos, partes relacionadas e aplicação automática do banco)</span></h3>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px">
+                        <button class="res-view-btn active" onclick="setResView('geral',this)">Visão Geral</button>
+                        <button class="res-view-btn" onclick="setResView('negocio',this)">Visão Negócio</button>
+                        <button class="res-view-btn" onclick="setResView('socios',this)">Visão Sócios</button>
+                        <button class="res-view-btn" onclick="setResView('sede',this)">Posição Consolidada</button>
+                    </div>
                     <div id="resMesResultado" style="margin:6px 0 16px"></div>
                     <canvas id="resChartEntSai" height="200"></canvas>
                 </div>
@@ -15796,20 +15805,15 @@
             const despesas = (desp && desp[mesKey] != null) ? desp[mesKey] : null;
             const resultado = (recebido != null && despesas != null) ? recebido - despesas : null;
 
-            // Acumulado do ANO (do mês selecionado): soma entradas e saídas de todos os meses daquele ano.
-            const anoStr = String(_resDate.getFullYear());
-            let entAno = null, saiAno = null;
-            if (receb) { entAno = 0; receb.forEach(x => { if (x.mes && x.mes.slice(0, 4) === anoStr) entAno += (x.rede || 0) + (x.pix || 0) + (x.mp || 0); }); }
-            if (desp)  { saiAno = 0; Object.keys(desp).forEach(k => { if (k.slice(0, 4) === anoStr) saiAno += desp[k]; }); }
-            const resAno = (entAno != null && saiAno != null) ? entAno - saiAno : null;
-
             _resRenderKPIs({
                 recebido, despesas, resultado,
                 faturado: m ? m.fat / 100 : null,
                 aReceber: m ? m.pend / 100 : null,
                 parcial: rec ? !!rec.parcial : false
             });
-            _resRenderResultadoAno(entAno, saiAno, resAno, _resDate.getFullYear());
+            // O card do resultado do ano agora sai de dentro do _resRenderEntSai, pra seguir a
+            // visão ativa (geral / negócio / sócios / consolidada).
+            _resLastReceb = receb; _resLastDesp = desp;
             _execRenderCartaoMes();
             _execRenderCartaoSemana();
             _resRenderEntSai(receb || [], desp || {});
@@ -16306,8 +16310,63 @@
             });
         }
 
+        // ===== Visões do Entradas × Saídas (as mesmas 4 do "Receita vs Despesas" da aba Financeiro) =====
+        //   geral   → saída = despesa paga do extrato (a régua do dashboard, barra vermelha única)
+        //   negocio → Custo Fixo + Custo Variável        (Budget_Consolidado, por categoria)
+        //   socios  → + Retirada de Sócios               (linha 47)
+        //   sede    → + Investimento Nova Sede           (linha 46)
+        // Atenção: as 3 visões decompostas NÃO somam a despesa da visão geral. São recortes
+        // diferentes (o Budget é orçado por categoria, o geral é o extrato inteiro), exatamente
+        // como já acontece na aba Financeiro.
+        let resViewMode = 'geral';
+        let _resBudgetCustos = null;              // { cf:{'2026-MM':v}, cv:{}, sc:{}, ns:{} }
+        let _resLastReceb = null, _resLastDesp = null;   // pro botão re-renderizar sem recarregar tudo
+
+        async function _resLoadBudgetCustos() {
+            if (_resBudgetCustos) return _resBudgetCustos;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${encodeURIComponent('Budget_Consolidado')}?key=${API_KEY}`;
+            const rows = (await fetch(url).then(r => r.json())).values || [];
+            const norm = v => (v == null ? '' : v).toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const num = v => {
+                let t = (v == null ? '' : v).toString().trim();
+                if (!t || t === '0' || t === 'R$ 0') return 0;
+                t = t.replace(/R\$\s*/g, '').replace(/\s/g, '');
+                if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+                else { const p = t.split('.'); if (p.length > 1 && p[p.length - 1].length === 3) t = t.replace(/\./g, ''); }
+                const n = parseFloat(t.replace(/[^\d.\-]/g, ''));
+                return (isNaN(n) || n <= 0) ? 0 : n;
+            };
+            const MK = i => '2026-' + ('0' + (i + 1)).slice(-2);   // colunas C..N = jan..dez/2026
+            const FIX = ['tributos','folha','fornecedor','tarifa','juros'];
+            const VAR = ['medicamentos','repasse','cartao credito','cartao de credito','taxa rede','beneficio','reembolso','estorno'];
+            const cf = {}, cv = {}, sc = {}, ns = {}, visto = new Set();
+            rows.forEach(row => {
+                const cat = norm(row && row[0]);
+                if (!cat || cat.includes('expense') || cat.includes('nova sede') || cat.includes('socio')) return;
+                const isF = FIX.some(k => cat.includes(k)), isV = VAR.some(k => cat.includes(k));
+                if ((!isF && !isV) || visto.has(cat)) return;   // "Reembolso" aparece 2x na aba
+                visto.add(cat);
+                for (let c = 2; c <= 13; c++) {
+                    const v = num(row[c]); if (!v) continue;
+                    const alvo = isF ? cf : cv, mk = MK(c - 2);
+                    alvo[mk] = (alvo[mk] || 0) + v;
+                }
+            });
+            const lerLinha = (n, dest) => { const r = rows[n - 1] || []; for (let c = 2; c <= 13; c++) { const v = num(r[c]); if (v) dest[MK(c - 2)] = v; } };
+            lerLinha(47, sc); lerLinha(46, ns);
+            _resBudgetCustos = { cf, cv, sc, ns };
+            return _resBudgetCustos;
+        }
+
+        async function setResView(mode, btn) {
+            resViewMode = mode;
+            document.querySelectorAll('.res-view-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            await _resRenderEntSai(_resLastReceb || [], _resLastDesp || {});
+        }
+
         // Entradas (recebido real) × Saídas (despesas pagas) por mês, com rótulo em cima de cada barra.
-        function _resRenderEntSai(receb, despMap) {
+        async function _resRenderEntSai(receb, despMap) {
             const el = document.getElementById('resChartEntSai'); if (!el) return;
             if (_resCharts.entsai) { try{_resCharts.entsai.destroy();}catch(e){} }
             receb = _resPreencherAno(receb);   // enche o ano até dezembro (barras vazias)
@@ -16315,6 +16374,27 @@
             if (!keys.length) return;
             const ent = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) + (r.mp || 0) : 0; });
             const sai = keys.map(k => despMap[k] || 0);
+
+            // Visão escolhida nos botões. Se o Budget falhar, cai na visão geral em vez de esvaziar.
+            let custos = null;
+            if (resViewMode !== 'geral') {
+                try { custos = await _resLoadBudgetCustos(); }
+                catch (e) { console.warn('Budget_Consolidado falhou, caindo na visão geral:', e); }
+            }
+            const serie = campo => keys.map(k => (custos[campo] || {})[k] || 0);
+            // Fatias na ordem da pilha (de baixo pra cima), com as mesmas cores do Receita vs Despesas.
+            const fatias = !custos ? [] : [
+                { key: 'cf', label: 'CF - Custo Fixo',      cor: 'rgba(245,158,11,0.85)', borda: '#f59e0b', txt: '#3b2a06' },
+                { key: 'cv', label: 'CV - Custo Variável',  cor: 'rgba(59,130,246,0.85)', borda: '#3b82f6', txt: '#ffffff' },
+            ].concat(
+                (resViewMode === 'socios' || resViewMode === 'sede')
+                    ? [{ key: 'sc', label: 'Sócio', cor: 'rgba(168,85,247,0.85)', borda: '#a855f7', txt: '#ffffff' }] : [],
+                resViewMode === 'sede'
+                    ? [{ key: 'ns', label: 'Nova Sede', cor: 'rgba(244,114,182,0.85)', borda: '#f472b6', txt: '#ffffff' }] : []
+            );
+            const saiSeries = fatias.map(f => serie(f.key));
+            // Total da saída conforme a visão (é o que entra no badge de % e no resultado do ano).
+            const saiTot = custos ? keys.map((_, i) => saiSeries.reduce((t, arr) => t + arr[i], 0)) : sai;
             // Composição pro tooltip: entradas por fonte (cartão/PIX/dinheiro), saídas por categoria (Plano de Contas).
             const entComp = keys.map(k => { const r = (receb || []).find(x => x.mes === k) || {}; return { rede: r.rede || 0, pix: r.pix || 0, mp: r.mp || 0 }; });
             const saiComp = keys.map(k => {
@@ -16328,18 +16408,46 @@
                 id: 'entSaiLabels',
                 afterDatasetsDraw(chart) {
                     const { ctx } = chart;
-                    ctx.save(); ctx.font = '600 10px Outfit, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
-                    chart.data.datasets.forEach((ds, di) => {
-                        const meta = chart.getDatasetMeta(di);
-                        meta.data.forEach((bar, i) => { const v = ds.data[i]; if (!v) return; ctx.fillText(fmtK(v), bar.x, bar.y - 3); });
-                    });
-                    // Indicador do resultado de cada mês (margem % = (entradas − saídas) ÷ entradas) — badge acima das barras.
-                    const mE = chart.getDatasetMeta(0), mS = chart.getDatasetMeta(1);
+                    const dss = chart.data.datasets;
+                    const iSai = dss.map((d, i) => d.stack === 'saida' ? i : -1).filter(i => i >= 0);
+                    const mE = chart.getDatasetMeta(0);
+                    const mTopo = chart.getDatasetMeta(iSai[iSai.length - 1]);
+                    ctx.save(); ctx.textAlign = 'center';
+
+                    // valor no topo da barra de entradas
+                    ctx.font = '600 10px Outfit, sans-serif'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
+                    mE.data.forEach((bar, i) => { const v = dss[0].data[i]; if (v) ctx.fillText(fmtK(v), bar.x, bar.y - 3); });
+
+                    // valor DENTRO de cada fatia (só quando a pilha tem mais de uma e a fatia cabe)
+                    if (iSai.length > 1) {
+                        ctx.textBaseline = 'middle';
+                        iSai.forEach(di => {
+                            const meta = chart.getDatasetMeta(di);
+                            ctx.fillStyle = dss[di]._txt || '#ffffff';
+                            meta.data.forEach((bar, i) => {
+                                const v = dss[di].data[i]; if (!v) return;
+                                if (Math.abs(bar.base - bar.y) < 15) return;
+                                ctx.fillText(fmtK(v), bar.x, (bar.y + bar.base) / 2);
+                            });
+                        });
+                    }
+
+                    // total da saída no topo da pilha
+                    ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
                     chart.data.labels.forEach((_, i) => {
-                        const e = chart.data.datasets[0].data[i] || 0, s = chart.data.datasets[1].data[i] || 0;
-                        if (!e && !s) return;
-                        const bE = mE.data[i], bS = mS.data[i]; if (!bE || !bS) return;
-                        const res = e - s, marg = e > 0 ? (res / e * 100) : 0, pos = res >= 0;
+                        const tot = iSai.reduce((t, di) => t + (dss[di].data[i] || 0), 0);
+                        if (!tot) return;
+                        const bar = mTopo.data[i]; if (!bar) return;
+                        ctx.fillText(fmtK(tot), bar.x, bar.y - 3);
+                    });
+
+                    // Badge do resultado do mês (margem % = (entradas − saídas) ÷ entradas), acima das barras.
+                    chart.data.labels.forEach((_, i) => {
+                        const e = dss[0].data[i] || 0;
+                        const sTot = iSai.reduce((t, di) => t + (dss[di].data[i] || 0), 0);
+                        if (!e && !sTot) return;
+                        const bE = mE.data[i], bS = mTopo.data[i]; if (!bE || !bS) return;
+                        const res = e - sTot, marg = e > 0 ? (res / e * 100) : 0, pos = res >= 0;
                         const txt = (pos ? '▲ ' : '▼ ') + Math.abs(marg).toFixed(0) + '%';
                         ctx.font = '700 11px Outfit, sans-serif';
                         const w = ctx.measureText(txt).width + 14, h = 17;
@@ -16347,7 +16455,7 @@
                         ctx.fillStyle = pos ? 'rgba(52,211,153,0.16)' : 'rgba(248,113,113,0.16)';
                         if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(cx - w / 2, yb - h, w, h, 8); ctx.fill(); }
                         ctx.fillStyle = pos ? '#34d399' : '#f87171';
-                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.textBaseline = 'middle';
                         ctx.fillText(txt, cx, yb - h / 2 + 1);
                     });
                     ctx.restore();
@@ -16356,8 +16464,15 @@
             _resCharts.entsai = new Chart(el.getContext('2d'), {
                 type: 'bar',
                 data: { labels, datasets: [
-                    { label: 'Entradas (recebido)', data: ent, backgroundColor: '#00d4aa', borderRadius: 4, maxBarThickness: 40 },
-                    { label: 'Saídas (despesas)',   data: sai, backgroundColor: '#ef4444', borderRadius: 4, maxBarThickness: 40 }
+                    { label: 'Entradas (recebido)', data: ent, backgroundColor: '#00d4aa', borderRadius: 4, maxBarThickness: 40, stack: 'entrada' },
+                    ...(custos
+                        ? fatias.map((f, k) => ({
+                            label: f.label, data: saiSeries[k], backgroundColor: f.cor, borderColor: f.borda, borderWidth: 1,
+                            // canto arredondado só na fatia de cima da pilha
+                            borderRadius: k === fatias.length - 1 ? { topLeft: 4, topRight: 4 } : 0,
+                            maxBarThickness: 40, stack: 'saida', _txt: f.txt
+                        }))
+                        : [{ label: 'Saídas (despesas)', data: sai, backgroundColor: '#ef4444', borderRadius: 4, maxBarThickness: 40, stack: 'saida' }])
                 ]},
                 options: {
                     responsive: true,
@@ -16375,6 +16490,7 @@
                                     if (b.mp)   out.push('   Dinheiro: ' + fmtR(b.mp));
                                     return out;
                                 }
+                                if (ctx.dataset.stack === 'saida' && custos) return '';   // já é a própria fatia
                                 const arr = saiComp[i] || []; if (!arr.length) return '';
                                 const top = arr.slice(0, 5);
                                 const outros = arr.slice(5).reduce((s, x) => s + x.valor, 0);
@@ -16382,16 +16498,28 @@
                                 if (outros > 0) out.push('   outros: ' + fmtR(outros));
                                 return out;
                             },
-                            footer: items => { const e = items.find(i => i.datasetIndex === 0), s = items.find(i => i.datasetIndex === 1); if (!e || !s) return ''; return 'Resultado: R$ ' + (e.raw - s.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+                            footer: items => {
+                                const e = items.find(i => i.datasetIndex === 0); if (!e) return '';
+                                const sTot = items.filter(i => i.dataset.stack === 'saida').reduce((t, i) => t + i.raw, 0);
+                                return 'Resultado: R$ ' + (e.raw - sTot).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            }
                         } }
                     },
                     scales: {
-                        x: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
-                        y: { grace: '18%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                        // stacks nomeados: 'entrada' e 'saida' ficam LADO A LADO, e as fatias da
+                        // saída é que empilham entre si.
+                        x: { stacked: true, ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
+                        y: { stacked: true, grace: '18%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
                     }
                 },
                 plugins: [entSaiLabels]
             });
+
+            // Resultado acumulado do ano segue a visão ativa (entradas − saídas da visão).
+            const anoStr = String(_resDate.getFullYear());
+            let eAno = 0, sAno = 0;
+            keys.forEach((k, i) => { if (k.slice(0, 4) !== anoStr) return; eAno += ent[i]; sAno += saiTot[i]; });
+            _resRenderResultadoAno(eAno, sAno, eAno - sAno, _resDate.getFullYear());
         }
 
         // Espelho do gráfico acima + a Retirada dos Sócios (barra âmbar em destaque, com valores em cima).
