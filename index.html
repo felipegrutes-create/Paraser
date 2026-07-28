@@ -15993,13 +15993,21 @@
             const bd  = pos ? 'rgba(16,185,129,0.35)' : 'rgba(248,113,113,0.35)';
             const margem = (entAno && entAno > 0) ? (resAno / entAno * 100) : null;
             const R = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            // A frase tem que dizer o que ENTROU na conta desta visão: as 3 decompostas somam
+            // só o Budget (CF/CV/Sócio/Nova Sede), não a despesa inteira do extrato.
+            const LEGENDA = {
+                geral:   'entradas menos tudo que saiu da conta (obra incluída), somando o ano todo até agora',
+                negocio: 'entradas menos custo fixo e variável · sem a obra e sem a retirada dos sócios',
+                socios:  'entradas menos custo fixo, variável e retirada dos sócios · sem a obra',
+                sede:    'entradas menos custo fixo, variável, sócios e obra da nova sede'
+            };
             box.innerHTML =
                 `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 20px">
                     <div style="display:flex;align-items:center;gap:12px">
                         <span style="font-size:24px">${pos ? '📈' : '📉'}</span>
                         <div>
                             <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700">Resultado acumulado ${ano}</div>
-                            <div style="font-size:12px;color:var(--muted)">entradas menos saídas pagas, somando o ano todo até agora</div>
+                            <div style="font-size:12px;color:var(--muted)">${LEGENDA[resViewMode] || LEGENDA.geral}</div>
                         </div>
                     </div>
                     <div style="display:flex;align-items:baseline;gap:16px">
