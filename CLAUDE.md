@@ -18,12 +18,13 @@ Felipe Grutes (felipegrutes@yahoo.com.br). **Não é programador** — prefere i
 | 📁 Pasta local desk | `C:\Users\USER\Paraser\` |
 | 📁 Pasta local notebook | `C:\Users\felip\Paraser\` |
 | 📦 Repo GitHub | `https://github.com/felipegrutes-create/Paraser` |
-| 🌐 Dashboard live | `https://felipegrutes-create.github.io/Paraser/dashboard-feegow-v2.html` (GitHub Pages auto-deploy) |
+| 🌐 Dashboard live | `https://app.paraser.com.br` (GitHub Pages + CNAME, auto-deploy do `main`) |
 | 📜 Apps Scripts (cloud) | "Confirmação de Agenda" + "CRM Paraser" no `script.google.com` |
 
 ## 📄 Arquivos principais
 
-- `dashboard-feegow-v2.html` — **dashboard único** (single HTML file). Roda no GitHub Pages. Contém Chart.js + integração Google Sheets API + multiplas abas (Receitas, Médicos, Projeto ANA, etc).
+- `index.html` — **dashboard único** (single HTML file), servido em `app.paraser.com.br`. Contém Chart.js + integração Google Sheets API + múltiplas abas (Receitas, Médicos, Repasses, Marketing, etc). *(Já se chamou `dashboard-feegow-v2.html`; esse arquivo não existe mais.)*
+- `extratobq/` — espelho do Apps Script da planilha FLUXO DE CX (ver `extratobq/LEIA-ME.md`; ⚠️ o fuso daquela planilha é Los Angeles).
 - `crm-apps-script.gs` — código fonte do Apps Script "CRM Paraser" (cópia local; **roda no Google Cloud**).
 - `confirmacoes-whatsapp.gs` — código fonte do Apps Script "Confirmação de Agenda" (envia WhatsApp via Z-API + notifica Slack).
 
