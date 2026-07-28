@@ -2137,6 +2137,58 @@ function doGet(e) {
     }
     return ContentService.createTextOutput(JSON.stringify(diag)).setMimeType(ContentService.MimeType.JSON);
   }
+  // Auditoria da agenda diária dos médicos: quem REALMENTE recebeu, quantas vezes,
+  // e quantos ficaram de fora por não ter grade no dia seguinte. Fonte = aba de log.
+  if (params.action === 'agenda-med-log' && params.key === 'paraser2026') {
+    var diasL = Number(params.dias) || 30;
+    var corteL = new Date(Date.now() - diasL * 86400000);
+    var outL = { dias: diasL, envios: 0, semAgenda: 0, erros: 0, porMedico: {}, ultimos: [] };
+    try {
+      var shL = SpreadsheetApp.openById(CF_SPREADSHEET_ID).getSheetByName('Agenda_Medicos_Log');
+      if (!shL || shL.getLastRow() < 2) { outL.aviso = 'aba Agenda_Medicos_Log vazia ou inexistente'; }
+      else {
+        var dadosL = shL.getRange(2, 1, shL.getLastRow() - 1, 6).getValues();
+        dadosL.forEach(function (r) {
+          var ts = r[0] instanceof Date ? r[0] : new Date(r[0]);
+          if (!(ts instanceof Date) || isNaN(ts) || ts < corteL) return;
+          var med = String(r[1] || '?'), st = String(r[5] || '');
+          var b = outL.porMedico[med] || (outL.porMedico[med] = { enviado: 0, semAgenda: 0, erro: 0, ultimoEnvio: '' });
+          if (st.indexOf('ENVIADO') === 0) {
+            outL.envios++; b.enviado++;
+            b.ultimoEnvio = Utilities.formatDate(ts, 'America/Sao_Paulo', 'dd/MM HH:mm');
+          } else if (st.indexOf('SEM_AGENDA') === 0) { outL.semAgenda++; b.semAgenda++; }
+          else { outL.erros++; b.erro++; if (outL.ultimos.length < 10) outL.ultimos.push({ med: med, st: st.slice(0, 90) }); }
+        });
+      }
+    } catch (e) { outL.erro_leitura = e.message; }
+    return ContentService.createTextOutput(JSON.stringify(outL, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  }
+  // Foto de agora dos agendamentos presos em "Em atendimento", agrupados por médico.
+  if (params.action === 'presos-em-atendimento' && params.key === 'paraser2026') {
+    var outP = {};
+    try {
+      var hjP = new Date();
+      var iniP = new Date(hjP.getFullYear(), hjP.getMonth() - (Number(params.meses) || 1), 1);
+      var fimP = new Date(hjP.getTime() - 86400000);
+      var presosP = cfBuscarEmAtendimento(iniP, fimP);
+      var mapP = carregarProfissionais();
+      outP.periodo = cfDataBR(iniP) + ' a ' + cfDataBR(fimP);
+      outP.total = presosP.length;
+      outP.porMedico = {};
+      presosP.forEach(function (a) {
+        var k = mapP[a.profissional_id] || ('prof ' + (a.profissional_id || '?'));
+        var b = outP.porMedico[k] || (outP.porMedico[k] = { presos: 0, maisAntigo: '' });
+        b.presos++;
+        var d = cfDataKey(a.data);
+        if (!b.maisAntigo || d < b.maisAntigo) b.maisAntigo = d;
+      });
+      Object.keys(outP.porMedico).forEach(function (k) {
+        var m = outP.porMedico[k].maisAntigo;
+        if (m && m.length === 8) outP.porMedico[k].maisAntigo = m.slice(6, 8) + '/' + m.slice(4, 6) + '/' + m.slice(0, 4);
+      });
+    } catch (e) { outP.erro = e.message; }
+    return ContentService.createTextOutput(JSON.stringify(outP, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'primeira-usg-sim' && params.key === 'paraser2026') {
     return ContentService.createTextOutput(JSON.stringify(_simularPrimeiraUsg_(Number(params.limit) || 30))).setMimeType(ContentService.MimeType.JSON);
   }
