@@ -16398,10 +16398,15 @@
             return map;
         }
 
-        // Empréstimo TOMADO no banco (entrada de caixa). Mesmo critério "banco" do painel de
-        // Sócios: descrição com CAPITAL DE GIRO / PARCELA GIRO, ou plano EMPRÉSTMO ITAÚ (as TBI
-        // de uso do limite). Sem isso o Caixa Completo mostraria a parcela saindo mas não os
-        // 600k que entraram em 02/01, e o resultado do ano ficaria falsamente negativo.
+        // Empréstimo TOMADO no banco (entrada de caixa). Só o empréstimo ESTRUTURADO, pela
+        // descrição "CAPITAL DE GIRO" (02/01/2026: R$ 600.000). Sem isso o Caixa Completo
+        // mostraria a parcela saindo mas não o dinheiro que entrou.
+        //
+        // ⚠️ A conta garantida (TBI 0715.12521-7) fica FORA dos dois lados de propósito: é
+        // limite rotativo, pega e devolve em dias (jan-jul: 362.200 tomados x 546.800 devolvidos).
+        // As tomadas têm plano EMPRÉSTMO ITAÚ e as devoluções ACERTO EMPRÉSTIMO, então incluir
+        // só o plano do Itaú contava a entrada e perdia a devolução, inflando o resultado em
+        // 152k. Contar os dois lados também não ajuda: vira ruído de curtíssimo prazo.
         let _resEmprestimoMap = null;
         async function _resEmprestimoTomadoPorMes() {
             if (_resEmprestimoMap) return _resEmprestimoMap;
@@ -16413,10 +16418,7 @@
                 const r = rows[i];
                 if (!r || r.length < 14) continue;
                 if (norm(r[9]) !== 'entrada') continue;
-                const desc = norm(r[1]), plano = norm(r[13]);
-                const ehBanco = desc.includes('capital de giro') || desc.includes('parcela giro')
-                    || plano.includes('emprestmo ita') || plano.includes('emprestimo ita');
-                if (!ehBanco) continue;
+                if (!norm(r[1]).includes('capital de giro')) continue;
                 const mesPad = mesesMap[norm(r[10])];
                 if (!mesPad) continue;
                 let vs = (r[5] || '').toString().trim().replace(/[^\d,\.]/g, '');
