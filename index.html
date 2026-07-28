@@ -4216,7 +4216,7 @@
             <!-- Entradas × Saídas por Mês — com o card do resultado do mês acima das barras -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes + dinheiro · saídas = despesas pagas (sem retiradas, empréstimos e partes relacionadas)</span></h3>
+                    <h3>⚖️ Entradas × Saídas por Mês <span id="resEntSaiSub" style="font-size:11px;font-weight:400;color:var(--muted)">entradas = cartão + PIX de pacientes + dinheiro · saídas = despesas pagas (sem retiradas, empréstimos, partes relacionadas e aplicação automática do banco)</span></h3>
                     <div id="resMesResultado" style="margin:6px 0 16px"></div>
                     <canvas id="resChartEntSai" height="200"></canvas>
                 </div>
@@ -11583,6 +11583,11 @@
                 if (plano.includes('EMPR')) continue;
                 if (plano.includes('RETIRADA')) continue;
                 if (plano.includes('RELACIONAD')) continue; // Parte Relacionada: movimento entre empresas/sócios, não é despesa operacional
+                // Aplicação automática do Itaú (APL/RES APLIC AUT): o banco varre o saldo pro fundo e
+                // resgata pra pagar. Movimento interno da conta, mesmo roll da Parte Relacionada.
+                // Casa também pela descrição porque as linhas antigas vieram sem plano de contas.
+                if (plano.includes('APLICACAO FINANCEIRA')) continue;
+                if (/^(APL|RES)\s+APLIC AUT/.test((r[iLanc] || '').toString().trim().toUpperCase())) continue;
 
                 // Saídas (coluna G)
                 const saidaStr = (r[iSaidas] || '').toString().trim();
@@ -12242,7 +12247,9 @@
                 const tipo=(r[9]||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
                 const planoU=up(r[13]), forn=up(r[12]), e=num(r[5]), s=num(r[6]);
                 if(tipo==='entrada') allIn[i]+=e; else allOut[i]+=s;
-                const isfin=FIN.some(f=>planoU.includes(f));
+                // Aplicação automática do banco entra como mov. financeira (não despesa), mesmo
+                // nas linhas antigas que vieram sem plano de contas.
+                const isfin=FIN.some(f=>planoU.includes(f)) || /^(APL|RES)\s+APLIC AUT/.test(up(r[1]));
                 if(planoU.includes('RETIRADA DOS S') && tipo!=='entrada'){
                     const dest=forn.includes('RODOLFO')?'Rodolfo':forn.includes('JOSELMO')?'Joselmo':forn.includes('ALMA')?'Alma Mater':forn.includes('BIANCA')?'Bianca':(r[12]||'').toString().slice(0,18);
                     if(forn.includes('JOSELMO')){ retJ[i]+=s; retDet.Joselmo.push({d:(r[0]||'').toString().trim(),v:Math.round(s),dest}); }
@@ -15956,7 +15963,7 @@
                 <div class="exec-kpi red">
                     <div class="exec-kpi-val">${R(k.despesas)}</div>
                     <div class="exec-kpi-label">📤 Despesas pagas</div>
-                    <div class="exec-kpi-bench">Extrato das 2 empresas, <b>sem</b> retiradas, empréstimos e partes relacionadas</div>
+                    <div class="exec-kpi-bench">Extrato das 2 empresas, <b>sem</b> retiradas, empréstimos, partes relacionadas e aplicação automática</div>
                 </div>
                 <div class="exec-kpi ${resS}">
                     <div class="exec-kpi-val">${R(k.resultado)}</div>
