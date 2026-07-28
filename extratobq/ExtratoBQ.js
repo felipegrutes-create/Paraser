@@ -155,6 +155,10 @@ function regrasBanco_(descNorm, operation) {
   const ent = operation === "C";
   if (/^REDE\b/.test(descNorm))                        return { classificacao: "Clientes/REDE", fornecedor: "REDE", plano: "Receita Produtos e Serviços" };
   if (/REND PAGO APLIC/.test(descNorm))                return { classificacao: "Rendimento", fornecedor: "ITAÚ", plano: "Receita Rendimentos" };
+  // Aplicação automática do Itaú: o banco varre o saldo pro fundo (APL) e resgata pra
+  // pagar (RES). É movimento interno da conta, não despesa nem receita operacional.
+  if (/^APL\s+APLIC AUT/.test(descNorm))                return { classificacao: "Aplicação", fornecedor: "ITAÚ", plano: "APLICAÇÃO FINANCEIRA" };
+  if (/^RES\s+APLIC AUT/.test(descNorm))                return { classificacao: "Resgate", fornecedor: "ITAÚ", plano: "RESGATE APLICAÇÃO FINANCEIRA" };
   if (/INSTITUTO PARASER|PARASER SERV/.test(descNorm)) return { classificacao: "Parte Relacionada", fornecedor: "", plano: "Empréstimo" };
   if (/SISPAG TRIB|TRIBUTOS|\bDARF\b|\bISS\b|\bDAS\b|\bGPS\b|\bFGTS\b|\bISSQN\b|\bIOF\b/.test(descNorm)) return { classificacao: "Tributos", fornecedor: "", plano: "" };
   if (ent && /\bPIX\b/.test(descNorm))                 return { classificacao: "Clientes/PIX", fornecedor: "PACIENTES - GERAL", plano: "Receita Produtos e Serviços" };
