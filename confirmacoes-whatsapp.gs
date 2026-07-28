@@ -2189,6 +2189,12 @@ function doGet(e) {
     } catch (e) { outP.erro = e.message; }
     return ContentService.createTextOutput(JSON.stringify(outP, null, 2)).setMimeType(ContentService.MimeType.JSON);
   }
+  if (params.action === 'retry-feegow' && params.key === 'paraser2026') {
+    return ContentService.createTextOutput(JSON.stringify(reprocessarErroFeegow())).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (params.action === 'setup-retry-feegow' && params.key === 'paraser2026') {
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, msg: setupRetryFeegow() })).setMimeType(ContentService.MimeType.JSON);
+  }
   if (params.action === 'primeira-usg-sim' && params.key === 'paraser2026') {
     return ContentService.createTextOutput(JSON.stringify(_simularPrimeiraUsg_(Number(params.limit) || 30))).setMimeType(ContentService.MimeType.JSON);
   }
@@ -2468,8 +2474,10 @@ function processarResposta(phone, answer) {
     } catch (err) {
       marcarPendente(pend.row, 'ERRO_FEEGOW');
       sendWhatsApp(phone, 'Recebi sua confirmação! ✅ Já avisei a equipe. 💜');
-      slackPost('⚠️ ' + (pend.nome || phone) + ' confirmou, mas FALHOU mudar no Feegow ' +
-                '(agendamento ' + pend.agId + '): ' + err.message + '. Confirmar manualmente.');
+      slackPostUmaVez_('falha-feegow-' + pend.agId,
+        '⚠️ *Confirmar na mão:* ' + (pend.nome || phone) + ' confirmou (agendamento *' +
+        pend.agId + '*) e o Feegow não aceitou.\n_' + err.message + '_\n' +
+        'A paciente já foi avisada de que recebemos. Falta mudar o status no Feegow.', 60);
     }
   } else { // NAO
     marcarPendente(pend.row, 'REAGENDAR');
@@ -2483,28 +2491,75 @@ function processarResposta(phone, answer) {
 // Feegow — muda o status do agendamento para 7 (Marcado-confirmado).
 // Params via query-string (compatível com a API PHP do Feegow).
 // ----------------------------------------------------------------
+// Transforma a resposta de erro do Feegow em uma linha legível.
+// Quando o gateway deles cai, a resposta é uma PÁGINA HTML inteira; despejá-la
+// no Slack enterrava o aviso em 40 linhas de <meta> e ninguém lia o que
+// importava (qual agendamento e o que fazer).
+function _erroFeegowLegivel_(code, txt) {
+  var corpo = String(txt || '').trim();
+  if (/^\s*<(!doctype|html)/i.test(corpo)) {
+    var t = corpo.match(/<title[^>]*>([^<]{0,120})<\/title>/i);
+    corpo = t ? t[1].trim() : '(página de erro do servidor)';
+  }
+  corpo = corpo.replace(/\s+/g, ' ').substring(0, 120);
+  var explica = {
+    500: 'erro interno do Feegow',
+    502: 'o servidor do Feegow respondeu errado ao gateway',
+    503: 'o Feegow estava indisponível',
+    504: 'o Feegow demorou demais para responder'
+  }[code] || '';
+  return 'Feegow HTTP ' + code + (explica ? ' (' + explica + ')' : '') + (corpo ? ' · ' + corpo : '');
+}
+
+// Posta no Slack só uma vez por chave dentro da janela. A paciente que clica e
+// não vê nada acontecer clica de novo, e cada clique gerava um aviso novo — o
+// mesmo agendamento apareceu 3 vezes seguidas no canal.
+function slackPostUmaVez_(chave, texto, minutos) {
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache.get(chave)) return false;
+    cache.put(chave, '1', (minutos || 30) * 60);
+  } catch (e) { /* sem cache: melhor avisar duas vezes do que não avisar */ }
+  return slackPost(texto);
+}
+
 function confirmarFeegow(agId) {
   var url = CF_FEEGOW_BASE + '/appoints/statusUpdate' +
             '?AgendamentoID=' + encodeURIComponent(agId) +
             '&StatusID=7' +
             '&Obs=' + encodeURIComponent('Confirmado pela paciente via WhatsApp');
-  var resp = UrlFetchApp.fetch(url, {
-    method:             'post',
-    headers:            { 'x-access-token': CF_FEEGOW_TOKEN },
-    muteHttpExceptions: true
-  });
-  var code = resp.getResponseCode();
-  var txt  = resp.getContentText();
-  if (code < 200 || code >= 300) {
-    throw new Error('Feegow HTTP ' + code + ': ' + txt.substring(0, 200));
-  }
-  // Feegow às vezes responde 200 com success:false — trata como erro.
-  try {
-    var j = JSON.parse(txt);
-    if (j && j.success === false) {
-      throw new Error('Feegow success:false — ' + (j.message || txt.substring(0, 150)));
+
+  // Erro 5xx do Feegow é passageiro (504 = demorou a responder). Tentar de novo
+  // resolve na maioria das vezes; antes, a primeira falha ja jogava a paciente
+  // pro atendimento manual. A paciente espera na tela, entao sao 3 tentativas
+  // curtas, no maximo ~4,5s a mais.
+  var ultimoErro = '';
+  for (var tentativa = 1; tentativa <= 3; tentativa++) {
+    var resp = UrlFetchApp.fetch(url, {
+      method:             'post',
+      headers:            { 'x-access-token': CF_FEEGOW_TOKEN },
+      muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    var txt  = resp.getContentText();
+
+    if (code >= 500 && code < 600) {
+      ultimoErro = _erroFeegowLegivel_(code, txt);
+      if (tentativa < 3) { Utilities.sleep(tentativa * 1500); continue; }
+      throw new Error(ultimoErro + ' (3 tentativas)');
     }
-  } catch (e) { /* resposta não-JSON: confia no HTTP 2xx */ }
+    if (code < 200 || code >= 300) {
+      throw new Error(_erroFeegowLegivel_(code, txt));
+    }
+
+    // Feegow às vezes responde 200 com success:false — trata como erro.
+    var j = null;
+    try { j = JSON.parse(txt); } catch (e) { /* não-JSON: confia no HTTP 2xx */ }
+    if (j && j.success === false) {
+      throw new Error('Feegow recusou: ' + (j.message || txt.substring(0, 120)));
+    }
+    return; // deu certo
+  }
 }
 
 // ================================================================
@@ -2598,7 +2653,11 @@ function _confirmarViaLink(agId, token) {
     return { emoji:'✅', titulo:'Presença confirmada!', msg:'Tudo certo, te esperamos! 💜' };
   } catch (err) {
     if (pend) marcarPendente(pend.row, 'ERRO_FEEGOW');
-    slackPost('⚠️ Clicou confirmar (ag ' + agId + ') mas FALHOU no Feegow: ' + err.message + '. Confirmar manual.');
+    slackPostUmaVez_('falha-feegow-' + agId,
+      '⚠️ *Confirmar na mão:* a paciente clicou confirmar (agendamento *' + agId + '*' +
+      (pend && pend.nome ? ' · ' + pend.nome : '') + ') e o Feegow não aceitou.\n' +
+      '_' + err.message + '_\n' +
+      'A paciente já foi avisada de que recebemos. Falta mudar o status no Feegow.', 60);
     return { emoji:'✅', titulo:'Recebemos sua confirmação!', msg:'Já avisamos a equipe. 💜' };
   }
 }
@@ -2632,6 +2691,59 @@ function _reagendarViaLink(agId, token) {
 // Fila de pendentes — aba Confirmacoes_Pendentes
 // Colunas: Timestamp | Telefone | Paciente | AgendamentoID | Data | Status
 // ----------------------------------------------------------------
+// ================================================================
+// RETENTATIVA DAS CONFIRMAÇÕES QUE O FEEGOW RECUSOU
+// Se o Feegow ficar fora alguns minutos, as 3 tentativas do clique falham e a
+// confirmação da paciente fica só no nosso lado: ela ouviu "recebemos", mas a
+// agenda continua não confirmada e alguém precisa lembrar de arrumar na mão.
+// Esta rotina varre as pendências marcadas ERRO_FEEGOW e tenta de novo sozinha.
+// Só olha os últimos 3 dias: erro velho é caso encerrado, não fila.
+// ================================================================
+function reprocessarErroFeegow() {
+  var sh = pendentesSheet_();
+  if (sh.getLastRow() < 2) return { verificados: 0, resolvidos: 0, aindaFalhando: 0 };
+
+  var dados = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+  var limite = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  var resolvidos = 0, falhando = 0, verificados = 0, nomes = [], motivos = [];
+
+  dados.forEach(function (linha, i) {
+    if (String(linha[5]) !== 'ERRO_FEEGOW') return;
+    var quando = linha[0] instanceof Date ? linha[0] : new Date(linha[0]);
+    if (!(quando instanceof Date) || isNaN(quando) || quando < limite) return;
+
+    verificados++;
+    var agId = linha[3];
+    try {
+      confirmarFeegow(agId);
+      sh.getRange(i + 2, 6).setValue('CONFIRMADO');
+      resolvidos++;
+      nomes.push((linha[2] || ('ag ' + agId)) + ' (ag ' + agId + ')');
+    } catch (err) {
+      falhando++;
+      // Guardar o motivo: sem isso, "4 ainda falhando" nao diz se o Feegow
+      // esta fora ou se aqueles agendamentos tem outro problema.
+      motivos.push({ ag: agId, nome: linha[2] || '', erro: String(err.message).substring(0, 160) });
+    }
+  });
+
+  if (resolvidos) {
+    slackPost('✅ *Confirmações recuperadas* — o Feegow voltou e ' + resolvidos +
+              ' confirmação(ões) que tinham falhado foram aplicadas sozinhas: ' +
+              nomes.join(', ') + '. Não precisa fazer nada.');
+  }
+  return { verificados: verificados, resolvidos: resolvidos, aindaFalhando: falhando, motivos: motivos };
+}
+
+// Cria o gatilho de 1 em 1 hora (rodar uma vez).
+function setupRetryFeegow() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'reprocessarErroFeegow') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('reprocessarErroFeegow').timeBased().everyHours(1).create();
+  return 'gatilho horário de reprocessarErroFeegow criado';
+}
+
 function pendentesSheet_() {
   var ss = SpreadsheetApp.openById(CF_SPREADSHEET_ID);
   var sh = ss.getSheetByName(CF_PENDENTES_SHEET);
