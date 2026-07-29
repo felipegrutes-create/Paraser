@@ -1462,6 +1462,8 @@
         .doa-select.cls-fiv-od { border-color: #0ea5e9; color: #38bdf8; }
         .doa-select.cls-congelamento { border-color: #64748b; color: #94a3b8; }
         .doa-select.cls-nova-tec { border-color: #06b6d4; color: #22d3ee; }
+        .doa-select.cls-prenatal { border-color: #10b981; color: #34d399; }
+        .doa-select.cls-alta { border-color: #84cc16; color: #a3e635; }
         .doa-saving { opacity: 0.5; pointer-events: none; }
 
         @media (max-width: 768px) {
@@ -3518,6 +3520,10 @@
                     <div class="value" style="color:#94a3b8" id="doa-congelamento">—</div>
                     <div class="label">Congelamento</div>
                 </div>
+                <div class="kpi-card" style="border-color:#10b981">
+                    <div class="value" style="color:#34d399" id="doa-alta">—</div>
+                    <div class="label">Alta / Pré-Natal</div>
+                </div>
                 <div class="kpi-card">
                     <div class="value" style="color:var(--muted)" id="doa-sem-class">—</div>
                     <div class="label">Sem Classificação</div>
@@ -3541,6 +3547,8 @@
                     <option value="Doadora Voluntária">Doadora Voluntária</option>
                     <option value="Congelamento">Congelamento</option>
                     <option value="Nova TEC">Nova TEC</option>
+                    <option value="Liberação Pré-Natal">Liberação Pré-Natal</option>
+                    <option value="Alta / Já Engravidou">Alta / Já Engravidou</option>
                     <option value="sem">Sem classificação</option>
                 </select>
             </div>
@@ -4998,6 +5006,8 @@
                                 <option value="Doadora Voluntária">Doadora Voluntária</option>
                                 <option value="Congelamento">Congelamento</option>
                                 <option value="Nova TEC">Nova TEC</option>
+                                <option value="Liberação Pré-Natal">Liberação Pré-Natal</option>
+                                <option value="Alta / Já Engravidou">Alta / Já Engravidou</option>
                             </select>
                         </div>
                     </div>
@@ -5088,6 +5098,17 @@
         // então não viram card no Fluxo Pacientes. O retorno genérico ("CONSULTA DE RETORNO -
         // Presencial", o mesmo que Rodolfo/Bruna/Mário usam) continua entrando normalmente.
         const RETORNO_CONSULTORIO_RX = /retorno\s*[-+]?\s*30\s*dias|retorno\s+ginecolog/i;
+
+        // ===== AGENDAMENTOS VIVOS NO FEEGOW =====
+        // A aba "Dados Diários" guarda a linha mesmo depois que a recepção EXCLUI o
+        // agendamento no Feegow (o status fica congelado em "Marcado"), e o painel
+        // criava card fantasma. Conferimos os últimos FGV_DIAS direto na API e
+        // escondemos o que não existe mais. Se a consulta falhar, não filtra nada.
+        const FGV_DIAS = 45, FGV_TTL = 30 * 60 * 1000, FGV_LS = 'paraser_fg_vivos';
+        let fgVivos = null;       // Set com os IDs de agendamento que ainda existem
+        let fgVivosDesde = null;  // AAAAMMDD do começo da janela conferida
+        let _fgVivosBusy = false;
+        let _fgVivosTentativa = 0; // pra não repetir a consulta quando ela falha
 
         // ===== CRM KANBAN GLOBALS =====
         let crmMap     = {};   // paciente_key → registro CRM
@@ -5949,7 +5970,10 @@
             // Dados: agendamentos de 1ª vez e retorno, exceto cancelado/remarcado
             doaPatients = [];
             avalDoadPatients = [];
+            // Prefixo, não texto exato: a planilha grava "Desmarcado pelo paciente" e
+            // "Cancelado pelo profissional", que passavam batido na comparação antiga.
             const doaExcludeStatus = ['cancelado','desmarcado','remarcado'];
+            const doaCancelado = s => doaExcludeStatus.some(x => s.startsWith(x));
             const doaSeen = new Set();
 
             // Formatar status para exibição (deve ser definido ANTES de doaAdd)
@@ -5968,7 +5992,7 @@
 
             const doaAdd = (r, tipo) => {
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
-                if (doaExcludeStatus.includes(s)) return;
+                if (doaCancelado(s)) return;
                 const pac = (r[d.C.pac]||'').trim();
                 const dt = r[d.C.data]||'';
                 if (!pac || !dt) return;
@@ -5983,6 +6007,7 @@
                 if (doaSeen.has(uniqueKey)) return;
                 doaSeen.add(uniqueKey);
                 doaPatients.push({
+                    id: String(r[d.C.id] || ''),
                     pac, prof: r[d.C.prof]||'', cel: r[d.C.cel]||'',
                     email: r[d.C.email]||'', dataAp: dt,
                     proc: r[d.C.proc]||'', status: fmtStatus(s),
@@ -6019,7 +6044,7 @@
                 const proc = (r[d.C.proc]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
                 if (!proc.includes('avaliacao') || !proc.includes('doador')) return;
                 const s = (r[d.C.sta]||'').toLowerCase().trim();
-                if (doaExcludeStatus.includes(s)) return;
+                if (doaCancelado(s)) return;
                 const pac = (r[d.C.pac]||'').trim();
                 const dt  = r[d.C.data]||'';
                 if (!pac || !dt) return;
@@ -6078,7 +6103,7 @@
                 const proc0 = (r0[C.proc]||'').trim().toLowerCase().replace(/\s+/g, ' ');
                 if (!proc0.startsWith('usg fiv 1')) return;
                 const s0 = (r0[C.sta]||'').toLowerCase().trim();
-                if (doaExcludeStatus.includes(s0) || s0.includes('não compareceu') || s0.includes('nao compareceu')) return;
+                if (doaCancelado(s0) || s0.includes('não compareceu') || s0.includes('nao compareceu')) return;
                 const d0 = parseDate(r0[C.data]);
                 if (!d0 || daysBetween(d0, today) > 90) return;
                 const key = normalizeKey(r0[C.pac]);
@@ -7012,6 +7037,8 @@
                                 <option value="Doadora Voluntária" ${sel('Doadora Voluntária')}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${sel('Congelamento')}>Congelamento</option>
                                 <option value="Nova TEC" ${sel('Nova TEC')}>Nova TEC</option>
+                                <option value="Liberação Pré-Natal" ${sel('Liberação Pré-Natal')}>Liberação Pré-Natal</option>
+                                <option value="Alta / Já Engravidou" ${sel('Alta / Já Engravidou')}>Alta / Já Engravidou</option>
                             </select>
                         </div>`;
                     })() : ''}
@@ -8603,15 +8630,69 @@
             }
         }
 
+        // Data DD/MM/AAAA → número AAAAMMDD (comparação segura)
+        function fgvDataNum(dt) {
+            const p = (dt || '').trim().split('/');
+            if (p.length !== 3) return 0;
+            return parseInt(p[2]) * 10000 + parseInt(p[1]) * 100 + parseInt(p[0]);
+        }
+
+        // O card só vale se o agendamento ainda existe no Feegow. Fora da janela
+        // conferida (ou sem resposta da API) o card passa, pra nunca esconder paciente real.
+        function fgvAtivo(p) {
+            if (!fgVivos || !p.id) return true;
+            const n = fgvDataNum(p.dataAp);
+            if (!n || n < fgVivosDesde) return true;
+            return fgVivos.has(p.id);
+        }
+
+        async function carregarAgendamentosVivos() {
+            if (_fgVivosBusy) return;
+            const agora = Date.now();
+            try {
+                const c = JSON.parse(localStorage.getItem(FGV_LS) || 'null');
+                if (c && (agora - c.ts) < FGV_TTL && Array.isArray(c.ids) && c.ids.length) {
+                    fgVivos = new Set(c.ids);
+                    fgVivosDesde = c.desde;
+                    return;
+                }
+            } catch (e) { /* cache ruim, busca de novo */ }
+
+            _fgVivosBusy = true;
+            _fgVivosTentativa = agora;
+            const hoje = new Date();
+            const de   = new Date(); de.setDate(de.getDate() - FGV_DIAS);
+            const br   = d => String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+            try {
+                const j   = await feegowFetch('/appoints/search', { data_start: br(de), data_end: br(hoje), per_page: 5000 });
+                const ids = (j.content || []).map(a => String(a.agendamento_id));
+                if (ids.length) {
+                    fgVivos = new Set(ids);
+                    fgVivosDesde = de.getFullYear() * 10000 + (de.getMonth()+1) * 100 + de.getDate();
+                    localStorage.setItem(FGV_LS, JSON.stringify({ ts: agora, desde: fgVivosDesde, ids }));
+                }
+            } catch (e) {
+                console.warn('Não deu pra conferir os agendamentos no Feegow:', e.message);
+            } finally {
+                _fgVivosBusy = false;
+            }
+        }
+
         function renderDoadoras() {
             const container = document.getElementById('doaList');
             if (!container || !doaPatients.length) return;
+
+            // Primeira abertura: confere no Feegow quem foi excluído e redesenha sem eles.
+            if (!fgVivos && !_fgVivosBusy && (Date.now() - _fgVivosTentativa) > 300000) {
+                carregarAgendamentosVivos().then(() => { if (fgVivos) renderDoadoras(); });
+            }
 
             const srch    = norm(document.getElementById('doaSearch')?.value || '');
             const profF   = document.getElementById('doaProf')?.value || '';
             const classF  = document.getElementById('doaClass')?.value || '';
 
             const filtered = doaPatients.filter(p => {
+                if (!fgvAtivo(p)) return false; // agendamento excluído no Feegow
                 if (srch && !norm(p.pac).includes(srch)) return false;
                 if (profF && p.prof !== profF) return false;
                 const cls = (getCrmRec(p.key)?.classificacao) || '';
@@ -8639,10 +8720,10 @@
             });
 
             // KPIs — deduplica por paciente (uma paciente pode ter múltiplos agendamentos em doaPatients)
-            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nSem = 0;
+            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nAlta = 0, nSem = 0;
             const kpiSeenKeys = new Set();
             doaPatients.forEach(p => {
-                if (kpiSeenKeys.has(p.key)) return;
+                if (!fgvAtivo(p) || kpiSeenKeys.has(p.key)) return;
                 kpiSeenKeys.add(p.key);
                 const cls = (getCrmRec(p.key)?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
@@ -8654,6 +8735,8 @@
                 else if (cls === 'Doadora Voluntária') nFivOd++;
                 else if (cls === 'Congelamento') nCong++;
                 else if (cls === 'Nova TEC') nCong++; // conta junto com Congelamento
+                // Fora do funil comercial: já fechou/terminou o tratamento, não é lead
+                else if (cls === 'Liberação Pré-Natal' || cls === 'Alta / Já Engravidou') nAlta++;
                 else nSem++;
             });
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -8665,6 +8748,8 @@
             set('doa-coito', nCoito);
             set('doa-embriao', nEmbriao);
             set('doa-fiv-od', nFivOd);
+            set('doa-congelamento', nCong);
+            set('doa-alta', nAlta);
             set('doa-sem-class', nSem);
 
             if (!sortedDates.length) {
@@ -8690,7 +8775,9 @@
                             : cls === 'Embrião Doado' ? 'cls-embriao'
                             : cls === 'Doadora Voluntária' ? 'cls-fiv-od'
                             : cls === 'Congelamento' ? 'cls-congelamento'
-                            : cls === 'Nova TEC' ? 'cls-nova-tec' : '';
+                            : cls === 'Nova TEC' ? 'cls-nova-tec'
+                            : cls === 'Liberação Pré-Natal' ? 'cls-prenatal'
+                            : cls === 'Alta / Já Engravidou' ? 'cls-alta' : '';
                         const statusClass = p.status === 'Atendido' ? 'doa-status-atendido'
                             : p.status === 'Aguardando' ? 'doa-status-aguardando'
                             : (p.status === 'Não Compareceu') ? 'doa-status-naocomp'
@@ -8724,6 +8811,8 @@
                                 <option value="Doadora Voluntária" ${cls === 'Doadora Voluntária' ? 'selected' : ''}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${cls === 'Congelamento' ? 'selected' : ''}>Congelamento</option>
                                 <option value="Nova TEC" ${cls === 'Nova TEC' ? 'selected' : ''}>Nova TEC</option>
+                                <option value="Liberação Pré-Natal" ${cls === 'Liberação Pré-Natal' ? 'selected' : ''}>Liberação Pré-Natal</option>
+                                <option value="Alta / Já Engravidou" ${cls === 'Alta / Já Engravidou' ? 'selected' : ''}>Alta / Já Engravidou</option>
                             </select>
                         </div>`;
                     }).join('')}
@@ -8745,7 +8834,9 @@
                 : value === 'Embrião Doado' ? 'cls-embriao'
                 : value === 'Doadora Voluntária' ? 'cls-fiv-od'
                 : value === 'Congelamento' ? 'cls-congelamento'
-                : value === 'Nova TEC' ? 'cls-nova-tec' : ''
+                : value === 'Nova TEC' ? 'cls-nova-tec'
+                : value === 'Liberação Pré-Natal' ? 'cls-prenatal'
+                : value === 'Alta / Já Engravidou' ? 'cls-alta' : ''
             );
 
             // Optimistic update local
@@ -8754,10 +8845,10 @@
             crmSaveLocal();
 
             // Atualizar KPIs — deduplica por paciente
-            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nSem = 0;
+            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nAlta = 0, nSem = 0;
             const kpiSeen2 = new Set();
             doaPatients.forEach(p => {
-                if (kpiSeen2.has(p.key)) return;
+                if (!fgvAtivo(p) || kpiSeen2.has(p.key)) return;
                 kpiSeen2.add(p.key);
                 const cls = (getCrmRec(p.key)?.classificacao) || '';
                 if (cls === 'FIV Normal') nFiv++;
@@ -8769,6 +8860,8 @@
                 else if (cls === 'Doadora Voluntária') nFivOd++;
                 else if (cls === 'Congelamento') nCong++;
                 else if (cls === 'Nova TEC') nCong++; // conta junto com Congelamento
+                // Fora do funil comercial: já fechou/terminou o tratamento, não é lead
+                else if (cls === 'Liberação Pré-Natal' || cls === 'Alta / Já Engravidou') nAlta++;
                 else nSem++;
             });
             const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -8781,6 +8874,7 @@
             s('doa-embriao', nEmbriao);
             s('doa-fiv-od', nFivOd);
             s('doa-congelamento', nCong);
+            s('doa-alta', nAlta);
             s('doa-sem-class', nSem);
 
             // Save to server
