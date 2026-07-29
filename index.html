@@ -5084,6 +5084,10 @@
         let chartInstances = {};
         const PEND_PER_PAGE = 30;
         const CONSULTA_PRESENCIAL_PROFS = ['mario barroso','priscila loyola','rejane santana','rodolfo salvato','joselmo salvato','marcelle moura','bruna ortiz'];
+        // Retornos de consultório do Dr. Joselmo (gineco/rotina): não são funil de fertilidade,
+        // então não viram card no Fluxo Pacientes. O retorno genérico ("CONSULTA DE RETORNO -
+        // Presencial", o mesmo que Rodolfo/Bruna/Mário usam) continua entrando normalmente.
+        const RETORNO_CONSULTORIO_RX = /retorno\s*[-+]?\s*30\s*dias|retorno\s+ginecolog/i;
 
         // ===== CRM KANBAN GLOBALS =====
         let crmMap     = {};   // paciente_key → registro CRM
@@ -5994,6 +5998,9 @@
                 const proc = (r[d.C.proc]||'').toLowerCase();
                 if (!proc.includes('retorno') && !proc.includes('retor')) return false;
                 const prof = (r[d.C.prof]||'').trim().toLowerCase();
+                // Joselmo é gineco/obstetra: retorno -30/+30 dias e retorno ginecologista dele
+                // ficam fora do funil comercial (decisão de 21/07, reforçada em 29/07).
+                if (prof.includes('joselmo') && RETORNO_CONSULTORIO_RX.test(proc)) return false;
                 return CONSULTA_PRESENCIAL_PROFS.some(p => prof.includes(p));
             }).forEach(r => doaAdd(r, 'retorno'));
 
