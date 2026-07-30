@@ -2978,7 +2978,12 @@ function dedupPixConferir_() {
   return removidas;
 }
 
-// Aprova (OK) ou descarta (DESCARTADO) um PIX da fila. Invalida o cache da meta.
+// Aprova (OK), descarta (DESCARTADO) ou devolve pra fila (PENDENTE = desfazer) um PIX.
+// Invalida o cache da meta.
+// 30/07/2026: a fila chegou a mostrar 83 itens que eram 50 linhas repetidas + 33 PIX que
+// JÁ linkavam por CPF (o total nem mexia ao classificar). Se a fila voltar a encher sem
+// sentido: ?action=dedup_pixc tira linha repetida e ?action=limpar_pixc_linkados tira o
+// que já linkou (só mexe em PENDENTE, e a recomputação recoloca se voltar a ficar solto).
 function handleConferirPix(body) {
   const fitid = String(body.fitid || '');
   const decisao = String(body.decisao || '').toUpperCase();
