@@ -200,7 +200,7 @@ function _executarSincronizacaoHoraria() {
 // =================================================================================
 function processarDados(sheet, dadosApi, idxPorId) {
     const appends = [];
-    const updates = [];
+    const porLinha = new Map(); // nº da linha na planilha -> valores da linha
     dadosApi.forEach(ag => {
         const id = String(ag.AgendamentoID);
         const dataCri = extrairDataCriacao(ag);
@@ -215,14 +215,32 @@ function processarDados(sheet, dadosApi, idxPorId) {
         ];
         const rowIndex = idxPorId.get(id);
         if (rowIndex) {
-            updates.push({ rangeA1: `A${rowIndex}`, values: [linha] });
+            porLinha.set(rowIndex, linha);
         } else {
             appends.push(linha);
         }
     });
 
     try {
-        if (updates.length > 0) updates.forEach(u => sheet.getRange(u.rangeA1).offset(0, 0, 1, HEADERS.length).setValues(u.values));
+        // 30/07/2026 — escreve em BLOCOS CONTÍGUOS, não uma chamada por linha.
+        // Antes: um setValues por linha (~1.171 escritas por rodada). Agora linhas
+        // vizinhas viram um bloco só (~91 escritas, medido na aba real).
+        // De propósito NÃO escrevo a faixa inteira de uma vez (linha 7530 até 41146):
+        // isso reescreveria 32 mil linhas alheias e poderia apagar o carimbo
+        // "Excluído no Feegow" que a faxina do CRM grava nessa mesma aba.
+        let blocos = 0;
+        const linhas = Array.from(porLinha.keys()).sort((a, b) => a - b);
+        let i = 0;
+        while (i < linhas.length) {
+            let j = i;
+            while (j + 1 < linhas.length && linhas[j + 1] === linhas[j] + 1) j++;
+            const valores = [];
+            for (let k = i; k <= j; k++) valores.push(porLinha.get(linhas[k]));
+            sheet.getRange(linhas[i], 1, valores.length, HEADERS.length).setValues(valores);
+            blocos++;
+            i = j + 1;
+        }
+        if (linhas.length) Logger.log(`  ${linhas.length} linhas atualizadas em ${blocos} blocos.`);
         if (appends.length > 0) {
             const newRowStart = sheet.getLastRow() + 1;
             sheet.getRange(newRowStart, 1, appends.length, HEADERS.length).setValues(appends);
