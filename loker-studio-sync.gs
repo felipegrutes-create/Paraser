@@ -20,6 +20,9 @@ const HEADERS = [
     "Faturado","Idade","Local","Profissional","Procedimento",
     "Status","Valor","Usuário","Data de Criação","Mês"
 ];
+// ⚠️ A API IGNORA offset e limit no report schedule-appointments: ela devolve a faixa
+// de datas inteira, sempre o mesmo conjunto. LIMITE_API só sobrou na Fase 1 (carga
+// inicial, já concluída, que pede 1 dia por vez e nunca chega perto de 1000).
 const LIMITE_API = 1000;
 const DATA_INICIO_GERAL = "01/01/2025";
 
@@ -153,20 +156,39 @@ function _executarSincronizacaoHoraria() {
         
         const idxPorId = new Map(sheet.getDataRange().getValues().slice(1).map((row, i) => [String(row[0]), i + 2]));
 
-        for (let diaAtual = new Date(dataInicio); diaAtual <= dataFim; diaAtual.setDate(diaAtual.getDate() + 1)) {
-            let offset = 0;
-            while (true) {
-                const dataFormatada = formatBR(diaAtual);
-                const payload = { report: "schedule-appointments", DATA_INICIO: dataFormatada, DATA_FIM: dataFormatada, offset: offset, limit: LIMITE_API };
-                const registros = requisicaoFeegow(API_URL, API_TOKEN, payload);
+        // 30/07/2026 — Um pedido por MÊS, não um por dia.
+        // Antes: 1 chamada por dia, do 1º do mês até hoje+180 = ~210 chamadas POR RODADA,
+        // de hora em hora (~5 mil por dia). Agora: 7 chamadas.
+        // O relatório devolve a faixa inteira numa chamada só (testado: outubro/2025
+        // devolveu 1166 registros de uma vez). ⚠️ NÃO paginar por offset aqui: a API
+        // IGNORA offset e limit, devolve sempre o mesmo conjunto, então o laço antigo
+        // (`while(true)` até vir menos que LIMITE_API) viraria LOOP INFINITO em qualquer
+        // bloco com 1000 registros ou mais. Por isso o bloco é mensal e sem paginação.
+        let chamadas = 0, processados = 0;
+        let blocoIni = new Date(dataInicio);
+        while (blocoIni <= dataFim) {
+            let blocoFim = new Date(blocoIni.getFullYear(), blocoIni.getMonth() + 1, 0); // último dia do mês
+            if (blocoFim > dataFim) blocoFim = new Date(dataFim);
 
-                if (registros === null) break;
-                if (registros.length > 0) processarDados(sheet, registros, idxPorId);
-                if (registros.length < LIMITE_API) break;
-                offset += LIMITE_API;
+            const payload = { report: "schedule-appointments", DATA_INICIO: formatBR(blocoIni), DATA_FIM: formatBR(blocoFim) };
+            const registros = requisicaoFeegow(API_URL, API_TOKEN, payload);
+            chamadas++;
+
+            if (registros === null) {
+                Logger.log(`Falha na API no bloco ${formatBR(blocoIni)}–${formatBR(blocoFim)}. Segue pro próximo bloco.`);
+            } else {
+                if (registros.length > 0) {
+                    processarDados(sheet, registros, idxPorId);
+                    processados += registros.length;
+                }
+                if (registros.length >= 5000) {
+                    Logger.log(`⚠️ Bloco ${formatBR(blocoIni)} devolveu ${registros.length} registros. Se a API começar a truncar, quebrar o bloco em quinzenas.`);
+                }
             }
+
+            blocoIni = new Date(blocoFim.getFullYear(), blocoFim.getMonth(), blocoFim.getDate() + 1);
         }
-        Logger.log('SINCRONIZAÇÃO HORÁRIA: Verificação concluída.');
+        Logger.log(`SINCRONIZAÇÃO HORÁRIA: Verificação concluída. ${chamadas} chamadas, ${processados} registros.`);
     } finally {
         lock.releaseLock();
     }
