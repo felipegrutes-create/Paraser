@@ -102,6 +102,12 @@ function doGet(e) {
       if (_modo === 'triggers') return jsonOk({ ok: true, triggers: ScriptApp.getProjectTriggers().map(function (t) {
         return t.getHandlerFunction() + ' (' + t.getEventType() + ')';
       }) });
+      // Última rodada automática da faxina (a tela de acionadores não mostra detalhe).
+      if (_modo === 'status') {
+        let _u = null;
+        try { _u = JSON.parse(PropertiesService.getScriptProperties().getProperty('FAX_LAST') || 'null'); } catch (se) { _u = null; }
+        return jsonOk({ ok: true, ultimaFaxina: _u });
+      }
       return jsonOk({ ok: true, faxina: _modo === 'ano' ? faxinaAgendaAno() : faxinaAgendaHora() });
     }
     // Diagnóstico do envio do 🌙 Fechamento do dia pro canal do financeiro.
@@ -4940,9 +4946,22 @@ function faxinaAgendaHora() {
   const hoje = new Date();
   const de  = new Date(hoje); de.setDate(de.getDate() - 45);
   const ate = new Date(hoje); ate.setDate(ate.getDate() + 60);
-  const r = faxinaAgendaExcluidos_(de, ate);
+  let r;
+  try {
+    r = faxinaAgendaExcluidos_(de, ate);
+  } catch (err) {
+    PropertiesService.getScriptProperties().setProperty('FAX_LAST',
+      JSON.stringify({ quando: faxAgora_(), erro: String(err && err.message || err) }));
+    throw err;
+  }
+  PropertiesService.getScriptProperties().setProperty('FAX_LAST',
+    JSON.stringify({ quando: faxAgora_(), ok: true, resultado: r }));
   Logger.log('faxinaAgendaHora: ' + JSON.stringify(r));
   return r;
+}
+
+function faxAgora_() {
+  return Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm:ss');
 }
 
 // Passada funda: 1º de janeiro do ano corrente até 90 dias à frente.
