@@ -99,6 +99,9 @@ function doGet(e) {
     if (action === 'faxina_agenda' && e.parameter.key === 'paraser2026') {
       const _modo = String(e.parameter.modo || 'hora');
       if (_modo === 'setup') return jsonOk({ ok: true, faxina: setupFaxinaAgenda() });
+      if (_modo === 'triggers') return jsonOk({ ok: true, triggers: ScriptApp.getProjectTriggers().map(function (t) {
+        return t.getHandlerFunction() + ' (' + t.getEventType() + ')';
+      }) });
       return jsonOk({ ok: true, faxina: _modo === 'ano' ? faxinaAgendaAno() : faxinaAgendaHora() });
     }
     // Diagnóstico do envio do 🌙 Fechamento do dia pro canal do financeiro.
