@@ -27,6 +27,7 @@ Felipe Grutes (felipegrutes@yahoo.com.br). **Não é programador** — prefere i
 - `extratobq/` — espelho do Apps Script da planilha FLUXO DE CX (ver `extratobq/LEIA-ME.md`; ⚠️ o fuso daquela planilha é Los Angeles).
 - `crm-apps-script.gs` — código fonte do Apps Script "CRM Paraser" (cópia local; **roda no Google Cloud**).
 - `confirmacoes-whatsapp.gs` — código fonte do Apps Script "Confirmação de Agenda" (envia WhatsApp via Z-API + notifica Slack).
+- `loker-studio-sync.gs` — espelho do Apps Script **"Loker Studio"**, o script que **alimenta a aba "Dados Diários"** (a fonte do dashboard) puxando o relatório do Feegow de hora em hora. É bound na planilha Controle Agendamentos, igual ao CRM (uma planilha pode ter mais de um script bound). ⚠️ Ele faz upsert e **nunca apaga linha**: agendamento excluído no Feegow vira card fantasma, e quem limpa é a `faxinaAgendaHora` do CRM.
 
 ## 📊 Integrações de dados
 
