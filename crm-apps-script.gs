@@ -99,6 +99,13 @@ function doGet(e) {
     if (action === 'faxina_agenda' && e.parameter.key === 'paraser2026') {
       const _modo = String(e.parameter.modo || 'hora');
       if (_modo === 'setup') return jsonOk({ ok: true, faxina: setupFaxinaAgenda() });
+      // Faixa livre: &modo=faixa&de=01-01-2025&ate=31-12-2025 (dd-mm-aaaa)
+      if (_modo === 'faixa') {
+        const _p = s => { const m = String(s || '').match(/^(\d{2})-(\d{2})-(\d{4})$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null; };
+        const _de = _p(e.parameter.de), _ate = _p(e.parameter.ate);
+        if (!_de || !_ate || _de > _ate) return jsonErr('use de=dd-mm-aaaa e ate=dd-mm-aaaa, com de <= ate');
+        return jsonOk({ ok: true, faxina: faxinaAgendaExcluidos_(_de, _ate) });
+      }
       if (_modo === 'triggers') return jsonOk({ ok: true, triggers: ScriptApp.getProjectTriggers().map(function (t) {
         return t.getHandlerFunction() + ' (' + t.getEventType() + ')';
       }) });

@@ -258,3 +258,30 @@ function obterMesPorExtenso(dataString) { if (!dataString) return ""; const mm =
 function strBRToDate(s){ const [d,m,y]=s.split("/").map(n=>parseInt(n,10)); return new Date(y,m-1,d); }
 function formatBR(d){ return Utilities.formatDate(d,"GMT-3","dd/MM/yyyy"); }
 function addDays(d,n){ const x=new Date(d.getTime()); x.setDate(x.getDate()+n); return x; }
+// =================================================================================
+// GATILHO MANUAL (30/07/2026) — só pela URL /dev, que exige login de uma conta com
+// acesso de edição a esta planilha. Serve pra rodar/conferir o sync na hora, sem
+// esperar o acionador de hora em hora. Não cria nada público.
+// =================================================================================
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if (p.key !== 'paraser2026') {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (p.acao === 'sincronizar') {
+    const t0 = new Date();
+    sincronizarFeegow();
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: true, segundos: Math.round((new Date() - t0) / 1000)
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (p.acao === 'triggers') {
+    return ContentService.createTextOutput(JSON.stringify({
+      triggers: ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction() + ' (' + t.getEventType() + ')'),
+      cargaInicialConcluida: PropertiesService.getUserProperties().getProperty('CARGA_INICIAL_CONCLUIDA')
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput(JSON.stringify({ ok: false }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
