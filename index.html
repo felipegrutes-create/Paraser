@@ -7393,6 +7393,7 @@
                         </div>`).join('')}`;
             } catch(e) { console.warn('a conferir:', e.message); }
         }
+        let _pixFilaTimer = null, _pixMetaTimer = null;
         async function conferirPix(fitid, decisao, btn) {
             // Some com a linha NA HORA (feedback imediato) e atualiza o contador do cabeçalho.
             const row = btn && btn.parentElement;
@@ -7404,9 +7405,13 @@
                 });
             } catch(e) {}
             // Re-sincroniza a FILA direto (rápido, só lê a aba) — não depende do get_meta lento.
-            setTimeout(renderAConferir, 800);
-            // Atualiza os TOTAIS da barra em segundo plano (get_meta é mais lento).
-            setTimeout(renderMetaBar, 1800);
+            clearTimeout(_pixFilaTimer);
+            _pixFilaTimer = setTimeout(renderAConferir, 1200);
+            // Os TOTAIS da barra só depois que a pessoa PARA de clicar. Cada get_meta
+            // recomputa o mês inteiro (lento) e, disparado em rajada, duas recomputações
+            // simultâneas duplicavam linha na fila. Um clique a mais reinicia a espera.
+            clearTimeout(_pixMetaTimer);
+            _pixMetaTimer = setTimeout(renderMetaBar, 4000);
         }
         async function editarMeta() {
             const off = prompt('Meta de qual mês?\n0 = este mês\n1 = mês que vem\n2 = daqui 2 meses ...', '0');

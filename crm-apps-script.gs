@@ -2861,6 +2861,7 @@ function computarMetaMes_(mes) {
   const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
   const jaTem = {}; for (let i = 1; i < dd.length; i++) jaTem[String(dd[i][Hc.fitid])] = dd[i];
   const cache = {};
+  const aInserir = [];   // linhas novas da fila; gravadas em bloco no fim, sob trava
   let pixLinkado = 0, aConfValor = 0, aConfQtd = 0;
   lerPixRecebimentos_(inicioDoMesIso_(mesRe), fimDoMesIso_(mesRe)).forEach(function(r){
     if (!noMes(normData_(r.data))) return;
@@ -2868,10 +2869,30 @@ function computarMetaMes_(mes) {
     const ex = jaTem[String(r.fitid)];
     const status = ex ? String(ex[Hc.status]) : 'PENDENTE';
     // jaTem marca o fitid recém-inserido na MESMA passada (evita 2 appends do mesmo PIX aqui).
-    if (!ex) { shC.appendRow([r.fitid, r.data, r.valor, r.pagador, r.cpf, '', 'PENDENTE', '']); jaTem[String(r.fitid)] = true; }
+    // 30/07/2026: NÃO grava aqui. Junta e grava no fim, sob trava — duas recomputações
+    // simultâneas (o dashboard chama get_meta a cada clique da fila) montavam o jaTem
+    // antes de a outra escrever, e cada uma inseria o mesmo PIX. Deu 130 linhas repetidas,
+    // até 4 do mesmo pagamento, e a fila parecia travada na tela.
+    if (!ex) { aInserir.push([r.fitid, r.data, r.valor, r.pagador, r.cpf, '', 'PENDENTE', '']); jaTem[String(r.fitid)] = true; }
     if (status === 'OK') pixLinkado += r.valor;
     else if (status !== 'DESCARTADO') { aConfValor += r.valor; aConfQtd++; }
   });
+
+  // Grava a fila em UMA vez, sob trava, conferindo de novo o que já existe.
+  // Sem isso, recomputações simultâneas duplicavam linha (ver comentário acima).
+  if (aInserir.length) {
+    const lock = LockService.getScriptLock();
+    if (lock.tryLock(20000)) {
+      try {
+        const ddNow = shC.getDataRange().getValues();
+        const temAgora = {}; for (let i = 1; i < ddNow.length; i++) temAgora[String(ddNow[i][Hc.fitid])] = true;
+        const novas = aInserir.filter(function(l){ return !temAgora[String(l[0])]; });
+        if (novas.length) shC.getRange(shC.getLastRow() + 1, 1, novas.length, novas[0].length).setValues(novas);
+      } finally { lock.releaseLock(); }
+    } else {
+      Logger.log('fila PIX: outra recomputação segurando a trava; não inseri nada nesta passada.');
+    }
+  }
 
   const porVendedora = comercialPorVendedora_(mes);
   let comercial = 0; porVendedora.forEach(function(x){ comercial += x.valor; });
@@ -2961,7 +2982,8 @@ function dedupPixConferir_() {
 function handleConferirPix(body) {
   const fitid = String(body.fitid || '');
   const decisao = String(body.decisao || '').toUpperCase();
-  if (!fitid || (decisao !== 'OK' && decisao !== 'DESCARTADO')) return jsonErr('fitid/decisao inválidos');
+  // PENDENTE = desfazer: devolve o PIX pra fila (clique errado ou teste). 30/07/2026.
+  if (!fitid || (decisao !== 'OK' && decisao !== 'DESCARTADO' && decisao !== 'PENDENTE')) return jsonErr('fitid/decisao inválidos');
   const sh = getOrCreateSheetGen_(PIX_CONFERIR_SHEET, PIXC_HEADERS);
   const dd = sh.getDataRange().getValues();
   const Hc = {}; PIXC_HEADERS.forEach(function(h, i){ Hc[h] = i; });
@@ -4961,8 +4983,12 @@ function faxinaAgendaHora() {
       JSON.stringify({ quando: faxAgora_(), erro: String(err && err.message || err) }));
     throw err;
   }
+  // De carona, limpa linha repetida da fila do PIX (a trava acima resolve a origem,
+  // mas só vale quando o deployment novo subir; o acionador já roda o código novo).
+  let dupPix = 0;
+  try { dupPix = dedupPixConferir_(); } catch (e2) { dupPix = 'erro: ' + e2.message; }
   PropertiesService.getScriptProperties().setProperty('FAX_LAST',
-    JSON.stringify({ quando: faxAgora_(), ok: true, resultado: r }));
+    JSON.stringify({ quando: faxAgora_(), ok: true, resultado: r, filaPixDuplicadasRemovidas: dupPix }));
   Logger.log('faxinaAgendaHora: ' + JSON.stringify(r));
   return r;
 }
