@@ -94,6 +94,13 @@ function doGet(e) {
     if (action === 'wpp_busca' && e.parameter.key === 'paraser2026') {
       return handleWppBusca(e.parameter);
     }
+    // Faxina da aba "Dados Diários": carimba agendamento que não existe mais no
+    // Feegow (?modo=ano faz a passada funda; sem modo, últimos 45 dias).
+    if (action === 'faxina_agenda' && e.parameter.key === 'paraser2026') {
+      const _modo = String(e.parameter.modo || 'hora');
+      if (_modo === 'setup') return jsonOk({ ok: true, faxina: setupFaxinaAgenda() });
+      return jsonOk({ ok: true, faxina: _modo === 'ano' ? faxinaAgendaAno() : faxinaAgendaHora() });
+    }
     // Diagnóstico do envio do 🌙 Fechamento do dia pro canal do financeiro.
     if (action === 'fech_diag' && e.parameter.key === 'paraser2026') {
       return handleFechDiag(e.parameter);
@@ -4905,4 +4912,156 @@ function setupTriggerWatchdog() {
     wppProps_().setProperty('WPP_HEARTBEAT', Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd'));
   }
   return 'vigia (watchdog) das 9h criado';
+}
+
+// =========================================================
+// FAXINA DA ABA "Dados Diários" — agendamento excluído no Feegow
+// ---------------------------------------------------------
+// A aba é alimentada por um sync externo que ATUALIZA linha por ID mas NUNCA
+// apaga. Quando a recepção exclui o agendamento no Feegow, a linha fica aqui
+// com o status congelado em "Marcado" e o dashboard trata como agendamento
+// real (card fantasma no Fluxo Pacientes, 1ª vez inflada no funil).
+// Em 29/07/2026: 63 linhas nessa situação só em julho (6,5% do mês).
+//
+// Esta faxina compara a aba com a agenda do Feegow e carimba o Status como
+// "Excluído no Feegow", guardando o status anterior na nota da célula. NÃO
+// apaga linha nenhuma. Se a API falhar no meio, aborta sem carimbar nada.
+// =========================================================
+const FAX_SHEET    = 'Dados Diários';
+const FAX_MARCA    = 'Excluído no Feegow';
+const FAX_TETO_PC  = 0.20;  // aborta se for carimbar mais de 20% da janela
+const FAX_TETO_ABS = 800;   // teto absoluto por rodada
+
+// Roda de hora em hora (trigger): últimos 45 dias + 60 dias à frente.
+function faxinaAgendaHora() {
+  const hoje = new Date();
+  const de  = new Date(hoje); de.setDate(de.getDate() - 45);
+  const ate = new Date(hoje); ate.setDate(ate.getDate() + 60);
+  const r = faxinaAgendaExcluidos_(de, ate);
+  Logger.log('faxinaAgendaHora: ' + JSON.stringify(r));
+  return r;
+}
+
+// Passada funda: 1º de janeiro do ano corrente até 90 dias à frente.
+function faxinaAgendaAno() {
+  const hoje = new Date();
+  const de  = new Date(hoje.getFullYear(), 0, 1);
+  const ate = new Date(hoje); ate.setDate(ate.getDate() + 90);
+  const r = faxinaAgendaExcluidos_(de, ate);
+  Logger.log('faxinaAgendaAno: ' + JSON.stringify(r));
+  return r;
+}
+
+function faxinaAgendaExcluidos_(de, ate) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(FAX_SHEET);
+  if (!sh) throw new Error('aba "' + FAX_SHEET + '" não encontrada');
+
+  // 1) IDs que AINDA existem no Feegow, em blocos de 30 dias.
+  //    Qualquer bloco que falhe aborta a rodada: melhor não carimbar do que
+  //    carimbar em cima de resposta incompleta.
+  const vivos = {};
+  let bloco = new Date(de);
+  while (bloco <= ate) {
+    let fim = new Date(bloco); fim.setDate(fim.getDate() + 29);
+    if (fim > ate) fim = new Date(ate);
+    const url = FEEGOW_API_BASE + '/appoints/search?data_start=' + faxData_(bloco) +
+                '&data_end=' + faxData_(fim) + '&per_page=5000';
+    const resp = UrlFetchApp.fetch(url, {
+      headers: { 'x-access-token': FEEGOW_API_TOKEN }, muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() !== 200) {
+      throw new Error('Feegow HTTP ' + resp.getResponseCode() + ' no bloco ' + faxData_(bloco));
+    }
+    const js = JSON.parse(resp.getContentText());
+    if (!js || js.success === false || !Array.isArray(js.content)) {
+      throw new Error('Feegow devolveu resposta inesperada no bloco ' + faxData_(bloco));
+    }
+    js.content.forEach(function (a) { vivos[String(a.agendamento_id)] = true; });
+    bloco = new Date(fim); bloco.setDate(bloco.getDate() + 1);
+  }
+
+  // 2) lê só as 3 colunas que interessam (a aba tem 41 mil linhas)
+  const last = sh.getLastRow();
+  if (last < 2) return { erro: 'aba vazia' };
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const cId = head.indexOf('ID Agendamento') + 1;
+  const cDt = head.indexOf('Data') + 1;
+  const cSt = head.indexOf('Status') + 1;
+  if (!cId || !cDt || !cSt) throw new Error('cabeçalho inesperado na aba "' + FAX_SHEET + '"');
+
+  const ids = sh.getRange(2, cId, last - 1, 1).getValues();
+  const dts = sh.getRange(2, cDt, last - 1, 1).getValues();
+  const sts = sh.getRange(2, cSt, last - 1, 1).getValues();
+
+  const deN = faxNum_(de), ateN = faxNum_(ate), marca = FAX_MARCA.toLowerCase();
+  const alvo = [];
+  let naJanela = 0;
+  for (let i = 0; i < ids.length; i++) {
+    const n = faxNum_(dts[i][0]);
+    if (!n || n < deN || n > ateN) continue;
+    naJanela++;
+    const st = String(sts[i][0] || '').trim();
+    if (st.toLowerCase().indexOf(marca) === 0) continue;      // já carimbada
+    const id = String(ids[i][0] || '').trim();
+    if (!id || vivos[id]) continue;                            // existe no Feegow
+    alvo.push({ linha: i + 2, status: st });
+  }
+
+  const res = {
+    janela: faxData_(de) + ' a ' + faxData_(ate),
+    vivosNoFeegow: Object.keys(vivos).length,
+    linhasNaJanela: naJanela,
+    candidatas: alvo.length,
+    carimbadas: 0,
+    abortou: null
+  };
+  if (!alvo.length) return res;
+
+  // 3) trava de segurança: volume alto = provável problema na API, não faxina
+  if (alvo.length > FAX_TETO_ABS || (naJanela && (alvo.length / naJanela) > FAX_TETO_PC)) {
+    res.abortou = 'iria carimbar ' + alvo.length + ' de ' + naJanela +
+                  ' linhas da janela; passou do teto, nada foi alterado';
+    Logger.log('⚠️ faxina abortada: ' + res.abortou);
+    return res;
+  }
+
+  const quando = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm');
+  alvo.forEach(function (a) {
+    const cel = sh.getRange(a.linha, cSt);
+    cel.setValue(FAX_MARCA);
+    cel.setNote('Faxina ' + quando + ' — status anterior: ' + (a.status || '(vazio)') +
+                '. Agendamento não existe mais na agenda do Feegow.');
+  });
+  res.carimbadas = alvo.length;
+  return res;
+}
+
+// Desfaz a faxina de uma linha (volta o status que está na nota).
+function faxinaDesfazerLinha(linha) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(FAX_SHEET);
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const cSt = head.indexOf('Status') + 1;
+  const cel = sh.getRange(linha, cSt);
+  const m = String(cel.getNote() || '').match(/status anterior:\s*(.+?)\./);
+  if (!m) return 'linha ' + linha + ' não tem nota de faxina';
+  cel.setValue(m[1] === '(vazio)' ? '' : m[1]);
+  cel.clearNote();
+  return 'linha ' + linha + ' voltou para "' + m[1] + '"';
+}
+
+function faxData_(d) { return Utilities.formatDate(d, 'America/Sao_Paulo', 'dd-MM-yyyy'); }
+
+function faxNum_(v) {
+  if (v instanceof Date) return v.getFullYear() * 10000 + (v.getMonth() + 1) * 100 + v.getDate();
+  const m = String(v || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? (+m[3]) * 10000 + (+m[2]) * 100 + (+m[1]) : 0;
+}
+
+// Cria o trigger de 1x/h da faxina (rode uma vez).
+function setupFaxinaAgenda() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'faxinaAgendaHora') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('faxinaAgendaHora').timeBased().everyHours(1).create();
+  return 'faxina da agenda: trigger de 1x por hora criado';
 }

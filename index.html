@@ -5291,7 +5291,13 @@
                 idade: col["Idade"]
             };
 
-            const raw = rows.slice(1).filter(r => r[C.pac]);
+            // "Excluído no Feegow" = carimbo da faxina do CRM (roda 1x/h): a linha
+            // ficou na planilha mas o agendamento foi excluído no Feegow. Sai de
+            // TODAS as telas, porque esse agendamento nunca existiu de fato.
+            const raw = rows.slice(1).filter(r => {
+                if (!r[C.pac]) return false;
+                return !/^exclu[íi]do no feegow/i.test(String(r[C.sta] || '').trim());
+            });
             _repRaw = raw; _repCols = C; // seção Repasses calcula em cima da agenda
 
             function sta(r) {
