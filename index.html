@@ -1576,12 +1576,14 @@
            pedido da equipe em 31/07/2026. São 10 slots; eles quebram linha sozinhos. */
         .dn-photos-grid { display: flex; flex-wrap: wrap; gap: 10px; }
         .dn-photo-item { display: flex; flex-direction: column; gap: 4px; width: 80px; }
+        .dn-form-header input.dn-photo-nome,
         .dn-photo-nome {
-            width: 80px; background: var(--surface2); border: 1px solid var(--border);
-            border-radius: 6px; color: var(--text); padding: 4px 6px;
-            font-family: inherit; font-size: 10.5px; text-align: center;
+            width: 80px; min-width: 80px; background: var(--surface2);
+            border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+            padding: 4px 5px; font-family: inherit; font-size: 10.5px; font-weight: 500;
+            letter-spacing: 0; text-align: center;
         }
-        .dn-photo-nome::placeholder { color: var(--muted); font-size: 10px; }
+        .dn-photo-nome::placeholder { color: var(--muted); font-size: 9.5px; letter-spacing: 0; }
         .dn-photo-nome:focus { outline: none; border-color: var(--accent); }
         .dn-form-header { display:flex; align-items:center; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
         .dn-form-header input {
