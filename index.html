@@ -1655,7 +1655,7 @@
         .dn-fitz-card {
             display:flex; flex-direction:column; align-items:center; gap:4px;
             padding:8px 6px; background:#f5f0ea; border:3px solid transparent;
-            border-radius:6px; cursor:pointer; transition:all 0.2s; width:108px;
+            border-radius:6px; cursor:pointer; transition:all 0.2s; width:134px;
             user-select:none; position:relative;
         }
         .dn-fitz-card:hover { border-color:rgba(0,0,0,0.3); }
@@ -1666,8 +1666,10 @@
         }
         .dn-fitz-card.selected .dn-fitz-face { border-color:var(--accent); }
         .dn-fitz-info { text-align:center; }
-        .dn-fitz-type { font-size:10px; font-weight:700; color:#333; }
-        .dn-fitz-desc { font-size:7px; color:#666; line-height:1.3; }
+        /* Era 10px e 7px em cinza claro: a equipe não conseguia ler. Agora escuro e em negrito. */
+        .dn-fitz-type { font-size:13px; font-weight:800; color:#1a1a1a; letter-spacing:.2px; }
+        .dn-fitz-pele { font-size:11.5px; font-weight:700; color:#222; line-height:1.35; margin-top:1px; }
+        .dn-fitz-desc { font-size:10.5px; font-weight:600; color:#444; line-height:1.35; margin-top:2px; }
         .dn-fitz-card .dn-vc-mark { font-size:11px; color:#4a3a2a; }
         .dn-fitz-card.selected .dn-vc-mark { color:var(--accent); font-weight:700; }
         .dn-fitz-card.selected .dn-vc-check { display:block; }
@@ -8997,15 +8999,18 @@
             {name:'C. Escuro',iris:'#6a4a30',ring:'#3d2314',img:DN_EYE_IMG_BASE+'castanho-escuro.png'},
             {name:'Preto',iris:'#2a2218',ring:'#0d0a08',img:DN_EYE_IMG_BASE+'preto.png'}
         ];
-        const DN_SKIN_IMG_BASE = 'https://raw.githubusercontent.com/felipegrutes-create/Paraser/main/images/skin/';
-        const DN_SKIN_MALE_IMG_BASE = 'https://raw.githubusercontent.com/felipegrutes-create/Paraser/main/images/skin-male/';
+        // As fotos de pele saíram em 31/07/2026: a escala agora usa avatar desenhado
+        // (dnAvatarPele_). As imagens continuam no repo, em images/skin e images/skin-male,
+        // caso algum dia se queira voltar.
+        // Textos revisados pela equipe em 31/07/2026 (descrição oficial da escala).
+        // pele = 1ª linha do cartão, sol = 2ª linha. skin/hair alimentam o avatar desenhado.
         const DN_FITZ = [
-            {id:'I',label:'Tipo I',desc:'Pele muito clara\nSempre queima\nNunca bronzeia',skin:'#fde8d0',hair:'#d4b35a',img:DN_SKIN_IMG_BASE+'tipo1.png'},
-            {id:'II',label:'Tipo II',desc:'Pele clara\nSempre queima\nÀs vezes bronzeia',skin:'#f5d0a9',hair:'#8b6b3d',img:DN_SKIN_IMG_BASE+'tipo2.png'},
-            {id:'III',label:'Tipo III',desc:'Pele menos clara\nÀs vezes queima\nSempre bronzeia',skin:'#d4a574',hair:'#5a3a20',img:DN_SKIN_IMG_BASE+'tipo3.png'},
-            {id:'IV',label:'Tipo IV',desc:'Pele negra clara\nRaramente queima\nSempre bronzeia',skin:'#a67c52',hair:'#2d1a10',img:DN_SKIN_IMG_BASE+'tipo4.png'},
-            {id:'V',label:'Tipo V',desc:'Pele negra\nÀs vezes queima\nSempre bronzeia',skin:'#7b5437',hair:'#1a1a1a',img:DN_SKIN_IMG_BASE+'tipo5.png'},
-            {id:'VI',label:'Tipo VI',desc:'Pele negra escura\nNunca queima\nSempre bronzeia',skin:'#4a2c17',hair:'#0d0d0d',img:DN_SKIN_IMG_BASE+'tipo6.png'}
+            {id:'I',  label:'Tipo I',  pele:'Pele muito branca',  sol:'Sempre queima, nunca bronzeia',            skin:'#fbe3cd', hair:'#e0b95f'},
+            {id:'II', label:'Tipo II', pele:'Pele branca clara',  sol:'Queima facilmente, às vezes bronzeia',     skin:'#f2cfa8', hair:'#a97c46'},
+            {id:'III',label:'Tipo III',pele:'Pele morena clara',  sol:'Às vezes queima, sempre bronzeia',         skin:'#d9a97a', hair:'#6b4423'},
+            {id:'IV', label:'Tipo IV', pele:'Pele morena média',  sol:'Raramente queima, bronzeia com facilidade',skin:'#a9784f', hair:'#3a2216'},
+            {id:'V',  label:'Tipo V',  pele:'Pele morena escura', sol:'Raramente queima, bronzeia intensamente',  skin:'#7c5334', hair:'#241610'},
+            {id:'VI', label:'Tipo VI', pele:'Pele negra',         sol:'Nunca queima, bronzeia intensamente',      skin:'#4b2d19', hair:'#120c08'}
         ];
         const DN_MED_PERSONAL_OV = [
             {id:'saude',label:'Possui algum problema de saúde?',detail:true},
@@ -9084,22 +9089,40 @@
             }).join('')}</div>`;
         }
 
+        // Avatar desenhado (SVG) no lugar da foto de pessoa real, pedido da equipe em
+        // 31/07/2026. Ganho extra: não depende de imagem baixada da internet, então carrega
+        // sempre, e o tom de pele é exatamente o da escala em vez do tom da foto.
+        function dnAvatarPele_(skin, hair, isMale) {
+            const frente = isMale
+                ? `<path d="M13 24c1-9 7-13 17-13s16 4 17 13c-3-4-8-6-17-6s-14 2-17 6z" fill="${hair}"/>`
+                : `<path d="M12 30c0-13 7-19 18-19s18 6 18 19c0-6-4-9-7-10-3 3-16 4-22 1-3 1-6 3-7 9z" fill="${hair}"/>`;
+            const atras = isMale ? ''
+                : `<path d="M11 30c-1 12 1 20 3 24 1-9 2-16 3-20zM49 30c1 12-1 20-3 24-1-9-2-16-3-20z" fill="${hair}"/>`;
+            return `<svg viewBox="0 0 60 70" width="60" height="70" aria-hidden="true">
+                <rect width="60" height="70" fill="#ffffff"/>
+                ${atras}
+                <path d="M30 44c-10 0-18 6-19 16v10h38V60c-1-10-9-16-19-16z" fill="${skin}" opacity=".55"/>
+                <rect x="25" y="38" width="10" height="12" rx="5" fill="${skin}"/>
+                <ellipse cx="30" cy="29" rx="14" ry="16" fill="${skin}"/>
+                ${frente}
+                <ellipse cx="24" cy="29" rx="1.6" ry="1.9" fill="#3b2b22" opacity=".75"/>
+                <ellipse cx="36" cy="29" rx="1.6" ry="1.9" fill="#3b2b22" opacity=".75"/>
+                <path d="M26 36c2 2 6 2 8 0" stroke="#3b2b22" stroke-width="1.2" fill="none" opacity=".5" stroke-linecap="round"/>
+            </svg>`;
+        }
+
         function dnFitzCards(prefix, tabPfx='dn') {
             const isMale = prefix === 'sp';
-            const imgBase = isMale ? DN_SKIN_MALE_IMG_BASE : DN_SKIN_IMG_BASE;
-            return `<div class="dn-fitz-cards">${DN_FITZ.map((f, i) => {
-                const descLines = f.desc.split('\n').map(l => `<div>${l}</div>`).join('');
-                const imgUrl = imgBase + 'tipo' + (i + 1) + '.png';
-                const preview = `<img src="${imgUrl}" alt="${f.label}" style="width:60px;height:70px;object-fit:cover;border-radius:6px">`;
-                return `<div class="dn-fitz-card" data-group="${tabPfx}-${prefix}-pele" data-value="${f.id}" onclick="dnSelectChip(this)">
-                    <div class="dn-fitz-face">${preview}</div>
+            return `<div class="dn-fitz-cards">${DN_FITZ.map(f => `
+                <div class="dn-fitz-card" data-group="${tabPfx}-${prefix}-pele" data-value="${f.id}" onclick="dnSelectChip(this)">
+                    <div class="dn-fitz-face">${dnAvatarPele_(f.skin, f.hair, isMale)}</div>
                     <div class="dn-fitz-info">
                         <div class="dn-fitz-type">${f.label}</div>
-                        <div class="dn-fitz-desc">${descLines}</div>
+                        <div class="dn-fitz-pele">${f.pele}</div>
+                        <div class="dn-fitz-desc">${f.sol}</div>
                     </div>
                     <div class="dn-vc-mark">( )</div>
-                </div>`;
-            }).join('')}</div>`;
+                </div>`).join('')}</div>`;
         }
 
         function dnMedTable(prefix, questions) {
