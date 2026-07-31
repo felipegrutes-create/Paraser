@@ -1572,6 +1572,11 @@
             line-height: 1.2;
         }
         .dn-photo-placeholder span { font-size: 10px; margin-top: 2px; }
+        .dn-btn-nasc {
+            background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+            color: var(--muted); cursor: pointer; padding: 6px 8px; font-size: 12px; line-height: 1;
+        }
+        .dn-btn-nasc:hover { border-color: var(--accent); color: var(--accent); }
         /* Cada foto tem um nome livre embaixo ("foto criança", "foto adulta", "foto pais"),
            pedido da equipe em 31/07/2026. São 10 slots; eles quebram linha sozinhos. */
         .dn-photos-grid { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -5307,7 +5312,8 @@
                 dcri:  col["Data de Criação"],
                 mes:   col["Mês"],
                 local: col["Local"],
-                idade: col["Idade"]
+                idade: col["Idade"],
+                cpf:   col["CPF"]      // usado pra puxar o nascimento da paciente no Feegow
             };
 
             // "Excluído no Feegow" = carimbo da faxina do CRM (roda 1x/h): a linha
@@ -9123,7 +9129,28 @@
             return `<div class="dn-side">
                 <div class="dn-side-title ${cls}">${title}</div>
                 <div class="dn-field-row">
-                    ${hasAge ? `<div class="dn-field"><label>Idade</label><input type="number" id="${tabPfx}-${prefix}-idade" min="18" max="50"></div>` : ''}
+                    ${hasAge ? `
+                    <div class="dn-field"><label>Data de Nascimento</label>
+                        <div style="display:flex;gap:4px;align-items:center">
+                            <input type="date" id="${tabPfx}-${prefix}-nascimento" style="flex:1">
+                            <button type="button" class="dn-btn-nasc" title="Puxar do Feegow" onclick="dnPuxaNascimento_('${tabPfx}')">📥</button>
+                        </div>
+                    </div>
+                    <div class="dn-field"><label>Idade na doação</label><input type="number" id="${tabPfx}-${prefix}-idade" min="18" max="50" placeholder="—"></div>
+                    <div class="dn-field"><label>Estado Civil</label>
+                        <select id="${tabPfx}-${prefix}-estado-civil">
+                            <option value="">—</option><option>Solteira</option><option>Casada</option>
+                        </select>
+                    </div>
+                    <div class="dn-field"><label>Escolaridade</label>
+                        <select id="${tabPfx}-${prefix}-escolaridade">
+                            <option value="">—</option>
+                            <option>Ensino Médio</option><option>Superior Incompleto</option>
+                            <option>Superior Completo</option><option>Pós-Graduação</option>
+                        </select>
+                    </div>
+                    <div class="dn-field"><label>Profissão Atual</label><input type="text" id="${tabPfx}-${prefix}-profissao" placeholder="—"></div>
+                    ` : ''}
                     <div class="dn-field"><label>Tipo Sanguíneo</label>
                         <select id="${tabPfx}-${prefix}-sangue" onchange="dnMirrorToProfile('${tabPfx}','sangue',this.value)">
                             <option value="">—</option>
@@ -9267,6 +9294,11 @@
                 wrap.dataset.pacienteNome = nome;
             }
             autoFillExtraBlocks('dn', key, nome);
+            // Melhor esforço: busca o nascimento no Feegow em segundo plano (não trava o form).
+            dnBuscaNascimento_(key, nome).then(d => {
+                const el = document.getElementById('dn-ov-nascimento');
+                if (el && d && !el.value) el.value = d;
+            });
             // Add a note at the top of the form
             const header = wrap?.querySelector('.dn-form-header');
             if (header) {
@@ -9793,6 +9825,41 @@
         // Código do perfil = iniciais do nome + data de entrada em DDMMAA (6 dígitos).
         // Antes eram os 4 últimos dígitos do relógio, que não queriam dizer nada e davam a
         // volta a cada 10 segundos. Com a data dá pra bater o olho e saber quando entrou.
+        // Puxa a data de nascimento da paciente no Feegow. O CPF vem da própria agenda
+        // (coluna CPF da aba Dados Diários), então não precisa procurar por nome. Silencioso:
+        // se não achar, deixa o campo em branco pra preencher à mão.
+        async function dnBuscaNascimento_(pacienteKey, pacienteNome) {
+            try {
+                const C = _repCols;
+                if (!C || C.cpf == null || !Array.isArray(_repRaw)) return '';
+                const alvo = pacienteKey || normalizeKey(pacienteNome || '');
+                const linha = _repRaw.find(r => {
+                    if (normalizeKey(r[C.pac]) !== alvo) return false;
+                    return String(r[C.cpf] || '').replace(/\D/g, '').length >= 11;
+                });
+                const cpf = linha ? String(linha[C.cpf]).replace(/\D/g, '') : '';
+                if (!cpf) return '';
+                const j = await feegowFetch('/patient/list', { cpf: cpf, limit: 1, offset: 0 });
+                const pac = ((j && j.content) || [])[0];
+                const nasc = pac && pac.nascimento;          // Feegow devolve DD-MM-AAAA
+                const m = String(nasc || '').match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                return m ? `${m[3]}-${m[2]}-${m[1]}` : '';   // input date quer AAAA-MM-DD
+            } catch (e) { return ''; }
+        }
+
+        // Botão 📥 ao lado do campo, e também usado no automático ao criar o perfil.
+        async function dnPuxaNascimento_(tabPfx) {
+            const el = document.getElementById(tabPfx + '-ov-nascimento');
+            if (!el) return;
+            const wrap = document.getElementById(tabPfx + 'FormWrap');
+            const antes = el.value;
+            el.value = ''; el.placeholder = 'buscando...';
+            const d = await dnBuscaNascimento_(wrap?.dataset?.pacienteKey || '', wrap?.dataset?.pacienteNome || '');
+            el.value = d || antes;
+            el.placeholder = '';
+            if (!d && !antes) alert('Não achei o nascimento no Feegow por CPF. Preencha à mão.');
+        }
+
         function dnCodigoData_() {
             const d = new Date();
             const p2 = n => String(n).padStart(2, '0');
@@ -10172,6 +10239,10 @@
                 paciente_key: pacKey,
                 paciente_nome: pacNome,
                 ov_idade: document.getElementById('dn-ov-idade')?.value || '',
+                ov_nascimento: document.getElementById('dn-ov-nascimento')?.value || '',
+                ov_estado_civil: document.getElementById('dn-ov-estado-civil')?.value || '',
+                ov_escolaridade: document.getElementById('dn-ov-escolaridade')?.value || '',
+                ov_profissao: document.getElementById('dn-ov-profissao')?.value || '',
                 ov_sangue: document.getElementById('dn-ov-sangue')?.value || '',
                 ov_altura: document.getElementById('dn-ov-altura')?.value || '',
                 ov_peso: document.getElementById('dn-ov-peso')?.value || '',
@@ -10205,6 +10276,11 @@
             if (wrap && data.paciente_key) wrap.dataset.pacienteKey = data.paciente_key;
             if (wrap && data.paciente_nome) wrap.dataset.pacienteNome = data.paciente_nome;
             if (data.ov_idade) document.getElementById('dn-ov-idade').value = data.ov_idade;
+            // Campos novos da faixa de cima (31/07/2026): nascimento, estado civil, escolaridade, profissão.
+            [['ov_nascimento','dn-ov-nascimento'],['ov_estado_civil','dn-ov-estado-civil'],
+             ['ov_escolaridade','dn-ov-escolaridade'],['ov_profissao','dn-ov-profissao']].forEach(([campo, id]) => {
+                const el = document.getElementById(id); if (el && data[campo]) el.value = data[campo];
+            });
             if (data.ov_sangue) document.getElementById('dn-ov-sangue').value = data.ov_sangue;
             if (data.ov_altura) { document.getElementById('dn-ov-altura').value = data.ov_altura; const v1=document.getElementById('dn-ov-altura-val'); if(v1) v1.textContent=data.ov_altura; dnCalcIMC('ov'); }
             if (data.ov_peso) { document.getElementById('dn-ov-peso').value = data.ov_peso; const v2=document.getElementById('dn-ov-peso-val'); if(v2) v2.textContent=data.ov_peso; dnCalcIMC('ov'); }
@@ -10624,6 +10700,10 @@
                     paciente_key: wrap?.dataset?.pacienteKey || '',
                     paciente_nome: wrap?.dataset?.pacienteNome || '',
                     ov_idade: document.getElementById(`${T}-ov-idade`)?.value || '',
+                    ov_nascimento: document.getElementById(`${T}-ov-nascimento`)?.value || '',
+                    ov_estado_civil: document.getElementById(`${T}-ov-estado-civil`)?.value || '',
+                    ov_escolaridade: document.getElementById(`${T}-ov-escolaridade`)?.value || '',
+                    ov_profissao: document.getElementById(`${T}-ov-profissao`)?.value || '',
                     ov_sangue: document.getElementById(`${T}-ov-sangue`)?.value || '',
                     ov_altura: document.getElementById(`${T}-ov-altura`)?.value || '',
                     ov_peso: document.getElementById(`${T}-ov-peso`)?.value || '',
@@ -10662,6 +10742,11 @@
                     if (data[side+'_peso']) { const el = document.getElementById(`${T}-${side}-peso`); if (el) el.value = data[side+'_peso']; const v = document.getElementById(`${T}-${side}-peso-val`); if (v) v.textContent = data[side+'_peso']; dnCalcIMC(side, T); }
                 });
                 if (data.ov_idade) { const el = document.getElementById(`${T}-ov-idade`); if (el) el.value = data.ov_idade; }
+                // Campos novos da faixa de cima (31/07/2026).
+                [['ov_nascimento','-ov-nascimento'],['ov_estado_civil','-ov-estado-civil'],
+                 ['ov_escolaridade','-ov-escolaridade'],['ov_profissao','-ov-profissao']].forEach(([campo, sufixo]) => {
+                    const el = document.getElementById(T + sufixo); if (el && data[campo]) el.value = data[campo];
+                });
                 [`${T}-ov-cabelo`,`${T}-ov-cabelo-tipo`,`${T}-ov-olhos`,`${T}-ov-pele`,`${T}-sp-cabelo`,`${T}-sp-cabelo-tipo`,`${T}-sp-olhos`,`${T}-sp-pele`].forEach(g => {
                     const key = g.replace(new RegExp(`^${T}-`), '').replace(/-/g,'_');
                     const val = data[key];
@@ -10802,6 +10887,10 @@
                 const wrap = document.getElementById(T + 'FormWrap');
                 if (wrap) { wrap.dataset.pacienteKey = key; wrap.dataset.pacienteNome = nome; }
                 autoFillExtraBlocks(T, key, nome);
+                dnBuscaNascimento_(key, nome).then(d => {
+                    const el = document.getElementById(T + '-ov-nascimento');
+                    if (el && d && !el.value) el.value = d;
+                });
                 const header = wrap?.querySelector('.dn-form-header');
                 if (header) {
                     const note = document.createElement('div');
