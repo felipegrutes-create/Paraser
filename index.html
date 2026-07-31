@@ -9841,9 +9841,13 @@
                 if (!cpf) return '';
                 const j = await feegowFetch('/patient/list', { cpf: cpf, limit: 1, offset: 0 });
                 const pac = ((j && j.content) || [])[0];
-                const nasc = pac && pac.nascimento;          // Feegow devolve DD-MM-AAAA
-                const m = String(nasc || '').match(/^(\d{2})-(\d{2})-(\d{4})$/);
-                return m ? `${m[3]}-${m[2]}-${m[1]}` : '';   // input date quer AAAA-MM-DD
+                // ⚠️ Os dois endpoints do Feegow devolvem formatos DIFERENTES:
+                // /patient/list devolve AAAA-MM-DD e /patient/search devolve DD-MM-AAAA.
+                // O input type=date só aceita AAAA-MM-DD, então aceita os dois e normaliza.
+                const nasc = String((pac && pac.nascimento) || '').trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(nasc)) return nasc;
+                const m = nasc.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
             } catch (e) { return ''; }
         }
 
