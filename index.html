@@ -2838,6 +2838,7 @@
         <div class="tab-group" id="group-pacientes">
             <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-pacientes',event)">Pacientes <span class="tab-group-arrow">▾</span></button>
             <div class="tab-dropdown">
+                <button class="tab-dropdown-item" onclick="showSection('sec-doadoras',this)">🏷️ Fluxo Pacientes</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-salas',null)">🗺️ Mapa de Salas</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-doashared',null)">Doadoras Compartilhadas <span class="tab-badge" id="tabBadgeDc" style="display:none"></span></button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-doavol',null)">Doadoras Voluntárias <span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
@@ -6717,8 +6718,14 @@
 
             const groupId = SECTION_GROUP[id];
             if (groupId) {
-                document.querySelector(`#${groupId} .tab-group-trigger`)?.classList.add("active");
-                document.querySelector(`#${groupId} .tab-dropdown-item[onclick*="${id}"]`)?.classList.add("active");
+                // Uma seção pode aparecer em mais de um menu (o Fluxo Pacientes está em
+                // Comercial e em Pacientes, por ser a porta de entrada do fluxo de perfis).
+                // Marca o item nos dois e acende o menu de onde a pessoa clicou; sem clique
+                // de menu (chamada por código), acende o grupo padrão do SECTION_GROUP.
+                document.querySelectorAll(`.tab-dropdown-item[onclick*="${id}"]`).forEach(b => b.classList.add("active"));
+                const grupoClicado = el && el.closest ? el.closest('.tab-group') : null;
+                (grupoClicado || document.getElementById(groupId))
+                    ?.querySelector('.tab-group-trigger')?.classList.add("active");
             } else {
                 el?.classList.add("active");
             }
