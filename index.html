@@ -2841,8 +2841,8 @@
                 <button class="tab-dropdown-item" onclick="showSection('sec-salas',null)">🗺️ Mapa de Salas</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-doashared',null)">Doadoras Compartilhadas <span class="tab-badge" id="tabBadgeDc" style="display:none"></span></button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-doavol',null)">Doadoras Voluntárias <span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
-                <button class="tab-dropdown-item" onclick="showSection('sec-receptoras',null)">Receptoras <span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
-                <button class="tab-dropdown-item" onclick="showSection('sec-embriao',null)">Embrião Doado <span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-receptoras',null)">Receptora Óvulo Doado <span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-embriao',null)">Receptora Embrião Doado <span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
             </div>
         </div>
 
@@ -3693,7 +3693,7 @@
 
         <!-- RECEPTORAS -->
         <section id="sec-receptoras" class="section">
-            <p class="section-title">Receptoras — Perfis</p>
+            <p class="section-title">Receptora Óvulo Doado — Perfis</p>
             <div class="dn-toolbar">
                 <div style="position:relative">
                     <button class="dn-btn-new" onclick="rcTab.toggleDropdown()">+ Novo Perfil ▾</button>
@@ -3762,14 +3762,14 @@
 
         <!-- EMBRIÃO DOADO -->
         <section id="sec-embriao" class="section">
-            <p class="section-title">Embrião Doado — Perfis</p>
+            <p class="section-title">Receptora Embrião Doado — Perfis</p>
             <div class="dn-toolbar">
                 <div style="position:relative">
                     <button class="dn-btn-new" onclick="ebTab.toggleDropdown()">+ Novo Perfil ▾</button>
                     <div class="dn-new-dropdown" id="ebNewDropdown" style="display:none">
                         <div class="dn-dd-item" onclick="ebTab.newProfile(); ebTab.closeDropdown()">📝 Perfil em Branco</div>
                         <div class="dn-dd-divider"></div>
-                        <div class="dn-dd-title">Pacientes Embrião Doado:</div>
+                        <div class="dn-dd-title">Pacientes Receptora Embrião Doado:</div>
                         <div id="ebPendingList"></div>
                     </div>
                 </div>
