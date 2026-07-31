@@ -6557,7 +6557,11 @@
         // ===== Login individual + acesso por função + registro de uso =====
         // Quais papéis podem ver cada área. Área sem entrada aqui = liberada (evita bloquear algo novo por engano).
         const AREA_PERM = {
-            'sec-vg': ['admin','comercial'], 'sec-pv': ['admin','comercial'],
+            // Recepção entrou na Visão Geral em 31/07/2026 (pedido do Felipe). ⚠️ Esta tela
+            // tem o quadro "Receita por Profissional": quem tem acesso vê quanto cada médico
+            // gerou no mês. Pra tirar só esse quadro da recepção, esconder #receitaProfTable
+            // no applyRoleGating em vez de bloquear a área inteira.
+            'sec-vg': ['admin','comercial','recepcao'], 'sec-pv': ['admin','comercial'],
             'sec-txconv': ['admin','comercial'], 'sec-ret': ['admin','comercial'],
             'sec-doadoras': ['admin','comercial'], 'sec-pend': ['admin','comercial','recepcao'],
             'sec-meta': ['admin','comercial'], 'sec-arquivo-morto': ['admin','comercial'],
