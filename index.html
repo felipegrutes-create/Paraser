@@ -1572,6 +1572,17 @@
             line-height: 1.2;
         }
         .dn-photo-placeholder span { font-size: 10px; margin-top: 2px; }
+        /* Cada foto tem um nome livre embaixo ("foto criança", "foto adulta", "foto pais"),
+           pedido da equipe em 31/07/2026. São 10 slots; eles quebram linha sozinhos. */
+        .dn-photos-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+        .dn-photo-item { display: flex; flex-direction: column; gap: 4px; width: 80px; }
+        .dn-photo-nome {
+            width: 80px; background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); padding: 4px 6px;
+            font-family: inherit; font-size: 10.5px; text-align: center;
+        }
+        .dn-photo-nome::placeholder { color: var(--muted); font-size: 10px; }
+        .dn-photo-nome:focus { outline: none; border-color: var(--accent); }
         .dn-form-header { display:flex; align-items:center; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
         .dn-form-header input {
             background:var(--surface2); border:1px solid var(--border); border-radius:8px;
@@ -9771,20 +9782,67 @@
             }
         }
 
+        // ===== Fotos do perfil (10 slots com nome) =====
+        // Os 4 primeiros campos mantêm o nome antigo (foto, foto2, foto3, foto4) pra não
+        // quebrar perfil já salvo. O nome de cada foto vai em <campo>_nome. Tudo dentro do
+        // JSON "dados" da aba Doadoras_Perfis, então não precisa mexer na planilha.
+        const DN_FOTO_CAMPOS = ['foto','foto2','foto3','foto4','foto5','foto6','foto7','foto8','foto9','foto10'];
+
+        function dnFotosSlotsHtml_(pref, onChange) {
+            return `<div class="dn-photos-grid">` + DN_FOTO_CAMPOS.map((_, i) => `
+                <div class="dn-photo-item">
+                    <div class="dn-photo-upload" onclick="document.getElementById('${pref}PhotoInput${i}').click()">
+                        <img id="${pref}PhotoPreview${i}" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
+                        <div id="${pref}PhotoPlaceholder${i}" class="dn-photo-placeholder">📷<br><span>Foto ${i + 1}</span></div>
+                        <input type="file" id="${pref}PhotoInput${i}" accept="image/*" style="display:none" onchange="${onChange(i)}">
+                    </div>
+                    <input type="text" class="dn-photo-nome" id="${pref}PhotoNome${i}" maxlength="30" placeholder="nome da foto">
+                </div>`).join('') + `</div>`;
+        }
+
+        // Devolve { foto, foto_nome, foto2, foto2_nome, ... }. Compacta os vazios pra não
+        // deixar buraco, e leva o nome junto com a sua foto (senão o nome desgruda).
+        function dnFotosColeta_(pref) {
+            const cheias = [];
+            for (let i = 0; i < DN_FOTO_CAMPOS.length; i++) {
+                const img = document.getElementById(pref + 'PhotoPreview' + i);
+                const nome = document.getElementById(pref + 'PhotoNome' + i);
+                const temFoto = img && img.style.display !== 'none' && img.src;
+                if (temFoto) cheias.push({ url: img.src, nome: (nome?.value || '').trim() });
+            }
+            const out = {};
+            DN_FOTO_CAMPOS.forEach((campo, i) => {
+                out[campo] = cheias[i] ? cheias[i].url : '';
+                out[campo + '_nome'] = cheias[i] ? cheias[i].nome : '';
+            });
+            return out;
+        }
+
+        function dnFotosPreenche_(pref, data) {
+            DN_FOTO_CAMPOS.forEach((campo, i) => {
+                const nome = document.getElementById(pref + 'PhotoNome' + i);
+                if (nome) nome.value = data[campo + '_nome'] || '';
+                if (!data[campo]) return;
+                const img = document.getElementById(pref + 'PhotoPreview' + i);
+                const ph  = document.getElementById(pref + 'PhotoPlaceholder' + i);
+                if (img) {
+                    // URL antiga do Drive não abre em <img>; converte pro formato que abre.
+                    let url = data[campo];
+                    const m = url.match(/drive\.google\.com\/uc\?export=view&id=([^&]+)/);
+                    if (m) url = 'https://lh3.googleusercontent.com/d/' + m[1];
+                    img.src = url;
+                    img.style.display = 'block';
+                }
+                if (ph) ph.style.display = 'none';
+            });
+        }
+
         function newDonorProfile() {
             editingDonorId = null;
             const wrap = document.getElementById('dnFormWrap');
             wrap.innerHTML = `<div class="dn-form">
                 <div class="dn-form-header">
-                    <div style="display:flex;gap:8px">
-                        ${[0,1,2,3].map(i => `
-                            <div class="dn-photo-upload" onclick="document.getElementById('dnPhotoInput${i}').click()">
-                                <img id="dnPhotoPreview${i}" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
-                                <div id="dnPhotoPlaceholder${i}" class="dn-photo-placeholder">📷<br><span>Foto ${i+1}</span></div>
-                                <input type="file" id="dnPhotoInput${i}" accept="image/*" style="display:none" onchange="dnPreviewPhoto(this,${i})">
-                            </div>
-                        `).join('')}
-                    </div>
+                    ${dnFotosSlotsHtml_('dn', i => `dnPreviewPhoto(this,${i})`)}
                     <input id="dnCodigo" placeholder="Código do Perfil (ex: EDO85)">
                     <button id="dnFormSearchBtn" class="dn-btn-questionnaire" onclick="dnTab_openFormSearch()">📋 Questionário</button>
                     <button class="dn-btn-close-form" onclick="closeDonorForm()">✕ Fechar</button>
@@ -10094,20 +10152,12 @@
         }
 
         function collectDonorData() {
-            const fotos = [];
-            for (let i = 0; i < 4; i++) {
-                const preview = document.getElementById('dnPhotoPreview' + i);
-                if (preview && preview.style.display !== 'none' && preview.src) fotos.push(preview.src);
-            }
             const wrap = document.getElementById('dnFormWrap');
             const pacKey = wrap?.dataset?.pacienteKey || '';
             const pacNome = wrap?.dataset?.pacienteNome || '';
             return {
                 codigo_perfil: document.getElementById('dnCodigo')?.value || '',
-                foto: fotos[0] || '',
-                foto2: fotos[1] || '',
-                foto3: fotos[2] || '',
-                foto4: fotos[3] || '',
+                ...dnFotosColeta_('dn'),
                 paciente_key: pacKey,
                 paciente_nome: pacNome,
                 ov_idade: document.getElementById('dn-ov-idade')?.value || '',
@@ -10138,23 +10188,7 @@
 
         function fillDonorForm(data) {
             document.getElementById('dnCodigo').value = data.codigo_perfil || '';
-            // Restore photos (4 slots)
-            const fotoFields = ['foto','foto2','foto3','foto4'];
-            fotoFields.forEach((field, i) => {
-                if (data[field]) {
-                    const preview = document.getElementById('dnPhotoPreview' + i);
-                    const placeholder = document.getElementById('dnPhotoPlaceholder' + i);
-                    if (preview) {
-                        // Converter URL antiga do Drive para formato que funciona em <img>
-                        let url = data[field];
-                        const driveMatch = url.match(/drive\.google\.com\/uc\?export=view&id=([^&]+)/);
-                        if (driveMatch) url = 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
-                        preview.src = url;
-                        preview.style.display = 'block';
-                    }
-                    if (placeholder) placeholder.style.display = 'none';
-                }
-            });
+            dnFotosPreenche_('dn', data);   // 10 fotos + o nome de cada uma
             // Restore patient info
             const wrap = document.getElementById('dnFormWrap');
             if (wrap && data.paciente_key) wrap.dataset.pacienteKey = data.paciente_key;
@@ -10198,12 +10232,12 @@
             statusEl.style.color = '#f59e0b';
 
             // Upload photos to Google Drive if base64 (new photos)
-            const fotoFields = ['foto','foto2','foto3','foto4'];
+            const fotoFields = DN_FOTO_CAMPOS;
             for (const field of fotoFields) {
                 if (data[field] && data[field].startsWith('data:') && CRM_SCRIPT_URL) {
                     try {
                         const idx = fotoFields.indexOf(field) + 1;
-                        statusEl.textContent = `Enviando foto ${idx}/4...`;
+                        statusEl.textContent = `Enviando foto ${idx}...`;
                         const photoRes = await fetch(CRM_SCRIPT_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'text/plain' },
@@ -10526,15 +10560,7 @@
                 if (!wrap) return;
                 wrap.innerHTML = `<div class="dn-form">
                     <div class="dn-form-header">
-                        <div style="display:flex;gap:8px">
-                            ${[0,1,2,3].map(i => `
-                                <div class="dn-photo-upload" onclick="document.getElementById('${T}PhotoInput${i}').click()">
-                                    <img id="${T}PhotoPreview${i}" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px">
-                                    <div id="${T}PhotoPlaceholder${i}" class="dn-photo-placeholder">📷<br><span>Foto ${i+1}</span></div>
-                                    <input type="file" id="${T}PhotoInput${i}" accept="image/*" style="display:none" onchange="${T}Tab.previewPhoto(this,${i})">
-                                </div>
-                            `).join('')}
-                        </div>
+                        ${dnFotosSlotsHtml_(T, i => `${T}Tab.previewPhoto(this,${i})`)}
                         <input id="${T}Codigo" placeholder="Código do Perfil (ex: EDO85)">
                         <button id="${T}FormSearchBtn" class="dn-btn-questionnaire" onclick="${T}Tab.openFormSearch()">📋 Questionário</button>
                         <button class="dn-btn-close-form" onclick="${T}Tab.closeForm()">✕ Fechar</button>
@@ -10579,12 +10605,11 @@
             }
 
             function collectData() {
-                const fotos = [0,1,2,3].map(i => { const el = document.getElementById(T + 'PhotoPreview' + i); return (el && el.style.display !== 'none' && el.src) ? el.src : ''; });
                 const wrap = document.getElementById(T + 'FormWrap');
                 return {
                     tab_type: T,
                     codigo_perfil: document.getElementById(T + 'Codigo')?.value || '',
-                    foto: fotos[0] || '', foto2: fotos[1] || '', foto3: fotos[2] || '', foto4: fotos[3] || '',
+                    ...dnFotosColeta_(T),
                     paciente_key: wrap?.dataset?.pacienteKey || '',
                     paciente_nome: wrap?.dataset?.pacienteNome || '',
                     ov_idade: document.getElementById(`${T}-ov-idade`)?.value || '',
@@ -10616,14 +10641,7 @@
             function fillForm(data) {
                 const codigoEl = document.getElementById(T + 'Codigo');
                 if (codigoEl) codigoEl.value = data.codigo_perfil || '';
-                ['foto','foto2','foto3','foto4'].forEach((field, i) => {
-                    if (data[field]) {
-                        const preview = document.getElementById(T + 'PhotoPreview' + i);
-                        const ph = document.getElementById(T + 'PhotoPlaceholder' + i);
-                        if (preview) { preview.src = data[field]; preview.style.display = 'block'; }
-                        if (ph) ph.style.display = 'none';
-                    }
-                });
+                dnFotosPreenche_(T, data);   // 10 fotos + o nome de cada uma
                 const wrap = document.getElementById(T + 'FormWrap');
                 if (wrap && data.paciente_key) wrap.dataset.pacienteKey = data.paciente_key;
                 if (wrap && data.paciente_nome) wrap.dataset.pacienteNome = data.paciente_nome;
@@ -10653,7 +10671,7 @@
                 const statusEl = document.getElementById(T + 'SaveStatus');
                 if (statusEl) { statusEl.textContent = 'Salvando...'; statusEl.style.color = '#f59e0b'; }
                 if (CRM_SCRIPT_URL) {
-                    const fotoFields = ['foto','foto2','foto3','foto4'];
+                    const fotoFields = DN_FOTO_CAMPOS;
                     for (const field of fotoFields) {
                         if (data[field] && data[field].startsWith('data:')) {
                             try {
