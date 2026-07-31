@@ -2820,7 +2820,13 @@
     </div>
 
     <div class="tabs-wrapper">
-        <button class="tab active" onclick="showSection('sec-vg',this)">Visão Geral</button>
+        <div class="tab-group" id="group-geral">
+            <button class="tab tab-group-trigger active" onclick="toggleTabGroup('group-geral',event)">Visão Geral <span class="tab-group-arrow">▾</span></button>
+            <div class="tab-dropdown">
+                <button class="tab-dropdown-item active" onclick="showSection('sec-vg',this)">📊 Visão Geral</button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-salas',this)">🗺️ Mapa de Salas</button>
+            </div>
+        </div>
         <button class="tab" onclick="showSection('sec-pv',this)">1ª Vez — Geral</button>
         <button class="tab" onclick="showSection('sec-txconv',this)">TX Conversão</button>
         <button class="tab" onclick="showSection('sec-ret',this)">Retorno</button>
@@ -2839,7 +2845,6 @@
             <button class="tab tab-group-trigger" onclick="toggleTabGroup('group-pacientes',event)">Pacientes <span class="tab-group-arrow">▾</span></button>
             <div class="tab-dropdown">
                 <button class="tab-dropdown-item" onclick="showSection('sec-doadoras',this)">🏷️ Fluxo Pacientes</button>
-                <button class="tab-dropdown-item" onclick="showSection('sec-salas',null)">🗺️ Mapa de Salas</button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-doashared',null)">Doadoras Compartilhadas <span class="tab-badge" id="tabBadgeDc" style="display:none"></span></button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-doavol',null)">Doadoras Voluntárias <span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-receptoras',null)">Receptora Óvulo Doado <span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
@@ -6509,7 +6514,8 @@
             'sec-meta':          'group-crm',
             'sec-pend':          'group-crm',
             'sec-arquivo-morto': 'group-crm',
-            'sec-salas':         'group-pacientes',
+            'sec-vg':            'group-geral',
+            'sec-salas':         'group-geral',
             'sec-doadoras':      'group-crm',
             'sec-doashared':     'group-pacientes',
             'sec-doavol':        'group-pacientes',
