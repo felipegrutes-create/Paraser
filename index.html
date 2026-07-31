@@ -8978,12 +8978,20 @@
         let donorProfiles = [];
         let editingDonorId = null;
 
+        // 8 tons pedidos pela equipe em 31/07/2026, nesta ordem (referência: a tabela da
+        // Embrion, com mecha de cabelo em vez de retângulo chapado).
+        // ⚠️ 'name' é o que fica GRAVADO. Os cinco antigos mantêm o texto de antes
+        // ('Loiro', 'C. Claro', 'C. Escuro'), então perfil já preenchido não desmarca:
+        // o antigo 'Loiro' passa a aparecer como Loiro médio, que é o meio da escala.
         const DN_HAIR_COLORS = [
-            {name:'Loiro',grad:'linear-gradient(180deg,#f5e6b8,#e8cc7a 20%,#d4b35a 40%,#c9a040 60%,#e0c06a 80%,#d4b35a)'},
-            {name:'Ruivo',grad:'linear-gradient(180deg,#d45a3a,#b8412a 20%,#a54423 40%,#8b3520 60%,#c04030 80%,#8b3520)'},
-            {name:'C. Claro',grad:'linear-gradient(180deg,#c4a06a,#a8804a 20%,#8b6b3d 40%,#7a5a30 60%,#a0804a 80%,#8b6b3d)'},
-            {name:'C. Escuro',grad:'linear-gradient(180deg,#5a3a20,#4a2f1a 20%,#3d2314 40%,#2d1a10 60%,#4a2f1a 80%,#3d2314)'},
-            {name:'Preto',grad:'linear-gradient(180deg,#3a3a3a,#252525 20%,#1a1a1a 40%,#0d0d0d 60%,#252525 80%,#1a1a1a)'}
+            {name:'Loiro Claro',    label:'Loiro claro',     base:'#e8d49a', luz:'#f7ecc8', sombra:'#c9ab63'},
+            {name:'Loiro',          label:'Loiro médio',     base:'#d4b35a', luz:'#efdc9c', sombra:'#a8862f'},
+            {name:'Loiro Escuro',   label:'Loiro escuro',    base:'#a98a4a', luz:'#cdb178', sombra:'#7c6128'},
+            {name:'Ruivo',          label:'Ruivo',           base:'#b8452a', luz:'#dd7350', sombra:'#7f2b17'},
+            {name:'C. Claro',       label:'Castanho claro',  base:'#966a3f', luz:'#bd9268', sombra:'#68482a'},
+            {name:'Castanho Médio', label:'Castanho médio',  base:'#6f4a2b', luz:'#946a45', sombra:'#472c17'},
+            {name:'C. Escuro',      label:'Castanho escuro', base:'#432a18', luz:'#66422a', sombra:'#26160c'},
+            {name:'Preto',          label:'Preto',           base:'#1d1a18', luz:'#3d3835', sombra:'#0a0908'}
         ];
         const DN_HAIR_TYPES = [
             {name:'Liso'},
@@ -9053,11 +9061,37 @@
             </svg>`;
         }
 
+        // Mecha de cabelo desenhada, no lugar do retângulo com degradê (referência que a
+        // equipe mandou: a tabela da Embrion). São fios curvos em três tons do mesmo cabelo,
+        // o que deixa a diferença entre um castanho e outro visível de longe.
+        function dnMechaSVG_(base, luz, sombra, uid) {
+            const fio = (x, cor, larg, op) =>
+                `<path d="M${x} 0 C${x - 5} 16, ${x + 6} 30, ${x - 2} 46 C${x - 8} 60, ${x + 3} 70, ${x} 78"
+                    stroke="${cor}" stroke-width="${larg}" fill="none" opacity="${op}" stroke-linecap="round"/>`;
+            let fios = '';
+            for (let i = 0; i < 11; i++) {
+                const x = 6 + i * 6.4;
+                const cor = i % 3 === 0 ? luz : (i % 3 === 1 ? base : sombra);
+                fios += fio(x, cor, i % 3 === 1 ? 5.5 : 3.4, i % 3 === 0 ? 0.85 : 1);
+            }
+            return `<svg viewBox="0 0 76 78" width="100%" height="100%" preserveAspectRatio="none" style="display:block" aria-hidden="true">
+                <defs>
+                    <linearGradient id="mc${uid}" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="${luz}"/>
+                        <stop offset="45%" stop-color="${base}"/>
+                        <stop offset="100%" stop-color="${sombra}"/>
+                    </linearGradient>
+                </defs>
+                <rect width="76" height="78" fill="url(#mc${uid})"/>
+                ${fios}
+            </svg>`;
+        }
+
         function dnHairColorCards(prefix, tabPfx='dn') {
-            return `<div class="dn-vcards">${DN_HAIR_COLORS.map(h =>
+            return `<div class="dn-vcards">${DN_HAIR_COLORS.map((h, i) =>
                 `<div class="dn-vcard" data-group="${tabPfx}-${prefix}-cabelo" data-value="${h.name}" onclick="dnSelectChip(this)">
-                    <div class="dn-vc-preview" style="background:${h.grad};border-radius:4px;"></div>
-                    <div class="dn-vc-label">${h.name}</div>
+                    <div class="dn-vc-preview" style="border-radius:4px;overflow:hidden">${dnMechaSVG_(h.base, h.luz, h.sombra, `${tabPfx}${prefix}${i}`)}</div>
+                    <div class="dn-vc-label">${h.label || h.name}</div>
                     <div class="dn-vc-mark">( )</div>
                 </div>`
             ).join('')}</div>`;
