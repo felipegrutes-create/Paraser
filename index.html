@@ -9163,10 +9163,12 @@
                     <div class="dn-field"><label>IMC</label><div class="dn-imc" id="${tabPfx}-${prefix}-imc">—</div></div>
                 </div>
 
+                <!-- Ordem pedida pela equipe em 31/07/2026: pele, olhos, cabelos, característica.
+                     Só a apresentação mudou; os campos e o que fica salvo continuam iguais. -->
+                <div class="dn-subsec"><h5>Cor da Pele — Escala de Fitzpatrick</h5>${dnFitzCards(prefix, tabPfx)}</div>
+                <div class="dn-subsec"><h5>Cor dos Olhos</h5>${dnEyeColorCards(prefix, tabPfx)}</div>
                 <div class="dn-subsec"><h5>Cor dos Cabelos</h5>${dnHairColorCards(prefix, tabPfx)}</div>
                 <div class="dn-subsec"><h5>Característica dos Cabelos</h5>${dnHairTypeCards(prefix, tabPfx)}</div>
-                <div class="dn-subsec"><h5>Cor dos Olhos</h5>${dnEyeColorCards(prefix, tabPfx)}</div>
-                <div class="dn-subsec"><h5>Cor da Pele — Escala de Fitzpatrick</h5>${dnFitzCards(prefix, tabPfx)}</div>
 
                 <div class="dn-subsec"><h5>Histórico Médico Pessoal</h5>${dnMedTable(tabPfx+'_'+prefix+'_med', medQuestions)}</div>
                 <div class="dn-subsec"><h5>Malformações Congênitas</h5>${dnMedSimple(tabPfx+'_'+prefix+'_malf', DN_MALFORM)}</div>
