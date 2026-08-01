@@ -9057,6 +9057,17 @@
             {id:'cirurgia',label:'Fez alguma cirurgia?',detail:true},
             {id:'psiq',label:'Faz ou fez tratamento psiquiátrico?',detail:true},
         ];
+        // Antecedentes Familiares (Dra Bianca, 01/08/2026). Nenhuma linha vem marcada:
+        // "Mãe viva? Não" por padrão seria uma informação clínica falsa.
+        const DN_FAMILIAR = [
+            {id:'adotada',label:'Paciente adotada?',labelM:'Paciente adotado?',detail:true,semPadrao:true,ph:'Conhece os pais?'},
+            {id:'mae_viva',label:'Mãe viva?',detail:true,semPadrao:true,ph:'Se faleceu, de quê?'},
+            {id:'pai_vivo',label:'Pai vivo?',detail:true,semPadrao:true,ph:'Se faleceu, de quê?'},
+            {id:'doencas_mae',label:'Histórico de doenças na família da mãe?',detail:true,semPadrao:true,ph:'Quais'},
+            {id:'doencas_pai',label:'Histórico de doenças na família do pai?',detail:true,semPadrao:true,ph:'Quais'},
+            {id:'avos_paternos',label:'Conhece os avós paternos?',detail:true,semPadrao:true,ph:'Observações'},
+            {id:'avos_maternos',label:'Conhece os avós maternos?',detail:true,semPadrao:true,ph:'Observações'},
+        ];
         const DN_MALFORM = ['Lábio Leporino','Espinha Bífida','Hipospádia','Malformação cardíaca','Luxação congênita do quadril'];
         const DN_GENETICA = ['Albinismo','Hemofilia','Hemoglobinopatia','Hipercolesterolemia hereditária','Neurofibromatose','Esclerose tuberosa','Neurodivergências (Autismo, TDAH, TOD, Dislexia)'];
 
@@ -9191,13 +9202,16 @@
                 </div>`).join('')}</div>`;
         }
 
-        function dnMedTable(prefix, questions) {
+        // isMale troca o rótulo no lado dos espermatozóides (q.labelM).
+        // semPadrao deixa a linha em branco: "Mãe viva?" já nascer marcada como "Não"
+        // registraria uma morte que ninguém informou.
+        function dnMedTable(prefix, questions, isMale) {
             return `<table class="dn-med-table">${questions.map(q => {
                 const n = `${prefix}_${q.id}`;
                 return `<tr>
-                    <td>${q.label}</td>
+                    <td>${(isMale && q.labelM) ? q.labelM : q.label}</td>
                     <td><label><input type="radio" name="${n}" value="sim"> Sim</label></td>
-                    <td><label><input type="radio" name="${n}" value="nao" checked> Não</label></td>
+                    <td><label><input type="radio" name="${n}" value="nao"${q.semPadrao ? '' : ' checked'}> Não</label></td>
                     ${q.detail ? `<td><input class="dn-detail-input" name="${n}_detail" placeholder="${q.ph || 'Qual / Quando'}"></td>` : ''}
                 </tr>`;
             }).join('')}</table>`;
@@ -9296,6 +9310,7 @@
                 </div>` : ''}
 
                 <div class="dn-subsec"><h5>Histórico Médico Pessoal</h5>${dnMedTable(tabPfx+'_'+prefix+'_med', medQuestions)}</div>
+                <div class="dn-subsec"><h5>Antecedentes Familiares</h5>${dnMedTable(tabPfx+'_'+prefix+'_fam', DN_FAMILIAR, prefix === 'sp')}</div>
                 <div class="dn-subsec"><h5>Malformações Congênitas</h5>${dnMedSimple(tabPfx+'_'+prefix+'_malf', DN_MALFORM)}</div>
                 <div class="dn-subsec"><h5>Doenças Genéticas Hereditárias</h5>${dnMedSimple(tabPfx+'_'+prefix+'_gen', DN_GENETICA)}</div>
             </div>`;
@@ -10373,7 +10388,7 @@
                     ? `${prefix}_${q.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'_').toLowerCase().slice(0,20)}`
                     : `${prefix}_${q.id}`;
                 const checked = dnAchaRadio_(n, ':checked');
-                result[n] = checked ? checked.value : 'nao';
+                result[n] = checked ? checked.value : (q.semPadrao ? '' : 'nao');
                 const detail = dnAchaRadio_(n + '_detail', '');
                 if (detail) result[n + '_detail'] = detail.value;
             });
@@ -10409,6 +10424,7 @@
                 ov_olhos: dnGetChip('ov-olhos'),
                 ov_pele: dnGetChip('ov-pele'),
                 ...dnGetRadios('ov_med', DN_MED_PERSONAL_OV),
+                ...dnGetRadios('ov_fam', DN_FAMILIAR),
                 ...dnGetRadios('ov_malf', DN_MALFORM),
                 ...dnGetRadios('ov_gen', DN_GENETICA),
                 sp_sangue: document.getElementById('dn-sp-sangue')?.value || '',
@@ -10419,6 +10435,7 @@
                 sp_olhos: dnGetChip('sp-olhos'),
                 sp_pele: dnGetChip('sp-pele'),
                 ...dnGetRadios('sp_med', DN_MED_PERSONAL_SP),
+                ...dnGetRadios('sp_fam', DN_FAMILIAR),
                 ...dnGetRadios('sp_malf', DN_MALFORM),
                 ...dnGetRadios('sp_gen', DN_GENETICA),
                 info_adicional: document.getElementById('dnInfoAdicional')?.value || '',
@@ -10878,6 +10895,7 @@
                     ov_olhos: dnGetChip(`${T}-ov-olhos`),
                     ov_pele: dnGetChip(`${T}-ov-pele`),
                     ...dnGetRadios(`${T}_ov_med`, DN_MED_PERSONAL_OV),
+                    ...dnGetRadios(`${T}_ov_fam`, DN_FAMILIAR),
                     ...dnGetRadios(`${T}_ov_malf`, DN_MALFORM),
                     ...dnGetRadios(`${T}_ov_gen`, DN_GENETICA),
                     sp_sangue: document.getElementById(`${T}-sp-sangue`)?.value || '',
@@ -10888,6 +10906,7 @@
                     sp_olhos: dnGetChip(`${T}-sp-olhos`),
                     sp_pele: dnGetChip(`${T}-sp-pele`),
                     ...dnGetRadios(`${T}_sp_med`, DN_MED_PERSONAL_SP),
+                    ...dnGetRadios(`${T}_sp_fam`, DN_FAMILIAR),
                     ...dnGetRadios(`${T}_sp_malf`, DN_MALFORM),
                     ...dnGetRadios(`${T}_sp_gen`, DN_GENETICA),
                     info_adicional: document.getElementById(T + 'InfoAdicional')?.value || '',
