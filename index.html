@@ -9391,7 +9391,7 @@
                 <div class="dn-subsec"><h5>Características Familiares</h5>${dnCaractFamiliares_(prefix, tabPfx)}</div>
                 <div class="dn-subsec"><h5>Malformações Congênitas</h5>${dnMedSimple(tabPfx+'_'+prefix+'_malf', DN_MALFORM)}</div>
                 <div class="dn-subsec"><h5>Doenças Genéticas Hereditárias</h5>${dnMedSimple(tabPfx+'_'+prefix+'_gen', DN_GENETICA)}</div>
-                <div class="dn-subsec"><h5>Exames</h5>${dnPainelExames_()}</div>
+                ${hasAge ? `<div class="dn-subsec"><h5>Exames</h5>${dnPainelExames_()}</div>` : ''}
             </div>`;
         }
 
