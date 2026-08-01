@@ -9039,16 +9039,19 @@
         ];
         const DN_MED_PERSONAL_OV = [
             {id:'saude',label:'Possui algum problema de saúde?',detail:true},
-            {id:'hereditaria',label:'Doenças hereditariamente transmissíveis?',detail:true},
-            {id:'cancer',label:'Histórico de Câncer? (Mama, Útero, Ovários)',detail:true},
+            {id:'hereditaria',label:'Possui doenças hereditariamente transmissíveis?',detail:true},
+            {id:'cancer',label:'Histórico de Câncer?',detail:true},
             {id:'alergia',label:'Possui alguma alergia?',detail:true},
-            {id:'gravidez',label:'Gravidez?',detail:true},
+            {id:'gravidez',label:'Já esteve grávida?',detail:true},
             {id:'cirurgia',label:'Fez alguma cirurgia?',detail:true},
             {id:'psiq',label:'Faz ou fez tratamento psiquiátrico?',detail:true},
+            {id:'etilista',label:'Etilista?',detail:true,ph:'Com que frequência?'},
+            {id:'tabagista',label:'Tabagista?',detail:true,ph:'Com que frequência?'},
+            {id:'drogas',label:'Usuária de drogas?',detail:true,ph:'Qual / Com que frequência?'},
         ];
         const DN_MED_PERSONAL_SP = [
             {id:'saude',label:'Possui algum problema de saúde?',detail:true},
-            {id:'hereditaria',label:'Doenças hereditariamente transmissíveis?',detail:true},
+            {id:'hereditaria',label:'Possui doenças hereditariamente transmissíveis?',detail:true},
             {id:'alergia',label:'Possui alguma alergia?',detail:true},
             {id:'cirurgia',label:'Fez alguma cirurgia?',detail:true},
             {id:'psiq',label:'Faz ou fez tratamento psiquiátrico?',detail:true},
@@ -9194,7 +9197,7 @@
                     <td>${q.label}</td>
                     <td><label><input type="radio" name="${n}" value="sim"> Sim</label></td>
                     <td><label><input type="radio" name="${n}" value="nao" checked> Não</label></td>
-                    ${q.detail ? `<td><input class="dn-detail-input" name="${n}_detail" placeholder="Qual / Quando"></td>` : ''}
+                    ${q.detail ? `<td><input class="dn-detail-input" name="${n}_detail" placeholder="${q.ph || 'Qual / Quando'}"></td>` : ''}
                 </tr>`;
             }).join('')}</table>`;
         }
