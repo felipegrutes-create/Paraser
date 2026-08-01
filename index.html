@@ -1537,6 +1537,8 @@
         .dn-quest-result:hover { background:var(--surface2);border-color:rgba(99,102,241,0.4); }
         .dn-btn-questionnaire { background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;transition:background 0.15s;white-space:nowrap; }
         .dn-btn-questionnaire:hover { background:rgba(99,102,241,0.22); }
+        .dn-btn-ficha { background:rgba(0,212,170,0.12);color:#00d4aa;border:1px solid rgba(0,212,170,0.35);border-radius:8px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap; }
+        .dn-btn-ficha:hover { background:rgba(0,212,170,0.22); }
         .dn-quest-filled-tag { display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);margin-left:6px;vertical-align:middle; }
         .dn-conversa-ok { background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); }
         .dn-conversa-pending { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
@@ -9259,14 +9261,18 @@
                 </div>`).join('')}</div>`;
         }
 
-        function dnHairTypeCards(prefix, tabPfx='dn') {
-            const types = {
+        // Desenho de cada tipo de cabelo. Fica fora da função porque a ficha em PDF
+        // usa exatamente o mesmo traço dos cartões do formulário.
+        const DN_HAIR_TYPE_SVG = {
                 'Liso': (c) => [10,22,34,46,58,70].map(x => `<line x1="${x}" y1="2" x2="${x}" y2="62" stroke="${c}" stroke-width="4" stroke-linecap="round"/>`).join(''),
                 'Liso Pontas': (c) => [10,22,34,46,58,70].map(x => `<path d="M${x},2 L${x},34 Q${x+6},44 ${x},52 Q${x-6},58 ${x},63" stroke="${c}" fill="none" stroke-width="3.6" stroke-linecap="round"/>`).join(''),
                 'Ondulado': (c) => [10,24,38,52,66].map(x => `<path d="M${x},2 Q${x+8},18 ${x},32 Q${x-8},46 ${x},62" stroke="${c}" fill="none" stroke-width="3.5" stroke-linecap="round"/>`).join(''),
                 'Cacheado': (c) => [12,28,44,60].map(x => `<path d="M${x},2 C${x+12},8 ${x-12},18 ${x},24 C${x+12},30 ${x-12},40 ${x},46 C${x+12},52 ${x-12},58 ${x},64" stroke="${c}" fill="none" stroke-width="3" stroke-linecap="round"/>`).join(''),
                 'Crespo': (c) => [8,20,32,44,56,68].map(x => `<path d="M${x},2 Q${x+4},5 ${x},8 Q${x-4},11 ${x},14 Q${x+4},17 ${x},20 Q${x-4},23 ${x},26 Q${x+4},29 ${x},32 Q${x-4},35 ${x},38 Q${x+4},41 ${x},44 Q${x-4},47 ${x},50 Q${x+4},53 ${x},56 Q${x-4},59 ${x},62" stroke="${c}" fill="none" stroke-width="2.5" stroke-linecap="round"/>`).join('')
             };
+
+        function dnHairTypeCards(prefix, tabPfx='dn') {
+            const types = DN_HAIR_TYPE_SVG;
             return `<div class="dn-vcards">${DN_HAIR_TYPES.map(t => {
                 const svg = `<svg viewBox="0 0 80 64" width="88" height="66" xmlns="http://www.w3.org/2000/svg">
                     <rect width="80" height="64" rx="4" fill="#f0e8dd"/>
@@ -10246,6 +10252,7 @@
                 <div class="dn-form-header">
                     ${dnFotosSlotsHtml_('dn', i => `dnPreviewPhoto(this,${i})`)}
                     <input id="dnCodigo" placeholder="Código do Perfil (ex: FSDL-310726)">
+                    <button class="dn-btn-ficha" onclick="dnGerarFicha()">📄 Gerar Ficha</button>
                     <button id="dnFormSearchBtn" class="dn-btn-questionnaire" onclick="dnTab_openFormSearch()">📋 Questionário</button>
                     <button class="dn-btn-close-form" onclick="closeDonorForm()">✕ Fechar</button>
                 </div>
@@ -10870,6 +10877,343 @@
             } catch(e) { console.error('Erro ao carregar perfis:', e); }
         }
 
+        // ===================== FICHA DA DOADORA (PDF pro WhatsApp) =====================
+        // Modelada no material impresso que a equipe já usa, na paleta do Instituto ParaSer.
+        // Sai sem foto nenhuma: só identificação, características e histórico.
+        const FICHA_PROGRAMA = 'Doar ParaSer';
+
+        const DN_SIGNOS = [
+            [1,20,'Capricórnio'],[2,19,'Aquário'],[3,20,'Peixes'],[4,20,'Áries'],
+            [5,21,'Touro'],[6,21,'Gêmeos'],[7,22,'Câncer'],[8,22,'Leão'],
+            [9,23,'Virgem'],[10,23,'Libra'],[11,22,'Escorpião'],[12,21,'Sagitário'],[12,31,'Capricórnio']
+        ];
+
+        // Aceita dd/mm/aaaa e aaaa-mm-dd, que é como os dois endpoints do Feegow respondem.
+        function dnFichaSigno_(nasc) {
+            if (!nasc) return '';
+            let dia, mes;
+            const m1 = String(nasc).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            const m2 = String(nasc).match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/);
+            if (m1) { mes = +m1[2]; dia = +m1[3]; }
+            else if (m2) { dia = +m2[1]; mes = +m2[2]; }
+            else return '';
+            for (const [mm, dd, signo] of DN_SIGNOS) {
+                if (mes < mm || (mes === mm && dia <= dd)) return signo;
+            }
+            return '';
+        }
+
+        function dnFichaEsc_(t) {
+            return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function dnFichaSlug_(label) {
+            return label.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'_').toLowerCase().slice(0,20);
+        }
+
+        // "Sim" com o detalhe entre parênteses; "Não" vira travessão pra não poluir a folha.
+        function dnFichaResposta_(d, chave) {
+            const v = d[chave] || '';
+            const det = (d[chave + '_detail'] || '').trim();
+            if (v === 'sim') return det ? 'Sim (' + det + ')' : 'Sim';
+            if (v === 'nao') return det ? 'Não (' + det + ')' : 'Não';
+            return det || '—';
+        }
+
+        function dnFichaLinhaPainel_(rot, valor) {
+            return '<div class="fp-linha"><span class="fp-rot">' + dnFichaEsc_(rot) + '</span>'
+                 + '<span class="fp-val">' + dnFichaEsc_(valor || '—') + '</span></div>';
+        }
+
+        function dnFichaMarcador_(marcado) {
+            return marcado ? '<span class="fc-mark on">●</span>' : '<span class="fc-mark">○</span>';
+        }
+
+        // Um cartão de característica: figura em cima, nome embaixo, bolinha marcando a escolha.
+        function dnFichaCartoes_(itens, escolhido, chave) {
+            // Uma linha só por característica, quantos cartões forem: com largura fixa,
+            // os 8 tons de cabelo quebravam pra segunda linha e desalinhavam a folha.
+            return '<div class="fc-grade" style="grid-template-columns:repeat(' + itens.length + ',1fr)">'
+                 + itens.map(it => {
+                const val = it[chave];
+                const on = val && val === escolhido;
+                return '<div class="fc-card' + (on ? ' on' : '') + '">'
+                     + '<div class="fc-fig">' + it.fig + '</div>'
+                     + '<div class="fc-nome">' + dnFichaEsc_(it.nome) + '</div>'
+                     + dnFichaMarcador_(on) + '</div>';
+            }).join('') + '</div>';
+        }
+
+        function dnFichaImg_(caminho) {
+            return '<img src="' + location.origin + '/' + caminho + '" alt="">';
+        }
+
+        function dnFichaCaracteristicas_(d, p) {
+            const pele = dnFichaCartoes_(DN_FITZ.map(f => ({
+                id: f.id, nome: f.label + ' · ' + f.pele,
+                fig: dnAvatarPele_(f, p === 'sp')
+            })), d[p + '_pele'], 'id');
+            const olhos = dnFichaCartoes_(DN_EYE_COLORS.map(e => ({
+                name: e.name, nome: e.label || e.name, fig: dnFichaImg_(e.img)
+            })), d[p + '_olhos'], 'name');
+            const cabelo = dnFichaCartoes_(DN_HAIR_COLORS.map(c => ({
+                name: c.name, nome: c.label || c.name, fig: dnFichaImg_(c.img)
+            })), d[p + '_cabelo'], 'name');
+            const tipo = dnFichaCartoes_(DN_HAIR_TYPES.map(t => ({
+                name: t.name, nome: t.label,
+                fig: '<svg viewBox="0 0 80 64" xmlns="http://www.w3.org/2000/svg">'
+                   + '<rect width="80" height="64" rx="4" fill="#f0e8dd"/>'
+                   + DN_HAIR_TYPE_SVG[t.name]('#8b6b3d') + '</svg>'
+            })), d[p + '_cabelo_tipo'], 'name');
+
+            // Os valores gravados são abreviados ("C. Escuro"), então traduz pro nome cheio.
+            const nomeDe = (lista, val) => {
+                const it = lista.find(x => x.name === val);
+                return it ? (it.label || it.name) : val;
+            };
+            const descreve = quem => {
+                const g = c => d[p + '_' + quem + '_' + c] || '';
+                const fitz = DN_FITZ.find(f => f.id === g('pele'));
+                return [
+                    fitz ? fitz.pele : '',
+                    g('olhos') ? 'olhos ' + nomeDe(DN_EYE_COLORS, g('olhos')).toLowerCase() : '',
+                    g('cabelo') ? 'cabelo ' + nomeDe(DN_HAIR_COLORS, g('cabelo')).toLowerCase() : '',
+                    g('cabelo_tipo') ? nomeDe(DN_HAIR_TYPES, g('cabelo_tipo')).toLowerCase() : ''
+                ].filter(Boolean).join(', ');
+            };
+
+            const mae = descreve('mae'), pai = descreve('pai'), obs = d[p + '_familia_obs'] || '';
+
+            return '<h3 class="fc-tit">Cor da pele</h3>' + pele
+                 + '<h3 class="fc-tit">Cor dos cabelos</h3>' + cabelo
+                 + '<h3 class="fc-tit">Cor dos olhos</h3>' + olhos
+                 + '<h3 class="fc-tit">Característica dos cabelos</h3>' + tipo
+                 + '<h3 class="fc-tit">Características familiares</h3>'
+                 + '<div class="fc-fam">'
+                 + '<div class="fc-fambox"><span>Materna</span><p>' + dnFichaEsc_(mae || '—') + '</p></div>'
+                 + '<div class="fc-fambox"><span>Paterna</span><p>' + dnFichaEsc_(pai || '—') + '</p></div>'
+                 + '</div>'
+                 + (obs ? '<div class="fc-fambox larga"><span>Observação sobre a família</span><p>'
+                        + dnFichaEsc_(obs) + '</p></div>' : '');
+        }
+
+        function dnFichaPainel_(d, p, med) {
+            const alergia = d[p + '_med_alergia'] === 'sim'
+                ? (d[p + '_med_alergia_detail'] || 'Sim') : 'Nega';
+            const oft = d[p + '_med_oftalmo'] === 'sim'
+                ? (d[p + '_med_oftalmo_detail'] || 'Sim') : 'Nega';
+            const antec = [
+                d[p + '_fam_doencas_mae'] === 'sim' ? 'Família materna: ' + (d[p + '_fam_doencas_mae_detail'] || 'sim') : '',
+                d[p + '_fam_doencas_pai'] === 'sim' ? 'Família paterna: ' + (d[p + '_fam_doencas_pai_detail'] || 'sim') : '',
+                d[p + '_fam_mae_viva'] === 'nao' ? 'Mãe falecida' + (d[p + '_fam_mae_viva_detail'] ? ' (' + d[p + '_fam_mae_viva_detail'] + ')' : '') : '',
+                d[p + '_fam_pai_vivo'] === 'nao' ? 'Pai falecido' + (d[p + '_fam_pai_vivo_detail'] ? ' (' + d[p + '_fam_pai_vivo_detail'] + ')' : '') : ''
+            ].filter(Boolean).join('. ');
+
+            const marca = (rot, chave) => '<div class="fp-check">'
+                + (d[chave] === 'sim' ? '<b>✓</b>' : '<b class="off"></b>')
+                + '<span>' + rot + '</span></div>';
+
+            const signo = dnFichaSigno_(d[p + '_nascimento']);
+            const idiomas = d[p + '_idiomas'] || '';
+
+            return '<div class="fp">'
+                + '<div class="fp-marca">'
+                +   '<div class="fp-selo">'
+                +     '<svg viewBox="0 0 64 64" aria-hidden="true">'
+                +       '<path d="M32 54V30" stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none"/>'
+                +       '<path d="M32 34C32 24 25 17 15 17c0 10 7 17 17 17z" fill="#7fe8d2"/>'
+                +       '<path d="M32 30c0-9 6-15 15-15 0 9-6 15-15 15z" fill="#ffffff" opacity=".85"/>'
+                +     '</svg>'
+                +   '</div>'
+                +   '<div class="fp-prog">' + dnFichaEsc_(FICHA_PROGRAMA) + '</div>'
+                +   '<div class="fp-inst">Instituto ParaSer</div>'
+                + '</div>'
+                + '<div class="fp-sec">Identificação</div>'
+                + '<div class="fp-cod">' + dnFichaEsc_(d.codigo_perfil || '—') + '</div>'
+                + dnFichaLinhaPainel_('Idade', d[p + '_idade'] ? d[p + '_idade'] + ' anos' : '')
+                + dnFichaLinhaPainel_('Tipo sanguíneo e RH', d[p + '_sangue'])
+                + '<div class="fp-dupla">'
+                +   dnFichaLinhaPainel_('Altura', d[p + '_altura'] ? d[p + '_altura'] + ' m' : '')
+                +   dnFichaLinhaPainel_('Peso', d[p + '_peso'] ? d[p + '_peso'] + ' kg' : '')
+                + '</div>'
+                + dnFichaLinhaPainel_('Origem étnica / raça', d[p + '_etnia'])
+                + dnFichaLinhaPainel_('Profissão / escolaridade',
+                      [d[p + '_profissao'], d[p + '_escolaridade']].filter(Boolean).join(' · '))
+                + dnFichaLinhaPainel_('Alergia', alergia)
+                + dnFichaLinhaPainel_('Diagnóstico oftálmico', oft)
+                + '<div class="fp-checks">'
+                +   marca('Tabagista', p + '_med_tabagista')
+                +   marca('Etilista', p + '_med_etilista')
+                + '</div>'
+                + '<div class="fp-checks">'
+                +   '<div class="fp-check">' + (d[p + '_vegetariana'] === 'Sim' ? '<b>✓</b>' : '<b class="off"></b>')
+                +     '<span>Vegetariana</span></div>'
+                +   '<div class="fp-check">' + (d[p + '_atividade'] === 'Sim' ? '<b>✓</b>' : '<b class="off"></b>')
+                +     '<span>Atividade física</span></div>'
+                + '</div>'
+                + dnFichaLinhaPainel_('Hobby / esportes', d[p + '_hobby'])
+                + dnFichaLinhaPainel_('Religião', d[p + '_religiao'])
+                + dnFichaLinhaPainel_('Antecedentes familiares (doenças)', antec || 'Nega')
+                + '<div class="fp-sec">Sorologias</div>'
+                + '<p class="fp-nota">Informamos que nosso banco atende a todas as normas vigentes '
+                +   'estabelecidas pela ANVISA (órgão regulador).</p>'
+                + '<div class="fp-sec">Genético</div>'
+                + '<p class="fp-nota">Cariótipo: NORMAL<br>Pesquisa de hemoglobina S: NEGATIVA</p>'
+                + '<div class="fp-sec">Sorologias negativas</div>'
+                + '<div class="fp-soro">'
+                +   ['HIV','Hepatite C','Gonorreia','Sífilis','Hepatite B','Clamídia']
+                        .map(n => '<span>' + n + '</span>').join('')
+                + '</div>'
+                + dnFichaLinhaPainel_('Característica de personalidade', d[p + '_personalidade'])
+                + dnFichaLinhaPainel_('Signo / idiomas', [signo, idiomas].filter(Boolean).join(' · '))
+                + '</div>';
+        }
+
+        function dnFichaTabela_(titulo, linhas) {
+            if (!linhas.length) return '';
+            return '<div class="fh-bloco"><h3 class="fc-tit">' + titulo + '</h3>'
+                 + '<table class="fh-tab">' + linhas.map(l =>
+                      '<tr><td>' + dnFichaEsc_(l[0]) + '</td><td>' + dnFichaEsc_(l[1]) + '</td></tr>').join('')
+                 + '</table></div>';
+        }
+
+        function dnFichaHistorico_(d, p, med) {
+            const medLinhas = med.map(q => [q.label, dnFichaResposta_(d, p + '_med_' + q.id)]);
+            const famLinhas = DN_FAMILIAR.map(q => [
+                (p === 'sp' && q.labelM) ? q.labelM : q.label,
+                dnFichaResposta_(d, p + '_fam_' + q.id)
+            ]);
+            const malf = DN_MALFORM.filter(l => d[p + '_malf_' + dnFichaSlug_(l)] === 'sim');
+            const gen  = DN_GENETICA.filter(l => d[p + '_gen_' + dnFichaSlug_(l)] === 'sim');
+            return dnFichaTabela_('Histórico médico pessoal', medLinhas)
+                 + dnFichaTabela_('Antecedentes familiares', famLinhas)
+                 + '<div class="fh-bloco"><h3 class="fc-tit">Malformações congênitas</h3>'
+                 +   '<p class="fh-txt">' + (malf.length ? dnFichaEsc_(malf.join(', ')) : 'Nega todas as listadas.') + '</p></div>'
+                 + '<div class="fh-bloco"><h3 class="fc-tit">Doenças genéticas hereditárias</h3>'
+                 +   '<p class="fh-txt">' + (gen.length ? dnFichaEsc_(gen.join(', ')) : 'Nega todas as listadas.') + '</p></div>';
+        }
+
+        function dnFichaTemLado_(d, p) {
+            return ['_pele','_olhos','_cabelo','_sangue','_idade','_altura'].some(s => d[p + s]);
+        }
+
+        function dnFichaHTML_(d) {
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            const lados = [{ p: 'ov', rot: '', med: DN_MED_PERSONAL_OV }];
+            if (dnFichaTemLado_(d, 'sp')) lados.push({ p: 'sp', rot: ' — lado espermatozóides', med: DN_MED_PERSONAL_SP });
+
+            const paginas = lados.map(l =>
+                  '<section class="folha">'
+                +   '<aside class="col-esq">' + dnFichaPainel_(d, l.p, l.med) + '</aside>'
+                +   '<main class="col-dir">'
+                +     '<h2 class="fc-h2">Características' + (l.rot ? l.rot : ' da doadora') + '</h2>'
+                +     dnFichaCaracteristicas_(d, l.p)
+                +   '</main>'
+                + '</section>'
+                + '<section class="folha simples">'
+                +   '<h2 class="fc-h2">Histórico' + (l.rot ? l.rot : '') + '</h2>'
+                +   dnFichaHistorico_(d, l.p, l.med)
+                +   (d.info_adicional ? '<div class="fh-bloco"><h3 class="fc-tit">Informações adicionais</h3>'
+                        + '<p class="fh-txt">' + dnFichaEsc_(d.info_adicional) + '</p></div>' : '')
+                +   '<p class="fh-rodape">' + dnFichaEsc_(FICHA_PROGRAMA) + ' · Instituto ParaSer · '
+                +     'Ficha ' + dnFichaEsc_(d.codigo_perfil || '') + ' · emitida em ' + hoje + '</p>'
+                + '</section>').join('');
+
+            return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
+                + '<title>Ficha ' + dnFichaEsc_(d.codigo_perfil || 'da doadora') + '</title>'
+                + '<style>' + dnFichaCSS_() + '</style></head><body>' + paginas
+                + '<div class="barra-tela"><button onclick="window.print()">Salvar em PDF</button>'
+                + '<span>Escolha "Salvar como PDF" na janela de impressão e mande o arquivo no WhatsApp.</span></div>'
+                + '</body></html>';
+        }
+
+        function dnFichaCSS_() {
+            return `
+            @page { size: A4; margin: 0; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: 'Outfit', system-ui, sans-serif; background: #e9edf2; color: #16232e;
+                   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .folha { width: 210mm; min-height: 297mm; margin: 0 auto 10mm; background: #fff;
+                     display: grid; grid-template-columns: 68mm 1fr; page-break-after: always; }
+            .folha.simples { display: block; padding: 16mm 14mm; }
+            .col-esq { background: linear-gradient(180deg, #0f7565, #0a4b41); color: #f0fbf8; padding: 10mm 7mm; }
+            .col-dir { padding: 10mm 8mm; }
+
+            .fp-marca { text-align: center; margin-bottom: 7mm; }
+            .fp-selo { width: 21mm; height: 21mm; margin: 0 auto 2mm; border-radius: 50%;
+                       background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.35);
+                       display: flex; align-items: center; justify-content: center; }
+            .fp-selo svg { width: 13mm; height: 13mm; }
+            .fp-prog { font-size: 13.5pt; font-weight: 800; letter-spacing: .01em; }
+            .fp-inst { font-size: 7.5pt; letter-spacing: .16em; text-transform: uppercase; opacity: .7; margin-top: 1mm; }
+
+            .fp-sec { font-size: 8pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+                      color: #7fe8d2; margin: 5mm 0 2mm; border-bottom: 1px solid rgba(127,232,210,.35); padding-bottom: 1mm; }
+            .fp-cod { font-size: 14pt; font-weight: 800; letter-spacing: .04em; margin-bottom: 3mm; }
+            .fp-linha { margin-bottom: 2.6mm; }
+            .fp-rot { display: block; font-size: 6.8pt; letter-spacing: .1em; text-transform: uppercase; opacity: .68; }
+            .fp-val { display: block; font-size: 9.5pt; font-weight: 600; line-height: 1.35; margin-top: .6mm;
+                      background: rgba(255,255,255,.1); border-radius: 2mm; padding: 1.2mm 2mm; }
+            .fp-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
+            .fp-checks { display: flex; gap: 4mm; margin: 1mm 0 2.6mm; }
+            .fp-check { display: flex; align-items: center; gap: 1.5mm; font-size: 8pt; }
+            .fp-check b { width: 3.4mm; height: 3.4mm; border-radius: 1mm; background: #7fe8d2; color: #0a4b41;
+                          font-size: 7pt; display: flex; align-items: center; justify-content: center; }
+            .fp-check b.off { background: transparent; border: 1px solid rgba(255,255,255,.5); }
+            .fp-nota { font-size: 7.2pt; line-height: 1.45; opacity: .85; }
+            .fp-soro { display: flex; flex-wrap: wrap; gap: 1.4mm; }
+            .fp-soro span { font-size: 7pt; font-weight: 700; padding: .8mm 2mm; border-radius: 4mm;
+                            background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); }
+
+            .fc-h2 { font-size: 15pt; font-weight: 800; color: #0a4b41; letter-spacing: .01em; margin-bottom: 4mm; }
+            .fc-tit { font-size: 8.5pt; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+                      color: #0f7565; margin: 4mm 0 2mm; border-bottom: 1.5px solid #d9e6e2; padding-bottom: 1mm; }
+            .fc-grade { display: grid; gap: 1.6mm; }
+            .fc-card { border: 1.2px solid #dfe6ea; border-radius: 2mm; padding: 1.2mm;
+                       text-align: center; background: #fbfaf8; page-break-inside: avoid; }
+            .fc-card.on { border-color: #0f7565; border-width: 2px; background: #eafaf6; }
+            .fc-fig { height: 13mm; border-radius: 1.4mm; overflow: hidden; background: #fff; display: flex;
+                      align-items: center; justify-content: center; }
+            .fc-fig img, .fc-fig svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+            .fc-nome { font-size: 5.9pt; font-weight: 700; line-height: 1.18; margin: .9mm 0 .5mm; color: #24323c;
+                       hyphens: auto; }
+            .fc-mark { font-size: 7pt; color: #b8c4cc; }
+            .fc-mark.on { color: #0f7565; }
+            .fc-fam { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+            .fc-fambox { border: 1.2px solid #dfe6ea; border-radius: 2mm; padding: 2mm 2.5mm; background: #fbfaf8; }
+            .fc-fambox.larga { margin-top: 3mm; }
+            .fc-fambox span { font-size: 6.6pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #0f7565; }
+            .fc-fambox p { font-size: 8.5pt; line-height: 1.4; margin-top: 1mm; }
+
+            .fh-bloco { page-break-inside: avoid; margin-bottom: 4mm; }
+            .fh-tab { width: 100%; border-collapse: collapse; }
+            .fh-tab td { font-size: 8.6pt; padding: 1.6mm 2mm; border-bottom: 1px solid #e7edf0; vertical-align: top; }
+            .fh-tab td:first-child { width: 58%; color: #3a4a55; }
+            .fh-tab td:last-child { font-weight: 700; }
+            .fh-txt { font-size: 8.6pt; line-height: 1.5; }
+            .fh-rodape { margin-top: 8mm; font-size: 7pt; letter-spacing: .06em; color: #7c8b95; text-align: center; }
+
+            .barra-tela { position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 10px;
+                          background: #0a4b41; color: #eafaf6; padding: 10px 14px; border-radius: 10px;
+                          font-size: 12px; max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+            .barra-tela button { background: #7fe8d2; color: #06342d; border: 0; border-radius: 7px;
+                                 padding: 8px 12px; font-weight: 800; cursor: pointer; font-family: inherit; }
+            @media print { .barra-tela { display: none; } .folha { margin: 0; } body { background: #fff; } }
+            `;
+        }
+
+        // Abre a ficha numa aba nova. Quem gera o PDF é a própria impressão do navegador
+        // ("Salvar como PDF"), que é o caminho que não depende de biblioteca externa.
+        function dnFichaAbrir_(d) {
+            if (!d.codigo_perfil) { alert('Preencha o código do perfil antes de gerar a ficha.'); return; }
+            const w = window.open('', '_blank');
+            if (!w) { alert('O navegador bloqueou a aba da ficha. Libere o pop-up e tente de novo.'); return; }
+            w.document.write(dnFichaHTML_(d));
+            w.document.close();
+        }
+
+        function dnGerarFicha() { dnFichaAbrir_(collectDonorData()); }
+
         // ===================== DONOR TAB FACTORY =====================
         function dnInducaoBadgeHTML(d) {
             const dt = d.inicio_inducao || '';
@@ -11013,6 +11357,7 @@
                     <div class="dn-form-header">
                         ${dnFotosSlotsHtml_(T, i => `${T}Tab.previewPhoto(this,${i})`)}
                         <input id="${T}Codigo" placeholder="Código do Perfil (ex: FSDL-310726)">
+                        <button class="dn-btn-ficha" onclick="${T}Tab.gerarFicha()">📄 Gerar Ficha</button>
                         <button id="${T}FormSearchBtn" class="dn-btn-questionnaire" onclick="${T}Tab.openFormSearch()">📋 Questionário</button>
                         <button class="dn-btn-close-form" onclick="${T}Tab.closeForm()">✕ Fechar</button>
                     </div>
@@ -11509,7 +11854,9 @@
                 }
             }
 
-            return { getPending, renderPending, toggleDropdown, closeDropdown, newProfile, previewPhoto, closeForm, saveProfile, editProfile, deleteProfile, renderCards, newFromPending, load, openFormSearch, fillFromFormRow };
+            function gerarFicha() { dnFichaAbrir_(collectData()); }
+
+            return { getPending, renderPending, toggleDropdown, closeDropdown, newProfile, gerarFicha, previewPhoto, closeForm, saveProfile, editProfile, deleteProfile, renderCards, newFromPending, load, openFormSearch, fillFromFormRow };
         }
 
         const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'], patientSource: () => avalDoadPatients, hideSp: true });
