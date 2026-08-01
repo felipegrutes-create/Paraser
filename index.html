@@ -1660,6 +1660,12 @@
         }
         .dn-fitz-card:hover { border-color:rgba(0,0,0,0.3); }
         .dn-fitz-card.selected { border-color:var(--accent); box-shadow:0 0 12px rgba(0,212,170,0.3); }
+        /* Bloco "Outras Informações Pessoais" (01/08/2026): quebra em várias linhas e
+           dá mais largura pros campos de escrever livre. */
+        .dn-outras { flex-wrap: wrap; gap: 12px 18px; }
+        .dn-outras .dn-field { min-width: 150px; }
+        .dn-outras .dn-field-larga { min-width: 260px; flex: 1 1 260px; }
+        .dn-outras input, .dn-outras select { width: 100%; }
         .dn-fitz-face { width:72px; height:84px; border-radius:6px; overflow:hidden; background:#fff; }
         .dn-fitz-card.selected .dn-fitz-face { box-shadow:0 0 0 2px var(--accent); }
         .dn-fitz-info { text-align:center; }
@@ -9214,18 +9220,18 @@
                     </div>
                     <div class="dn-field"><label>Idade na doação</label><input type="number" id="${tabPfx}-${prefix}-idade" min="18" max="50" placeholder="—"></div>
                     <div class="dn-field"><label>Estado Civil</label>
-                        <select id="${tabPfx}-${prefix}-estado-civil">
+                        <select id="${tabPfx}-${prefix}-estado-civil" onchange="dnMirrorToProfile('${tabPfx}','estado_civil',this.value)">
                             <option value="">—</option><option>Solteira</option><option>Casada</option>
                         </select>
                     </div>
                     <div class="dn-field"><label>Escolaridade</label>
-                        <select id="${tabPfx}-${prefix}-escolaridade">
+                        <select id="${tabPfx}-${prefix}-escolaridade" onchange="dnMirrorToProfile('${tabPfx}','escolaridade',this.value)">
                             <option value="">—</option>
                             <option>Ensino Médio</option><option>Superior Incompleto</option>
                             <option>Superior Completo</option><option>Pós-Graduação</option>
                         </select>
                     </div>
-                    <div class="dn-field"><label>Profissão Atual</label><input type="text" id="${tabPfx}-${prefix}-profissao" placeholder="—"></div>
+                    <div class="dn-field"><label>Profissão Atual</label><input type="text" id="${tabPfx}-${prefix}-profissao" placeholder="—" onchange="dnMirrorToProfile('${tabPfx}','profissao',this.value)"></div>
                     ` : ''}
                     <div class="dn-field"><label>Tipo Sanguíneo</label>
                         <select id="${tabPfx}-${prefix}-sangue" onchange="dnMirrorToProfile('${tabPfx}','sangue',this.value)">
@@ -9245,6 +9251,47 @@
                 <div class="dn-subsec"><h5>Cor dos Olhos</h5>${dnEyeColorCards(prefix, tabPfx)}</div>
                 <div class="dn-subsec"><h5>Cor dos Cabelos</h5>${dnHairColorCards(prefix, tabPfx)}</div>
                 <div class="dn-subsec"><h5>Característica dos Cabelos</h5>${dnHairTypeCards(prefix, tabPfx)}</div>
+
+                ${hasAge ? `<div class="dn-subsec"><h5>Outras Informações Pessoais</h5>
+                    <div class="dn-field-row dn-outras">
+                        <div class="dn-field"><label>Origem Étnica / Raça</label>
+                            <select id="${tabPfx}-${prefix}-etnia">
+                                <option value="">—</option><option>Branca</option><option>Parda</option>
+                                <option>Preta</option><option>Amarela</option><option>Indígena</option>
+                            </select>
+                        </div>
+                        <div class="dn-field"><label>Religião</label>
+                            <select id="${tabPfx}-${prefix}-religiao" onchange="dnMirrorToProfile('${tabPfx}','religiao',this.value)">
+                                <option value="">—</option><option>Evangélica</option><option>Católica</option>
+                                <option>Judia</option><option>Sem religião</option>
+                            </select>
+                        </div>
+                        <div class="dn-field"><label>Usa Óculos?</label>
+                            <select id="${tabPfx}-${prefix}-oculos" onchange="dnMirrorToProfile('${tabPfx}','oculos',this.value)">
+                                <option value="">—</option><option>Sim</option><option>Não</option>
+                            </select>
+                        </div>
+                        <div class="dn-field"><label>Atividade Física Regular?</label>
+                            <select id="${tabPfx}-${prefix}-atividade">
+                                <option value="">—</option><option>Sim</option><option>Não</option>
+                            </select>
+                        </div>
+                        <div class="dn-field"><label>Vegetariana ou Vegana?</label>
+                            <select id="${tabPfx}-${prefix}-vegetariana" onchange="dnMirrorToProfile('${tabPfx}','vegetariana',this.value)">
+                                <option value="">—</option><option>Sim</option><option>Não</option>
+                            </select>
+                        </div>
+                        <div class="dn-field dn-field-larga"><label>Hobby / Esportes</label>
+                            <input type="text" id="${tabPfx}-${prefix}-hobby" placeholder="—" onchange="dnMirrorToProfile('${tabPfx}','hobby',this.value)">
+                        </div>
+                        <div class="dn-field dn-field-larga"><label>Características de Personalidade</label>
+                            <input type="text" id="${tabPfx}-${prefix}-personalidade" placeholder="—">
+                        </div>
+                        <div class="dn-field dn-field-larga"><label>Idiomas Falados</label>
+                            <input type="text" id="${tabPfx}-${prefix}-idiomas" placeholder="—">
+                        </div>
+                    </div>
+                </div>` : ''}
 
                 <div class="dn-subsec"><h5>Histórico Médico Pessoal</h5>${dnMedTable(tabPfx+'_'+prefix+'_med', medQuestions)}</div>
                 <div class="dn-subsec"><h5>Malformações Congênitas</h5>${dnMedSimple(tabPfx+'_'+prefix+'_malf', DN_MALFORM)}</div>
@@ -9436,19 +9483,31 @@
             return `<div class="dn-conversa-badge dn-conversa-ok">🟢 Conversa agendada dia ${last.dataAp}</div>`;
         }
 
-        // Mirrors blood type / height / weight from physical profile to Perfil da Paciente block
+        // Espelha pro bloco "Perfil da Paciente" o que também é digitado lá em cima, pra
+        // ninguém preencher a mesma informação duas vezes. Sangue/altura/peso já eram
+        // espelhados; 01/08/2026 entraram estado civil, escolaridade, profissão, religião,
+        // hobby, vegetariana e óculos, que existiam nos dois lugares sem conversar.
+        const DN_ESPELHO = {
+            sangue: 'tipo_sanguineo', estado_civil: 'estado_civil', escolaridade: 'escolaridade',
+            profissao: 'profissao', religiao: 'religiao', hobby: 'hobby',
+            vegetariana: 'vegetariana', oculos: 'usa_oculos'
+        };
         function dnMirrorToProfile(tabPfx, field, value) {
             const p = tabPfx + '_eb_pf_';
-            if (field === 'sangue') {
-                const el = document.getElementById(p + 'tipo_sanguineo');
-                if (el) el.value = value;
-            } else if (field === 'altura') {
+            if (field === 'altura') {
                 const el = document.getElementById(p + 'altura');
                 if (el) el.value = Math.round(parseFloat(value) * 100);
-            } else if (field === 'peso') {
+                return;
+            }
+            if (field === 'peso') {
                 const el = document.getElementById(p + 'peso');
                 if (el) el.value = parseFloat(value);
+                return;
             }
+            const destino = DN_ESPELHO[field];
+            if (!destino) return;
+            const el = document.getElementById(p + destino);
+            if (el && value) el.value = value;
         }
 
         // Sync all three at once (called after loading a saved profile)
@@ -10325,6 +10384,14 @@
                 ov_estado_civil: document.getElementById('dn-ov-estado-civil')?.value || '',
                 ov_escolaridade: document.getElementById('dn-ov-escolaridade')?.value || '',
                 ov_profissao: document.getElementById('dn-ov-profissao')?.value || '',
+                ov_etnia: document.getElementById('dn-ov-etnia')?.value || '',
+                ov_religiao: document.getElementById('dn-ov-religiao')?.value || '',
+                ov_oculos: document.getElementById('dn-ov-oculos')?.value || '',
+                ov_atividade: document.getElementById('dn-ov-atividade')?.value || '',
+                ov_vegetariana: document.getElementById('dn-ov-vegetariana')?.value || '',
+                ov_hobby: document.getElementById('dn-ov-hobby')?.value || '',
+                ov_personalidade: document.getElementById('dn-ov-personalidade')?.value || '',
+                ov_idiomas: document.getElementById('dn-ov-idiomas')?.value || '',
                 ov_sangue: document.getElementById('dn-ov-sangue')?.value || '',
                 ov_altura: document.getElementById('dn-ov-altura')?.value || '',
                 ov_peso: document.getElementById('dn-ov-peso')?.value || '',
@@ -10360,7 +10427,8 @@
             if (data.ov_idade) document.getElementById('dn-ov-idade').value = data.ov_idade;
             // Campos novos da faixa de cima (31/07/2026): nascimento, estado civil, escolaridade, profissão.
             [['ov_nascimento','dn-ov-nascimento'],['ov_estado_civil','dn-ov-estado-civil'],
-             ['ov_escolaridade','dn-ov-escolaridade'],['ov_profissao','dn-ov-profissao']].forEach(([campo, id]) => {
+             ['ov_escolaridade','dn-ov-escolaridade'],['ov_profissao','dn-ov-profissao'],
+             ['ov_etnia','dn-ov-etnia'],['ov_religiao','dn-ov-religiao'],['ov_oculos','dn-ov-oculos'],['ov_atividade','dn-ov-atividade'],['ov_vegetariana','dn-ov-vegetariana'],['ov_hobby','dn-ov-hobby'],['ov_personalidade','dn-ov-personalidade'],['ov_idiomas','dn-ov-idiomas']].forEach(([campo, id]) => {
                 const el = document.getElementById(id); if (el && data[campo]) el.value = data[campo];
             });
             if (data.ov_sangue) document.getElementById('dn-ov-sangue').value = data.ov_sangue;
@@ -10786,6 +10854,14 @@
                     ov_estado_civil: document.getElementById(`${T}-ov-estado-civil`)?.value || '',
                     ov_escolaridade: document.getElementById(`${T}-ov-escolaridade`)?.value || '',
                     ov_profissao: document.getElementById(`${T}-ov-profissao`)?.value || '',
+                    ov_etnia: document.getElementById(`${T}-ov-etnia`)?.value || '',
+                    ov_religiao: document.getElementById(`${T}-ov-religiao`)?.value || '',
+                    ov_oculos: document.getElementById(`${T}-ov-oculos`)?.value || '',
+                    ov_atividade: document.getElementById(`${T}-ov-atividade`)?.value || '',
+                    ov_vegetariana: document.getElementById(`${T}-ov-vegetariana`)?.value || '',
+                    ov_hobby: document.getElementById(`${T}-ov-hobby`)?.value || '',
+                    ov_personalidade: document.getElementById(`${T}-ov-personalidade`)?.value || '',
+                    ov_idiomas: document.getElementById(`${T}-ov-idiomas`)?.value || '',
                     ov_sangue: document.getElementById(`${T}-ov-sangue`)?.value || '',
                     ov_altura: document.getElementById(`${T}-ov-altura`)?.value || '',
                     ov_peso: document.getElementById(`${T}-ov-peso`)?.value || '',
@@ -10826,7 +10902,8 @@
                 if (data.ov_idade) { const el = document.getElementById(`${T}-ov-idade`); if (el) el.value = data.ov_idade; }
                 // Campos novos da faixa de cima (31/07/2026).
                 [['ov_nascimento','-ov-nascimento'],['ov_estado_civil','-ov-estado-civil'],
-                 ['ov_escolaridade','-ov-escolaridade'],['ov_profissao','-ov-profissao']].forEach(([campo, sufixo]) => {
+                 ['ov_escolaridade','-ov-escolaridade'],['ov_profissao','-ov-profissao'],
+                 ['ov_etnia','-ov-etnia'],['ov_religiao','-ov-religiao'],['ov_oculos','-ov-oculos'],['ov_atividade','-ov-atividade'],['ov_vegetariana','-ov-vegetariana'],['ov_hobby','-ov-hobby'],['ov_personalidade','-ov-personalidade'],['ov_idiomas','-ov-idiomas']].forEach(([campo, sufixo]) => {
                     const el = document.getElementById(T + sufixo); if (el && data[campo]) el.value = data[campo];
                 });
                 [`${T}-ov-cabelo`,`${T}-ov-cabelo-tipo`,`${T}-ov-olhos`,`${T}-ov-pele`,`${T}-sp-cabelo`,`${T}-sp-cabelo-tipo`,`${T}-sp-olhos`,`${T}-sp-pele`].forEach(g => {
