@@ -10362,15 +10362,23 @@
             return sel ? sel.dataset.value : '';
         }
 
+        // 🔴 O formulário da doadora desenha os radios com o prefixo da aba (dn_ov_med_saude),
+        // mas os dados são gravados sem ele (ov_med_saude). Sem procurar pelos dois nomes,
+        // tudo que a equipe marcava no Histórico Médico voltava como "não" e o Qual/Quando sumia.
+        function dnAchaRadio_(nome, sufixo) {
+            return document.querySelector(`input[name="${nome}"]${sufixo}`)
+                || document.querySelector(`input[name="dn_${nome}"]${sufixo}`);
+        }
+
         function dnGetRadios(prefix, questions) {
             const result = {};
             questions.forEach(q => {
                 const n = typeof q === 'string'
                     ? `${prefix}_${q.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'_').toLowerCase().slice(0,20)}`
                     : `${prefix}_${q.id}`;
-                const checked = document.querySelector(`input[name="${n}"]:checked`);
+                const checked = dnAchaRadio_(n, ':checked');
                 result[n] = checked ? checked.value : 'nao';
-                const detail = document.querySelector(`input[name="${n}_detail"]`);
+                const detail = dnAchaRadio_(n + '_detail', '');
                 if (detail) result[n + '_detail'] = detail.value;
             });
             return result;
@@ -10455,10 +10463,10 @@
             // Radios & details
             Object.keys(data).forEach(k => {
                 if (k.endsWith('_detail')) {
-                    const inp = document.querySelector(`input[name="${k}"]`);
+                    const inp = dnAchaRadio_(k, '');
                     if (inp) inp.value = data[k];
                 } else {
-                    const radio = document.querySelector(`input[name="${k}"][value="${data[k]}"]`);
+                    const radio = dnAchaRadio_(k, `[value="${data[k]}"]`);
                     if (radio) radio.checked = true;
                 }
             });
