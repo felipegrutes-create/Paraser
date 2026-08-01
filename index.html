@@ -1459,6 +1459,7 @@
         .doa-select.cls-investigando { border-color: #14b8a6; color: #2dd4bf; }
         .doa-select.cls-coito { border-color: #8b5cf6; color: #a78bfa; }
         .doa-select.cls-embriao { border-color: #f43f5e; color: #fb7185; }
+        .doa-select.cls-doa-embriao { border-color: #c026d3; color: #e879f9; }
         .doa-select.cls-fiv-od { border-color: #0ea5e9; color: #38bdf8; }
         .doa-select.cls-congelamento { border-color: #64748b; color: #94a3b8; }
         .doa-select.cls-nova-tec { border-color: #06b6d4; color: #22d3ee; }
@@ -2896,6 +2897,7 @@
                 <button class="tab-dropdown-item" onclick="showSection('sec-doavol',null)">Doadoras Voluntárias <span class="tab-badge" id="tabBadgeDv" style="display:none"></span></button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-receptoras',null)">Receptora Óvulo Doado <span class="tab-badge" id="tabBadgeRc" style="display:none"></span></button>
                 <button class="tab-dropdown-item" onclick="showSection('sec-embriao',null)">Receptora Embrião Doado <span class="tab-badge" id="tabBadgeEb" style="display:none"></span></button>
+                <button class="tab-dropdown-item" onclick="showSection('sec-doaembriao',null)">Doadores de Embrião <span class="tab-badge" id="tabBadgeDe" style="display:none"></span></button>
             </div>
         </div>
 
@@ -3565,6 +3567,10 @@
                     <div class="value" style="color:#fb7185" id="doa-embriao">—</div>
                     <div class="label">Receptora Embrião Doado</div>
                 </div>
+                <div class="kpi-card" style="border-color:#c026d3">
+                    <div class="value" style="color:#e879f9" id="doa-doa-embriao">—</div>
+                    <div class="label">Doadores de Embrião</div>
+                </div>
                 <div class="kpi-card" style="border-color:#0ea5e9">
                     <div class="value" style="color:#38bdf8" id="doa-fiv-od">—</div>
                     <div class="label">Doadora Voluntária</div>
@@ -3597,6 +3603,7 @@
                     <option value="Investigando">Investigando</option>
                     <option value="Coito Programado">Coito Programado</option>
                     <option value="Embrião Doado">Receptora Embrião Doado</option>
+                    <option value="Doadores de Embrião">Doadores de Embrião</option>
                     <option value="Doadora Voluntária">Doadora Voluntária</option>
                     <option value="Congelamento">Congelamento</option>
                     <option value="Nova TEC">Nova TEC</option>
@@ -3880,6 +3887,74 @@
             </div>
             <div id="ebCards" class="dn-cards"></div>
             <div id="ebFormWrap" style="display:none"></div>
+        </section>
+
+        <section id="sec-doaembriao" class="section">
+            <p class="section-title">Doadores de Embrião — Perfis</p>
+            <div class="dn-toolbar">
+                <div style="position:relative">
+                    <button class="dn-btn-new" onclick="deTab.toggleDropdown()">+ Novo Perfil ▾</button>
+                    <div class="dn-new-dropdown" id="deNewDropdown" style="display:none">
+                        <div class="dn-dd-item" onclick="deTab.newProfile(); deTab.closeDropdown()">📝 Perfil em Branco</div>
+                        <div class="dn-dd-divider"></div>
+                        <div class="dn-dd-title">Pacientes Doadores de Embrião:</div>
+                        <div id="dePendingList"></div>
+                    </div>
+                </div>
+                <span class="dn-count" id="deCount">0 perfis</span>
+            </div>
+            <div id="dePendingCards" style="margin-bottom:20px"></div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">
+                <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px;letter-spacing:0.5px">🔍 BUSCA MULTI FILTROS</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                    <div style="position:relative;flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:18px;text-align:center">🔎</span>
+                        <div style="position:relative">
+                            <input type="text" id="deFilterNome" placeholder="Nome ou código da paciente..." oninput="_debouncedDeRender()" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 36px 10px 14px;font-family:inherit;font-size:13px">
+                            <button onclick="document.getElementById('deFilterNome').value='';deTab.renderCards()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">🩸</span>
+                        <select id="deFilterSangue" onchange="deTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:130px;cursor:pointer">
+                            <option value="">Tipo Sanguíneo</option>
+                            <option value="A+">A+</option><option value="A-">A-</option>
+                            <option value="B+">B+</option><option value="B-">B-</option>
+                            <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                            <option value="O+">O+</option><option value="O-">O-</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">💇</span>
+                        <select id="deFilterCabelo" onchange="deTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
+                            <option value="">Cor Cabelo</option>
+                            <option value="Loiro">Loiro</option><option value="Ruivo">Ruivo</option>
+                            <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                            <option value="Preto">Preto</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">👁️</span>
+                        <select id="deFilterOlhos" onchange="deTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:120px;cursor:pointer">
+                            <option value="">Cor Olhos</option>
+                            <option value="Azul">Azul</option><option value="Verde">Verde</option>
+                            <option value="C. Claro">C. Claro</option><option value="C. Escuro">C. Escuro</option>
+                            <option value="Preto">Preto</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                        <span style="font-size:18px">🎨</span>
+                        <select id="deFilterPele" onchange="deTab.renderCards()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;min-width:140px;cursor:pointer">
+                            <option value="">Tom de Pele</option>
+                            <option value="I">I - Muito Clara</option><option value="II">II - Clara</option>
+                            <option value="III">III - Média</option><option value="IV">IV - Morena</option>
+                            <option value="V">V - Escura</option><option value="VI">VI - Muito Escura</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="deCards" class="dn-cards"></div>
+            <div id="deFormWrap" style="display:none"></div>
         </section>
 
 
@@ -5056,6 +5131,7 @@
                                 <option value="Investigando">Investigando</option>
                                 <option value="Coito Programado">Coito Programado</option>
                                 <option value="Embrião Doado">Receptora Embrião Doado</option>
+                    <option value="Doadores de Embrião">Doadores de Embrião</option>
                                 <option value="Doadora Voluntária">Doadora Voluntária</option>
                                 <option value="Congelamento">Congelamento</option>
                                 <option value="Nova TEC">Nova TEC</option>
@@ -6569,6 +6645,7 @@
             'sec-doavol':        'group-pacientes',
             'sec-receptoras':    'group-pacientes',
             'sec-embriao':       'group-pacientes',
+            'sec-doaembriao':    'group-pacientes',
             'sec-resumo':        'group-fin',
             'sec-fin':           'group-fin',
             'sec-cr':            'group-fin',
@@ -6599,6 +6676,7 @@
         var _debouncedDvRender  = _debounce(function(){ dvTab.renderCards(); }, 250);
         var _debouncedRcRender  = _debounce(function(){ rcTab.renderCards(); }, 250);
         var _debouncedEbRender  = _debounce(function(){ ebTab.renderCards(); }, 250);
+        var _debouncedDeRender  = _debounce(function(){ deTab.renderCards(); }, 250);
 
         var _cachedSections = null, _cachedTabs = null, _cachedTabGroups = null;
 
@@ -6614,7 +6692,7 @@
             'sec-doadoras': ['admin','comercial'], 'sec-pend': ['admin','comercial','recepcao'],
             'sec-meta': ['admin','comercial'], 'sec-arquivo-morto': ['admin','comercial'],
             'sec-salas': ['admin','recepcao'],
-            'sec-doashared': ['admin'], 'sec-doavol': ['admin'], 'sec-receptoras': ['admin'], 'sec-embriao': ['admin'],
+            'sec-doashared': ['admin'], 'sec-doavol': ['admin'], 'sec-receptoras': ['admin'], 'sec-embriao': ['admin'], 'sec-doaembriao': ['admin'],
             'sec-resumo': ['admin'], 'sec-fin': ['admin'], 'sec-cr': ['admin'], 'sec-caixa': ['admin'],
             'sec-repasses': ['admin'], 'sec-socios': ['admin'], 'sec-medicamentos': ['admin'],
             'sec-exec': ['admin'], 'sec-estoque': ['admin'],
@@ -6792,6 +6870,7 @@
             if (id === 'sec-doavol') dvTab.renderPending();
             if (id === 'sec-receptoras') rcTab.renderPending();
             if (id === 'sec-embriao') ebTab.renderPending();
+            if (id === 'sec-doaembriao') deTab.renderPending();
             if (id === 'sec-resumo') loadAndRenderResumo();
             if (id === 'sec-fin') loadAndRenderFinanceiro();
             if (id === 'sec-socios') loadSociosLive();
@@ -7105,6 +7184,7 @@
                                 <option value="Investigando" ${sel('Investigando')}>Investigando</option>
                                 <option value="Coito Programado" ${sel('Coito Programado')}>Coito Programado</option>
                                 <option value="Embrião Doado" ${sel('Embrião Doado')}>Receptora Embrião Doado</option>
+                                <option value="Doadores de Embrião" ${sel('Doadores de Embrião')}>Doadores de Embrião</option>
                                 <option value="Doadora Voluntária" ${sel('Doadora Voluntária')}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${sel('Congelamento')}>Congelamento</option>
                                 <option value="Nova TEC" ${sel('Nova TEC')}>Nova TEC</option>
@@ -8796,7 +8876,7 @@
             });
 
             // KPIs — deduplica por paciente (uma paciente pode ter múltiplos agendamentos em doaPatients)
-            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nAlta = 0, nSem = 0;
+            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nAlta = 0, nSem = 0, nDoaEmb = 0;
             const kpiSeenKeys = new Set();
             doaPatients.forEach(p => {
                 if (!fgvAtivo(p) || kpiSeenKeys.has(p.key)) return;
@@ -8809,6 +8889,7 @@
                 else if (cls === 'Coito Programado') nCoito++;
                 else if (cls === 'Embrião Doado') nEmbriao++;
                 else if (cls === 'Doadora Voluntária') nFivOd++;
+                else if (cls === 'Doadores de Embrião') nDoaEmb++;
                 else if (cls === 'Congelamento') nCong++;
                 else if (cls === 'Nova TEC') nCong++; // conta junto com Congelamento
                 // Fora do funil comercial: já fechou/terminou o tratamento, não é lead
@@ -8824,6 +8905,7 @@
             set('doa-coito', nCoito);
             set('doa-embriao', nEmbriao);
             set('doa-fiv-od', nFivOd);
+            set('doa-doa-embriao', nDoaEmb);
             set('doa-congelamento', nCong);
             set('doa-alta', nAlta);
             set('doa-sem-class', nSem);
@@ -8849,6 +8931,7 @@
                             : cls === 'Investigando' ? 'cls-investigando'
                             : cls === 'Coito Programado' ? 'cls-coito'
                             : cls === 'Embrião Doado' ? 'cls-embriao'
+                            : cls === 'Doadores de Embrião' ? 'cls-doa-embriao'
                             : cls === 'Doadora Voluntária' ? 'cls-fiv-od'
                             : cls === 'Congelamento' ? 'cls-congelamento'
                             : cls === 'Nova TEC' ? 'cls-nova-tec'
@@ -8884,6 +8967,7 @@
                                 <option value="Investigando" ${cls === 'Investigando' ? 'selected' : ''}>Investigando</option>
                                 <option value="Coito Programado" ${cls === 'Coito Programado' ? 'selected' : ''}>Coito Programado</option>
                                 <option value="Embrião Doado" ${cls === 'Embrião Doado' ? 'selected' : ''}>Receptora Embrião Doado</option>
+                                <option value="Doadores de Embrião" ${cls === 'Doadores de Embrião' ? 'selected' : ''}>Doadores de Embrião</option>
                                 <option value="Doadora Voluntária" ${cls === 'Doadora Voluntária' ? 'selected' : ''}>Doadora Voluntária</option>
                                 <option value="Congelamento" ${cls === 'Congelamento' ? 'selected' : ''}>Congelamento</option>
                                 <option value="Nova TEC" ${cls === 'Nova TEC' ? 'selected' : ''}>Nova TEC</option>
@@ -8908,6 +8992,7 @@
                 : value === 'Investigando' ? 'cls-investigando'
                 : value === 'Coito Programado' ? 'cls-coito'
                 : value === 'Embrião Doado' ? 'cls-embriao'
+                : value === 'Doadores de Embrião' ? 'cls-doa-embriao'
                 : value === 'Doadora Voluntária' ? 'cls-fiv-od'
                 : value === 'Congelamento' ? 'cls-congelamento'
                 : value === 'Nova TEC' ? 'cls-nova-tec'
@@ -8921,7 +9006,7 @@
             crmSaveLocal();
 
             // Atualizar KPIs — deduplica por paciente
-            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nAlta = 0, nSem = 0;
+            let nFiv = 0, nComp = 0, nRec = 0, nInv = 0, nCoito = 0, nEmbriao = 0, nFivOd = 0, nCong = 0, nAlta = 0, nSem = 0, nDoaEmb = 0;
             const kpiSeen2 = new Set();
             doaPatients.forEach(p => {
                 if (!fgvAtivo(p) || kpiSeen2.has(p.key)) return;
@@ -8934,6 +9019,7 @@
                 else if (cls === 'Coito Programado') nCoito++;
                 else if (cls === 'Embrião Doado') nEmbriao++;
                 else if (cls === 'Doadora Voluntária') nFivOd++;
+                else if (cls === 'Doadores de Embrião') nDoaEmb++;
                 else if (cls === 'Congelamento') nCong++;
                 else if (cls === 'Nova TEC') nCong++; // conta junto com Congelamento
                 // Fora do funil comercial: já fechou/terminou o tratamento, não é lead
@@ -8949,6 +9035,7 @@
             s('doa-coito', nCoito);
             s('doa-embriao', nEmbriao);
             s('doa-fiv-od', nFivOd);
+            s('doa-doa-embriao', nDoaEmb);
             s('doa-congelamento', nCong);
             s('doa-alta', nAlta);
             s('doa-sem-class', nSem);
@@ -10777,6 +10864,7 @@
                     if (typeof dvTab !== 'undefined') dvTab.load(json.profiles);
                     if (typeof rcTab !== 'undefined') rcTab.load(json.profiles);
                     if (typeof ebTab !== 'undefined') ebTab.load(json.profiles);
+                    if (typeof deTab !== 'undefined') deTab.load(json.profiles);
                     updateDonorTabBadges();
                 }
             } catch(e) { console.error('Erro ao carregar perfis:', e); }
@@ -10803,6 +10891,7 @@
             if (typeof dvTab !== 'undefined') setBadge('tabBadgeDv', dvTab.getPending().length);
             if (typeof rcTab !== 'undefined') setBadge('tabBadgeRc', rcTab.getPending().length);
             if (typeof ebTab !== 'undefined') setBadge('tabBadgeEb', ebTab.getPending().length);
+            if (typeof deTab !== 'undefined') setBadge('tabBadgeDe', deTab.getPending().length);
         }
 
         function dnIsDistancia(d) {
@@ -11426,8 +11515,10 @@
         const dvTab = makeDonorTab({ tabId: 'dv', classFilters: ['Doadora Voluntária'], patientSource: () => avalDoadPatients, hideSp: true });
         const rcTab = makeDonorTab({ tabId: 'rc', classFilters: ['Receptora'] });
         const ebTab = makeDonorTab({ tabId: 'eb', classFilters: ['Embrião Doado'] });
+        // Casal que DOA os embriões (não a receptora): perfil dos dois lados, igual ao eb.
+        const deTab = makeDonorTab({ tabId: 'de', classFilters: ['Doadores de Embrião'] });
         // Expose tabs globally so modal onclicks can resolve by tab ID string
-        window.dvTab = dvTab; window.rcTab = rcTab; window.ebTab = ebTab;
+        window.dvTab = dvTab; window.rcTab = rcTab; window.ebTab = ebTab; window.deTab = deTab;
 
         async function reloadData() {
             document.getElementById('loadingOverlay').style.display = 'flex';
