@@ -8992,11 +8992,15 @@
             {name:'C. Escuro',      label:'Castanho escuro', img:'images/hair/cabelo-castanho-escuro.jpg'},
             {name:'Preto',          label:'Preto',           img:'images/hair/cabelo-preto.jpg'}
         ];
+        // 'name' é o valor GRAVADO. 'Liso Pontas' entrou em 01/08/2026 (o 1B da tabela de
+        // tipos de cabelo: liso do comprimento todo, ondulando só nas pontas). Os 4 antigos
+        // não mudaram, então perfil já preenchido continua marcado.
         const DN_HAIR_TYPES = [
-            {name:'Liso'},
-            {name:'Ondulado'},
-            {name:'Cacheado'},
-            {name:'Crespo'}
+            {name:'Liso',         label:'Liso'},
+            {name:'Liso Pontas',  label:'Liso c/ pontas onduladas'},
+            {name:'Ondulado',     label:'Ondulado'},
+            {name:'Cacheado',     label:'Cacheado'},
+            {name:'Crespo',       label:'Crespo'}
         ];
         // 7 variações. A imagem é RECORTE de foto real (um olho por linha da referência que
         // a equipe mandou), guardado em images/eyes. ⚠️ 'name' é o valor GRAVADO: os cinco
@@ -9070,6 +9074,7 @@
         function dnHairTypeCards(prefix, tabPfx='dn') {
             const types = {
                 'Liso': (c) => [10,22,34,46,58,70].map(x => `<line x1="${x}" y1="2" x2="${x}" y2="62" stroke="${c}" stroke-width="4" stroke-linecap="round"/>`).join(''),
+                'Liso Pontas': (c) => [10,22,34,46,58,70].map(x => `<path d="M${x},2 L${x},34 Q${x+6},44 ${x},52 Q${x-6},58 ${x},63" stroke="${c}" fill="none" stroke-width="3.6" stroke-linecap="round"/>`).join(''),
                 'Ondulado': (c) => [10,24,38,52,66].map(x => `<path d="M${x},2 Q${x+8},18 ${x},32 Q${x-8},46 ${x},62" stroke="${c}" fill="none" stroke-width="3.5" stroke-linecap="round"/>`).join(''),
                 'Cacheado': (c) => [12,28,44,60].map(x => `<path d="M${x},2 C${x+12},8 ${x-12},18 ${x},24 C${x+12},30 ${x-12},40 ${x},46 C${x+12},52 ${x-12},58 ${x},64" stroke="${c}" fill="none" stroke-width="3" stroke-linecap="round"/>`).join(''),
                 'Crespo': (c) => [8,20,32,44,56,68].map(x => `<path d="M${x},2 Q${x+4},5 ${x},8 Q${x-4},11 ${x},14 Q${x+4},17 ${x},20 Q${x-4},23 ${x},26 Q${x+4},29 ${x},32 Q${x-4},35 ${x},38 Q${x+4},41 ${x},44 Q${x-4},47 ${x},50 Q${x+4},53 ${x},56 Q${x-4},59 ${x},62" stroke="${c}" fill="none" stroke-width="2.5" stroke-linecap="round"/>`).join('')
@@ -9081,7 +9086,7 @@
                 </svg>`;
                 return `<div class="dn-vcard" data-group="${tabPfx}-${prefix}-cabelo-tipo" data-value="${t.name}" onclick="dnSelectChip(this)">
                     <div class="dn-vc-preview">${svg}</div>
-                    <div class="dn-vc-label">${t.name}</div>
+                    <div class="dn-vc-label">${t.label || t.name}</div>
                     <div class="dn-vc-mark">( )</div>
                 </div>`;
             }).join('')}</div>`;
