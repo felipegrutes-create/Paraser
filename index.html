@@ -9042,6 +9042,7 @@
             {id:'hereditaria',label:'Possui doenças hereditariamente transmissíveis?',detail:true},
             {id:'cancer',label:'Histórico de Câncer?',detail:true},
             {id:'alergia',label:'Possui alguma alergia?',detail:true},
+            {id:'oftalmo',label:'Possui algum diagnóstico oftálmico?',detail:true,ph:'Qual'},
             {id:'gravidez',label:'Já esteve grávida?',detail:true},
             {id:'cirurgia',label:'Fez alguma cirurgia?',detail:true},
             {id:'psiq',label:'Faz ou fez tratamento psiquiátrico?',detail:true},
@@ -9272,11 +9273,6 @@
                                 <option>Judia</option><option>Sem religião</option>
                             </select>
                         </div>
-                        <div class="dn-field"><label>Usa Óculos?</label>
-                            <select id="${tabPfx}-${prefix}-oculos" onchange="dnMirrorToProfile('${tabPfx}','oculos',this.value)">
-                                <option value="">—</option><option>Sim</option><option>Não</option>
-                            </select>
-                        </div>
                         <div class="dn-field"><label>Atividade Física Regular?</label>
                             <select id="${tabPfx}-${prefix}-atividade">
                                 <option value="">—</option><option>Sim</option><option>Não</option>
@@ -9492,11 +9488,12 @@
         // Espelha pro bloco "Perfil da Paciente" o que também é digitado lá em cima, pra
         // ninguém preencher a mesma informação duas vezes. Sangue/altura/peso já eram
         // espelhados; 01/08/2026 entraram estado civil, escolaridade, profissão, religião,
-        // hobby, vegetariana e óculos, que existiam nos dois lugares sem conversar.
+        // hobby e vegetariana, que existiam nos dois lugares sem conversar. Óculos saiu em
+        // 01/08/2026 a pedido da Dra Bianca: virou "diagnóstico oftálmico" no histórico médico.
         const DN_ESPELHO = {
             sangue: 'tipo_sanguineo', estado_civil: 'estado_civil', escolaridade: 'escolaridade',
             profissao: 'profissao', religiao: 'religiao', hobby: 'hobby',
-            vegetariana: 'vegetariana', oculos: 'usa_oculos'
+            vegetariana: 'vegetariana'
         };
         function dnMirrorToProfile(tabPfx, field, value) {
             const p = tabPfx + '_eb_pf_';
@@ -9630,7 +9627,6 @@
                         ${fld('Estado Civil', sel('pf_estado_civil', ['Solteira','Casada','Viúva','Divorciada','União Estável']))}
                         ${fld('Tem Filhos?', sel('pf_tem_filhos', ['Sim','Não']))}
                         ${fld('Vegetariana?', sel('pf_vegetariana', ['Sim','Não']))}
-                        ${fld('Usa Óculos?', sel('pf_usa_oculos', ['Sim','Não']))}
                         ${fld('Fumante?', sel('pf_fumante', ['Sim','Não']))}
                         ${fld('Etilista?', sel('pf_etilista', ['Sim','Não']))}
                         ${fld('Alergia', inp('pf_alergia'))}
@@ -10400,7 +10396,6 @@
                 ov_profissao: document.getElementById('dn-ov-profissao')?.value || '',
                 ov_etnia: document.getElementById('dn-ov-etnia')?.value || '',
                 ov_religiao: document.getElementById('dn-ov-religiao')?.value || '',
-                ov_oculos: document.getElementById('dn-ov-oculos')?.value || '',
                 ov_atividade: document.getElementById('dn-ov-atividade')?.value || '',
                 ov_vegetariana: document.getElementById('dn-ov-vegetariana')?.value || '',
                 ov_hobby: document.getElementById('dn-ov-hobby')?.value || '',
@@ -10442,7 +10437,7 @@
             // Campos novos da faixa de cima (31/07/2026): nascimento, estado civil, escolaridade, profissão.
             [['ov_nascimento','dn-ov-nascimento'],['ov_estado_civil','dn-ov-estado-civil'],
              ['ov_escolaridade','dn-ov-escolaridade'],['ov_profissao','dn-ov-profissao'],
-             ['ov_etnia','dn-ov-etnia'],['ov_religiao','dn-ov-religiao'],['ov_oculos','dn-ov-oculos'],['ov_atividade','dn-ov-atividade'],['ov_vegetariana','dn-ov-vegetariana'],['ov_hobby','dn-ov-hobby'],['ov_personalidade','dn-ov-personalidade'],['ov_idiomas','dn-ov-idiomas']].forEach(([campo, id]) => {
+             ['ov_etnia','dn-ov-etnia'],['ov_religiao','dn-ov-religiao'],['ov_atividade','dn-ov-atividade'],['ov_vegetariana','dn-ov-vegetariana'],['ov_hobby','dn-ov-hobby'],['ov_personalidade','dn-ov-personalidade'],['ov_idiomas','dn-ov-idiomas']].forEach(([campo, id]) => {
                 const el = document.getElementById(id); if (el && data[campo]) el.value = data[campo];
             });
             if (data.ov_sangue) document.getElementById('dn-ov-sangue').value = data.ov_sangue;
@@ -10870,7 +10865,6 @@
                     ov_profissao: document.getElementById(`${T}-ov-profissao`)?.value || '',
                     ov_etnia: document.getElementById(`${T}-ov-etnia`)?.value || '',
                     ov_religiao: document.getElementById(`${T}-ov-religiao`)?.value || '',
-                    ov_oculos: document.getElementById(`${T}-ov-oculos`)?.value || '',
                     ov_atividade: document.getElementById(`${T}-ov-atividade`)?.value || '',
                     ov_vegetariana: document.getElementById(`${T}-ov-vegetariana`)?.value || '',
                     ov_hobby: document.getElementById(`${T}-ov-hobby`)?.value || '',
@@ -10917,7 +10911,7 @@
                 // Campos novos da faixa de cima (31/07/2026).
                 [['ov_nascimento','-ov-nascimento'],['ov_estado_civil','-ov-estado-civil'],
                  ['ov_escolaridade','-ov-escolaridade'],['ov_profissao','-ov-profissao'],
-                 ['ov_etnia','-ov-etnia'],['ov_religiao','-ov-religiao'],['ov_oculos','-ov-oculos'],['ov_atividade','-ov-atividade'],['ov_vegetariana','-ov-vegetariana'],['ov_hobby','-ov-hobby'],['ov_personalidade','-ov-personalidade'],['ov_idiomas','-ov-idiomas']].forEach(([campo, sufixo]) => {
+                 ['ov_etnia','-ov-etnia'],['ov_religiao','-ov-religiao'],['ov_atividade','-ov-atividade'],['ov_vegetariana','-ov-vegetariana'],['ov_hobby','-ov-hobby'],['ov_personalidade','-ov-personalidade'],['ov_idiomas','-ov-idiomas']].forEach(([campo, sufixo]) => {
                     const el = document.getElementById(T + sufixo); if (el && data[campo]) el.value = data[campo];
                 });
                 [`${T}-ov-cabelo`,`${T}-ov-cabelo-tipo`,`${T}-ov-olhos`,`${T}-ov-pele`,`${T}-sp-cabelo`,`${T}-sp-cabelo-tipo`,`${T}-sp-olhos`,`${T}-sp-pele`].forEach(g => {
