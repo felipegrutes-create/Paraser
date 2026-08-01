@@ -8996,20 +8996,18 @@
             {name:'Cacheado'},
             {name:'Crespo'}
         ];
-        // As fotos de olho saíram em 31/07/2026 (agora é desenho, dnOlhoSVG_). Continuam
-        // no repo, em images/eyes, caso um dia se queira voltar.
-        // 7 variações pedidas pela equipe em 31/07/2026 (as pacientes pedem detalhe na cor
-        // dos olhos). ⚠️ 'value' é o que fica GRAVADO no perfil: os cinco antigos mantêm o
-        // texto de antes ('C. Claro', 'C. Escuro') pra não desmarcar perfil já preenchido.
-        // O que mudou nesses foi só o rótulo que aparece na tela.
+        // 7 variações. A imagem é RECORTE de foto real (um olho por linha da referência que
+        // a equipe mandou), guardado em images/eyes. ⚠️ 'name' é o valor GRAVADO: os cinco
+        // antigos mantêm o texto de antes ('C. Claro', 'C. Escuro') pra não desmarcar perfil
+        // já preenchido; só o rótulo na tela mudou.
         const DN_EYE_COLORS = [
-            {name:'Azul',           label:'Azul',            iris:'#4a90d9', ring:'#1b4a7e'},
-            {name:'Verde',          label:'Verde',           iris:'#6b9e4a', ring:'#2f5a26'},
-            {name:'Mel/Avelã',      label:'Mel / Avelã',     iris:'#b98b45', ring:'#6d5027'},
-            {name:'C. Claro',       label:'Castanho claro',  iris:'#a9743c', ring:'#653f1f'},
-            {name:'Castanho Médio', label:'Castanho médio',  iris:'#7d4f2a', ring:'#472a14'},
-            {name:'C. Escuro',      label:'Castanho escuro', iris:'#5a3720', ring:'#2e1a0d'},
-            {name:'Preto',          label:'Preto',           iris:'#2b211a', ring:'#0d0907'}
+            {name:'Azul',           label:'Azul',            img:'images/eyes/olho-azul.png'},
+            {name:'Verde',          label:'Verde',           img:'images/eyes/olho-verde.png'},
+            {name:'Mel/Avelã',      label:'Mel / Avelã',     img:'images/eyes/olho-mel-avela.png'},
+            {name:'C. Claro',       label:'Castanho claro',  img:'images/eyes/olho-castanho-claro.png'},
+            {name:'Castanho Médio', label:'Castanho médio',  img:'images/eyes/olho-castanho-medio.png'},
+            {name:'C. Escuro',      label:'Castanho escuro', img:'images/eyes/olho-castanho-escuro.png'},
+            {name:'Preto',          label:'Preto',           img:'images/eyes/olho-preto.png'}
         ];
         // As fotos de pele saíram em 31/07/2026: a escala agora usa avatar desenhado
         // (dnAvatarPele_). As imagens continuam no repo, em images/skin e images/skin-male,
@@ -9114,41 +9112,13 @@
             }).join('')}</div>`;
         }
 
-        // Olho desenhado, um só (a equipe disse que não precisa o par). Cada cartão tem
-        // seu próprio id de gradiente/recorte, senão um cartão herda o do outro quando o
-        // formulário aparece mais de uma vez na página.
-        function dnOlhoSVG_(iris, ring, uid) {
-            const forma = 'M4 25C18 7 52 7 66 25 52 43 18 43 4 25Z';
-            return `<svg viewBox="0 0 70 50" width="70" height="50" aria-hidden="true">
-                <defs>
-                    <radialGradient id="ir${uid}" cx="45%" cy="42%" r="62%">
-                        <stop offset="30%" stop-color="${iris}"/>
-                        <stop offset="100%" stop-color="${ring}"/>
-                    </radialGradient>
-                    <clipPath id="cl${uid}"><path d="${forma}"/></clipPath>
-                </defs>
-                <path d="${forma}" fill="#f8f5f1"/>
-                <g clip-path="url(#cl${uid})">
-                    <circle cx="35" cy="25" r="12.5" fill="url(#ir${uid})"/>
-                    <circle cx="35" cy="25" r="12.5" fill="none" stroke="${ring}" stroke-width="1.6"/>
-                    <circle cx="35" cy="25" r="5" fill="#120d0a"/>
-                    <circle cx="31" cy="21" r="2.6" fill="#fff" opacity=".9"/>
-                    <circle cx="39" cy="29" r="1.2" fill="#fff" opacity=".35"/>
-                </g>
-                <path d="M4 25C18 7 52 7 66 25" fill="none" stroke="#3a2a20" stroke-width="2.6" stroke-linecap="round"/>
-                <path d="M4 25C18 43 52 43 66 25" fill="none" stroke="#7a6154" stroke-width="1.3" opacity=".8"/>
-            </svg>`;
-        }
-
         function dnEyeColorCards(prefix, tabPfx='dn') {
-            return `<div class="dn-vcards">${DN_EYE_COLORS.map((e, i) => {
-                const uid = `${tabPfx}${prefix}${i}`;
-                return `<div class="dn-vcard" data-group="${tabPfx}-${prefix}-olhos" data-value="${e.name}" onclick="dnSelectChip(this)">
-                    <div class="dn-vc-eye-preview">${dnOlhoSVG_(e.iris, e.ring, uid)}</div>
+            return `<div class="dn-vcards">${DN_EYE_COLORS.map(e =>
+                `<div class="dn-vcard" data-group="${tabPfx}-${prefix}-olhos" data-value="${e.name}" onclick="dnSelectChip(this)">
+                    <div class="dn-vc-eye-preview"><img src="${e.img}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>
                     <div class="dn-vc-label">${e.label || e.name}</div>
                     <div class="dn-vc-mark">( )</div>
-                </div>`;
-            }).join('')}</div>`;
+                </div>`).join('')}</div>`;
         }
 
         // Avatar desenhado (SVG) no lugar da foto de pessoa real, pedido da equipe em
