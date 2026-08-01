@@ -1668,6 +1668,27 @@
             gap: 14px 18px;
         }
         .dn-field-row.dn-outras .dn-field-larga { grid-column: span 2; }
+        /* Características familiares (01/08/2026): mesmas opções dos cartões da doadora,
+           só que em lista, senão seriam 8 grades de figurinha dentro do formulário. */
+        .dn-fam-lado { margin-bottom: 12px; }
+        .dn-fam-quem { font-size: 11px; font-weight: 700; letter-spacing: .06em;
+            text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+        .dn-fam-obs { width: 100%; min-height: 64px; resize: vertical; background: var(--surface2);
+            border: 1px solid var(--border); border-radius: 8px; color: inherit;
+            padding: 8px 10px; font: inherit; }
+        /* Painel de exames: reproduz o cartão dourado que a equipe já usa no material da
+           doadora. Não tem campo pra preencher: só doa quem está normal e negativa. */
+        .dn-exames { display: grid; gap: 14px; padding: 16px 18px; border-radius: 12px;
+            background: linear-gradient(155deg, #9c7c2e, #6f5620); color: #fdf6e3;
+            border: 1px solid rgba(255,255,255,.18); }
+        .dn-ex-tit { font-size: 13px; font-weight: 800; letter-spacing: .08em;
+            text-transform: uppercase; margin-bottom: 4px; }
+        .dn-ex-nota { font-size: 11.5px; line-height: 1.45; opacity: .9; margin: 0; }
+        .dn-ex-lista { margin: 0; padding-left: 16px; font-size: 12.5px; line-height: 1.7; }
+        .dn-ex-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .dn-ex-chip { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+            background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); }
+        .dn-ex-chip b { font-weight: 800; }
         @media (max-width: 900px) { .dn-field-row.dn-outras .dn-field-larga { grid-column: auto; } }
         .dn-fitz-face { width:72px; height:84px; border-radius:6px; overflow:hidden; background:#fff; }
         .dn-fitz-card.selected .dn-fitz-face { box-shadow:0 0 0 2px var(--accent); }
@@ -9057,6 +9078,62 @@
             {id:'cirurgia',label:'Fez alguma cirurgia?',detail:true},
             {id:'psiq',label:'Faz ou fez tratamento psiquiátrico?',detail:true},
         ];
+        // Características da mãe e do pai (Dra Bianca, 01/08/2026). Usam exatamente as mesmas
+        // opções dos cartões da doadora, então o vocabulário do perfil continua um só.
+        const DN_FAM_CARACT = ['mae_pele','mae_olhos','mae_cabelo','mae_cabelo_tipo',
+            'pai_pele','pai_olhos','pai_cabelo','pai_cabelo_tipo','familia_obs'];
+
+        function dnSelectOpcoes_(id, lista, textoDe) {
+            return `<select id="${id}"><option value="">—</option>${
+                lista.map(o => `<option value="${o.name || o.id}">${textoDe(o)}</option>`).join('')}</select>`;
+        }
+
+        function dnCaractFamiliares_(prefix, tabPfx) {
+            const base = q => `${tabPfx}-${prefix}-${q}`;
+            const lado = (quem, rot) => `
+                <div class="dn-fam-lado">
+                    <div class="dn-fam-quem">Características ${rot}</div>
+                    <div class="dn-field-row dn-outras">
+                        <div class="dn-field"><label>Cor da pele</label>
+                            ${dnSelectOpcoes_(base(quem+'-pele'), DN_FITZ, f => `${f.label} · ${f.pele}`)}</div>
+                        <div class="dn-field"><label>Cor dos olhos</label>
+                            ${dnSelectOpcoes_(base(quem+'-olhos'), DN_EYE_COLORS, o => o.label)}</div>
+                        <div class="dn-field"><label>Cor do cabelo</label>
+                            ${dnSelectOpcoes_(base(quem+'-cabelo'), DN_HAIR_COLORS, o => o.label)}</div>
+                        <div class="dn-field"><label>Característica do cabelo</label>
+                            ${dnSelectOpcoes_(base(quem+'-cabelo-tipo'), DN_HAIR_TYPES, o => o.label)}</div>
+                    </div>
+                </div>`;
+            return lado('mae','da mãe') + lado('pai','do pai') + `
+                <div class="dn-fam-quem">Alguma observação sobre a família</div>
+                <textarea class="dn-fam-obs" id="${base('familia-obs')}" placeholder="Espaço livre"></textarea>`;
+        }
+
+        // Exames: painel fixo, sem campo pra preencher. A doadora só é aprovada com cariótipo
+        // normal e sorologias negativas, então o perfil já nasce com o resultado escrito.
+        function dnPainelExames_() {
+            const negativas = ['HIV','Hepatite C','Gonorreia','Sífilis','Hepatite B','Clamídia'];
+            return `<div class="dn-exames">
+                <div>
+                    <div class="dn-ex-tit">🩸 Sorologias</div>
+                    <p class="dn-ex-nota">Informamos que nosso banco atende a todas as normas vigentes
+                    estabelecidas pela ANVISA (órgão regulador).</p>
+                </div>
+                <div>
+                    <div class="dn-ex-tit">🧬 Genético</div>
+                    <ul class="dn-ex-lista">
+                        <li>Cariótipo: <b>NORMAL</b></li>
+                        <li>Pesquisa de hemoglobina S: <b>NEGATIVA</b></li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="dn-ex-tit">🩸 Sorologias negativas</div>
+                    <div class="dn-ex-chips">${negativas.map(n =>
+                        `<span class="dn-ex-chip">${n} <b>NEGATIVO</b></span>`).join('')}</div>
+                </div>
+            </div>`;
+        }
+
         // Antecedentes Familiares (Dra Bianca, 01/08/2026). Nenhuma linha vem marcada:
         // "Mãe viva? Não" por padrão seria uma informação clínica falsa.
         const DN_FAMILIAR = [
@@ -9311,8 +9388,10 @@
 
                 <div class="dn-subsec"><h5>Histórico Médico Pessoal</h5>${dnMedTable(tabPfx+'_'+prefix+'_med', medQuestions)}</div>
                 <div class="dn-subsec"><h5>Antecedentes Familiares</h5>${dnMedTable(tabPfx+'_'+prefix+'_fam', DN_FAMILIAR, prefix === 'sp')}</div>
+                <div class="dn-subsec"><h5>Características Familiares</h5>${dnCaractFamiliares_(prefix, tabPfx)}</div>
                 <div class="dn-subsec"><h5>Malformações Congênitas</h5>${dnMedSimple(tabPfx+'_'+prefix+'_malf', DN_MALFORM)}</div>
                 <div class="dn-subsec"><h5>Doenças Genéticas Hereditárias</h5>${dnMedSimple(tabPfx+'_'+prefix+'_gen', DN_GENETICA)}</div>
+                <div class="dn-subsec"><h5>Exames</h5>${dnPainelExames_()}</div>
             </div>`;
         }
 
@@ -10381,6 +10460,22 @@
                 || document.querySelector(`input[name="dn_${nome}"]${sufixo}`);
         }
 
+        function dnGetCampos_(prefix, campos, tabPfx) {
+            const r = {};
+            campos.forEach(c => {
+                const el = document.getElementById(`${tabPfx}-${prefix}-${c.replace(/_/g,'-')}`);
+                r[`${prefix}_${c}`] = el ? el.value : '';
+            });
+            return r;
+        }
+
+        function dnSetCampos_(prefix, campos, tabPfx, data) {
+            campos.forEach(c => {
+                const el = document.getElementById(`${tabPfx}-${prefix}-${c.replace(/_/g,'-')}`);
+                if (el && data[`${prefix}_${c}`]) el.value = data[`${prefix}_${c}`];
+            });
+        }
+
         function dnGetRadios(prefix, questions) {
             const result = {};
             questions.forEach(q => {
@@ -10425,6 +10520,7 @@
                 ov_pele: dnGetChip('ov-pele'),
                 ...dnGetRadios('ov_med', DN_MED_PERSONAL_OV),
                 ...dnGetRadios('ov_fam', DN_FAMILIAR),
+                ...dnGetCampos_('ov', DN_FAM_CARACT, 'dn'),
                 ...dnGetRadios('ov_malf', DN_MALFORM),
                 ...dnGetRadios('ov_gen', DN_GENETICA),
                 sp_sangue: document.getElementById('dn-sp-sangue')?.value || '',
@@ -10436,6 +10532,7 @@
                 sp_pele: dnGetChip('sp-pele'),
                 ...dnGetRadios('sp_med', DN_MED_PERSONAL_SP),
                 ...dnGetRadios('sp_fam', DN_FAMILIAR),
+                ...dnGetCampos_('sp', DN_FAM_CARACT, 'dn'),
                 ...dnGetRadios('sp_malf', DN_MALFORM),
                 ...dnGetRadios('sp_gen', DN_GENETICA),
                 info_adicional: document.getElementById('dnInfoAdicional')?.value || '',
@@ -10463,6 +10560,8 @@
             if (data.sp_sangue) document.getElementById('dn-sp-sangue').value = data.sp_sangue;
             if (data.sp_altura) { document.getElementById('dn-sp-altura').value = data.sp_altura; const v3=document.getElementById('dn-sp-altura-val'); if(v3) v3.textContent=data.sp_altura; dnCalcIMC('sp'); }
             if (data.sp_peso) { document.getElementById('dn-sp-peso').value = data.sp_peso; const v4=document.getElementById('dn-sp-peso-val'); if(v4) v4.textContent=data.sp_peso; dnCalcIMC('sp'); }
+            dnSetCampos_('ov', DN_FAM_CARACT, 'dn', data);
+            dnSetCampos_('sp', DN_FAM_CARACT, 'dn', data);
             // Chips
             ['ov-cabelo','ov-cabelo-tipo','ov-olhos','ov-pele','sp-cabelo','sp-cabelo-tipo','sp-olhos','sp-pele'].forEach(g => {
                 const key = g.replace(/-/g,'_');
@@ -10896,6 +10995,7 @@
                     ov_pele: dnGetChip(`${T}-ov-pele`),
                     ...dnGetRadios(`${T}_ov_med`, DN_MED_PERSONAL_OV),
                     ...dnGetRadios(`${T}_ov_fam`, DN_FAMILIAR),
+                    ...dnGetCampos_('ov', DN_FAM_CARACT, T),
                     ...dnGetRadios(`${T}_ov_malf`, DN_MALFORM),
                     ...dnGetRadios(`${T}_ov_gen`, DN_GENETICA),
                     sp_sangue: document.getElementById(`${T}-sp-sangue`)?.value || '',
@@ -10907,6 +11007,7 @@
                     sp_pele: dnGetChip(`${T}-sp-pele`),
                     ...dnGetRadios(`${T}_sp_med`, DN_MED_PERSONAL_SP),
                     ...dnGetRadios(`${T}_sp_fam`, DN_FAMILIAR),
+                    ...dnGetCampos_('sp', DN_FAM_CARACT, T),
                     ...dnGetRadios(`${T}_sp_malf`, DN_MALFORM),
                     ...dnGetRadios(`${T}_sp_gen`, DN_GENETICA),
                     info_adicional: document.getElementById(T + 'InfoAdicional')?.value || '',
@@ -10933,6 +11034,8 @@
                  ['ov_etnia','-ov-etnia'],['ov_religiao','-ov-religiao'],['ov_atividade','-ov-atividade'],['ov_vegetariana','-ov-vegetariana'],['ov_hobby','-ov-hobby'],['ov_personalidade','-ov-personalidade'],['ov_idiomas','-ov-idiomas']].forEach(([campo, sufixo]) => {
                     const el = document.getElementById(T + sufixo); if (el && data[campo]) el.value = data[campo];
                 });
+                dnSetCampos_('ov', DN_FAM_CARACT, T, data);
+                dnSetCampos_('sp', DN_FAM_CARACT, T, data);
                 [`${T}-ov-cabelo`,`${T}-ov-cabelo-tipo`,`${T}-ov-olhos`,`${T}-ov-pele`,`${T}-sp-cabelo`,`${T}-sp-cabelo-tipo`,`${T}-sp-olhos`,`${T}-sp-pele`].forEach(g => {
                     const key = g.replace(new RegExp(`^${T}-`), '').replace(/-/g,'_');
                     const val = data[key];
