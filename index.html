@@ -1660,12 +1660,15 @@
         }
         .dn-fitz-card:hover { border-color:rgba(0,0,0,0.3); }
         .dn-fitz-card.selected { border-color:var(--accent); box-shadow:0 0 12px rgba(0,212,170,0.3); }
-        /* Bloco "Outras Informações Pessoais" (01/08/2026): quebra em várias linhas e
-           dá mais largura pros campos de escrever livre. */
-        .dn-outras { flex-wrap: wrap; gap: 12px 18px; }
-        .dn-outras .dn-field { min-width: 150px; }
-        .dn-outras .dn-field-larga { min-width: 260px; flex: 1 1 260px; }
-        .dn-outras input, .dn-outras select { width: 100%; }
+        /* Bloco "Outras Informações Pessoais" (01/08/2026). ⚠️ .dn-field-row é grid com
+           auto-fit de 100px: com 8 campos vira uma linha só e os rótulos se atropelam.
+           Por isso o seletor duplo, pra ganhar dele, e a coluna mínima maior. */
+        .dn-field-row.dn-outras {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px 18px;
+        }
+        .dn-field-row.dn-outras .dn-field-larga { grid-column: span 2; }
+        @media (max-width: 900px) { .dn-field-row.dn-outras .dn-field-larga { grid-column: auto; } }
         .dn-fitz-face { width:72px; height:84px; border-radius:6px; overflow:hidden; background:#fff; }
         .dn-fitz-card.selected .dn-fitz-face { box-shadow:0 0 0 2px var(--accent); }
         .dn-fitz-info { text-align:center; }
