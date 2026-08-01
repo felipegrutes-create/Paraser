@@ -9154,48 +9154,21 @@
         // Avatar desenhado (SVG) no lugar da foto de pessoa real, pedido da equipe em
         // 31/07/2026. Ganho extra: não depende de imagem baixada da internet, então carrega
         // sempre, e o tom de pele é exatamente o da escala em vez do tom da foto.
-        // Mistura dois hex (t = 0..1). Usado pra derivar sombra, luz e tom do ombro a
-        // partir da própria cor de pele, em vez de cravar cor por tipo.
-        function dnMix_(a, b, t) {
-            const h = c => [1,3,5].map(i => parseInt(c.substr(i,2),16));
-            const [r1,g1,b1] = h(a), [r2,g2,b2] = h(b);
-            const p = n => Math.round(n).toString(16).padStart(2,'0');
-            return '#' + p(r1+(r2-r1)*t) + p(g1+(g2-g1)*t) + p(b1+(b2-b1)*t);
-        }
-
-        // Avatar da escala de pele. Chapado e recortado num círculo de propósito: em 64px
-        // detalhe vira sujeira, forma limpa lê bem. A 1ª versão tentava rosto realista e
-        // ficou ruim (feedback do Felipe em 31/07/2026).
-        function dnAvatarPele_(skin, hair, isMale) {
-            const uid    = String(skin).replace('#','') + (isMale ? 'm' : 'f');
-            const ombro  = dnMix_(skin, '#2b1a10', .30);
-            const aro    = dnMix_(skin, '#2b1a10', .16);
-            const luzCab = dnMix_(hair, '#ffffff', .24);
-            const cabelo = isMale
-                ? `<path d="M32 11.4c-9.8 0-14.6 6.2-14.6 16.2 0 2 .1 3.9.4 5.7l3.4-.9c-.2-1.6-.3-3.2-.3-4.8 0-6 3.4-8.8 11.1-8.8s11.1 2.8 11.1 8.8c0 1.6-.1 3.2-.3 4.8l3.4.9c.3-1.8.4-3.7.4-5.7 0-10-4.8-16.2-14.6-16.2z" fill="${hair}"/>`
-                : `<path d="M32 9.2c-11 0-16.8 7-16.8 18.4 0 6.6.9 13.4 2.6 20.4l4.6-1.2c-1.5-6.4-2.3-12.6-2.3-18.4 0-7.6 3.7-11 11.9-11s11.9 3.4 11.9 11c0 5.8-.8 12-2.3 18.4l4.6 1.2c1.7-7 2.6-13.8 2.6-20.4C48.8 16.2 43 9.2 32 9.2z" fill="${hair}"/>`;
-            const brilho = isMale
-                ? `<path d="M21.8 21.6c2.4-3 5.8-4.4 10.2-4.4s7.8 1.4 10.2 4.4c-2.8-1.7-6.2-2.5-10.2-2.5s-7.4.8-10.2 2.5z" fill="${luzCab}" opacity=".5"/>`
-                : `<path d="M20.8 20.6c2.8-3.4 6.6-5 11.2-5s8.4 1.6 11.2 5c-3.2-2-7-2.9-11.2-2.9s-8 .9-11.2 2.9z" fill="${luzCab}" opacity=".45"/>`;
-            return `<svg viewBox="0 0 64 64" width="100%" height="100%" style="display:block" aria-hidden="true">
-                <defs><clipPath id="pel${uid}"><circle cx="32" cy="32" r="31"/></clipPath></defs>
-                <circle cx="32" cy="32" r="31" fill="#f2ede7"/>
-                <g clip-path="url(#pel${uid})">
-                    <path d="M32 40.4c-11.8 0-21.4 7.7-21.4 17.2V68h42.8V57.6c0-9.5-9.6-17.2-21.4-17.2z" fill="${ombro}"/>
-                    <path d="M27.3 33.6h9.4v11c0 2.6-2.1 4.7-4.7 4.7s-4.7-2.1-4.7-4.7z" fill="${skin}"/>
-                    <ellipse cx="32" cy="27" rx="12.6" ry="14.4" fill="${skin}"/>
-                    ${cabelo}
-                    ${brilho}
-                </g>
-                <circle cx="32" cy="32" r="30.2" fill="none" stroke="${aro}" stroke-width="1.5" opacity=".4"/>
-            </svg>`;
+        // Avatar da escala de pele: ilustração pronta (estilo Lorelei, licença CC0, gerada
+        // no dicebear com o tom de pele e de cabelo de cada tipo) baixada pro repo em
+        // images/avatars. Duas tentativas de desenhar isso à mão em SVG saíram ruins
+        // (31/07/2026); ilustração feita por quem desenha bem resolve melhor, e como o
+        // arquivo mora aqui não depende de serviço externo pra abrir.
+        function dnAvatarPele_(indice, isMale) {
+            const arq = `images/avatars/pele-${isMale ? 'm' : 'f'}-${indice + 1}.svg`;
+            return `<img src="${arq}" alt="" loading="lazy" style="width:100%;height:100%;display:block">`;
         }
 
         function dnFitzCards(prefix, tabPfx='dn') {
             const isMale = prefix === 'sp';
-            return `<div class="dn-fitz-cards">${DN_FITZ.map(f => `
+            return `<div class="dn-fitz-cards">${DN_FITZ.map((f, i) => `
                 <div class="dn-fitz-card" data-group="${tabPfx}-${prefix}-pele" data-value="${f.id}" onclick="dnSelectChip(this)">
-                    <div class="dn-fitz-face">${dnAvatarPele_(f.skin, f.hair, isMale)}</div>
+                    <div class="dn-fitz-face">${dnAvatarPele_(i, isMale)}</div>
                     <div class="dn-fitz-info">
                         <div class="dn-fitz-type">${f.label}</div>
                         <div class="dn-fitz-pele">${f.pele}</div>
