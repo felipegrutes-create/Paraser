@@ -228,6 +228,9 @@ function doGet(e) {
     }
 
     if (action === 'get_estoque') return handleGetEstoque();
+    // Notas de compra linha a linha (produto, data, quantidade, valor unitário). O get_estoque
+    // só guarda o ÚLTIMO preço; pra custo médio de compra precisa de todas as entradas.
+    if (action === 'get_estoque_nf') return handleGetEstoqueNF();
     if (action === 'parse_nfs')   return handleParseNFs();
 
     // Meta comercial — barra da meta lida pelo dashboard
@@ -1542,6 +1545,33 @@ function handleParseNFs() {
 function _estoqueKey(nome) {
   var partes = String(nome || '').trim().toUpperCase().split(/[\s–—\-]+/);
   return partes.slice(0, 2).filter(Boolean).join(' ');
+}
+
+// Entradas de nota fiscal cruas, pro dashboard calcular custo médio ponderado por produto.
+// Só leitura; devolve o mínimo (produto, data, qtd, unitário, total, fornecedor).
+function handleGetEstoqueNF() {
+  try {
+    const d = getOrCreateEstoqueNFSheet().getDataRange().getValues();
+    const out = [];
+    for (let i = 1; i < d.length; i++) {
+      const produto = String(d[i][4] || '').trim();
+      if (!produto) continue;
+      const qtd  = parseFloat(d[i][5] || 0);
+      const unit = parseFloat(d[i][7] || 0);
+      out.push({
+        produto: produto,
+        data: d[i][1] instanceof Date ? Utilities.formatDate(d[i][1], 'America/Sao_Paulo', 'yyyy-MM-dd') : String(d[i][1] || ''),
+        fornecedor: String(d[i][2] || ''),
+        quantidade: qtd,
+        unidade: String(d[i][6] || ''),
+        valor_unit: unit,
+        valor_total: parseFloat(d[i][8] || 0) || (qtd * unit)
+      });
+    }
+    return jsonOk({ ok: true, entradas: out });
+  } catch (e) {
+    return jsonErr('Erro ao ler entradas de NF: ' + e.message);
+  }
 }
 
 function handleGetEstoque() {

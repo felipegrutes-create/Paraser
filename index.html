@@ -4422,6 +4422,7 @@
                 <div class="chart-card" style="flex:1">
                     <h3>💊 Medicamentos — receita, custo e margem <span id="resMedSub" style="font-size:11px;font-weight:400;color:var(--muted)">receita = itens de medicação faturados no Feegow · custo = categoria MEDICAÇÕES do fluxo de caixa · a compra vem em lote, então a linha (margem acumulada no ano) diz mais que o mês isolado</span></h3>
                     <canvas id="resChartMed" height="200"></canvas>
+                    <div id="resMedTabela" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px"></div>
                 </div>
             </div>
 
@@ -16854,6 +16855,7 @@
             _resRenderEntSaiRet(receb || [], desp || {}, ret || {});
             _resRenderFolha(receb || [], folha || {});
             _resRenderMed();
+            _resRenderMedTabela();
             _resRenderTaxasMes();
             _resRenderAnos(receb || []);
             _resRenderCaixa();
@@ -17988,6 +17990,150 @@
                     plugins: [rotulos]
                 });
             } finally { _resMedRodando = false; }
+        }
+
+
+        // ===== Medicamento a medicamento: preço de venda × custo médio de compra ==========
+        // Custo médio = ponderado por quantidade em TODAS as notas do produto (não o último
+        // preço). Venda = itens de medicação faturados no Feegow que têm nome de produto.
+        // ⚠️ O casamento é por marca. Quando a dosagem do que se compra é diferente da que se
+        // vende (compra caneta de 900, vende dose de 300), a linha sai marcada pra conferir:
+        // sem o fator de conversão a margem mente.
+        const MED_PALAVRAS_IGNORADAS = ['DE','DA','DO','COM','SEM','PARA','MG','MCG','UI','ML',
+            'AMP','CX','UN','INJ','PEN','CAPS','FRASCO','DOSE','AMPOLA','1SER','SER'];
+
+        function _medMarca_(nome) {
+            const limpo = (nome || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+            for (const p of limpo) {
+                if (p.length < 4 || MED_PALAVRAS_IGNORADAS.includes(p) || /^\d/.test(p)) continue;
+                return p;
+            }
+            return limpo[0] || '';
+        }
+
+        // Primeira dosagem citada no nome ("PERGOVERIS 300 UI" → 300; "900/450IU" → 900).
+        function _medDose_(nome) {
+            const m = (nome || '').toUpperCase().replace(',', '.').match(/(\d+(?:\.\d+)?)\s*(UI|IU|MCG|MG)/);
+            return m ? parseFloat(m[1]) : null;
+        }
+
+        async function _medCustoMedioPorProduto() {
+            const r = await fetch(CRM_SCRIPT_URL + '?action=get_estoque_nf');
+            const j = await r.json();
+            const por = {};
+            (j.entradas || []).forEach(e => {
+                const k = (e.produto || '').toUpperCase();
+                if (!k || !e.quantidade) return;
+                if (!por[k]) por[k] = { qtd: 0, total: 0, notas: 0 };
+                por[k].qtd += e.quantidade;
+                por[k].total += e.valor_total || (e.quantidade * e.valor_unit);
+                por[k].notas++;
+            });
+            return Object.entries(por).map(([produto, v]) => ({
+                produto, marca: _medMarca_(produto), dose: _medDose_(produto),
+                qtd: v.qtd, notas: v.notas, medio: v.qtd ? v.total / v.qtd : 0
+            }));
+        }
+
+        async function _medVendasPorProduto(ano) {
+            const hoje = new Date();
+            const ultimo = (ano === hoje.getFullYear()) ? hoje.getMonth() : 11;
+            const itens = {};
+            for (let m = 0; m <= ultimo; m++) {
+                let invs = [];
+                try { invs = await fgLoadMonth(new Date(ano, m, 1)); } catch (e) { continue; }
+                (invs || []).forEach(inv => (inv.itens || []).forEach(it => {
+                    if (_isCanc(it) || !isCrMedItem(it)) return;
+                    const n = (it.nomeResolvido || it.descricao || '').trim().toUpperCase();
+                    // linha de pacote não diz qual remédio é: fica fora da conta por produto
+                    if (!n || /MEDICAMENTO|MEDICACAO|MEDICAÇÃO/.test(n)) return;
+                    if (!itens[n]) itens[n] = { qtd: 0, receita: 0 };
+                    itens[n].qtd += (Number(it.quantidade) || 1);
+                    itens[n].receita += (parseInt(it.valor || '0', 10) || 0) / 100;
+                }));
+            }
+            return itens;
+        }
+
+        let _medTabelaRodando = false;
+        async function _resRenderMedTabela() {
+            const el = document.getElementById('resMedTabela'); if (!el || _medTabelaRodando) return;
+            _medTabelaRodando = true;
+            el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px 0">⏳ cruzando notas de compra com o que foi vendido…</div>';
+            try {
+                const ano = _resDate.getFullYear();
+                const [compras, vendas] = await Promise.all([
+                    _medCustoMedioPorProduto().catch(() => []),
+                    _medVendasPorProduto(ano).catch(() => ({}))
+                ]);
+                const linhas = Object.entries(vendas).map(([nome, v]) => {
+                    const marca = _medMarca_(nome), dose = _medDose_(nome);
+                    const cands = compras.filter(c => c.produto.includes(marca) || c.marca === marca);
+                    let custo = null, origem = '', alerta = '';
+                    if (cands.length) {
+                        // preferido: mesma dosagem. senão, o mais comprado, avisando.
+                        const igual = cands.filter(c => dose && c.dose && Math.abs(c.dose - dose) < 0.01);
+                        const esc = (igual.length ? igual : cands).sort((a, b) => b.qtd - a.qtd)[0];
+                        custo = esc.medio; origem = esc.produto;
+                        if (!igual.length && dose && esc.dose && esc.dose !== dose) {
+                            alerta = 'compra ' + esc.dose + ', vende ' + dose;
+                        }
+                    }
+                    const precoVenda = v.qtd ? v.receita / v.qtd : 0;
+                    const custoTotal = custo != null ? custo * v.qtd : null;
+                    return { nome, qtd: v.qtd, receita: v.receita, precoVenda, custo, custoTotal, origem, alerta };
+                }).filter(l => l.receita > 0).sort((a, b) => b.receita - a.receita);
+
+                const f = n => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
+                const casadas = linhas.filter(l => l.custoTotal != null && !l.alerta);
+                const somaR = casadas.reduce((s, l) => s + l.receita, 0);
+                const somaC = casadas.reduce((s, l) => s + l.custoTotal, 0);
+                const receitaTotal = linhas.reduce((s, l) => s + l.receita, 0);
+
+                el.innerHTML = `
+                    <div style="font-size:12px;color:var(--muted);margin:2px 0 10px">
+                        ${linhas.length} medicamentos vendidos com nome de produto em ${ano} ·
+                        ${casadas.length} com custo confiável (${f(somaR)} vendidos, ${f(somaC)} de custo,
+                        <b style="color:${somaR - somaC >= 0 ? 'var(--success)' : 'var(--danger)'}">margem ${somaR ? ((somaR - somaC) / somaR * 100).toFixed(1).replace('.', ',') : '0'}%</b>)
+                    </div>
+                    <div style="overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+                        <thead><tr style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em">
+                            <th style="text-align:left;padding:7px 8px">Medicamento</th>
+                            <th style="text-align:right;padding:7px 8px">Qtd</th>
+                            <th style="text-align:right;padding:7px 8px">Preço de venda</th>
+                            <th style="text-align:right;padding:7px 8px">Custo médio</th>
+                            <th style="text-align:right;padding:7px 8px">Receita</th>
+                            <th style="text-align:right;padding:7px 8px">Lucro</th>
+                            <th style="text-align:right;padding:7px 8px">Margem</th>
+                        </tr></thead>
+                        <tbody>${linhas.map(l => {
+                            const lucro = l.custoTotal != null ? l.receita - l.custoTotal : null;
+                            const marg = (lucro != null && l.receita > 0) ? (lucro / l.receita * 100) : null;
+                            const cor = marg == null ? 'var(--muted)' : marg >= 0 ? 'var(--success)' : 'var(--danger)';
+                            return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
+                                <td style="padding:7px 8px">${l.nome.slice(0, 46)}
+                                    ${l.alerta ? `<span title="${l.origem}" style="margin-left:6px;font-size:10px;color:var(--warning);border:1px solid var(--warning);border-radius:5px;padding:1px 5px">⚠ ${l.alerta}</span>` : ''}
+                                    ${l.custo == null ? '<span style="margin-left:6px;font-size:10px;color:var(--muted)">sem nota de compra</span>' : ''}</td>
+                                <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums">${l.qtd}</td>
+                                <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums">${f(l.precoVenda)}</td>
+                                <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums;color:${l.custo == null ? 'var(--muted)' : 'inherit'}">${l.custo == null ? '—' : f(l.custo)}</td>
+                                <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums">${f(l.receita)}</td>
+                                <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums;color:${cor}">${lucro == null ? '—' : f(lucro)}</td>
+                                <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums;font-weight:700;color:${cor}">${marg == null ? '—' : marg.toFixed(0) + '%'}</td>
+                            </tr>`;
+                        }).join('')}</tbody>
+                    </table></div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">
+                        ⚠️ As linhas marcadas compram numa dosagem e vendem em outra (ex.: compra caneta de 900 UI,
+                        vende dose de 300 UI). Enquanto ninguém definir quantas doses saem de cada caneta, a margem
+                        delas não vale. As linhas de pacote (medicação da doadora, antecipação, Projeto Ana)
+                        ficam de fora desta tabela: elas não dizem qual medicamento foi usado.
+                    </div>`;
+            } catch (e) {
+                el.innerHTML = '<div style="color:var(--danger);font-size:12px">Não consegui cruzar compra e venda: ' + e.message + '</div>';
+            } finally { _medTabelaRodando = false; }
         }
 
         function _execRenderComposicao(m) {
