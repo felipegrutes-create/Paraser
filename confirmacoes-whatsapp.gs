@@ -1312,6 +1312,15 @@ function formatPhone(raw) {
   return null;
 }
 
+// 5521999998888 → (21) 99999-8888. O formatPhone_ guarda o número colado, do jeito
+// que a Z-API precisa; quem lê no Slack precisa dele legível.
+function telefoneLegivel_(fone) {
+  var d = (fone || '').toString().replace(/\D/g, '').replace(/^55/, '');
+  if (d.length === 11) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+  if (d.length === 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+  return fone;
+}
+
 // ================================================================
 // DEBUG — descobre os procIds de procedimentos sem confirmação.
 // Varre 90 dias e lista todos os procIds que aparecem para médicos
@@ -2977,9 +2986,15 @@ function notificarPrimeiraUSG() {
     var ag = pac[pid], p = getPatientData(pid);
     var proc = resolveNomeProc(ag) || ('procId ' + ag.procedimento_id);
     var prof = carregarProfissionais()[ag.profissional_id] || '';
+    // Telefone no aviso (03/08/2026): o comercial precisava caçar o contato no Feegow
+    // pra falar com a paciente. Vai legível e com link do WhatsApp; sem telefone
+    // cadastrado, avisa em vez de sumir com a linha.
+    var contato = p.phone ? '📱 ' + telefoneLegivel_(p.phone) + ' · <https://wa.me/' + p.phone + '|abrir no WhatsApp>'
+                          : '📱 _sem telefone cadastrado no Feegow_';
     slackPostComercial('🔬 *Primeira USG* — ' + (p.nome || ('paciente ' + pid)) +
       ' faz a *primeira USG* dela hoje (' + proc + (prof ? ' · ' + prof : '') +
-      ' às ' + formatHora(ag.horario || '') + ').\nMarco de início de tratamento — vale acompanhar. 💜');
+      ' às ' + formatHora(ag.horario || '') + ').\n' + contato +
+      '\nMarco de início de tratamento — vale acompanhar. 💜');
     novos.push(pid);                                // primeira USG → entra na base
   });
   _usgHistAdd_(sh, novos);
@@ -2996,7 +3011,8 @@ function _simularPrimeiraUsg_(limit) {
   var base = _usgHistSet_(), ids = Object.keys(pac), out = [];
   ids.slice(0, limit || 30).forEach(function (pid) {
     var p = getPatientData(pid);
-    out.push({ paciente: p.nome || pid, proc: resolveNomeProc(pac[pid]), veredito: base[pid] ? 'ja fez antes' : 'PRIMEIRA USG' });
+    out.push({ paciente: p.nome || pid, telefone: p.phone ? telefoneLegivel_(p.phone) : '(sem telefone)',
+               proc: resolveNomeProc(pac[pid]), veredito: base[pid] ? 'ja fez antes' : 'PRIMEIRA USG' });
   });
   return { data: hojeISO, totalPacientesUsgHoje: ids.length, baseTamanho: Object.keys(base).length, amostra: out };
 }
