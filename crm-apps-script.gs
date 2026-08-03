@@ -313,6 +313,9 @@ function doGet(e) {
     // não distingue pasta vazia de arquivo em formato que ele não lê.
     if (action === 'get_cartao_arquivos') return handleCartaoArquivos_();
     if (action === 'get_cartao_xlsx') return handleCartaoXlsxPreview_(e.parameter);
+    // Devolve o PDF da fatura em base64 pro navegador ler com o leitor de PDF dele.
+    // O script tem acesso à pasta; a analista não precisa ter.
+    if (action === 'get_cartao_pdf')  return handleCartaoPdf_(e.parameter);
 
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
@@ -350,6 +353,8 @@ function doPost(e) {
     // Nota fiscal enviada pelo sistema: grava o XML na pasta do Drive. Também fora da fila —
     // é só criar arquivo, e quem esperava na fila morria com "Tempo limite do bloqueio".
     if (action === 'upload_nf_xml') return handleUploadNFXml(body);
+    // Lançamentos que o navegador leu do PDF da fatura do cartão.
+    if (action === 'salvar_cartao_pdf') return handleSalvarCartaoPdf_(body);
     // Nota lida do PDF (ou digitada à mão) e conferida na tela antes de salvar.
     if (action === 'add_nf_itens')  return handleAddNFItens(body);
 
@@ -2158,6 +2163,88 @@ function _cartaoEmpresaMes_(nome) {
   return { empresa: empresa, competencia: mes ? ano + '-' + mes : '' };
 }
 
+
+// Lançamentos lidos do PDF da fatura (o navegador lê e manda pra cá). Ficam numa aba
+// própria e entram no mesmo painel que o XLSX alimenta.
+const CARTAO_PDF_SHEET = 'Cartao_Fatura_PDF';
+const CARTAO_PDF_HEADERS = ['arquivo','empresa','competencia','vencimento','total_fatura',
+                            'data','dia','descricao','parcela','valor','importado_em'];
+
+function getOrCreateCartaoPdfSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(CARTAO_PDF_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(CARTAO_PDF_SHEET);
+    sh.getRange(1, 1, 1, CARTAO_PDF_HEADERS.length).setValues([CARTAO_PDF_HEADERS]);
+    sh.getRange(1, 1, 1, CARTAO_PDF_HEADERS.length).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function handleSalvarCartaoPdf_(body) {
+  try {
+    const arquivo = String(body.arquivo || '').trim();
+    const itens = body.itens || [];
+    if (!arquivo) return jsonErr('Falta o nome do arquivo');
+    if (!itens.length) return jsonErr('Nenhum lançamento pra salvar');
+
+    const sh = getOrCreateCartaoPdfSheet_();
+    const d = sh.getDataRange().getValues();
+    // Reprocessar a mesma fatura substitui o que estava lá, em vez de somar de novo.
+    for (let i = d.length - 1; i >= 1; i--) {
+      if (String(d[i][0]).trim() === arquivo) sh.deleteRow(i + 1);
+    }
+    const agora = new Date();
+    const linhas = itens.map(function (it) {
+      return [arquivo, String(body.empresa || ''), String(body.competencia || ''),
+              String(body.vencimento || ''), Number(body.total_fatura) || 0,
+              String(it.data || ''), String(it.dia || ''), String(it.descricao || ''),
+              String(it.parcela || ''), Number(it.valor) || 0, agora];
+    }).filter(function (l) { return l[7] && l[9]; });
+    if (!linhas.length) return jsonErr('Os lançamentos vieram sem descrição ou sem valor');
+    sh.getRange(sh.getLastRow() + 1, 1, linhas.length, CARTAO_PDF_HEADERS.length).setValues(linhas);
+    return jsonOk({ ok: true, arquivo: arquivo, itens: linhas.length });
+  } catch (e) {
+    return jsonErr('Não consegui salvar os lançamentos do PDF: ' + e.message);
+  }
+}
+
+function _cartaoItensDoPdf_() {
+  const out = [];
+  try {
+    const d = getOrCreateCartaoPdfSheet_().getDataRange().getValues();
+    for (let i = 1; i < d.length; i++) {
+      if (!d[i][7]) continue;
+      out.push({
+        arquivo: String(d[i][0]), empresa: String(d[i][1]), competencia: String(d[i][2]),
+        vencimento: String(d[i][3]), totalFatura: Number(d[i][4]) || 0,
+        data: String(d[i][5]), dia: String(d[i][6]), descricao: String(d[i][7]),
+        parcela: String(d[i][8]), valor: Number(d[i][9]) || 0,
+        portador: '', origem: 'pdf',
+        fitid: 'pdf|' + d[i][0] + '|' + d[i][6] + '|' + d[i][7] + '|' + d[i][9]
+      });
+    }
+  } catch (e) {}
+  return out;
+}
+
+function handleCartaoPdf_(p) {
+  try {
+    const alvo = String((p && p.arquivo) || '').trim();
+    if (!alvo) return jsonErr('Diga qual arquivo');
+    const files = getOrCreateCartaoFolder_().getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      if (f.getName() !== alvo) continue;
+      return jsonOk({ ok: true, nome: f.getName(), base64: Utilities.base64Encode(f.getBlob().getBytes()) });
+    }
+    return jsonErr('Não achei ' + alvo + ' na pasta');
+  } catch (e) {
+    return jsonErr('Erro lendo o PDF: ' + e.message);
+  }
+}
+
 function handleCartaoArquivos_() {
   try {
     const folder = getOrCreateCartaoFolder_();
@@ -2215,6 +2302,24 @@ function handleCartaoFatura_() {
                    vencimento: cab ? cab.vencimento : '', total: cab && cab.total != null ? cab.total : soma,
                    lancamentos: novos });
   }
+  // Junta o que veio dos PDFs (lidos no navegador e guardados na aba própria), sem repetir
+  // o que o XLSX da mesma fatura já trouxe: mesma descrição, mesmo valor, mesmo dia.
+  const assinatura = {};
+  itens.forEach(function (it) {
+    assinatura[String(it.descricao).toUpperCase().slice(0, 18) + '|' + it.valor] = true;
+  });
+  _cartaoItensDoPdf_().forEach(function (it) {
+    if (assinatura[String(it.descricao).toUpperCase().slice(0, 18) + '|' + it.valor]) return;
+    itens.push(it);
+    const jaTem = faturas.some(function (f) { return f.arquivo === it.arquivo; });
+    if (!jaTem) faturas.push({ arquivo: it.arquivo, empresa: it.empresa, competencia: it.competencia,
+                               vencimento: it.vencimento, total: it.totalFatura, lancamentos: 0, origem: 'pdf' });
+  });
+  faturas.forEach(function (f) {
+    if (f.origem !== 'pdf') return;
+    f.lancamentos = itens.filter(function (i) { return i.arquivo === f.arquivo; }).length;
+  });
+
   const porMes = {}, porPortador = {};
   itens.forEach(function(it) {
     const mes = it.competencia || String(it.data).slice(0, 7);

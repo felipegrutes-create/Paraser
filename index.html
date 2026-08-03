@@ -4024,8 +4024,11 @@
 
             <!-- Fatura do cartão de crédito IMPORTADA (OFX/CSV do portal Itaú, pasta no Drive) -->
             <div class="chart-card" style="margin-top:20px">
-                <h3>💳 Fatura do Cartão de Crédito · Itaú <span id="finFaturaSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
-                <div id="finFaturaBox"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                    <h3 style="margin:0">💳 Fatura do Cartão de Crédito · Itaú <span id="finFaturaSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                    <button class="cr-reload-btn" id="finLerPdfBtn" onclick="finLerPdfsFatura()">📄 Ler os PDFs da pasta</button>
+                </div>
+                <div id="finFaturaBox" style="margin-top:12px"></div>
             </div>
         </section>
 
@@ -15301,6 +15304,103 @@
             if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
         }
 
+        // ===== Faturas em PDF ============================================================
+        // O PDF do Itaú tem os lançamentos, só que como texto de duas colunas. O navegador lê
+        // (pdf.js) e manda pro servidor guardar. Só grava se a soma dos lançamentos bater com
+        // o total que a própria fatura declara: se não bater, alguma coisa foi lida errado.
+        function _faturaPdfLer(txt) {
+            // Depois dos lançamentos do mês vem "Compras parceladas - próximas faturas", que é
+            // gasto FUTURO. Somar aquilo dobrava o valor da fatura.
+            const corte = txt.search(/Compras parceladas\s*[-–]\s*pr[óo]ximas faturas|Total dos lan[çc]amentos atuais/i);
+            const corpo = corte > 0 ? txt.slice(0, corte) : txt;
+            const itens = [];
+            const rx = /(\d{2}\/\d{2})(?!\/)\s+(.+?)\s+(-\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})(?=\s|$)/g;
+            let m;
+            while ((m = rx.exec(corpo)) !== null) {
+                const desc = m[2].trim();
+                if (!desc || /^DATA\b/i.test(desc) || /LIMITE DE GASTOS|LIMITE RETIRADA|PAGAMENTO EFETUADO/i.test(desc)) continue;
+                const valor = (m[3] ? -1 : 1) * Number(m[4].replace(/\./g, '').replace(',', '.'));
+                if (!isFinite(valor) || valor === 0) continue;
+                const mp = desc.match(/(\d{2})\/(\d{2})\s*$/);
+                itens.push({ dia: m[1], descricao: desc.replace(/\s*\d{2}\/\d{2}\s*$/, '').trim(),
+                             parcela: mp ? mp[1] + '/' + mp[2] : '', valor: valor });
+            }
+            const t = (txt.match(/Total desta fatura\s+([\d.]+,\d{2})/) || [])[1];
+            const venc = (txt.match(/Vencimento:\s*(\d{2}\/\d{2}\/\d{4})/) || [])[1] || '';
+            return { itens: itens, total: t ? Number(t.replace(/\./g, '').replace(',', '.')) : null, vencimento: venc };
+        }
+
+        // O PDF só traz dia/mês. O ano sai da competência da fatura; compra de parcela antiga
+        // (mês maior que o da fatura) é do ano anterior.
+        function _faturaPdfData(dia, competencia) {
+            if (!competencia || !/^\d{2}\/\d{2}$/.test(dia)) return '';
+            const ano = parseInt(competencia.slice(0, 4), 10);
+            const mesFat = parseInt(competencia.slice(5, 7), 10);
+            const d = dia.slice(0, 2), mm = parseInt(dia.slice(3, 5), 10);
+            return (mm > mesFat ? ano - 1 : ano) + '-' + dia.slice(3, 5) + '-' + d;
+        }
+
+        function _faturaCompetencia(nome) {
+            const N = nome.toUpperCase();
+            const meses = { JAN: '01', FEV: '02', MAR: '03', ABR: '04', MAI: '05', JUN: '06',
+                            JUL: '07', AGO: '08', SET: '09', OUT: '10', NOV: '11', DEZ: '12' };
+            let mes = '';
+            Object.keys(meses).forEach(k => { if (!mes && new RegExp('[^A-Z]' + k + '[^A-Z]').test(N)) mes = meses[k]; });
+            const ano = (N.match(/20\d\d/) || [])[0] || String(new Date().getFullYear());
+            return { empresa: /INST/.test(N) ? 'Instituto' : (/PAR/.test(N) ? 'Paraser' : ''),
+                     competencia: mes ? ano + '-' + mes : '' };
+        }
+
+        async function finLerPdfsFatura() {
+            const btn = document.getElementById('finLerPdfBtn');
+            const antes = btn ? btn.textContent : '';
+            try {
+                if (btn) { btn.disabled = true; btn.textContent = '⏳ listando a pasta…'; }
+                const lista = await fetch(CRM_SCRIPT_URL + '?action=get_cartao_arquivos').then(r => r.json());
+                if (!lista.ok) throw new Error(lista.error || 'não consegui listar a pasta');
+                const pdfs = (lista.arquivos || []).filter(a => /\.pdf$/i.test(a.nome));
+                if (!pdfs.length) { alert('Não há PDF de fatura na pasta.'); return; }
+
+                const ok = [], falhas = [];
+                for (let i = 0; i < pdfs.length; i++) {
+                    const nome = pdfs[i].nome;
+                    if (btn) btn.textContent = `⏳ lendo ${i + 1}/${pdfs.length}…`;
+                    try {
+                        const j = await fetch(CRM_SCRIPT_URL + '?action=get_cartao_pdf&arquivo=' + encodeURIComponent(nome)).then(r => r.json());
+                        if (!j.ok) throw new Error(j.error || 'não veio o arquivo');
+                        const bin = atob(j.base64), u8 = new Uint8Array(bin.length);
+                        for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+                        const texto = await _pdfTexto(new File([u8], nome, { type: 'application/pdf' }));
+                        const lido = _faturaPdfLer(texto);
+                        const soma = lido.itens.reduce((s, x) => s + x.valor, 0);
+                        // Confere com o total impresso na fatura. 1 centavo de folga por arredondamento.
+                        if (lido.total == null || Math.abs(soma - lido.total) > 0.01) {
+                            falhas.push(nome + ': soma R$ ' + soma.toFixed(2) + ' ≠ total da fatura '
+                                + (lido.total == null ? 'não encontrado' : 'R$ ' + lido.total.toFixed(2)));
+                            continue;
+                        }
+                        const em = _faturaCompetencia(nome);
+                        const itens = lido.itens.map(it => ({ ...it, data: _faturaPdfData(it.dia, em.competencia) }));
+                        const r = await fetch(CRM_SCRIPT_URL, {
+                            method: 'POST', headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify({ action: 'salvar_cartao_pdf', arquivo: nome,
+                                empresa: em.empresa, competencia: em.competencia,
+                                vencimento: lido.vencimento.split('/').reverse().join('-'),
+                                total_fatura: lido.total, itens: itens })
+                        }).then(x => x.json());
+                        if (!r.ok) throw new Error(r.error || 'o servidor recusou');
+                        ok.push(nome + ': ' + r.itens + ' lançamentos');
+                    } catch (e) { falhas.push(nome + ': ' + e.message); }
+                }
+                let msg = ok.length ? `✅ ${ok.length} fatura(s) lida(s):\n` + ok.join('\n') : '';
+                if (falhas.length) msg += `\n\n⚠ ${falhas.length} não entraram (nada foi gravado delas):\n` + falhas.join('\n');
+                alert(msg || 'Nada novo.');
+                if (ok.length) await _finRenderFatura(true);
+            } catch (e) {
+                alert('⚠ ' + e.message);
+            } finally { if (btn) { btn.disabled = false; btn.textContent = antes || '📄 Ler os PDFs da pasta'; } }
+        }
+
         // Fatura do cartão importada (get_cartao_fatura). Lê OFX, CSV e o XLSX exportado do
         // portal Itaú, que é o formato que a analista realmente baixa. O XLSX vem separado
         // POR PORTADOR do cartão, então dá pra ver quem gastou, não só quanto.
@@ -15388,7 +15488,7 @@
 
             box.innerHTML = `
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">${cartoes}</div>
-                ${d.naoLidos ? `<div style="font-size:11.5px;color:var(--warning);margin-bottom:14px">⚠ ${d.naoLidos} arquivo(s) da pasta não foram lidos: PDF é a imagem do extrato e não traz os lançamentos separados. Exporte a mesma fatura em XLSX no portal.</div>` : ''}
+                ${d.naoLidos ? `<div style="font-size:11.5px;color:var(--warning);margin-bottom:14px">⚠ ${d.naoLidos} arquivo(s) da pasta ainda não foram lidos. Se forem PDFs de fatura, clique em <b>Ler os PDFs da pasta</b> aqui em cima.</div>` : ''}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px">
                     <div>
                         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Quem gastou</div>
