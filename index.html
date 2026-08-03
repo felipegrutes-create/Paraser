@@ -4417,6 +4417,14 @@
                 </div>
             </div>
 
+            <!-- Medicamentos: o que a paciente pagou × o que a clínica comprou -->
+            <div class="cr-charts-row" style="margin-bottom:16px">
+                <div class="chart-card" style="flex:1">
+                    <h3>💊 Medicamentos — receita, custo e margem <span id="resMedSub" style="font-size:11px;font-weight:400;color:var(--muted)">receita = itens de medicação faturados no Feegow · custo = categoria MEDICAÇÕES do fluxo de caixa · a compra vem em lote, então a linha (margem acumulada no ano) diz mais que o mês isolado</span></h3>
+                    <canvas id="resChartMed" height="200"></canvas>
+                </div>
+            </div>
+
             <!-- Caixa da Rede: o que pingou por dia + taxas pagas -->
             <div class="cr-charts-row" style="margin-bottom:20px">
                 <div class="chart-card" style="flex:1.4">
@@ -16416,6 +16424,16 @@
         // Uso exclusivo dos 2 gráficos de barra do Resumo — não mexe no _execCartaoData global
         // (KPIs/média/outros gráficos seguem só com os meses reais). Meses preenchidos levam
         // futuro:true → ficam FORA da média de meses fechados.
+        // Recebe chaves 'YYYY-MM' soltas e devolve todos os 12 meses de cada ano presente.
+        // Sem isso, um gráfico do ano encolhe até o último mês com dado e parece truncado.
+        function _resMesesCheios_(chaves) {
+            const anos = [...new Set((chaves || []).filter(Boolean).map(k => String(k).slice(0, 4)))];
+            if (!anos.length) return [];
+            const out = [];
+            anos.sort().forEach(ano => { for (let m = 1; m <= 12; m++) out.push(ano + '-' + ('0' + m).slice(-2)); });
+            return out;
+        }
+
         function _resPreencherAno(meses) {
             if (!meses || !meses.length) return meses || [];
             const byMes = {}; meses.forEach(x => byMes[x.mes] = x);
@@ -16835,6 +16853,7 @@
             _resRenderEntSai(receb || [], desp || {});
             _resRenderEntSaiRet(receb || [], desp || {}, ret || {});
             _resRenderFolha(receb || [], folha || {});
+            _resRenderMed();
             _resRenderTaxasMes();
             _resRenderAnos(receb || []);
             _resRenderCaixa();
@@ -17717,7 +17736,10 @@
             const el = document.getElementById('resChartFolha'); if (!el) return;
             if (_resCharts.folha) { try{_resCharts.folha.destroy();}catch(e){} }
             receb = _resPreencherAno(receb);   // enche o ano até dezembro
-            const keys = [...new Set([...(receb || []).map(x => x.mes), ...Object.keys(folhaMap || {})])].sort();
+            // 🔴 03/08/2026: em agosto o gráfico parava em julho. _resPreencherAno completa o ano
+            // do RECEBIMENTO, mas se ele vier vazio (falha na carga) sobram só os meses da folha.
+            // O eixo agora é sempre janeiro a dezembro do ano em tela.
+            const keys = _resMesesCheios_([...(receb || []).map(x => x.mes), ...Object.keys(folhaMap || {})]);
             if (!keys.length) return;
             const rec = keys.map(k => { const r = (receb || []).find(x => x.mes === k); return r ? (r.rede || 0) + (r.pix || 0) + (r.mp || 0) : 0; });
             const clt = keys.map(k => (folhaMap[k] && folhaMap[k].clt) || 0);
@@ -17835,6 +17857,134 @@
                 },
                 plugins: [labelPlugin, refLine20]
             });
+        }
+
+
+        // ===== Medicamentos: receita × custo × margem =====================
+        // Receita: itens de medicação faturados no Feegow (mesmo critério do resto do sistema,
+        // isCrMedItem). Custo: categoria MEDICAÇÕES do fluxo de caixa.
+        // ⚠️ A compra de medicamento vem em lote (um mês compra, três vendem), então a margem
+        // do mês isolado engana. Por isso a linha do gráfico é a margem ACUMULADA no ano.
+        async function _resCustoMedPorMes() {
+            let src = finData;
+            if (!finDataLoaded) { const rows = await loadFinanceData(); src = processFinanceData(rows); }
+            const norm = c => (c || '').toString().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            const map = {};
+            (src || []).forEach(d => {
+                if (!norm(d.categoria).includes('MEDICACOES')) return;
+                const p = (d.caixa || '').split('/');      // 'MM/AAAA'
+                if (p.length !== 2) return;
+                const k = p[1] + '-' + p[0];
+                map[k] = (map[k] || 0) + d.valor;
+            });
+            return map;
+        }
+
+        async function _resReceitaMedPorMes(ano) {
+            const hoje = new Date();
+            const ultimo = (ano === hoje.getFullYear()) ? hoje.getMonth() : 11;
+            const map = {};
+            const meses = [];
+            for (let m = 0; m <= ultimo; m++) meses.push(m);
+            // Cada mês falha sozinho: um erro de rede não apaga o gráfico inteiro.
+            await Promise.all(meses.map(async m => {
+                try {
+                    const invs = await fgLoadMonth(new Date(ano, m, 1));
+                    let soma = 0;
+                    (invs || []).forEach(inv => (inv.itens || []).forEach(it => {
+                        if (_isCanc(it) || !isCrMedItem(it)) return;
+                        soma += (parseInt(it.valor || '0', 10) || 0) / 100;
+                    }));
+                    map[ano + '-' + ('0' + (m + 1)).slice(-2)] = soma;
+                } catch (e) { /* mês sem dado fica sem barra */ }
+            }));
+            return map;
+        }
+
+        let _resMedRodando = false;
+        async function _resRenderMed() {
+            if (_resMedRodando) return;
+            const el = document.getElementById('resChartMed'); if (!el) return;
+            _resMedRodando = true;
+            try {
+                const ano = _resDate.getFullYear();
+                const [custoMap, recMap] = await Promise.all([
+                    _resCustoMedPorMes().catch(() => ({})),
+                    _resReceitaMedPorMes(ano).catch(() => ({}))
+                ]);
+                const keys = _resMesesCheios_([ano + '-01']);
+                const rec   = keys.map(k => recMap[k] || 0);
+                const custo = keys.map(k => custoMap[k] || 0);
+
+                // Margem acumulada: (receita até aqui − custo até aqui) ÷ receita até aqui.
+                let accR = 0, accC = 0;
+                const margem = keys.map((k, i) => {
+                    accR += rec[i]; accC += custo[i];
+                    return accR > 0 ? ((accR - accC) / accR * 100) : null;
+                });
+                const totR = rec.reduce((s, v) => s + v, 0), totC = custo.reduce((s, v) => s + v, 0);
+
+                const sub = document.getElementById('resMedSub');
+                if (sub) {
+                    const f = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+                    sub.textContent = totR > 0
+                        ? f(totR) + ' faturados × ' + f(totC) + ' comprados no ano · margem acumulada '
+                            + ((totR - totC) / totR * 100).toFixed(1).replace('.', ',') + '%'
+                            + ' · receita = itens de medicação no Feegow, custo = categoria MEDICAÇÕES do fluxo'
+                        : 'sem receita de medicamento carregada neste ano';
+                }
+
+                if (_resCharts.med) { try { _resCharts.med.destroy(); } catch (e) {} }
+                const labels = keys.map(k => _MONTHS_PT[parseInt(k.slice(5, 7), 10) - 1].slice(0, 3) + '/' + k.slice(2, 4));
+                const fmtK = v => v >= 1000000 ? (v / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + 'M'
+                                              : (v / 1000).toFixed(0) + 'k';
+                const rotulos = {
+                    id: 'medLabels',
+                    afterDatasetsDraw(chart) {
+                        const { ctx } = chart; ctx.save();
+                        ctx.font = '600 10px Outfit, sans-serif'; ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom'; ctx.fillStyle = '#e2e8f4';
+                        [0, 1].forEach(di => {
+                            const meta = chart.getDatasetMeta(di), val = di === 0 ? rec : custo;
+                            meta.data.forEach((bar, i) => { if (!val[i]) return; ctx.fillText(fmtK(val[i]), bar.x, bar.y - 3); });
+                        });
+                        ctx.restore();
+                    }
+                };
+                _resCharts.med = new Chart(el.getContext('2d'), {
+                    type: 'bar',
+                    data: { labels, datasets: [
+                        { label: 'Receita de medicamentos', data: rec,   backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 34, yAxisID: 'y', order: 2 },
+                        { label: 'Compra de medicamentos',  data: custo, backgroundColor: '#f43f5e', borderRadius: 4, maxBarThickness: 34, yAxisID: 'y', order: 2 },
+                        { label: 'Margem acumulada no ano', data: margem, type: 'line', yAxisID: 'y1',
+                          borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 2, pointRadius: 3,
+                          tension: 0.3, spanGaps: true, order: 1 }
+                    ]},
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+                            tooltip: { callbacks: {
+                                label: ctx => ctx.dataset.type === 'line'
+                                    ? '  margem acumulada: ' + (ctx.raw == null ? '—' : ctx.raw.toFixed(1).replace('.', ',') + '%')
+                                    : '  ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                                footer: items => {
+                                    const r = items.find(i => i.datasetIndex === 0), c = items.find(i => i.datasetIndex === 1);
+                                    if (!r || !c) return '';
+                                    const d = r.raw - c.raw;
+                                    return (d >= 0 ? 'Sobrou ' : 'Faltou ') + 'R$ ' + Math.abs(d).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' no mês';
+                                }
+                            } }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
+                            y: { position: 'left', grace: '18%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                            y1: { position: 'right', ticks: { color: '#fbbf24', font: { size: 10 }, callback: v => v + '%' }, grid: { display: false } }
+                        }
+                    },
+                    plugins: [rotulos]
+                });
+            } finally { _resMedRodando = false; }
         }
 
         function _execRenderComposicao(m) {
