@@ -343,6 +343,9 @@ function doPost(e) {
     // da sincronização horária, que segura o lock por bem mais que os 10s de espera.
     // Fora da fila: não disputa com ninguém e não tem com quem colidir.
     if (action === 'set_meta') return handleSetMeta(body);
+    // Nota fiscal enviada pelo sistema: grava o XML na pasta do Drive. Também fora da fila —
+    // é só criar arquivo, e quem esperava na fila morria com "Tempo limite do bloqueio".
+    if (action === 'upload_nf_xml') return handleUploadNFXml(body);
 
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
@@ -1545,6 +1548,26 @@ function handleParseNFs() {
 function _estoqueKey(nome) {
   var partes = String(nome || '').trim().toUpperCase().split(/[\s–—\-]+/);
   return partes.slice(0, 2).filter(Boolean).join(' ');
+}
+
+// Recebe o XML da nota pelo sistema e joga na mesma pasta do Drive que o importador lê.
+// Assim a analista não precisa de acesso ao Drive nem da conta @paraser.com.br: ela escolhe
+// o arquivo no computador dela e o resto é igual ao que já existia.
+function handleUploadNFXml(body) {
+  try {
+    const nome = String(body.nome || '').trim() || ('nota-' + new Date().getTime() + '.xml');
+    const conteudo = String(body.conteudo || '');
+    if (!conteudo) return jsonErr('XML vazio');
+    if (!/\.xml$/i.test(nome)) return jsonErr('Só aceito arquivo .xml (' + nome + ')');
+    const pasta = DriveApp.getFolderById(PASTA_NFS_XML_ID);
+    // Mesmo nome já na pasta = reenvio do mesmo arquivo. Não duplica.
+    const iguais = pasta.getFilesByName(nome);
+    if (iguais.hasNext()) return jsonOk({ ok: true, nome: nome, repetido: true });
+    pasta.createFile(nome, conteudo, MimeType.PLAIN_TEXT);
+    return jsonOk({ ok: true, nome: nome, repetido: false });
+  } catch (e) {
+    return jsonErr('Não consegui salvar a nota: ' + e.message);
+  }
 }
 
 // Entradas de nota fiscal cruas, pro dashboard calcular custo médio ponderado por produto.

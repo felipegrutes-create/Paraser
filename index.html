@@ -4469,6 +4469,8 @@
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
                 <p class="section-title" style="margin:0">💊 Estoque de Medicamentos</p>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <input type="file" id="estoqueNFInput" accept=".xml" multiple style="display:none" onchange="estoqueEnviarNFs(this)">
+                    <button class="cr-reload-btn" id="estoqueEnviarBtn" onclick="document.getElementById('estoqueNFInput').click()" style="background:rgba(0,212,170,0.14);border-color:rgba(0,212,170,0.4);color:#00d4aa;font-weight:700">📤 Enviar notas do computador</button>
                     <button class="cr-reload-btn" id="estoqueImportBtn" onclick="estoqueImportarNFs()">📥 Importar NFs do Drive</button>
                     <button class="cr-reload-btn" id="estoqueBaixaBtn" onclick="estoqueBaixaHoje()" style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#f87171">📉 Baixa de Hoje</button>
                     <button class="cr-reload-btn" onclick="estoqueAbrirInventario()" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#a5b4fc">📋 Inventário</button>
@@ -6706,7 +6708,7 @@
             'sec-doashared': ['admin'], 'sec-doavol': ['admin'], 'sec-receptoras': ['admin'], 'sec-embriao': ['admin'], 'sec-doaembriao': ['admin'],
             'sec-resumo': ['admin'], 'sec-fin': ['admin'], 'sec-cr': ['admin'], 'sec-caixa': ['admin'],
             'sec-repasses': ['admin'], 'sec-socios': ['admin'], 'sec-medicamentos': ['admin'],
-            'sec-exec': ['admin'], 'sec-estoque': ['admin'],
+            'sec-exec': ['admin'], 'sec-estoque': ['admin','comercial'],   // comercial entra pra lançar as notas de compra
             'sec-marketing': ['admin'], 'sec-uso': ['admin'],  // sec-estrutura virou parte de sec-marketing (16/07)
         };
         function prSession() { return window.PR_SESSION || null; }
@@ -18446,6 +18448,48 @@
                     <td style="padding:9px 12px">${badge}</td>
                 </tr>`;
             }).join('');
+        }
+
+        // A analista escolhe os XML no computador dela; o sistema guarda na pasta do Drive e
+        // já roda a importação. Ela não precisa de acesso ao Drive nem da conta @paraser.
+        async function estoqueEnviarNFs(input) {
+            const arquivos = [...(input.files || [])];
+            input.value = '';                                  // permite reenviar o mesmo arquivo
+            if (!arquivos.length) return;
+            const btn = document.getElementById('estoqueEnviarBtn');
+            const foraDoPadrao = arquivos.filter(f => !/\.xml$/i.test(f.name));
+            if (foraDoPadrao.length) {
+                alert('Só dá pra enviar arquivo .xml (o que vem do fornecedor junto com o PDF da nota).\n\n'
+                    + 'Fora do padrão: ' + foraDoPadrao.map(f => f.name).join(', '));
+                return;
+            }
+            let enviados = 0, repetidos = 0;
+            const falhas = [];
+            for (let i = 0; i < arquivos.length; i++) {
+                const f = arquivos[i];
+                if (btn) btn.textContent = '⏳ enviando ' + (i + 1) + '/' + arquivos.length + '…';
+                try {
+                    const texto = await f.text();
+                    const r = await fetch(CRM_SCRIPT_URL, {
+                        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({ action: 'upload_nf_xml', nome: f.name, conteudo: texto })
+                    });
+                    const j = await r.json();
+                    if (!j.ok) throw new Error(j.error || 'recusado pelo servidor');
+                    if (j.repetido) repetidos++; else enviados++;
+                } catch (e) { falhas.push(f.name + ': ' + e.message); }
+            }
+            if (btn) btn.textContent = '📤 Enviar notas do computador';
+            let msg = '';
+            if (enviados)  msg += '✅ ' + enviados + ' nota(s) enviada(s).\n';
+            if (repetidos) msg += '↩️ ' + repetidos + ' já tinha(m) sido enviada(s) antes.\n';
+            if (falhas.length) msg += '\n⚠ Não deu certo em ' + falhas.length + ':\n' + falhas.join('\n');
+            if (enviados) {
+                alert(msg + '\nVou importar agora.');
+                await estoqueImportarNFs();
+            } else {
+                alert(msg || 'Nenhuma nota nova.');
+            }
         }
 
         async function estoqueImportarNFs() {
