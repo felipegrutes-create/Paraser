@@ -17920,6 +17920,9 @@
                 let accR = 0, accC = 0;
                 const margem = keys.map((k, i) => {
                     accR += rec[i]; accC += custo[i];
+                    // Mês que ainda não aconteceu não repete a última margem: a linha para
+                    // no último mês com movimento, senão parece que dezembro já tem número.
+                    if (!rec[i] && !custo[i]) return null;
                     return accR > 0 ? ((accR - accC) / accR * 100) : null;
                 });
                 const totR = rec.reduce((s, v) => s + v, 0), totC = custo.reduce((s, v) => s + v, 0);
