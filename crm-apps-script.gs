@@ -2197,9 +2197,11 @@ function handleSalvarCartaoPdf_(body) {
     }
     const agora = new Date();
     const linhas = itens.map(function (it) {
-      return [arquivo, String(body.empresa || ''), String(body.competencia || ''),
-              String(body.vencimento || ''), Number(body.total_fatura) || 0,
-              String(it.data || ''), String(it.dia || ''), String(it.descricao || ''),
+      // O apostrofo trava como texto: sem ele a planilha converte "2026-05" em data e o
+      // painel passa a receber "Fri May 01 2026..." no lugar da competencia.
+      return [arquivo, String(body.empresa || ''), "'" + String(body.competencia || ''),
+              "'" + String(body.vencimento || ''), Number(body.total_fatura) || 0,
+              "'" + String(it.data || ''), String(it.dia || ''), String(it.descricao || ''),
               String(it.parcela || ''), Number(it.valor) || 0, agora];
     }).filter(function (l) { return l[7] && l[9]; });
     if (!linhas.length) return jsonErr('Os lançamentos vieram sem descrição ou sem valor');
@@ -2216,10 +2218,14 @@ function _cartaoItensDoPdf_() {
     const d = getOrCreateCartaoPdfSheet_().getDataRange().getValues();
     for (let i = 1; i < d.length; i++) {
       if (!d[i][7]) continue;
+      const txt = function (v, f) {
+        if (v instanceof Date) return Utilities.formatDate(v, 'America/Sao_Paulo', f);
+        return String(v == null ? '' : v);
+      };
       out.push({
-        arquivo: String(d[i][0]), empresa: String(d[i][1]), competencia: String(d[i][2]),
-        vencimento: String(d[i][3]), totalFatura: Number(d[i][4]) || 0,
-        data: String(d[i][5]), dia: String(d[i][6]), descricao: String(d[i][7]),
+        arquivo: String(d[i][0]), empresa: String(d[i][1]), competencia: txt(d[i][2], 'yyyy-MM'),
+        vencimento: txt(d[i][3], 'yyyy-MM-dd'), totalFatura: Number(d[i][4]) || 0,
+        data: txt(d[i][5], 'yyyy-MM-dd'), dia: String(d[i][6]), descricao: String(d[i][7]),
         parcela: String(d[i][8]), valor: Number(d[i][9]) || 0,
         portador: '', origem: 'pdf',
         fitid: 'pdf|' + d[i][0] + '|' + d[i][6] + '|' + d[i][7] + '|' + d[i][9]
@@ -2311,7 +2317,10 @@ function handleCartaoFatura_() {
   _cartaoItensDoPdf_().forEach(function (it) {
     if (assinatura[String(it.descricao).toUpperCase().slice(0, 18) + '|' + it.valor]) return;
     itens.push(it);
-    const jaTem = faturas.some(function (f) { return f.arquivo === it.arquivo; });
+    const jaTem = faturas.some(function (f) {
+      return f.arquivo === it.arquivo ||
+             (f.empresa === it.empresa && f.competencia === it.competencia && it.competencia);
+    });
     if (!jaTem) faturas.push({ arquivo: it.arquivo, empresa: it.empresa, competencia: it.competencia,
                                vencimento: it.vencimento, total: it.totalFatura, lancamentos: 0, origem: 'pdf' });
   });
