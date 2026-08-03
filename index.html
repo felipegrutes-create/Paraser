@@ -18662,7 +18662,8 @@
                 const j = await r.json();
                 if (!j.ok) throw new Error(j.error || 'o servidor recusou');
                 document.getElementById('estoqueNFConfModal').style.display = 'none';
-                alert('✅ Nota lançada: ' + j.itens + ' item(ns) no estoque.');
+                alert('✅ Nota lançada: ' + j.itens + ' item(ns) no estoque.'
+                    + (j.repetidos ? '\n(' + j.repetidos + ' item(ns) já estavam lançados e foram pulados.)' : ''));
                 await loadAndRenderEstoque();
             } catch (e) {
                 alert('⚠ ' + e.message);

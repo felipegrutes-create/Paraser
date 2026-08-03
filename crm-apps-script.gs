@@ -1501,10 +1501,15 @@ function handleParseNFs() {
     const nfSheet = getOrCreateEstoqueNFSheet();
 
     // Coleta chaves já importadas (nf_numero + arquivo_xml) para evitar duplicatas
+    // 🔴 03/08/2026: a chave era nota+ARQUIVO e era gravada no laço dos itens. Como ela é
+    // igual pra todos os itens da mesma nota, o 1º item entrava e os outros eram vistos como
+    // repetidos: TODA nota entrou com um produto só (116 notas, 116 linhas, nenhuma com 2).
+    // Agora a chave inclui o PRODUTO, então reimportar completa o que faltou sem duplicar,
+    // e o nome do arquivo saiu de dentro dela (renomear o XML não recria a nota).
     const existData = nfSheet.getDataRange().getValues();
     const existKeys = new Set();
     for (var i = 1; i < existData.length; i++) {
-      existKeys.add(String(existData[i][0]) + '|' + String(existData[i][9]));
+      existKeys.add(_nfChaveItem_(existData[i][0], existData[i][3], existData[i][4]));
     }
 
     const arquivos = pasta.getFiles(); // getFiles() pega todos os MIMEs (xml pode ser application/xml ou text/xml)
@@ -1526,7 +1531,7 @@ function handleParseNFs() {
 
       const agora = new Date().toISOString();
       parsed.itens.forEach(function(it) {
-        const key = parsed.nNF + '|' + nome;
+        const key = _nfChaveItem_(parsed.nNF, parsed.cnpj, it.produto);
         if (existKeys.has(key)) return;
         novas.push([parsed.nNF, parsed.data_nf, parsed.fornecedor, parsed.cnpj,
                     it.produto, it.quantidade, it.unidade, it.valor_unit, it.valor_total,
@@ -1544,6 +1549,14 @@ function handleParseNFs() {
   } catch(e) {
     return jsonErr('Erro ao processar NFs: ' + e.message);
   }
+}
+
+// Identidade de um item de nota: número da nota + CNPJ do fornecedor + produto. Não usa o
+// nome do arquivo, senão o mesmo XML renomeado entraria de novo.
+function _nfChaveItem_(nf, cnpj, produto) {
+  var so = function (s) { return String(s == null ? '' : s).replace(/\D/g, ''); };
+  var txt = function (s) { return String(s == null ? '' : s).trim().toUpperCase().replace(/\s+/g, ' '); };
+  return so(nf).replace(/^0+/, '') + '|' + so(cnpj) + '|' + txt(produto);
 }
 
 // Extrai as 2 primeiras palavras do nome como chave de matching (ex: "ORGALUTRAN 0,25MG/0,5ML")
@@ -1585,14 +1598,19 @@ function handleAddNFItens(body) {
     let arquivo = String(body.arquivo || '').trim() || ('digitada-' + new Date().getTime());
 
     const sh = getOrCreateEstoqueNFSheet();
-    // Mesma nota do mesmo fornecedor já lançada? Não duplica.
-    if (nf) {
-      const d = sh.getDataRange().getValues();
-      for (let i = 1; i < d.length; i++) {
-        if (String(d[i][0]).trim() === nf && String(d[i][2]).trim() === forn) {
-          return jsonErr('A nota ' + nf + ' de ' + (forn || 'sem fornecedor') + ' já está lançada.');
-        }
-      }
+    // Nota repetida: compara pelo número + CNPJ (ou fornecedor) + produto, do mesmo jeito que
+    // o importador de XML. Item que já está lá é pulado; se TUDO já estava, avisa e não grava.
+    const cnpj = String(body.cnpj || '');
+    const jaTem = {};
+    const d = sh.getDataRange().getValues();
+    for (let i = 1; i < d.length; i++) {
+      jaTem[_nfChaveItem_(d[i][0], d[i][3] || d[i][2], d[i][4])] = true;
+    }
+    const repetidos = itens.filter(function (it) {
+      return jaTem[_nfChaveItem_(nf, cnpj || forn, it.produto)];
+    }).length;
+    if (repetidos && repetidos === itens.length) {
+      return jsonErr('Essa nota já está lançada' + (nf ? ' (nº ' + nf + ')' : '') + '. Nada foi gravado de novo.');
     }
 
     if (body.pdf_base64) {
@@ -1602,17 +1620,19 @@ function handleAddNFItens(body) {
       } catch (ePdf) { /* arquivar é bônus: se falhar, os itens ainda entram */ }
     }
 
-    const linhas = itens.map(function (it) {
+    const linhas = itens.filter(function (it) {
+      return !jaTem[_nfChaveItem_(nf, cnpj || forn, it.produto)];
+    }).map(function (it) {
       const q = Number(it.quantidade) || 0;
       const u = Number(it.valor_unit) || 0;
-      return [nf, data, forn, String(body.cnpj || ''), String(it.produto || '').trim(),
+      return [nf, data, forn, cnpj, String(it.produto || '').trim(),
               q, String(it.unidade || ''), u, Number(it.valor_total) || (q * u),
               arquivo, new Date()];
     }).filter(function (l) { return l[4] && l[5] > 0; });
 
     if (!linhas.length) return jsonErr('Os itens precisam de nome e quantidade maior que zero');
     sh.getRange(sh.getLastRow() + 1, 1, linhas.length, ESTOQUE_NF_HEADERS.length).setValues(linhas);
-    return jsonOk({ ok: true, itens: linhas.length, nf: nf });
+    return jsonOk({ ok: true, itens: linhas.length, repetidos: repetidos, nf: nf });
   } catch (e) {
     return jsonErr('Não consegui lançar a nota: ' + e.message);
   }
@@ -1631,6 +1651,8 @@ function handleGetEstoqueNF() {
       const unit = parseFloat(d[i][7] || 0);
       out.push({
         produto: produto,
+        nf: String(d[i][0] || ''),
+        arquivo: String(d[i][9] || ''),
         data: d[i][1] instanceof Date ? Utilities.formatDate(d[i][1], 'America/Sao_Paulo', 'yyyy-MM-dd') : String(d[i][1] || ''),
         fornecedor: String(d[i][2] || ''),
         quantidade: qtd,
