@@ -346,6 +346,8 @@ function doPost(e) {
     // Nota fiscal enviada pelo sistema: grava o XML na pasta do Drive. Também fora da fila —
     // é só criar arquivo, e quem esperava na fila morria com "Tempo limite do bloqueio".
     if (action === 'upload_nf_xml') return handleUploadNFXml(body);
+    // Nota lida do PDF (ou digitada à mão) e conferida na tela antes de salvar.
+    if (action === 'add_nf_itens')  return handleAddNFItens(body);
 
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
@@ -1567,6 +1569,52 @@ function handleUploadNFXml(body) {
     return jsonOk({ ok: true, nome: nome, repetido: false });
   } catch (e) {
     return jsonErr('Não consegui salvar a nota: ' + e.message);
+  }
+}
+
+// Itens de nota conferidos na tela (vieram da leitura de um PDF ou foram digitados).
+// Escreve na MESMA aba que o importador de XML alimenta, então tudo desemboca no mesmo
+// custo médio. Guarda o PDF na pasta do Drive junto, pra nota ficar arquivada.
+function handleAddNFItens(body) {
+  try {
+    const itens = body.itens || [];
+    if (!itens.length) return jsonErr('Nenhum item pra salvar');
+    const nf   = String(body.nf_numero || '').trim();
+    const data = String(body.data_nf || '').trim();
+    const forn = String(body.fornecedor || '').trim();
+    let arquivo = String(body.arquivo || '').trim() || ('digitada-' + new Date().getTime());
+
+    const sh = getOrCreateEstoqueNFSheet();
+    // Mesma nota do mesmo fornecedor já lançada? Não duplica.
+    if (nf) {
+      const d = sh.getDataRange().getValues();
+      for (let i = 1; i < d.length; i++) {
+        if (String(d[i][0]).trim() === nf && String(d[i][2]).trim() === forn) {
+          return jsonErr('A nota ' + nf + ' de ' + (forn || 'sem fornecedor') + ' já está lançada.');
+        }
+      }
+    }
+
+    if (body.pdf_base64) {
+      try {
+        const blob = Utilities.newBlob(Utilities.base64Decode(body.pdf_base64), 'application/pdf', arquivo);
+        DriveApp.getFolderById(PASTA_NFS_XML_ID).createFile(blob);
+      } catch (ePdf) { /* arquivar é bônus: se falhar, os itens ainda entram */ }
+    }
+
+    const linhas = itens.map(function (it) {
+      const q = Number(it.quantidade) || 0;
+      const u = Number(it.valor_unit) || 0;
+      return [nf, data, forn, String(body.cnpj || ''), String(it.produto || '').trim(),
+              q, String(it.unidade || ''), u, Number(it.valor_total) || (q * u),
+              arquivo, new Date()];
+    }).filter(function (l) { return l[4] && l[5] > 0; });
+
+    if (!linhas.length) return jsonErr('Os itens precisam de nome e quantidade maior que zero');
+    sh.getRange(sh.getLastRow() + 1, 1, linhas.length, ESTOQUE_NF_HEADERS.length).setValues(linhas);
+    return jsonOk({ ok: true, itens: linhas.length, nf: nf });
+  } catch (e) {
+    return jsonErr('Não consegui lançar a nota: ' + e.message);
   }
 }
 

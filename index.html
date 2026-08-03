@@ -4469,8 +4469,9 @@
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
                 <p class="section-title" style="margin:0">💊 Estoque de Medicamentos</p>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <input type="file" id="estoqueNFInput" accept=".xml" multiple style="display:none" onchange="estoqueEnviarNFs(this)">
-                    <button class="cr-reload-btn" id="estoqueEnviarBtn" onclick="document.getElementById('estoqueNFInput').click()" style="background:rgba(0,212,170,0.14);border-color:rgba(0,212,170,0.4);color:#00d4aa;font-weight:700">📤 Enviar notas do computador</button>
+                    <input type="file" id="estoqueNFInput" accept=".xml,.pdf" multiple style="display:none" onchange="estoqueEnviarNFs(this)">
+                    <button class="cr-reload-btn" id="estoqueEnviarBtn" onclick="document.getElementById('estoqueNFInput').click()" style="background:rgba(0,212,170,0.14);border-color:rgba(0,212,170,0.4);color:#00d4aa;font-weight:700">📤 Enviar notas (XML ou PDF)</button>
+                    <button class="cr-reload-btn" onclick="estoqueLancarManual()">✍️ Lançar nota à mão</button>
                     <button class="cr-reload-btn" id="estoqueImportBtn" onclick="estoqueImportarNFs()">📥 Importar NFs do Drive</button>
                     <button class="cr-reload-btn" id="estoqueBaixaBtn" onclick="estoqueBaixaHoje()" style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#f87171">📉 Baixa de Hoje</button>
                     <button class="cr-reload-btn" onclick="estoqueAbrirInventario()" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#a5b4fc">📋 Inventário</button>
@@ -4530,6 +4531,50 @@
         </div>
 
         <!-- Modal Ajuste Estoque -->
+        <!-- CONFERÊNCIA DA NOTA (PDF lido ou digitada) -->
+        <div id="estoqueNFConfModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;padding:20px">
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:22px;width:min(860px,96vw);max-height:90vh;overflow:auto">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px">
+                    <h3 style="margin:0;font-size:16px">🧾 Conferir a nota antes de lançar</h3>
+                    <span style="font-size:11px;color:var(--muted)" id="nfConfArquivo">—</span>
+                </div>
+                <p id="nfConfAviso" style="font-size:12px;color:var(--warning);margin-bottom:14px"></p>
+                <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:10px;margin-bottom:14px">
+                    <div>
+                        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Número da nota</label>
+                        <input id="nfConfNumero" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Data</label>
+                        <input id="nfConfData" type="date" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Fornecedor</label>
+                        <input id="nfConfFornecedor" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px">
+                    </div>
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:12px">
+                    <thead><tr style="color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em">
+                        <th style="text-align:left;padding:4px">Produto</th>
+                        <th style="text-align:left;padding:4px">Un.</th>
+                        <th style="text-align:right;padding:4px">Qtd</th>
+                        <th style="text-align:right;padding:4px">Valor unitário</th>
+                        <th style="padding:4px"></th>
+                    </tr></thead>
+                    <tbody id="nfConfItens"></tbody>
+                </table>
+                <button onclick="estoqueAddLinhaConf()" style="margin-top:10px;background:none;border:1px dashed var(--muted);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:inherit">+ Acrescentar linha</button>
+                <p style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5">
+                    O valor unitário é o da nota, por embalagem. O sistema converte pra dose na hora de calcular a margem.
+                    O PDF fica guardado junto com a nota.
+                </p>
+                <div style="display:flex;gap:10px;margin-top:16px">
+                    <button onclick="document.getElementById('estoqueNFConfModal').style.display='none'" style="flex:1;padding:10px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancelar</button>
+                    <button id="nfConfSalvarBtn" onclick="estoqueSalvarNFConf()" style="flex:1;padding:10px;background:var(--accent);color:#062;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Salvar no estoque</button>
+                </div>
+            </div>
+        </div>
+
         <div id="estoqueAjusteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
             <div style="background:var(--card);border-radius:16px;padding:28px;width:100%;max-width:440px;margin:20px">
                 <h3 style="margin:0 0 20px;font-size:16px">✏️ Ajuste Manual de Estoque</h3>
@@ -18450,6 +18495,185 @@
             }).join('');
         }
 
+        // ===== Nota fiscal em PDF ========================================================
+        // O XML traz os dados prontos; o PDF não. Aqui o texto é lido no próprio navegador
+        // (pdf.js, carregado só quando alguém manda um PDF) e vira um RASCUNHO que a pessoa
+        // confere antes de salvar. Leitura de PDF erra: quem decide é quem está olhando.
+        let _pdfjsPronto = null;
+        function _carregarPdfJs() {
+            if (_pdfjsPronto) return _pdfjsPronto;
+            _pdfjsPronto = new Promise((ok, erro) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+                s.onload = () => {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                        'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+                    ok(window.pdfjsLib);
+                };
+                s.onerror = () => erro(new Error('não consegui carregar o leitor de PDF'));
+                document.head.appendChild(s);
+            });
+            return _pdfjsPronto;
+        }
+
+        async function _pdfTexto(file) {
+            const lib = await _carregarPdfJs();
+            const buf = await file.arrayBuffer();
+            const doc = await lib.getDocument({ data: buf }).promise;
+            let txt = '';
+            for (let p = 1; p <= doc.numPages; p++) {
+                const pag = await doc.getPage(p);
+                const c = await pag.getTextContent();
+                // Reconstrói as linhas pela posição vertical: o DANFE é uma tabela e, sem isso,
+                // o texto vira uma sopa onde produto e valor se perdem.
+                const linhas = {};
+                c.items.forEach(it => {
+                    const y = Math.round(it.transform[5]);
+                    (linhas[y] = linhas[y] || []).push({ x: it.transform[4], s: it.str });
+                });
+                Object.keys(linhas).sort((a, b) => b - a).forEach(y => {
+                    txt += linhas[y].sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim() + '\n';
+                });
+            }
+            return txt;
+        }
+
+        function _numBR(s) {
+            const n = parseFloat(String(s).replace(/\./g, '').replace(',', '.'));
+            return isNaN(n) ? null : n;
+        }
+
+        // Lê o quadro "DADOS DO PRODUTO/SERVIÇO" do DANFE. Cada linha costuma terminar com
+        // ... UNID QTD VL_UNITÁRIO VL_TOTAL ... e começar com código + descrição.
+        function _lerDanfe(txt) {
+            const linhas = txt.split('\n');
+            const ini = linhas.findIndex(l => /DADOS DO PRODUTO|DESCRI..O DO PRODUTO|C.DIGO PRODUTO/i.test(l));
+            const fim = linhas.findIndex((l, i) => i > (ini < 0 ? 0 : ini) &&
+                /C.LCULO DO ISSQN|DADOS ADICIONAIS|INFORMA..ES COMPLEMENTARES/i.test(l));
+            const corpo = linhas.slice(ini < 0 ? 0 : ini + 1, fim < 0 ? linhas.length : fim);
+            const UNI = 'UN|UND|PC|PÇ|CX|FR|AMP|KG|L|ML|MG|CT|EMB|TB|SC|DZ';
+            const itens = [];
+            corpo.forEach(l => {
+                const linha = l.trim();
+                if (!linha || linha.length < 12) return;
+                const m = linha.match(new RegExp(
+                    '^(.*?)\\s+(' + UNI + ')\\s+([\\d.,]+)\\s+([\\d.,]+)\\s+([\\d.,]+)(?:\\s|$)', 'i'));
+                if (!m) return;
+                const qtd = _numBR(m[3]), unit = _numBR(m[4]), total = _numBR(m[5]);
+                if (!qtd || !unit) return;
+                // descrição: tira o código do produto e os NCM/CST/CFOP que vêm antes da unidade
+                let desc = m[1].replace(/\s+\d{4,8}\s+\d{2,4}\s+\d{3,4}\s*$/, '')
+                               .replace(/^\d{2,10}\s+/, '').trim();
+                if (!desc || desc.length < 3) return;
+                itens.push({ produto: desc, unidade: m[2].toUpperCase(), quantidade: qtd,
+                             valor_unit: unit, valor_total: total || qtd * unit });
+            });
+            const nf   = (txt.match(/N[ºo°]?\.?\s*0*(\d{3}\.?\d{3}\.?\d{3})/) || txt.match(/N[ºo°]\s*(\d{4,})/) || [])[1] || '';
+            const data = (txt.match(/(\d{2}\/\d{2}\/\d{4})/) || [])[1] || '';
+            const forn = (linhas.find(l => /LTDA|S\.?A\.?\b|EIRELI|DISTRIBUID|COM[ÉE]RCIO/i.test(l)) || '').trim().slice(0, 60);
+            return { itens, nf: nf.replace(/\./g, ''), data, fornecedor: forn };
+        }
+
+        let _nfRascunho = null;
+        async function estoqueLerPDF(file) {
+            const btn = document.getElementById('estoqueEnviarBtn');
+            if (btn) btn.textContent = '⏳ lendo o PDF…';
+            try {
+                const txt = await _pdfTexto(file);
+                const lido = _lerDanfe(txt);
+                const b64 = await new Promise(ok => {
+                    const fr = new FileReader();
+                    fr.onload = () => ok(String(fr.result).split(',')[1] || '');
+                    fr.readAsDataURL(file);
+                });
+                _nfRascunho = { arquivo: file.name, pdf_base64: b64, ...lido };
+                estoqueAbrirConferencia();
+            } catch (e) {
+                alert('Não consegui ler esse PDF (' + e.message + ').\n\n'
+                    + 'Se ele for um documento escaneado, o texto não existe dentro do arquivo. '
+                    + 'Nesse caso dá pra lançar a nota à mão na mesma tela.');
+                _nfRascunho = { arquivo: file.name, pdf_base64: '', itens: [], nf: '', data: '', fornecedor: '' };
+                estoqueAbrirConferencia();
+            } finally {
+                if (btn) btn.textContent = '📤 Enviar notas (XML ou PDF)';
+            }
+        }
+
+        function estoqueAbrirConferencia() {
+            const r = _nfRascunho || { itens: [] };
+            document.getElementById('nfConfArquivo').textContent = r.arquivo || '—';
+            document.getElementById('nfConfNumero').value = r.nf || '';
+            document.getElementById('nfConfData').value = r.data ? r.data.split('/').reverse().join('-') : '';
+            document.getElementById('nfConfFornecedor').value = r.fornecedor || '';
+            estoqueRenderItensConf(r.itens.length ? r.itens : [{ produto: '', unidade: 'UN', quantidade: '', valor_unit: '' }]);
+            document.getElementById('nfConfAviso').textContent = r.itens.length
+                ? 'Li ' + r.itens.length + ' item(ns) do PDF. Confira, corrija o que estiver errado e salve.'
+                : 'Não consegui achar os produtos nesse PDF. Dá pra digitar as linhas aqui embaixo.';
+            document.getElementById('estoqueNFConfModal').style.display = 'flex';
+        }
+
+        function estoqueRenderItensConf(itens) {
+            const tb = document.getElementById('nfConfItens');
+            tb.innerHTML = itens.map((it, i) => `
+                <tr>
+                    <td style="padding:4px"><input value="${(it.produto || '').replace(/"/g, '&quot;')}" data-c="produto" data-i="${i}" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px"></td>
+                    <td style="padding:4px"><input value="${it.unidade || ''}" data-c="unidade" data-i="${i}" style="width:60px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:12px"></td>
+                    <td style="padding:4px"><input value="${it.quantidade || ''}" data-c="quantidade" data-i="${i}" inputmode="decimal" style="width:80px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:12px;text-align:right"></td>
+                    <td style="padding:4px"><input value="${it.valor_unit || ''}" data-c="valor_unit" data-i="${i}" inputmode="decimal" style="width:100px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:12px;text-align:right"></td>
+                    <td style="padding:4px;text-align:center"><button onclick="this.closest('tr').remove()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px" title="Tirar esta linha">✕</button></td>
+                </tr>`).join('');
+        }
+
+        function estoqueAddLinhaConf() {
+            const tb = document.getElementById('nfConfItens');
+            const i = tb.querySelectorAll('tr').length;
+            tb.insertAdjacentHTML('beforeend', `
+                <tr>
+                    <td style="padding:4px"><input data-c="produto" data-i="${i}" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px"></td>
+                    <td style="padding:4px"><input value="UN" data-c="unidade" data-i="${i}" style="width:60px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:12px"></td>
+                    <td style="padding:4px"><input data-c="quantidade" data-i="${i}" inputmode="decimal" style="width:80px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:12px;text-align:right"></td>
+                    <td style="padding:4px"><input data-c="valor_unit" data-i="${i}" inputmode="decimal" style="width:100px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;font-size:12px;text-align:right"></td>
+                    <td style="padding:4px;text-align:center"><button onclick="this.closest('tr').remove()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px">✕</button></td>
+                </tr>`);
+        }
+
+        async function estoqueSalvarNFConf() {
+            const linhas = [...document.querySelectorAll('#nfConfItens tr')].map(tr => {
+                const v = c => (tr.querySelector('[data-c="' + c + '"]') || {}).value || '';
+                return { produto: v('produto').trim(), unidade: v('unidade').trim(),
+                         quantidade: _numBR(v('quantidade')), valor_unit: _numBR(v('valor_unit')) };
+            }).filter(l => l.produto && l.quantidade && l.valor_unit);
+            if (!linhas.length) { alert('Preencha ao menos uma linha com produto, quantidade e valor unitário.'); return; }
+            const btn = document.getElementById('nfConfSalvarBtn');
+            btn.textContent = '⏳ salvando…'; btn.disabled = true;
+            try {
+                const r = await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        action: 'add_nf_itens',
+                        nf_numero: document.getElementById('nfConfNumero').value.trim(),
+                        data_nf: document.getElementById('nfConfData').value,
+                        fornecedor: document.getElementById('nfConfFornecedor').value.trim(),
+                        arquivo: (_nfRascunho || {}).arquivo || '',
+                        pdf_base64: (_nfRascunho || {}).pdf_base64 || '',
+                        itens: linhas
+                    })
+                });
+                const j = await r.json();
+                if (!j.ok) throw new Error(j.error || 'o servidor recusou');
+                document.getElementById('estoqueNFConfModal').style.display = 'none';
+                alert('✅ Nota lançada: ' + j.itens + ' item(ns) no estoque.');
+                await loadAndRenderEstoque();
+            } catch (e) {
+                alert('⚠ ' + e.message);
+            } finally { btn.textContent = 'Salvar no estoque'; btn.disabled = false; }
+        }
+
+        function estoqueLancarManual() {
+            _nfRascunho = { arquivo: '', pdf_base64: '', itens: [], nf: '', data: '', fornecedor: '' };
+            estoqueAbrirConferencia();
+        }
+
         // A analista escolhe os XML no computador dela; o sistema guarda na pasta do Drive e
         // já roda a importação. Ela não precisa de acesso ao Drive nem da conta @paraser.
         async function estoqueEnviarNFs(input) {
@@ -18457,17 +18681,25 @@
             input.value = '';                                  // permite reenviar o mesmo arquivo
             if (!arquivos.length) return;
             const btn = document.getElementById('estoqueEnviarBtn');
-            const foraDoPadrao = arquivos.filter(f => !/\.xml$/i.test(f.name));
-            if (foraDoPadrao.length) {
-                alert('Só dá pra enviar arquivo .xml (o que vem do fornecedor junto com o PDF da nota).\n\n'
-                    + 'Fora do padrão: ' + foraDoPadrao.map(f => f.name).join(', '));
+            // PDF não traz os dados separados como o XML: vai pra tela de conferência, um por vez.
+            const pdfs = arquivos.filter(f => /\.pdf$/i.test(f.name));
+            const xmls = arquivos.filter(f => /\.xml$/i.test(f.name));
+            const outros = arquivos.filter(f => !/\.(xml|pdf)$/i.test(f.name));
+            if (outros.length) {
+                alert('Só aceito .xml ou .pdf da nota.\n\nFora do padrão: ' + outros.map(f => f.name).join(', '));
                 return;
             }
+            if (pdfs.length) {
+                if (pdfs.length > 1) alert('Vou abrir o primeiro PDF pra conferência. PDF entra um por vez.');
+                await estoqueLerPDF(pdfs[0]);
+                if (!xmls.length) return;
+            }
+            const arquivosXml = xmls;
             let enviados = 0, repetidos = 0;
             const falhas = [];
-            for (let i = 0; i < arquivos.length; i++) {
-                const f = arquivos[i];
-                if (btn) btn.textContent = '⏳ enviando ' + (i + 1) + '/' + arquivos.length + '…';
+            for (let i = 0; i < arquivosXml.length; i++) {
+                const f = arquivosXml[i];
+                if (btn) btn.textContent = '⏳ enviando ' + (i + 1) + '/' + arquivosXml.length + '…';
                 try {
                     const texto = await f.text();
                     const r = await fetch(CRM_SCRIPT_URL, {
@@ -18479,7 +18711,7 @@
                     if (j.repetido) repetidos++; else enviados++;
                 } catch (e) { falhas.push(f.name + ': ' + e.message); }
             }
-            if (btn) btn.textContent = '📤 Enviar notas do computador';
+            if (btn) btn.textContent = '📤 Enviar notas (XML ou PDF)';
             let msg = '';
             if (enviados)  msg += '✅ ' + enviados + ' nota(s) enviada(s).\n';
             if (repetidos) msg += '↩️ ' + repetidos + ' já tinha(m) sido enviada(s) antes.\n';
