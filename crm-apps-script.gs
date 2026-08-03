@@ -2709,7 +2709,12 @@ function notificarMetaSlack_(novas, fechamento) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: l.trim() } });
   }
   blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + fmt(m.total) + '* de *' + fmt(m.meta) + '*   ·   *' + pct + '%*\n' + barraMeta_(pct) } });
-  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: falta > 0 ? '🔴 Faltam *' + fmt(falta) + '* pra bater a meta' : '🎉 *Meta batida!*' } });
+  // 🔴 01/08/2026: meta zerada (mês sem linha na aba Metas) caía no "falta 0" e o card
+  // anunciava "Meta batida!" com R$ 0 de R$ 0. Sem meta cadastrada não há o que comemorar.
+  blocks.push({ type: 'section', text: { type: 'mrkdwn',
+    text: m.meta <= 0 ? '⚠️ *Meta de ' + mesPorExtenso_(mes) + ' ainda não cadastrada* (aba Metas)'
+        : falta > 0   ? '🔴 Faltam *' + fmt(falta) + '* pra bater a meta'
+        :               '🎉 *Meta batida!*' } });
   blocks.push({ type: 'divider' });
   let vend = '';
   (m.porVendedora || []).forEach(function(v){ vend += '\n• ' + v.vendedora + '  ' + fmt(v.valor); });
