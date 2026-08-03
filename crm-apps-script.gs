@@ -309,6 +309,10 @@ function doGet(e) {
     if (action === 'get_receb_semanal') return handleRecebSemanal_(e.parameter); // cartao+PIX de pacientes por SEMANA do mes (grafico semanal)
     if (action === 'get_rede_caixa')  return handleRedeCaixa_(e.parameter);  // agenda de recebiveis futuros + taxas (Resumo)
     if (action === 'get_cartao_fatura') return handleCartaoFatura_();        // fatura do cartao importada (pasta no Drive)
+    // O que está na pasta, tenha o importador conseguido ler ou não. Sem isso, "0 faturas"
+    // não distingue pasta vazia de arquivo em formato que ele não lê.
+    if (action === 'get_cartao_arquivos') return handleCartaoArquivos_();
+    if (action === 'get_cartao_xlsx') return handleCartaoXlsxPreview_(e.parameter);
 
     // Retornar registros CRM (padrão)
     const sheet = getOrCreateSheet();
@@ -2003,36 +2007,229 @@ function parseCsvCartao_(texto, arquivo) {
 }
 
 // action=get_cartao_fatura: lê todos os arquivos da pasta, deduplica e devolve itens + total por mês.
+
+// =========================================================
+// LEITOR DE XLSX SEM CONVERSÃO
+// Um .xlsx é um zip de XMLs. Utilities.unzip + XmlService leem tudo sem depender do
+// serviço avançado do Drive, ou seja, sem escopo novo e sem risco de derrubar os
+// gatilhos por reautorização.
+// =========================================================
+const XLSX_NS = XmlService.getNamespace('http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
+function _xlsxSharedStrings_(xml) {
+  const out = [];
+  try {
+    const raiz = XmlService.parse(xml).getRootElement();
+    raiz.getChildren('si', XLSX_NS).forEach(function (si) {
+      // o texto pode vir direto em <t> ou quebrado em vários <r><t>
+      let t = si.getChild('t', XLSX_NS);
+      if (t) { out.push(t.getText()); return; }
+      let s = '';
+      si.getChildren('r', XLSX_NS).forEach(function (r) {
+        const rt = r.getChild('t', XLSX_NS);
+        if (rt) s += rt.getText();
+      });
+      out.push(s);
+    });
+  } catch (e) {}
+  return out;
+}
+
+function _xlsxColIndice_(ref) {                       // "BC12" → 54
+  const letras = String(ref || '').replace(/\d+/g, '');
+  let n = 0;
+  for (let i = 0; i < letras.length; i++) n = n * 26 + (letras.charCodeAt(i) - 64);
+  return n - 1;
+}
+
+// Serial do Excel → 'yyyy-MM-dd' (1899-12-30 é o zero do Excel).
+function _xlsxData_(serial) {
+  const ms = (Number(serial) - 25569) * 86400000;
+  if (!isFinite(ms)) return '';
+  return Utilities.formatDate(new Date(Math.round(ms)), 'America/Sao_Paulo', 'yyyy-MM-dd');
+}
+
+function _xlsxLinhas_(blob, maxLinhas) {
+  const arquivos = Utilities.unzip(blob.setContentType('application/zip'));
+  let shared = [], planilha = null;
+  arquivos.forEach(function (f) {
+    const n = f.getName();
+    if (n === 'xl/sharedStrings.xml') shared = _xlsxSharedStrings_(f.getDataAsString('UTF-8'));
+    else if (/^xl\/worksheets\/sheet1\.xml$/.test(n)) planilha = f.getDataAsString('UTF-8');
+  });
+  if (!planilha) return [];
+  const linhas = [];
+  const dados = XmlService.parse(planilha).getRootElement().getChild('sheetData', XLSX_NS);
+  if (!dados) return [];
+  const rows = dados.getChildren('row', XLSX_NS);
+  for (let i = 0; i < rows.length && (!maxLinhas || linhas.length < maxLinhas); i++) {
+    const linha = [];
+    rows[i].getChildren('c', XLSX_NS).forEach(function (c) {
+      const col = _xlsxColIndice_(c.getAttribute('r') ? c.getAttribute('r').getValue() : '');
+      const tipo = c.getAttribute('t') ? c.getAttribute('t').getValue() : '';
+      const v = c.getChild('v', XLSX_NS);
+      let valor = '';
+      if (tipo === 's') valor = shared[Number(v ? v.getText() : -1)] || '';
+      else if (tipo === 'inlineStr') {
+        const is = c.getChild('is', XLSX_NS), t = is && is.getChild('t', XLSX_NS);
+        valor = t ? t.getText() : '';
+      } else if (v) valor = v.getText();
+      while (linha.length < col) linha.push('');
+      linha[col] = valor;
+    });
+    linhas.push(linha);
+  }
+  return linhas;
+}
+
+// Espia as primeiras linhas de um arquivo da pasta, pra descobrir o layout dele.
+function handleCartaoXlsxPreview_(p) {
+  try {
+    const alvo = String((p && p.arquivo) || '').trim();
+    const folder = getOrCreateCartaoFolder_();
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      if (alvo && f.getName().indexOf(alvo) < 0) continue;
+      if (!/\.xlsx$/i.test(f.getName())) continue;
+      return jsonOk({ ok: true, arquivo: f.getName(), linhas: _xlsxLinhas_(f.getBlob(), Number(p.linhas) || 25) });
+    }
+    return jsonErr('Não achei xlsx com esse nome na pasta');
+  } catch (e) {
+    return jsonErr('Erro lendo o xlsx: ' + e.message);
+  }
+}
+
+
+// Fatura do Itaú exportada em XLSX. Layout: cabeçalho, "Resumo da fatura" e depois os
+// lançamentos agrupados POR PORTADOR do cartão. Colunas: data (0), descrição (2), valor (10).
+function parseXlsxCartao_(blob, arquivo) {
+  const linhas = _xlsxLinhas_(blob, 0);
+  const itens = [];
+  let portador = '', total = null, vencSerial = null, achouVenc = -1;
+
+  for (let i = 0; i < linhas.length; i++) {
+    const l = linhas[i] || [];
+    const c0 = String(l[0] == null ? '' : l[0]).trim();
+    const c2 = String(l[2] == null ? '' : l[2]).trim();
+    const c10 = String(l[10] == null ? '' : l[10]).trim();
+
+    if (/^total da fatura$/i.test(c0)) { const v = Number(c10); if (!isNaN(v)) total = v; continue; }
+    if (achouVenc === i - 1 && achouVenc >= 0) { const v = Number(c2) || Number(c10); if (v > 40000) vencSerial = v; }
+    if (/vencimento/i.test(c2) || /vencimento/i.test(c0)) { achouVenc = i; continue; }
+
+    // Nome do portador: linha só com o nome, sempre com "FINAL 1234" do cartão dele.
+    if (/\bFINAL\b/i.test(c0) && !c10) { portador = c0.replace(/\s*-\s*FINAL.*$/i, '').trim(); continue; }
+
+    const serial = Number(c0);
+    if (serial > 40000 && serial < 70000 && c2 && c10 !== '') {
+      const valor = Number(String(c10).replace(',', '.'));
+      if (isNaN(valor)) continue;
+      const mp = c2.match(/(\d{2})\/(\d{2})\s*$/);
+      itens.push({
+        data: _xlsxData_(serial),
+        descricao: c2.replace(/\s*\d{2}\/\d{2}\s*$/, '').trim(),
+        parcela: mp ? (mp[1] + '/' + mp[2]) : '',
+        valor: valor,
+        portador: portador || '(sem portador)',
+        arquivo: arquivo,
+        fitid: arquivo + '|' + serial + '|' + c2 + '|' + valor
+      });
+    }
+  }
+  return { itens: itens, total: total, vencimento: vencSerial ? _xlsxData_(vencSerial) : '' };
+}
+
+// PARASER ou INSTITUTO e o mês vêm do nome do arquivo, que segue o padrão do portal.
+function _cartaoEmpresaMes_(nome) {
+  const N = String(nome || '').toUpperCase();
+  const empresa = /INSTITUTO/.test(N) ? 'Instituto' : (/PARASER/.test(N) ? 'Paraser' : '');
+  const meses = { JANEIRO: '01', FEVEREIRO: '02', MARCO: '03', 'MARÇO': '03', ABRIL: '04', MAIO: '05',
+                  JUNHO: '06', JULHO: '07', AGOSTO: '08', SETEMBRO: '09', OUTUBRO: '10',
+                  NOVEMBRO: '11', DEZEMBRO: '12',
+                  JAN: '01', FEV: '02', MAR: '03', ABR: '04', MAI: '05', JUN: '06', JUL: '07',
+                  AGO: '08', SET: '09', OUT: '10', NOV: '11', DEZ: '12' };
+  let mes = '';
+  Object.keys(meses).forEach(function (k) {
+    if (mes) return;
+    if (new RegExp('(^|[^A-Z])' + k + '([^A-Z]|$)').test(N)) mes = meses[k];
+  });
+  const ano = (N.match(/20\d\d/) || [])[0] || String(new Date().getFullYear());
+  return { empresa: empresa, competencia: mes ? ano + '-' + mes : '' };
+}
+
+function handleCartaoArquivos_() {
+  try {
+    const folder = getOrCreateCartaoFolder_();
+    const files = folder.getFiles();
+    const out = [];
+    while (files.hasNext()) {
+      const f = files.next();
+      const nome = f.getName();
+      out.push({
+        nome: nome,
+        tipo: f.getMimeType(),
+        tamanho: f.getSize(),
+        atualizado: Utilities.formatDate(f.getLastUpdated(), 'America/Sao_Paulo', 'yyyy-MM-dd HH:mm'),
+        lido: /\.(ofx|csv|txt)$/i.test(nome)
+      });
+    }
+    return jsonOk({ ok: true, pasta: folder.getUrl(), pastaId: folder.getId(), arquivos: out });
+  } catch (e) {
+    return jsonErr('Não consegui listar a pasta: ' + e.message);
+  }
+}
+
 function handleCartaoFatura_() {
   const folder = getOrCreateCartaoFolder_();
   const files = folder.getFiles();
   const vistos = {};
   const itens = [];
-  let nArq = 0;
+  const faturas = [];
+  let nArq = 0, naoLidos = 0;
   while (files.hasNext()) {
     const f = files.next();
     const nome = f.getName();
-    let parsed = null;
+    let parsed = null, cab = null;
     if (/\.ofx$/i.test(nome)) parsed = parseOfxCartao_(f.getBlob().getDataAsString('ISO-8859-1'), nome);
     else if (/\.(csv|txt)$/i.test(nome)) parsed = parseCsvCartao_(f.getBlob().getDataAsString('UTF-8'), nome);
-    if (!parsed) continue;
+    else if (/\.xlsx$/i.test(nome)) {
+      try {
+        const r = parseXlsxCartao_(f.getBlob(), nome);
+        parsed = r.itens; cab = r;
+      } catch (eX) { parsed = null; }
+    }
+    if (!parsed || !parsed.length) { naoLidos++; continue; }
     nArq++;
+    const em = _cartaoEmpresaMes_(nome);
+    let soma = 0, novos = 0;
     parsed.forEach(function(it) {
+      it.empresa = it.empresa || em.empresa;
+      it.competencia = it.competencia || em.competencia;
       if (vistos[it.fitid]) return; // mesmo lançamento em 2 arquivos (fatura re-exportada)
       vistos[it.fitid] = true;
       itens.push(it);
+      soma += it.valor; novos++;
     });
+    faturas.push({ arquivo: nome, empresa: em.empresa, competencia: em.competencia,
+                   vencimento: cab ? cab.vencimento : '', total: cab && cab.total != null ? cab.total : soma,
+                   lancamentos: novos });
   }
-  const porMes = {};
+  const porMes = {}, porPortador = {};
   itens.forEach(function(it) {
-    const mes = String(it.data).slice(0, 7);
+    const mes = it.competencia || String(it.data).slice(0, 7);
     if (!porMes[mes]) porMes[mes] = { total: 0, n: 0 };
     porMes[mes].total += it.valor; porMes[mes].n++;
+    const p = it.portador || '(sem portador)';
+    if (!porPortador[p]) porPortador[p] = { total: 0, n: 0 };
+    porPortador[p].total += it.valor; porPortador[p].n++;
   });
   itens.sort(function(a, b){ return a.data < b.data ? 1 : -1; });
   return jsonOk({
-    ok: true, arquivos: nArq, itens: itens.slice(0, 400),
+    ok: true, arquivos: nArq, naoLidos: naoLidos, faturas: faturas, itens: itens.slice(0, 3000),
     porMes: Object.keys(porMes).sort().map(function(m){ return { mes: m, total: porMes[m].total, n: porMes[m].n }; }),
+    porPortador: Object.keys(porPortador).sort(function(a,b){ return porPortador[b].total - porPortador[a].total; })
+                  .map(function(p){ return { portador: p, total: porPortador[p].total, n: porPortador[p].n }; }),
     pasta: folder.getUrl()
   });
 }

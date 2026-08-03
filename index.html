@@ -4024,7 +4024,7 @@
 
             <!-- Fatura do cartão de crédito IMPORTADA (OFX/CSV do portal Itaú, pasta no Drive) -->
             <div class="chart-card" style="margin-top:20px">
-                <h3>💳 Fatura do Cartão de Crédito — importada do Itaú <span id="finFaturaSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                <h3>💳 Fatura do Cartão de Crédito · Itaú <span id="finFaturaSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
                 <div id="finFaturaBox"></div>
             </div>
         </section>
@@ -15301,43 +15301,124 @@
             if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
         }
 
-        // Fatura do cartão importada (get_cartao_fatura): total por mês + últimos lançamentos.
-        // Vazio = instruções com o link da pasta do Drive onde largar o OFX/CSV exportado do Itaú.
-        let _finFaturaData = null;
-        async function _finRenderFatura() {
+        // Fatura do cartão importada (get_cartao_fatura). Lê OFX, CSV e o XLSX exportado do
+        // portal Itaú, que é o formato que a analista realmente baixa. O XLSX vem separado
+        // POR PORTADOR do cartão, então dá pra ver quem gastou, não só quanto.
+        let _finFaturaData = null, _finFaturaFiltro = { fatura: '', busca: '' };
+        async function _finRenderFatura(forcar) {
             const box = document.getElementById('finFaturaBox'); if (!box) return;
             const sub = document.getElementById('finFaturaSub');
-            if (!_finFaturaData) {
-                box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">Carregando…</div>';
+            if (!_finFaturaData || forcar) {
+                box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⏳ lendo as faturas da pasta…</div>';
                 try {
                     const j = await fetch(`${CRM_SCRIPT_URL}?action=get_cartao_fatura`).then(r => r.json());
                     if (!j.ok) throw new Error(j.error || 'falhou');
                     _finFaturaData = j;
-                } catch (e) { box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⚠ não foi possível ler as faturas agora</div>'; return; }
+                } catch (e) {
+                    box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⚠ não foi possível ler as faturas agora</div>';
+                    return;
+                }
             }
             const d = _finFaturaData;
+            const R = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const R0 = v => 'R$ ' + Math.round(Number(v)).toLocaleString('pt-BR');
+
             if (!d.arquivos) {
-                if (sub) sub.textContent = 'nenhuma fatura importada ainda';
+                if (sub) sub.textContent = 'nenhuma fatura lida';
                 box.innerHTML = `<div style="font-size:13px;color:var(--muted);padding:10px;line-height:1.7">
-                    Pra ativar: no <b>Itaú Empresas</b>, abra a fatura do cartão e exporte em <b>OFX ou CSV</b>;
+                    No <b>Itaú Empresas</b>, abra a fatura do cartão e exporte em <b>XLSX, OFX ou CSV</b>;
                     depois solte o arquivo <a href="${d.pasta}" target="_blank" style="color:#00d4aa">nesta pasta do Drive</a>.
-                    O sistema lê sozinho (pode soltar quantas faturas quiser; lançamentos repetidos são ignorados).</div>`;
+                    O sistema lê sozinho e ignora lançamento repetido.
+                    ${d.naoLidos ? `<br><b style="color:var(--warning)">${d.naoLidos} arquivo(s) na pasta em formato que não dá pra ler</b> (PDF é imagem do extrato, não tem os lançamentos separados).` : ''}</div>`;
                 return;
             }
-            const R = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            if (sub) sub.textContent = `${d.arquivos} arquivo(s) · ${d.itens.length} lançamentos`;
-            const meses = (d.porMes || []).map(m => {
-                const i = parseInt(m.mes.slice(5, 7), 10) - 1;
-                return `<span style="display:inline-block;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 12px;margin:0 8px 8px 0">
-                    <b>${_MONTHS_PT[i].slice(0,3)}/${m.mes.slice(2,4)}</b>: <span style="color:#f87171;font-weight:600">${R(m.total)}</span> <small style="color:var(--muted)">(${m.n})</small></span>`;
+
+            const itens = d.itens || [];
+            const totalGeral = (d.faturas || []).reduce((s, f) => s + (f.total || 0), 0);
+            if (sub) sub.textContent = `${d.arquivos} fatura(s) · ${itens.length} lançamentos · ${R0(totalGeral)}`;
+
+            const faturas = (d.faturas || []).slice().sort((a, b) => (a.competencia + a.empresa) < (b.competencia + b.empresa) ? 1 : -1);
+            const cartoes = faturas.map(f => {
+                const i = f.competencia ? parseInt(f.competencia.slice(5, 7), 10) - 1 : -1;
+                const rot = i >= 0 ? _MONTHS_PT[i] + '/' + f.competencia.slice(2, 4) : f.arquivo.slice(0, 18);
+                const sel = _finFaturaFiltro.fatura === f.arquivo;
+                return `<button onclick="_finFiltrarFatura('${f.arquivo.replace(/'/g, "\\'")}')"
+                    style="text-align:left;background:${sel ? 'rgba(0,212,170,0.14)' : 'var(--surface)'};border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+                    border-radius:10px;padding:10px 12px;cursor:pointer;font-family:inherit;color:var(--text);min-width:150px">
+                    <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${f.empresa || 'sem empresa'} · ${rot}</div>
+                    <div style="font-size:16px;font-weight:800;margin:2px 0">${R0(f.total)}</div>
+                    <div style="font-size:10.5px;color:var(--muted)">${f.lancamentos} lançamentos${f.vencimento ? ' · vence ' + f.vencimento.slice(8, 10) + '/' + f.vencimento.slice(5, 7) : ''}</div>
+                </button>`;
             }).join('');
-            const linhas = (d.itens || []).slice(0, 15).map(it =>
-                `<tr><td style="padding:4px 10px 4px 0;color:var(--muted);white-space:nowrap">${it.data.slice(8,10)}/${it.data.slice(5,7)}</td>
-                 <td style="padding:4px 10px 4px 0">${it.descricao}</td>
-                 <td style="padding:4px 0;text-align:right;font-weight:600">${R(it.valor)}</td></tr>`).join('');
-            box.innerHTML = `<div style="margin-bottom:10px">${meses}</div>
-                <table style="font-size:13px;border-collapse:collapse;width:100%">${linhas}</table>
-                <div style="font-size:11px;color:var(--muted);margin-top:8px">últimos 15 lançamentos · <a href="${d.pasta}" target="_blank" style="color:#00d4aa">pasta das faturas</a></div>`;
+
+            const porPortador = (d.porPortador || []);
+            const maxP = porPortador.length ? porPortador[0].total : 1;
+            const barras = porPortador.map(p => `
+                <div style="margin-bottom:9px">
+                    <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px">
+                        <span>${p.portador}</span>
+                        <span style="font-weight:700">${R0(p.total)} <small style="color:var(--muted);font-weight:400">(${p.n})</small></span>
+                    </div>
+                    <div style="height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">
+                        <div style="height:100%;width:${(p.total / maxP * 100).toFixed(1)}%;background:linear-gradient(90deg,#f43f5e,#fb7185)"></div>
+                    </div>
+                </div>`).join('');
+
+            // Onde o dinheiro foi: junta pelo começo da descrição (o resto é código da compra).
+            const porLoja = {};
+            itens.forEach(it => {
+                const k = (it.descricao || '').split(/\s{2,}|\*/)[0].trim().toUpperCase().slice(0, 24) || '(sem descrição)';
+                porLoja[k] = (porLoja[k] || 0) + it.valor;
+            });
+            const topLojas = Object.entries(porLoja).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) =>
+                `<tr><td style="padding:4px 10px 4px 0">${k}</td><td style="padding:4px 0;text-align:right;font-weight:600">${R0(v)}</td></tr>`).join('');
+
+            const f = _finFaturaFiltro;
+            const filtrados = itens.filter(it =>
+                (!f.fatura || it.arquivo === f.fatura) &&
+                (!f.busca || (it.descricao || '').toUpperCase().includes(f.busca.toUpperCase()))
+            );
+            const linhas = filtrados.slice(0, 120).map(it =>
+                `<tr style="border-top:1px solid rgba(255,255,255,.05)">
+                    <td style="padding:5px 10px 5px 0;color:var(--muted);white-space:nowrap">${it.data.slice(8, 10)}/${it.data.slice(5, 7)}</td>
+                    <td style="padding:5px 10px 5px 0">${it.descricao}${it.parcela ? ` <span style="font-size:10px;color:var(--warning);border:1px solid var(--warning);border-radius:4px;padding:0 4px">${it.parcela}</span>` : ''}</td>
+                    <td style="padding:5px 10px 5px 0;color:var(--muted);font-size:11.5px;white-space:nowrap">${(it.portador || '').split(' ')[0]}</td>
+                    <td style="padding:5px 0;text-align:right;font-weight:600;color:${it.valor < 0 ? 'var(--success)' : 'inherit'}">${R(it.valor)}</td>
+                </tr>`).join('');
+
+            box.innerHTML = `
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">${cartoes}</div>
+                ${d.naoLidos ? `<div style="font-size:11.5px;color:var(--warning);margin-bottom:14px">⚠ ${d.naoLidos} arquivo(s) da pasta não foram lidos: PDF é a imagem do extrato e não traz os lançamentos separados. Exporte a mesma fatura em XLSX no portal.</div>` : ''}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px">
+                    <div>
+                        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Quem gastou</div>
+                        ${barras || '<div style="color:var(--muted);font-size:12px">sem portador identificado</div>'}
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Onde mais gastou</div>
+                        <table style="font-size:12.5px;border-collapse:collapse;width:100%">${topLojas}</table>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                    <input id="finFaturaBusca" value="${(f.busca || '').replace(/"/g, '&quot;')}" placeholder="Buscar lançamento…"
+                        oninput="_finFaturaFiltro.busca=this.value; clearTimeout(window._ffT); window._ffT=setTimeout(()=>_finRenderFatura(),300)"
+                        style="flex:1;min-width:200px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12.5px;font-family:inherit">
+                    ${f.fatura ? `<button onclick="_finFiltrarFatura('')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;font-family:inherit">✕ ver todas as faturas</button>` : ''}
+                    <span style="font-size:11.5px;color:var(--muted)">${filtrados.length} lançamento(s)</span>
+                </div>
+                <div style="max-height:420px;overflow:auto">
+                    <table style="font-size:12.5px;border-collapse:collapse;width:100%">${linhas}</table>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:10px">
+                    ${filtrados.length > 120 ? 'mostrando os 120 mais recentes · ' : ''}valor negativo é estorno ·
+                    <a href="${d.pasta}" target="_blank" style="color:#00d4aa">pasta das faturas</a> ·
+                    <a href="#" onclick="event.preventDefault();_finRenderFatura(true)" style="color:#00d4aa">reler agora</a>
+                </div>`;
+        }
+
+        function _finFiltrarFatura(arquivo) {
+            _finFaturaFiltro.fatura = (_finFaturaFiltro.fatura === arquivo) ? '' : arquivo;
+            _finRenderFatura();
         }
 
         async function loadAndRenderFinanceiro() {
