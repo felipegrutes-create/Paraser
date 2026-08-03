@@ -335,6 +335,12 @@ function doPost(e) {
       return handleZapiWebhook(body, e.parameter);
     }
 
+    // 🔴 03/08/2026: definir a meta do mês morria com "Tempo limite do bloqueio".
+    // É a gravação de UMA célula numa aba que só ela usa, mas esperava na mesma fila
+    // da sincronização horária, que segura o lock por bem mais que os 10s de espera.
+    // Fora da fila: não disputa com ninguém e não tem com quem colidir.
+    if (action === 'set_meta') return handleSetMeta(body);
+
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
