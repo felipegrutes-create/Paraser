@@ -4420,7 +4420,7 @@
             <!-- Medicamentos: o que a paciente pagou × o que a clínica comprou -->
             <div class="cr-charts-row" style="margin-bottom:16px">
                 <div class="chart-card" style="flex:1">
-                    <h3>💊 Medicamentos — receita, custo e margem <span id="resMedSub" style="font-size:11px;font-weight:400;color:var(--muted)">receita = itens de medicação faturados no Feegow · custo = categoria MEDICAÇÕES do fluxo de caixa · a compra vem em lote, então a linha (margem acumulada no ano) diz mais que o mês isolado</span></h3>
+                    <h3>💊 Medicamentos — receita, custo e margem <span id="resMedSub" style="font-size:11px;font-weight:400;color:var(--muted)">o mesmo remédio nas duas barras: o que foi vendido pelo preço final e quanto custou comprar aquela quantidade</span></h3>
                     <canvas id="resChartMed" height="200"></canvas>
                     <div id="resMedTabela" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px"></div>
                 </div>
@@ -17910,39 +17910,41 @@
             _resMedRodando = true;
             try {
                 const ano = _resDate.getFullYear();
-                const [custoMap, recMap] = await Promise.all([
-                    _resCustoMedPorMes().catch(() => ({})),
-                    _resReceitaMedPorMes(ano).catch(() => ({}))
+                const [compras, vendas] = await Promise.all([
+                    _medCustoMedioPorProduto().catch(() => []),
+                    _medVendasMesProduto(ano).catch(() => ({ porMes: {}, porProduto: {} }))
                 ]);
+                const custoMarca = _medCustoPorMarca(compras);
                 const keys = _resMesesCheios_([ano + '-01']);
-                const rec   = keys.map(k => recMap[k] || 0);
-                const custo = keys.map(k => custoMap[k] || 0);
-
-                // Margem acumulada: (receita até aqui − custo até aqui) ÷ receita até aqui.
-                let accR = 0, accC = 0;
-                const margem = keys.map((k, i) => {
-                    accR += rec[i]; accC += custo[i];
-                    // Mês que ainda não aconteceu não repete a última margem: a linha para
-                    // no último mês com movimento, senão parece que dezembro já tem número.
-                    if (!rec[i] && !custo[i]) return null;
-                    return accR > 0 ? ((accR - accC) / accR * 100) : null;
+                const rec = [], custo = [];
+                let semCusto = 0;
+                keys.forEach(k => {
+                    const doMes = vendas.porMes[k] || {};
+                    let r = 0, c = 0;
+                    Object.entries(doMes).forEach(([nome, v]) => {
+                        const cu = _medCustoDoVendido(nome, custoMarca);
+                        if (!cu || !cu.custo) { semCusto += v.receita; return; }  // sem nota: fica de fora dos DOIS
+                        r += v.receita; c += cu.custo * v.qtd;
+                    });
+                    rec.push(r); custo.push(c);
                 });
+                const margem = keys.map((k, i) => rec[i] > 0 ? ((rec[i] - custo[i]) / rec[i] * 100) : null);
                 const totR = rec.reduce((s, v) => s + v, 0), totC = custo.reduce((s, v) => s + v, 0);
 
                 const sub = document.getElementById('resMedSub');
                 if (sub) {
                     const f = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
                     sub.textContent = totR > 0
-                        ? f(totR) + ' faturados × ' + f(totC) + ' comprados no ano · margem acumulada '
-                            + ((totR - totC) / totR * 100).toFixed(1).replace('.', ',') + '%'
-                            + ' · receita = itens de medicação no Feegow, custo = categoria MEDICAÇÕES do fluxo'
-                        : 'sem receita de medicamento carregada neste ano';
+                        ? f(totR) + ' vendidos × ' + f(totC) + ' de custo · lucro ' + f(totR - totC)
+                            + ' (' + ((totR - totC) / totR * 100).toFixed(1).replace('.', ',') + '%) · custo = preço médio das notas'
+                            + ' convertido pra dosagem vendida'
+                            + (semCusto > 0 ? ' · fora da conta: ' + f(semCusto) + ' sem nota de compra' : '')
+                        : 'nenhum medicamento vendido com nome de produto neste ano';
                 }
 
                 if (_resCharts.med) { try { _resCharts.med.destroy(); } catch (e) {} }
                 const labels = keys.map(k => _MONTHS_PT[parseInt(k.slice(5, 7), 10) - 1].slice(0, 3) + '/' + k.slice(2, 4));
-                const fmtK = v => v >= 1000000 ? (v / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + 'M'
-                                              : (v / 1000).toFixed(0) + 'k';
+                const fmtK = v => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : Math.round(v);
                 const rotulos = {
                     id: 'medLabels',
                     afterDatasetsDraw(chart) {
@@ -17953,17 +17955,40 @@
                             const meta = chart.getDatasetMeta(di), val = di === 0 ? rec : custo;
                             meta.data.forEach((bar, i) => { if (!val[i]) return; ctx.fillText(fmtK(val[i]), bar.x, bar.y - 3); });
                         });
+                        // % de lucro do mês, em cima da linha
+                        const mLine = chart.getDatasetMeta(2);
+                        ctx.font = '700 11px Outfit, sans-serif'; ctx.textBaseline = 'middle';
+                        mLine.data.forEach((pt, i) => {
+                            if (margem[i] == null) return;
+                            const s = margem[i].toFixed(0) + '%';
+                            const w = ctx.measureText(s).width + 12, h = 17, bx = pt.x - w / 2;
+                            let by = pt.y - 10 - h;
+                            if (by < chart.chartArea.top + 2) by = pt.y + 10;
+                            ctx.save();
+                            ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+                            ctx.fillStyle = 'rgba(17,20,32,0.92)';
+                            const rr = 8;
+                            ctx.beginPath();
+                            ctx.moveTo(bx + rr, by);
+                            ctx.arcTo(bx + w, by, bx + w, by + h, rr);
+                            ctx.arcTo(bx + w, by + h, bx, by + h, rr);
+                            ctx.arcTo(bx, by + h, bx, by, rr);
+                            ctx.arcTo(bx, by, bx + w, by, rr);
+                            ctx.closePath(); ctx.fill(); ctx.restore();
+                            ctx.fillStyle = margem[i] >= 0 ? '#fde047' : '#fca5a5';
+                            ctx.fillText(s, pt.x, by + h / 2);
+                        });
                         ctx.restore();
                     }
                 };
                 _resCharts.med = new Chart(el.getContext('2d'), {
                     type: 'bar',
                     data: { labels, datasets: [
-                        { label: 'Receita de medicamentos', data: rec,   backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 34, yAxisID: 'y', order: 2 },
-                        { label: 'Compra de medicamentos',  data: custo, backgroundColor: '#f43f5e', borderRadius: 4, maxBarThickness: 34, yAxisID: 'y', order: 2 },
-                        { label: 'Margem acumulada no ano', data: margem, type: 'line', yAxisID: 'y1',
+                        { label: 'Vendido (preço final)', data: rec,  backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 34, yAxisID: 'y', order: 2 },
+                        { label: 'Custo do que foi vendido', data: custo, backgroundColor: '#f43f5e', borderRadius: 4, maxBarThickness: 34, yAxisID: 'y', order: 2 },
+                        { label: '% de lucro no mês', data: margem, type: 'line', yAxisID: 'y1',
                           borderColor: '#fbbf24', backgroundColor: '#fbbf24', borderWidth: 2, pointRadius: 3,
-                          tension: 0.3, spanGaps: true, order: 1 }
+                          tension: 0.3, spanGaps: false, order: 1 }
                     ]},
                     options: {
                         responsive: true,
@@ -17971,19 +17996,18 @@
                             legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
                             tooltip: { callbacks: {
                                 label: ctx => ctx.dataset.type === 'line'
-                                    ? '  margem acumulada: ' + (ctx.raw == null ? '—' : ctx.raw.toFixed(1).replace('.', ',') + '%')
+                                    ? '  lucro: ' + (ctx.raw == null ? '—' : ctx.raw.toFixed(1).replace('.', ',') + '%')
                                     : '  ' + ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
                                 footer: items => {
                                     const r = items.find(i => i.datasetIndex === 0), c = items.find(i => i.datasetIndex === 1);
                                     if (!r || !c) return '';
-                                    const d = r.raw - c.raw;
-                                    return (d >= 0 ? 'Sobrou ' : 'Faltou ') + 'R$ ' + Math.abs(d).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' no mês';
+                                    return 'Lucro: R$ ' + (r.raw - c.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                                 }
                             } }
                         },
                         scales: {
                             x: { ticks: { color: '#6b7a99', font: { size: 11 } }, grid: { display: false } },
-                            y: { position: 'left', grace: '18%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                            y: { position: 'left', grace: '22%', ticks: { color: '#6b7a99', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v) }, grid: { color: 'rgba(255,255,255,0.04)' } },
                             y1: { position: 'right', ticks: { color: '#fbbf24', font: { size: 10 }, callback: v => v + '%' }, grid: { display: false } }
                         }
                     },
@@ -17992,6 +18016,81 @@
             } finally { _resMedRodando = false; }
         }
 
+        // ===== Custo do que foi VENDIDO (não do que foi comprado) ========================
+        // A caixa comprada e a dose vendida quase nunca são a mesma embalagem: compra-se
+        // "MENOPUR 75UI C 5 AMP" (375 UI na caixa) e vende-se "MENOPUR 600UI". Por isso o
+        // custo sai por CONTEÚDO: preço médio da nota ÷ UI (ou mg) que vêm nela, vezes o
+        // conteúdo do que foi vendido. Onde não dá pra ler o conteúdo dos dois lados, cai
+        // pra unidade contra unidade e a linha fica marcada como estimativa.
+        function _medConteudo_(nome) {
+            const n = (nome || '').toUpperCase().replace(/,/g, '.');
+            const mDose = n.match(/(\d+(?:\.\d+)?)\s*(UI|IU|MCG|MG)\b/);
+            const dose = mDose ? parseFloat(mDose[1]) : null;
+            const un   = mDose ? (mDose[2] === 'IU' ? 'UI' : mDose[2]) : null;
+            // embalagem: "C 5 AMP", "C 42 CAPS", "5FA", "C/20"
+            const mPack = n.match(/C\s*\/?\s*(\d+)\s*(AMP|CAPS|COMP|FA|FR)/) || n.match(/\b(\d+)\s*(AMP|CAPS|COMP|FA)\b/);
+            const pack = mPack ? parseInt(mPack[1], 10) : 1;
+            return { dose, unidade: un, pack, conteudo: dose != null ? dose * pack : null };
+        }
+
+        // Um custo por marca, já normalizado por conteúdo.
+        function _medCustoPorMarca(compras) {
+            const marcas = {};
+            compras.forEach(c => {
+                const k = c.marca; if (!k) return;
+                const ct = _medConteudo_(c.produto);
+                if (!marcas[k]) marcas[k] = { porConteudo: [], porUnidade: [], unidade: null };
+                if (ct.conteudo) {
+                    marcas[k].porConteudo.push({ custoPorUn: c.medio / ct.conteudo, peso: c.qtd, unidade: ct.unidade });
+                    marcas[k].unidade = marcas[k].unidade || ct.unidade;
+                }
+                marcas[k].porUnidade.push({ custo: c.medio, peso: c.qtd });
+            });
+            const out = {};
+            Object.entries(marcas).forEach(([k, v]) => {
+                const med = arr => { const p = arr.reduce((s, x) => s + x.peso, 0);
+                    return p ? arr.reduce((s, x) => s + (x.custoPorUn != null ? x.custoPorUn : x.custo) * x.peso, 0) / p : null; };
+                out[k] = { porConteudo: v.porConteudo.length ? med(v.porConteudo) : null,
+                           porUnidade: med(v.porUnidade), unidade: v.unidade };
+            });
+            return out;
+        }
+
+        // Vendas por mês E por produto, só o que tem nome de produto (pacote fica fora).
+        async function _medVendasMesProduto(ano) {
+            const hoje = new Date();
+            const ultimo = (ano === hoje.getFullYear()) ? hoje.getMonth() : 11;
+            const porMes = {}, porProduto = {};
+            for (let m = 0; m <= ultimo; m++) {
+                const chave = ano + '-' + ('0' + (m + 1)).slice(-2);
+                porMes[chave] = {};
+                let invs = [];
+                try { invs = await fgLoadMonth(new Date(ano, m, 1)); } catch (e) { continue; }
+                (invs || []).forEach(inv => (inv.itens || []).forEach(it => {
+                    if (_isCanc(it) || !isCrMedItem(it)) return;
+                    const n = (it.nomeResolvido || it.descricao || '').trim().toUpperCase();
+                    if (!n || /MEDICAMENTO|MEDICACAO|MEDICAÇÃO/.test(n)) return;
+                    const q = Number(it.quantidade) || 1, v = (parseInt(it.valor || '0', 10) || 0) / 100;
+                    if (!porMes[chave][n]) porMes[chave][n] = { qtd: 0, receita: 0 };
+                    porMes[chave][n].qtd += q; porMes[chave][n].receita += v;
+                    if (!porProduto[n]) porProduto[n] = { qtd: 0, receita: 0 };
+                    porProduto[n].qtd += q; porProduto[n].receita += v;
+                }));
+            }
+            return { porMes, porProduto };
+        }
+
+        // Custo unitário de UM item vendido. Devolve null quando não há nota da marca.
+        function _medCustoDoVendido(nome, custoMarca) {
+            const marca = _medMarca_(nome);
+            const c = custoMarca[marca];
+            if (!c) return null;
+            const ct = _medConteudo_(nome);
+            if (ct.conteudo && c.porConteudo != null && (!c.unidade || !ct.unidade || c.unidade === ct.unidade)) {
+                return { custo: c.porConteudo * ct.conteudo, base: 'conteúdo', estimado: false };
+            }
+            return { custo: c.porUnidade, base: 'unidade', estimado: true };
+        }
 
         // ===== Medicamento a medicamento: preço de venda × custo médio de compra ==========
         // Custo médio = ponderado por quantidade em TODAS as notas do produto (não o último
@@ -18036,26 +18135,6 @@
             }));
         }
 
-        async function _medVendasPorProduto(ano) {
-            const hoje = new Date();
-            const ultimo = (ano === hoje.getFullYear()) ? hoje.getMonth() : 11;
-            const itens = {};
-            for (let m = 0; m <= ultimo; m++) {
-                let invs = [];
-                try { invs = await fgLoadMonth(new Date(ano, m, 1)); } catch (e) { continue; }
-                (invs || []).forEach(inv => (inv.itens || []).forEach(it => {
-                    if (_isCanc(it) || !isCrMedItem(it)) return;
-                    const n = (it.nomeResolvido || it.descricao || '').trim().toUpperCase();
-                    // linha de pacote não diz qual remédio é: fica fora da conta por produto
-                    if (!n || /MEDICAMENTO|MEDICACAO|MEDICAÇÃO/.test(n)) return;
-                    if (!itens[n]) itens[n] = { qtd: 0, receita: 0 };
-                    itens[n].qtd += (Number(it.quantidade) || 1);
-                    itens[n].receita += (parseInt(it.valor || '0', 10) || 0) / 100;
-                }));
-            }
-            return itens;
-        }
-
         let _medTabelaRodando = false;
         async function _resRenderMedTabela() {
             const el = document.getElementById('resMedTabela'); if (!el || _medTabelaRodando) return;
@@ -18065,28 +18144,23 @@
                 const ano = _resDate.getFullYear();
                 const [compras, vendas] = await Promise.all([
                     _medCustoMedioPorProduto().catch(() => []),
-                    _medVendasPorProduto(ano).catch(() => ({}))
+                    _medVendasMesProduto(ano).catch(() => ({ porMes: {}, porProduto: {} }))
                 ]);
-                const linhas = Object.entries(vendas).map(([nome, v]) => {
-                    const marca = _medMarca_(nome), dose = _medDose_(nome);
-                    const cands = compras.filter(c => c.produto.includes(marca) || c.marca === marca);
-                    let custo = null, origem = '', alerta = '';
-                    if (cands.length) {
-                        // preferido: mesma dosagem. senão, o mais comprado, avisando.
-                        const igual = cands.filter(c => dose && c.dose && Math.abs(c.dose - dose) < 0.01);
-                        const esc = (igual.length ? igual : cands).sort((a, b) => b.qtd - a.qtd)[0];
-                        custo = esc.medio; origem = esc.produto;
-                        if (!igual.length && dose && esc.dose && esc.dose !== dose) {
-                            alerta = 'compra ' + esc.dose + ', vende ' + dose;
-                        }
-                    }
-                    const precoVenda = v.qtd ? v.receita / v.qtd : 0;
-                    const custoTotal = custo != null ? custo * v.qtd : null;
-                    return { nome, qtd: v.qtd, receita: v.receita, precoVenda, custo, custoTotal, origem, alerta };
+                // Mesmo motor do gráfico acima: custo por conteúdo (UI/mg), não por embalagem.
+                const custoMarca = _medCustoPorMarca(compras);
+                const linhas = Object.entries(vendas.porProduto).map(([nome, v]) => {
+                    const cu = _medCustoDoVendido(nome, custoMarca);
+                    const custo = cu && cu.custo ? cu.custo : null;
+                    const ct = _medConteudo_(nome);
+                    return { nome, qtd: v.qtd, receita: v.receita,
+                        precoVenda: v.qtd ? v.receita / v.qtd : 0,
+                        custo, custoTotal: custo != null ? custo * v.qtd : null,
+                        base: cu ? cu.base : '', alerta: (cu && cu.estimado) ? 'custo por embalagem, não por dose' : '',
+                        conteudo: ct.conteudo ? ct.conteudo + (ct.unidade || '') : '' };
                 }).filter(l => l.receita > 0).sort((a, b) => b.receita - a.receita);
 
                 const f = n => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
-                const casadas = linhas.filter(l => l.custoTotal != null && !l.alerta);
+                const casadas = linhas.filter(l => l.custoTotal != null);
                 const somaR = casadas.reduce((s, l) => s + l.receita, 0);
                 const somaC = casadas.reduce((s, l) => s + l.custoTotal, 0);
                 const receitaTotal = linhas.reduce((s, l) => s + l.receita, 0);
@@ -18094,7 +18168,7 @@
                 el.innerHTML = `
                     <div style="font-size:12px;color:var(--muted);margin:2px 0 10px">
                         ${linhas.length} medicamentos vendidos com nome de produto em ${ano} ·
-                        ${casadas.length} com custo confiável (${f(somaR)} vendidos, ${f(somaC)} de custo,
+                        ${casadas.length} com nota de compra (${f(somaR)} vendidos, ${f(somaC)} de custo,
                         <b style="color:${somaR - somaC >= 0 ? 'var(--success)' : 'var(--danger)'}">margem ${somaR ? ((somaR - somaC) / somaR * 100).toFixed(1).replace('.', ',') : '0'}%</b>)
                     </div>
                     <div style="overflow-x:auto">
@@ -18114,8 +18188,9 @@
                             const cor = marg == null ? 'var(--muted)' : marg >= 0 ? 'var(--success)' : 'var(--danger)';
                             return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
                                 <td style="padding:7px 8px">${l.nome.slice(0, 46)}
-                                    ${l.alerta ? `<span title="${l.origem}" style="margin-left:6px;font-size:10px;color:var(--warning);border:1px solid var(--warning);border-radius:5px;padding:1px 5px">⚠ ${l.alerta}</span>` : ''}
-                                    ${l.custo == null ? '<span style="margin-left:6px;font-size:10px;color:var(--muted)">sem nota de compra</span>' : ''}</td>
+                                    ${l.alerta ? `<span style="margin-left:6px;font-size:10px;color:var(--warning);border:1px solid var(--warning);border-radius:5px;padding:1px 5px">⚠ ${l.alerta}</span>` : ''}
+                                    ${l.custo == null ? '<span style="margin-left:6px;font-size:10px;color:var(--muted)">sem nota de compra</span>' : ''}
+                                    ${l.conteudo ? `<span style="margin-left:6px;font-size:10px;color:var(--muted)">${l.conteudo}</span>` : ''}</td>
                                 <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums">${l.qtd}</td>
                                 <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums">${f(l.precoVenda)}</td>
                                 <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums;color:${l.custo == null ? 'var(--muted)' : 'inherit'}">${l.custo == null ? '—' : f(l.custo)}</td>
@@ -18126,10 +18201,12 @@
                         }).join('')}</tbody>
                     </table></div>
                     <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">
-                        ⚠️ As linhas marcadas compram numa dosagem e vendem em outra (ex.: compra caneta de 900 UI,
-                        vende dose de 300 UI). Enquanto ninguém definir quantas doses saem de cada caneta, a margem
-                        delas não vale. As linhas de pacote (medicação da doadora, antecipação, Projeto Ana)
-                        ficam de fora desta tabela: elas não dizem qual medicamento foi usado.
+                        O custo sai do preço médio das notas convertido pra dosagem vendida: uma caixa de
+                        MENOPUR 75UI com 5 ampolas tem 375 UI, então a dose de 600 UI custa 1,6 caixa. As linhas
+                        marcadas ⚠ não têm dosagem legível dos dois lados e usam o preço da embalagem inteira,
+                        que superestima o custo. Medicamento sem nota de compra fica fora dos dois lados do
+                        gráfico. As linhas de pacote (medicação da doadora, antecipação, Projeto Ana) também
+                        ficam de fora: elas não dizem qual medicamento foi usado.
                     </div>`;
             } catch (e) {
                 el.innerHTML = '<div style="color:var(--danger);font-size:12px">Não consegui cruzar compra e venda: ' + e.message + '</div>';
