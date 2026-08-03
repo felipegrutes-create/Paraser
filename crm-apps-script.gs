@@ -2463,11 +2463,25 @@ function handleSetMeta(body) {
   if (!/^\d{4}-\d{2}$/.test(mes)) return jsonErr('mes deve ser YYYY-MM');
   const sh = getOrCreateSheetGen_(METAS_SHEET, METAS_HEADERS);
   const data = sh.getDataRange().getValues();
+  let achou = false;
   for (let i = 1; i < data.length; i++) {
-    if (normMes_(data[i][0]) === mes) { sh.getRange(i + 1, 2).setValue(valor); return jsonOk({ ok: true, mes: mes, valor: valor }); }
+    if (normMes_(data[i][0]) === mes) { sh.getRange(i + 1, 2).setValue(valor); achou = true; break; }
   }
-  sh.appendRow(["'" + mes, valor]);
+  if (!achou) sh.appendRow(["'" + mes, valor]);
+  atualizarMetaNoCache_(mes, valor);
   return jsonOk({ ok: true, mes: mes, valor: valor });
+}
+
+// O get_meta guarda 20 min de cache. Sem mexer nele, quem acabou de definir a meta
+// continuava vendo o valor velho na barra e parecia que não tinha salvado (03/08/2026).
+// Corrige só o campo da meta: os totais do cache seguem válidos, sem recomputar o mês.
+function atualizarMetaNoCache_(mes, valor) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const c = JSON.parse(props.getProperty('META_CACHE') || 'null');
+    if (c && c.mes === mes) { c.meta = valor; props.setProperty('META_CACHE', JSON.stringify(c)); }
+    else props.deleteProperty('META_CACHE');
+  } catch (e) {}
 }
 
 // Dinheiro em espécie do mês (lançado à mão pela analista).

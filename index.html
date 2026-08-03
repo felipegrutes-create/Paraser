@@ -7570,13 +7570,48 @@
             const atual = prompt('Meta de vendas de ' + mes.split('-').reverse().join('/') + ' (só o número, ex: 677544):', '');
             if (atual === null) return;
             const valor = Number(String(atual).replace(/[^\d]/g, ''));
-            if (!valor) return;
+            if (!valor) { prAviso('Nada foi salvo: digite o valor só com números, ex 677544.', 'erro'); return; }
             logUso('acao', '', 'editar_meta');
-            await fetch(CRM_SCRIPT_URL, {
-                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'set_meta', mes, valor })
-            }).catch(() => {});
-            setTimeout(renderMetaBar, 900);
+            const rotulo = mes.split('-').reverse().join('/');
+            prAviso('Salvando a meta de ' + rotulo + '…', 'espera');
+            // 🔴 03/08/2026: isso era mode:'no-cors' e ninguém lia a resposta. Quando o
+            // servidor recusava (ex.: a sincronização horária segurando o lock), a meta
+            // não era gravada e a tela não dizia nada. Agora a resposta é lida e mostrada.
+            let ok = false, motivo = '';
+            try {
+                const r = await fetch(CRM_SCRIPT_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'set_meta', mes, valor })
+                });
+                const j = await r.json();
+                ok = j && j.ok === true;
+                if (!ok) motivo = (j && (j.erro || j.error || j.message)) || 'o servidor recusou';
+            } catch (e) { motivo = e.message || 'sem resposta do servidor'; }
+            if (ok) {
+                prAviso('✅ Meta de ' + rotulo + ' salva: R$ ' + valor.toLocaleString('pt-BR'), 'ok');
+                renderMetaBar();
+            } else {
+                prAviso('❌ A meta de ' + rotulo + ' NÃO foi salva (' + motivo + '). Tente de novo em 1 minuto.', 'erro');
+            }
+        }
+
+        // Aviso curto no canto da tela. Nasceu porque definir a meta não dava retorno
+        // nenhum: a pessoa digitava, nada mudava e não dava pra saber se tinha salvado.
+        function prAviso(msg, tipo) {
+            let el = document.getElementById('prAviso');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'prAviso';
+                document.body.appendChild(el);
+            }
+            const cor = tipo === 'ok' ? 'var(--success)' : tipo === 'erro' ? 'var(--danger)' : 'var(--muted)';
+            el.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:9999;max-width:330px;'
+                + 'background:var(--surface2);border:1px solid ' + cor + ';border-left:4px solid ' + cor + ';'
+                + 'color:var(--text);padding:12px 16px;border-radius:10px;font-size:13px;line-height:1.45;'
+                + 'box-shadow:0 10px 30px rgba(0,0,0,.45)';
+            el.textContent = msg;
+            clearTimeout(prAviso._t);
+            if (tipo !== 'espera') prAviso._t = setTimeout(() => el.remove(), tipo === 'erro' ? 12000 : 6000);
         }
         // ===== Dinheiro em espécie: lançamento por paciente (paciente/CPF/serviço/valor) =====
         // Cada linha é um pagamento em dinheiro, pra depois cruzar com o Feegow. O total entra na Meta.
