@@ -18023,8 +18023,12 @@
         // conteúdo do que foi vendido. Onde não dá pra ler o conteúdo dos dois lados, cai
         // pra unidade contra unidade e a linha fica marcada como estimativa.
         function _medConteudo_(nome) {
-            const n = (nome || '').toUpperCase().replace(/,/g, '.');
-            const mDose = n.match(/(\d+(?:\.\d+)?)\s*(UI|IU|MCG|MG)\b/);
+            let n = (nome || '').toUpperCase();
+            n = n.replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');   // 100.000UI → 100000UI
+            n = n.replace(/(\d),(\d)/g, '$1.$2');            // 0,5ML → 0.5ML
+            // "900/450IU" é caneta de 900: a segunda dose é do outro hormônio da mesma caneta.
+            // Sem tratar isso, o leitor pegava 450 e o custo do Pergoveris saía pelo dobro.
+            const mDose = n.match(/(\d+(?:\.\d+)?)(?:\s*\/\s*\d+(?:\.\d+)?)?\s*(UI|IU|MCG|MG)\b/);
             const dose = mDose ? parseFloat(mDose[1]) : null;
             const un   = mDose ? (mDose[2] === 'IU' ? 'UI' : mDose[2]) : null;
             // embalagem: "C 5 AMP", "C 42 CAPS", "5FA", "C/20"
