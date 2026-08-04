@@ -15582,13 +15582,8 @@
         // empresa, competência, se é dedutível e o mês de caixa). Aqui as duas fontes se
         // encontram: o relatório do mês sai da classificação dela, e a conferência aponta
         // o que a fatura cobrou e ainda não foi classificado.
-        const _CX_MES = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12 };
         let _finCartaoClassCache = null, _finCartaoRelMes = null;
 
-        function _cxOrdem(caixa) {   // "jun./2026" -> 202606, pra ordenar e comparar meses
-            const m = (caixa || '').toLowerCase().match(/([a-zç]{3})\.?\/(\d{4})/);
-            return m && _CX_MES[m[1]] ? parseInt(m[2], 10) * 100 + _CX_MES[m[1]] : 0;
-        }
 
         async function _finCartaoClass() {
             if (_finCartaoClassCache) return _finCartaoClassCache;
@@ -15617,139 +15612,172 @@
 
         function _finCartaoRelMesSet(m) { _finCartaoRelMes = m; _finRenderCartaoRel(); }
 
+        // Casa o que a FATURA cobrou com a linha que a analista classificou. A fatura manda:
+        // cada lançamento cobrado procura sua classificação, primeiro pelo par valor + começo
+        // da descrição, depois só pelo valor (a descrição dela nem sempre é igual à do banco).
+        // Cada linha da planilha é usada uma vez só, senão uma compra repetida casaria duas vezes.
+        function _cartaoCasar(itens, classif) {
+            const norm = s => (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, '');
+            const porValorDesc = {}, porValor = {};
+            classif.forEach(c => {
+                const v = c.valor.toFixed(2);
+                const k = v + '|' + norm(c.descricao).slice(0, 6);
+                (porValorDesc[k] = porValorDesc[k] || []).push(c);
+                (porValor[v] = porValor[v] || []).push(c);
+            });
+            const usada = new Set();
+            const pegar = lista => {
+                for (const c of (lista || [])) if (!usada.has(c)) { usada.add(c); return c; }
+                return null;
+            };
+            return itens.map(it => {
+                const v = Number(it.valor).toFixed(2);
+                const c = pegar(porValorDesc[v + '|' + norm(it.descricao).slice(0, 6)]) || pegar(porValor[v]);
+                return { ...it, classe: c };
+            });
+        }
+
         async function _finRenderCartaoRel(forcar) {
             const box = document.getElementById('finCartaoRelBox'); if (!box) return;
             const sub = document.getElementById('finCartaoRelSub');
             if (forcar) _finCartaoClassCache = null;
-            if (!_finCartaoClassCache) box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⏳ lendo a classificação da analista…</div>';
-            let dados;
-            try { dados = await _finCartaoClass(); } catch (e) {
+            if (!_finCartaoClassCache) box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⏳ cruzando as faturas com a classificação da analista…</div>';
+            if (!_finFaturaData || !_finFaturaData.itens) {
+                box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">O relatório sai das faturas importadas. Assim que a seção acima carregar, ele aparece. <a href="#" onclick="event.preventDefault();_finRenderCartaoRel()" style="color:#00d4aa">atualizar</a></div>';
+                return;
+            }
+            let classif;
+            try { classif = await _finCartaoClass(); } catch (e) {
                 box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⚠ não consegui ler a aba CARTÃO DE CRÉDITO agora</div>';
                 return;
             }
             const R = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const R0 = v => 'R$ ' + Math.round(Number(v)).toLocaleString('pt-BR');
             const soma = arr => arr.reduce((s, x) => s + x.valor, 0);
+            const rotulo = f => {
+                const i = f.competencia ? parseInt(f.competencia.slice(5, 7), 10) - 1 : -1;
+                return (f.empresa || 'sem empresa') + ' · ' + (i >= 0 ? _MONTHS_PT[i].slice(0, 3).toLowerCase() + '/' + f.competencia.slice(2, 4) : (f.arquivo || '').slice(0, 14));
+            };
 
-            const meses = [...new Set(dados.map(d => d.caixa))].sort((a, b) => _cxOrdem(b) - _cxOrdem(a));
-            // Abre no mês corrente. Existem lançamentos com mês de caixa futuro (parcelas já
-            // agendadas), e abrir em novembro por causa de duas parcelas não ajuda ninguém.
-            if (!_finCartaoRelMes || !meses.includes(_finCartaoRelMes)) {
-                const hj = new Date(), atual = hj.getFullYear() * 100 + (hj.getMonth() + 1);
-                _finCartaoRelMes = meses.find(m => _cxOrdem(m) && _cxOrdem(m) <= atual) || meses.find(m => _cxOrdem(m)) || meses[0];
-            }
-            const mesAtual = _finCartaoRelMes;
-            // Cancelado ENTRA na conta: a fatura cobrou e estornou, e as duas linhas estão
-            // na aba. Tirar só uma delas desequilibraria o mês e brigaria com a conferência.
-            const doMes = dados.filter(d => d.caixa === mesAtual);
-            const iAnterior = meses.indexOf(mesAtual) + 1;
-            const mesAnt = meses[iAnterior] && _cxOrdem(meses[iAnterior]) ? meses[iAnterior] : null;
-            const totalMes = soma(doMes);
-            const totalAnt = mesAnt ? soma(dados.filter(d => d.caixa === mesAnt)) : 0;
-            const varia = totalAnt ? ((totalMes - totalAnt) / totalAnt * 100) : null;
-            if (sub) sub.textContent = `${dados.length} lançamentos classificados · ${R0(soma(dados))}`;
+            // Uma fatura = uma empresa num mês. É essa a unidade do relatório.
+            const casados = _cartaoCasar(_finFaturaData.itens, classif);
+            const faturas = (_finFaturaData.faturas || []).slice()
+                .sort((a, b) => (b.competencia + b.empresa).localeCompare(a.competencia + a.empresa));
+            if (!faturas.length) { box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">nenhuma fatura importada ainda</div>'; return; }
+            const chave = f => (f.empresa || '') + '|' + (f.competencia || '');
+            if (!_finCartaoRelMes || !faturas.some(f => chave(f) === _finCartaoRelMes)) _finCartaoRelMes = chave(faturas[0]);
+            const fat = faturas.find(f => chave(f) === _finCartaoRelMes) || faturas[0];
+            // Só os lançamentos DO ARQUIVO daquela fatura. XLSX e PDF da mesma fatura convivem
+            // na pasta, e o que escapa da deduplicação do servidor (descrição escrita diferente)
+            // apareceria como lançamento a mais e estouraria o total impresso.
+            const itens = casados.filter(i => i.arquivo === fat.arquivo);
 
-            const botoesMes = meses.map(m => {
-                const sel = m === mesAtual, t = soma(dados.filter(d => d.caixa === m));
-                return `<button onclick="_finCartaoRelMesSet('${m.replace(/'/g, "\\'")}')"
+            const somaItens = soma(itens);
+            const classificados = itens.filter(i => i.classe);
+            const orfaos = itens.filter(i => !i.classe);
+            const vClass = soma(classificados), vOrf = soma(orfaos);
+            const dedut = soma(classificados.filter(i => i.classe.dedutivel));
+            const difFatura = (fat.total || 0) - somaItens;
+            // Vira fatura: o mês anterior não foi pago e entrou no total deste. Aí a diferença
+            // entre o total impresso e os lançamentos é exatamente a fatura anterior.
+            const vira = Math.abs(difFatura) > 0.01
+                ? faturas.find(f => f !== fat && f.empresa === fat.empresa && Math.abs((f.total || 0) - difFatura) < 0.02)
+                : null;
+            if (sub) sub.textContent = `${faturas.length} fatura(s) · ${casados.length} lançamentos · ${classif.length} linhas classificadas na planilha`;
+
+            const botoes = faturas.map(f => {
+                const sel = chave(f) === _finCartaoRelMes;
+                const its = casados.filter(i => i.arquivo === f.arquivo);
+                const pct = soma(its) ? Math.round(soma(its.filter(i => i.classe)) / soma(its) * 100) : 0;
+                return `<button onclick="_finCartaoRelMesSet('${chave(f).replace(/'/g, "\\'")}')"
                     style="background:${sel ? 'rgba(0,212,170,0.14)' : 'var(--surface)'};border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
                     border-radius:9px;padding:7px 11px;cursor:pointer;font-family:inherit;color:var(--text);text-align:left">
-                    <div style="font-size:10.5px;color:var(--muted)">${m}</div>
-                    <div style="font-size:13.5px;font-weight:700">${R0(t)}</div>
+                    <div style="font-size:10.5px;color:var(--muted)">${rotulo(f)}</div>
+                    <div style="font-size:13.5px;font-weight:700">${R0(f.total || soma(its))}</div>
+                    <div style="font-size:10px;color:${pct >= 95 ? 'var(--success)' : 'var(--warning)'}">${pct}% classificado</div>
                 </button>`;
             }).join('');
 
-            const agrupa = (campo, lista) => {
+            const agrupa = campo => {
                 const m = {};
-                lista.forEach(d => { m[d[campo]] = (m[d[campo]] || 0) + d.valor; });
+                classificados.forEach(i => { const k = i.classe[campo]; m[k] = (m[k] || 0) + i.valor; });
                 return Object.entries(m).sort((a, b) => b[1] - a[1]);
             };
+            const base = Math.max(somaItens, 1);
             const barra = (nome, valor, maxv, cor) => `
                 <div style="margin-bottom:9px">
                     <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px;gap:8px">
                         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</span>
-                        <span style="font-weight:700;white-space:nowrap">${R0(valor)} <small style="color:var(--muted);font-weight:400">${totalMes ? (valor / totalMes * 100).toFixed(0) : 0}%</small></span>
+                        <span style="font-weight:700;white-space:nowrap">${R0(valor)} <small style="color:var(--muted);font-weight:400">${(valor / base * 100).toFixed(0)}%</small></span>
                     </div>
                     <div style="height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">
                         <div style="height:100%;width:${maxv ? (valor / maxv * 100).toFixed(1) : 0}%;background:linear-gradient(90deg,${cor})"></div>
                     </div>
                 </div>`;
-
-            const planos = agrupa('plano', doMes), maxPlano = planos.length ? planos[0][1] : 1;
-            const barrasPlano = planos.slice(0, 9).map(([k, v]) => barra(k, v, maxPlano, '#6366f1,#818cf8')).join('');
-            const fornecedores = agrupa('fornecedor', doMes).slice(0, 10).map(([k, v]) =>
+            const planos = agrupa('plano'), maxP = Math.max(planos.length ? planos[0][1] : 1, vOrf);
+            const barrasPlano = planos.slice(0, 9).map(([k, v]) => barra(k, v, maxP, '#6366f1,#818cf8')).join('')
+                + (vOrf ? barra('(ainda sem classificação)', vOrf, maxP, '#f59e0b,#fbbf24') : '');
+            const fornecedores = agrupa('fornecedor').slice(0, 10).map(([k, v]) =>
                 `<tr><td style="padding:4px 10px 4px 0">${k}</td><td style="padding:4px 0;text-align:right;font-weight:600">${R0(v)}</td></tr>`).join('');
-            const empresas = agrupa('empresa', doMes).map(([k, v]) =>
-                `<span style="display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:12px">
-                    ${k} <b style="margin-left:4px">${R0(v)}</b></span>`).join('');
+            const empresas = (() => {
+                const m = {};
+                classificados.forEach(i => { const k = i.classe.empresa; m[k] = (m[k] || 0) + i.valor; });
+                return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, v]) =>
+                    `<span style="display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:12px">
+                        ${k} <b style="margin-left:4px">${R0(v)}</b></span>`).join('');
+            })();
 
-            const dedut = soma(doMes.filter(d => d.dedutivel));
-            const emAberto = doMes.filter(d => d.status === 'EM ABERTO');
-            const cancelados = doMes.filter(d => d.status === 'CANCELADO');
-            const semMes = dados.filter(d => !_cxOrdem(d.caixa));
-            const semEmpresa = doMes.filter(d => d.empresa === '(sem empresa)');
-            const semPlano = doMes.filter(d => d.plano === '(sem plano de contas)');
+            const listaOrfaos = orfaos.slice(0, 20).map(o =>
+                `<tr style="border-top:1px solid rgba(255,255,255,.05)">
+                    <td style="padding:4px 8px 4px 0;color:var(--muted);white-space:nowrap">${(o.data || '').slice(8, 10)}/${(o.data || '').slice(5, 7)}</td>
+                    <td style="padding:4px 8px 4px 0">${o.descricao}</td>
+                    <td style="padding:4px 8px 4px 0;color:var(--muted);font-size:11.5px;white-space:nowrap">${(o.portador || '').split(' ')[0]}</td>
+                    <td style="padding:4px 0;text-align:right;font-weight:600">${R(o.valor)}</td>
+                </tr>`).join('');
 
-            // Conferência: o que a fatura cobrou e não aparece classificado. Casa pelo valor
-            // exato, que sozinho já acerta 98% dos lançamentos.
-            let conferencia = '<div style="font-size:12px;color:var(--muted)">A conferência aparece depois que a fatura acima terminar de carregar. <a href="#" onclick="event.preventDefault();_finRenderCartaoRel()" style="color:#00d4aa">atualizar</a></div>';
-            if (_finFaturaData && _finFaturaData.itens) {
-                const disp = {};
-                dados.forEach(d => { const k = d.valor.toFixed(2); disp[k] = (disp[k] || 0) + 1; });
-                const orfaos = [];
-                _finFaturaData.itens.forEach(it => {
-                    const k = Number(it.valor).toFixed(2);
-                    if (disp[k]) disp[k]--; else orfaos.push(it);
-                });
-                const totalOrfaos = orfaos.reduce((s, x) => s + x.valor, 0);
-                conferencia = orfaos.length
-                    ? `<div style="font-size:12.5px;margin-bottom:8px">${orfaos.length} lançamento(s) da fatura sem classificação, <b>${R(totalOrfaos)}</b></div>
-                       <table style="font-size:12px;border-collapse:collapse;width:100%">${orfaos.slice(0, 15).map(o =>
-                        `<tr style="border-top:1px solid rgba(255,255,255,.05)">
-                            <td style="padding:4px 8px 4px 0;color:var(--muted);white-space:nowrap">${(o.data || '').slice(8, 10)}/${(o.data || '').slice(5, 7)}</td>
-                            <td style="padding:4px 8px 4px 0">${o.descricao}</td>
-                            <td style="padding:4px 0;text-align:right;font-weight:600">${R(o.valor)}</td>
-                        </tr>`).join('')}</table>
-                       ${orfaos.length > 15 ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">mostrando 15 de ${orfaos.length}</div>` : ''}`
-                    : '<div style="font-size:12.5px;color:var(--success)">✅ tudo que a fatura cobrou está classificado</div>';
-            }
-
-            const kpi = (rot, valor, extra) => `
+            const kpi = (rot, valor, extra, cor) => `
                 <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:140px;flex:1">
                     <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${rot}</div>
-                    <div style="font-size:17px;font-weight:800;margin-top:2px">${valor}</div>
+                    <div style="font-size:17px;font-weight:800;margin-top:2px${cor ? ';color:' + cor : ''}">${valor}</div>
                     ${extra ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${extra}</div>` : ''}
                 </div>`;
 
             box.innerHTML = `
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${botoesMes}</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${botoes}</div>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-                    ${kpi('Gasto do mês', R0(totalMes), `${doMes.length} lançamentos`)}
-                    ${kpi('Contra o mês anterior', varia === null ? '—' : (varia >= 0 ? '+' : '') + varia.toFixed(0) + '%', mesAnt ? `${mesAnt}: ${R0(totalAnt)}` : 'sem mês anterior')}
-                    ${kpi('Dedutível', R0(dedut), totalMes ? (dedut / totalMes * 100).toFixed(0) + '% do mês' : '')}
-                    ${kpi('Em aberto', R0(soma(emAberto)), `${emAberto.length} lançamento(s)`)}
+                    ${kpi('Total da fatura', R0(fat.total || somaItens), fat.vencimento ? 'vence ' + fat.vencimento.slice(8, 10) + '/' + fat.vencimento.slice(5, 7) : rotulo(fat))}
+                    ${kpi('Lançamentos importados', R0(somaItens), `${itens.length} lançamentos`)}
+                    ${kpi('Classificado', R0(vClass), somaItens ? (vClass / somaItens * 100).toFixed(0) + '% da fatura' : '')}
+                    ${kpi('Sem classificação', R0(vOrf), `${orfaos.length} lançamento(s)`, vOrf ? 'var(--warning)' : 'var(--success)')}
                 </div>
+                ${Math.abs(difFatura) > 0.01 ? (vira
+                    ? `<div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+                        ↩ o total impresso inclui a fatura anterior (${rotulo(vira)}, ${R(vira.total)}): é vira fatura, o mês passado rolou pra este.
+                        Os lançamentos desta fatura somam <b>${R(somaItens)}</b>.</div>`
+                    : `<div style="font-size:12px;color:var(--warning);margin-bottom:12px">
+                        ⚠ o total impresso na fatura e a soma dos lançamentos importados diferem em <b>${R(difFatura)}</b>.
+                        Falta importar arquivo dessa fatura, ou o importador juntou lançamentos idênticos.</div>`) : ''}
                 <div style="margin-bottom:14px">${empresas}</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px">
                     <div>
-                        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Em que foi gasto</div>
-                        ${barrasPlano || '<div style="color:var(--muted);font-size:12px">sem lançamento neste mês</div>'}
+                        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Em que a fatura foi gasta</div>
+                        ${barrasPlano || '<div style="color:var(--muted);font-size:12px">nada classificado nesta fatura</div>'}
                     </div>
                     <div>
                         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Maiores fornecedores</div>
                         <table style="font-size:12.5px;border-collapse:collapse;width:100%">${fornecedores}</table>
+                        <div style="font-size:11.5px;color:var(--muted);margin-top:10px">Dedutível nesta fatura: <b>${R0(dedut)}</b></div>
                     </div>
                 </div>
                 <div style="border-top:1px solid var(--border);padding-top:14px">
-                    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Conferência e pendências</div>
-                    ${conferencia}
-                    <div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.8">
-                        ${semMes.length ? `⚠ <b style="color:var(--warning)">${semMes.length}</b> lançamento(s) sem mês de caixa, ${R0(soma(semMes))} · não entram em nenhum mês deste relatório<br>` : ''}
-                        ${cancelados.length ? `${cancelados.length} lançamento(s) cancelados no mês, saldo ${R0(soma(cancelados))} · a compra e o estorno entram os dois<br>` : ''}
-                        ${semEmpresa.length ? `⚠ ${semEmpresa.length} sem empresa neste mês (${R0(soma(semEmpresa))})<br>` : ''}
-                        ${semPlano.length ? `⚠ ${semPlano.length} sem plano de contas neste mês (${R0(soma(semPlano))})<br>` : ''}
-                        fonte: aba CARTÃO DE CRÉDITO da planilha ·
-                        <a href="#" onclick="event.preventDefault();_finRenderCartaoRel(true)" style="color:#00d4aa">reler agora</a>
+                    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">O que a fatura cobrou e ninguém classificou</div>
+                    ${orfaos.length
+                        ? `<table style="font-size:12px;border-collapse:collapse;width:100%">${listaOrfaos}</table>
+                           ${orfaos.length > 20 ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">mostrando 20 de ${orfaos.length}</div>` : ''}`
+                        : '<div style="font-size:12.5px;color:var(--success)">✅ tudo que esta fatura cobrou está classificado na planilha</div>'}
+                    <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.8">
+                        a fatura manda: o total vem dela, e a planilha só diz em que cada lançamento foi gasto ·
+                        <a href="#" onclick="event.preventDefault();_finRenderCartaoRel(true)" style="color:#00d4aa">reler a planilha</a>
                     </div>
                 </div>`;
         }
