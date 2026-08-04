@@ -4030,6 +4030,15 @@
                 </div>
                 <div id="finFaturaBox" style="margin-top:12px"></div>
             </div>
+
+            <!-- Relatório mensal do cartão: a classificação que a analista faz na aba
+                 "CARTÃO DE CRÉDITO" da planilha, cruzada com a fatura importada acima -->
+            <div class="chart-card" style="margin-top:20px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                    <h3 style="margin:0">📊 Relatório do Cartão por Mês <span id="finCartaoRelSub" style="font-size:11px;font-weight:400;color:var(--muted)"></span></h3>
+                </div>
+                <div id="finCartaoRelBox" style="margin-top:12px"></div>
+            </div>
         </section>
 
         <!-- ===== Sócios — Geração × Retirada: página própria (menu Financeiro). Fechamento manual, atualizar a cada fechamento (ver memória decisao_2026-06-23_socios_geracao_retirada) ===== -->
@@ -15567,6 +15576,184 @@
             _finRenderFatura();
         }
 
+        // ===== Relatório mensal do cartão ===============================================
+        // A fatura diz QUANTO foi gasto; quem diz EM QUÊ é a analista, que classifica cada
+        // compra na aba "CARTÃO DE CRÉDITO" da planilha (plano de contas, fornecedor,
+        // empresa, competência, se é dedutível e o mês de caixa). Aqui as duas fontes se
+        // encontram: o relatório do mês sai da classificação dela, e a conferência aponta
+        // o que a fatura cobrou e ainda não foi classificado.
+        const _CX_MES = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12 };
+        let _finCartaoClassCache = null, _finCartaoRelMes = null;
+
+        function _cxOrdem(caixa) {   // "jun./2026" -> 202606, pra ordenar e comparar meses
+            const m = (caixa || '').toLowerCase().match(/([a-zç]{3})\.?\/(\d{4})/);
+            return m && _CX_MES[m[1]] ? parseInt(m[2], 10) * 100 + _CX_MES[m[1]] : 0;
+        }
+
+        async function _finCartaoClass() {
+            if (_finCartaoClassCache) return _finCartaoClassCache;
+            const tab = encodeURIComponent('CARTÃO DE CRÉDITO'.normalize('NFC'));
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${FIN_SHEET_ID}/values/${tab}?key=${API_KEY}`;
+            const v = (await fetch(url).then(r => r.json())).values || [];
+            // A=aprovação B=plano C=fornecedor D=descrição E=status F=valor G=NF
+            // I=empresa J=pgto K=competência L=dedutível M=caixa
+            _finCartaoClassCache = v.slice(1)
+                .filter(r => r && (r[0] || '').trim() && (r[5] || '').toString().trim())
+                .map(r => ({
+                    data: (r[0] || '').trim(),
+                    plano: (r[1] || '').trim() || '(sem plano de contas)',
+                    fornecedor: (r[2] || '').trim() || '(sem fornecedor)',
+                    descricao: (r[3] || '').trim(),
+                    status: (r[4] || '').trim().toUpperCase(),
+                    valor: parseValorPag((r[5] || '').toString()),
+                    nf: (r[6] || '').trim(),
+                    empresa: (r[8] || '').trim() || '(sem empresa)',
+                    pgto: (r[9] || '').trim(),
+                    dedutivel: String(r[11] || '').trim().toUpperCase() === 'TRUE',
+                    caixa: (r[12] || '').trim() || '(sem mês de caixa)',
+                }));
+            return _finCartaoClassCache;
+        }
+
+        function _finCartaoRelMesSet(m) { _finCartaoRelMes = m; _finRenderCartaoRel(); }
+
+        async function _finRenderCartaoRel(forcar) {
+            const box = document.getElementById('finCartaoRelBox'); if (!box) return;
+            const sub = document.getElementById('finCartaoRelSub');
+            if (forcar) _finCartaoClassCache = null;
+            if (!_finCartaoClassCache) box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⏳ lendo a classificação da analista…</div>';
+            let dados;
+            try { dados = await _finCartaoClass(); } catch (e) {
+                box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px">⚠ não consegui ler a aba CARTÃO DE CRÉDITO agora</div>';
+                return;
+            }
+            const R = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const R0 = v => 'R$ ' + Math.round(Number(v)).toLocaleString('pt-BR');
+            const soma = arr => arr.reduce((s, x) => s + x.valor, 0);
+
+            const meses = [...new Set(dados.map(d => d.caixa))].sort((a, b) => _cxOrdem(b) - _cxOrdem(a));
+            // Abre no mês corrente. Existem lançamentos com mês de caixa futuro (parcelas já
+            // agendadas), e abrir em novembro por causa de duas parcelas não ajuda ninguém.
+            if (!_finCartaoRelMes || !meses.includes(_finCartaoRelMes)) {
+                const hj = new Date(), atual = hj.getFullYear() * 100 + (hj.getMonth() + 1);
+                _finCartaoRelMes = meses.find(m => _cxOrdem(m) && _cxOrdem(m) <= atual) || meses.find(m => _cxOrdem(m)) || meses[0];
+            }
+            const mesAtual = _finCartaoRelMes;
+            // Cancelado ENTRA na conta: a fatura cobrou e estornou, e as duas linhas estão
+            // na aba. Tirar só uma delas desequilibraria o mês e brigaria com a conferência.
+            const doMes = dados.filter(d => d.caixa === mesAtual);
+            const iAnterior = meses.indexOf(mesAtual) + 1;
+            const mesAnt = meses[iAnterior] && _cxOrdem(meses[iAnterior]) ? meses[iAnterior] : null;
+            const totalMes = soma(doMes);
+            const totalAnt = mesAnt ? soma(dados.filter(d => d.caixa === mesAnt)) : 0;
+            const varia = totalAnt ? ((totalMes - totalAnt) / totalAnt * 100) : null;
+            if (sub) sub.textContent = `${dados.length} lançamentos classificados · ${R0(soma(dados))}`;
+
+            const botoesMes = meses.map(m => {
+                const sel = m === mesAtual, t = soma(dados.filter(d => d.caixa === m));
+                return `<button onclick="_finCartaoRelMesSet('${m.replace(/'/g, "\\'")}')"
+                    style="background:${sel ? 'rgba(0,212,170,0.14)' : 'var(--surface)'};border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+                    border-radius:9px;padding:7px 11px;cursor:pointer;font-family:inherit;color:var(--text);text-align:left">
+                    <div style="font-size:10.5px;color:var(--muted)">${m}</div>
+                    <div style="font-size:13.5px;font-weight:700">${R0(t)}</div>
+                </button>`;
+            }).join('');
+
+            const agrupa = (campo, lista) => {
+                const m = {};
+                lista.forEach(d => { m[d[campo]] = (m[d[campo]] || 0) + d.valor; });
+                return Object.entries(m).sort((a, b) => b[1] - a[1]);
+            };
+            const barra = (nome, valor, maxv, cor) => `
+                <div style="margin-bottom:9px">
+                    <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px;gap:8px">
+                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</span>
+                        <span style="font-weight:700;white-space:nowrap">${R0(valor)} <small style="color:var(--muted);font-weight:400">${totalMes ? (valor / totalMes * 100).toFixed(0) : 0}%</small></span>
+                    </div>
+                    <div style="height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">
+                        <div style="height:100%;width:${maxv ? (valor / maxv * 100).toFixed(1) : 0}%;background:linear-gradient(90deg,${cor})"></div>
+                    </div>
+                </div>`;
+
+            const planos = agrupa('plano', doMes), maxPlano = planos.length ? planos[0][1] : 1;
+            const barrasPlano = planos.slice(0, 9).map(([k, v]) => barra(k, v, maxPlano, '#6366f1,#818cf8')).join('');
+            const fornecedores = agrupa('fornecedor', doMes).slice(0, 10).map(([k, v]) =>
+                `<tr><td style="padding:4px 10px 4px 0">${k}</td><td style="padding:4px 0;text-align:right;font-weight:600">${R0(v)}</td></tr>`).join('');
+            const empresas = agrupa('empresa', doMes).map(([k, v]) =>
+                `<span style="display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:12px">
+                    ${k} <b style="margin-left:4px">${R0(v)}</b></span>`).join('');
+
+            const dedut = soma(doMes.filter(d => d.dedutivel));
+            const emAberto = doMes.filter(d => d.status === 'EM ABERTO');
+            const cancelados = doMes.filter(d => d.status === 'CANCELADO');
+            const semMes = dados.filter(d => !_cxOrdem(d.caixa));
+            const semEmpresa = doMes.filter(d => d.empresa === '(sem empresa)');
+            const semPlano = doMes.filter(d => d.plano === '(sem plano de contas)');
+
+            // Conferência: o que a fatura cobrou e não aparece classificado. Casa pelo valor
+            // exato, que sozinho já acerta 98% dos lançamentos.
+            let conferencia = '<div style="font-size:12px;color:var(--muted)">A conferência aparece depois que a fatura acima terminar de carregar. <a href="#" onclick="event.preventDefault();_finRenderCartaoRel()" style="color:#00d4aa">atualizar</a></div>';
+            if (_finFaturaData && _finFaturaData.itens) {
+                const disp = {};
+                dados.forEach(d => { const k = d.valor.toFixed(2); disp[k] = (disp[k] || 0) + 1; });
+                const orfaos = [];
+                _finFaturaData.itens.forEach(it => {
+                    const k = Number(it.valor).toFixed(2);
+                    if (disp[k]) disp[k]--; else orfaos.push(it);
+                });
+                const totalOrfaos = orfaos.reduce((s, x) => s + x.valor, 0);
+                conferencia = orfaos.length
+                    ? `<div style="font-size:12.5px;margin-bottom:8px">${orfaos.length} lançamento(s) da fatura sem classificação, <b>${R(totalOrfaos)}</b></div>
+                       <table style="font-size:12px;border-collapse:collapse;width:100%">${orfaos.slice(0, 15).map(o =>
+                        `<tr style="border-top:1px solid rgba(255,255,255,.05)">
+                            <td style="padding:4px 8px 4px 0;color:var(--muted);white-space:nowrap">${(o.data || '').slice(8, 10)}/${(o.data || '').slice(5, 7)}</td>
+                            <td style="padding:4px 8px 4px 0">${o.descricao}</td>
+                            <td style="padding:4px 0;text-align:right;font-weight:600">${R(o.valor)}</td>
+                        </tr>`).join('')}</table>
+                       ${orfaos.length > 15 ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">mostrando 15 de ${orfaos.length}</div>` : ''}`
+                    : '<div style="font-size:12.5px;color:var(--success)">✅ tudo que a fatura cobrou está classificado</div>';
+            }
+
+            const kpi = (rot, valor, extra) => `
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:140px;flex:1">
+                    <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${rot}</div>
+                    <div style="font-size:17px;font-weight:800;margin-top:2px">${valor}</div>
+                    ${extra ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${extra}</div>` : ''}
+                </div>`;
+
+            box.innerHTML = `
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${botoesMes}</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+                    ${kpi('Gasto do mês', R0(totalMes), `${doMes.length} lançamentos`)}
+                    ${kpi('Contra o mês anterior', varia === null ? '—' : (varia >= 0 ? '+' : '') + varia.toFixed(0) + '%', mesAnt ? `${mesAnt}: ${R0(totalAnt)}` : 'sem mês anterior')}
+                    ${kpi('Dedutível', R0(dedut), totalMes ? (dedut / totalMes * 100).toFixed(0) + '% do mês' : '')}
+                    ${kpi('Em aberto', R0(soma(emAberto)), `${emAberto.length} lançamento(s)`)}
+                </div>
+                <div style="margin-bottom:14px">${empresas}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px">
+                    <div>
+                        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Em que foi gasto</div>
+                        ${barrasPlano || '<div style="color:var(--muted);font-size:12px">sem lançamento neste mês</div>'}
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Maiores fornecedores</div>
+                        <table style="font-size:12.5px;border-collapse:collapse;width:100%">${fornecedores}</table>
+                    </div>
+                </div>
+                <div style="border-top:1px solid var(--border);padding-top:14px">
+                    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Conferência e pendências</div>
+                    ${conferencia}
+                    <div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.8">
+                        ${semMes.length ? `⚠ <b style="color:var(--warning)">${semMes.length}</b> lançamento(s) sem mês de caixa, ${R0(soma(semMes))} · não entram em nenhum mês deste relatório<br>` : ''}
+                        ${cancelados.length ? `${cancelados.length} lançamento(s) cancelados no mês, saldo ${R0(soma(cancelados))} · a compra e o estorno entram os dois<br>` : ''}
+                        ${semEmpresa.length ? `⚠ ${semEmpresa.length} sem empresa neste mês (${R0(soma(semEmpresa))})<br>` : ''}
+                        ${semPlano.length ? `⚠ ${semPlano.length} sem plano de contas neste mês (${R0(soma(semPlano))})<br>` : ''}
+                        fonte: aba CARTÃO DE CRÉDITO da planilha ·
+                        <a href="#" onclick="event.preventDefault();_finRenderCartaoRel(true)" style="color:#00d4aa">reler agora</a>
+                    </div>
+                </div>`;
+        }
+
         async function loadAndRenderFinanceiro() {
             if (finDataLoaded) return;
             const section = document.getElementById('sec-fin');
@@ -15585,7 +15772,8 @@
                 finDataLoaded = true;
                 populateFinFilters();
                 await renderFinanceiro();
-                _finRenderFatura(); // fatura do cartão importada (async, não bloqueia)
+                _finRenderFatura()           // fatura do cartão importada (async, não bloqueia)
+                    .finally(() => _finRenderCartaoRel());   // depois dela, pra a conferência já sair pronta
             } catch(e) {
                 console.error('Financeiro load error:', e);
                 spinner.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444">Erro ao carregar dados financeiros: ${e.message}</div>`;
