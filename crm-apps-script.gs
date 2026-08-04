@@ -2296,12 +2296,19 @@ function handleCartaoFatura_() {
     if (!parsed || !parsed.length) { naoLidosArq.push(nome); continue; }
     nArq++;
     const em = _cartaoEmpresaMes_(nome);
+    const seqArq = {};   // quantas vezes esta mesma cobrança já apareceu NESTE arquivo
     let soma = 0, novos = 0;
     parsed.forEach(function(it) {
       it.empresa = it.empresa || em.empresa;
       it.competencia = it.competencia || em.competencia;
-      if (vistos[it.fitid]) return; // mesmo lançamento em 2 arquivos (fatura re-exportada)
-      vistos[it.fitid] = true;
+      // 🔴 A mesma cobrança se repete de verdade dentro de uma fatura (ManyChat: 12x R$ 80,00
+      // no mesmo dia, mesma descrição). O fitid é idêntico nas 12, então deduplicar por fitid
+      // puro comia lançamento legítimo: 78 sumiram do Instituto de junho, R$ 6.240. Contando a
+      // ocorrência, a repetição real fica e a fatura re-exportada continua sendo descartada.
+      const n = seqArq[it.fitid] = (seqArq[it.fitid] || 0) + 1;
+      const chave = it.fitid + '#' + n;
+      if (vistos[chave]) return; // mesmo lançamento em 2 arquivos (fatura re-exportada)
+      vistos[chave] = true;
       itens.push(it);
       soma += it.valor; novos++;
     });
@@ -2309,21 +2316,19 @@ function handleCartaoFatura_() {
                    vencimento: cab ? cab.vencimento : '', total: cab && cab.total != null ? cab.total : soma,
                    lancamentos: novos });
   }
-  // Junta o que veio dos PDFs (lidos no navegador e guardados na aba própria), sem repetir
-  // o que o XLSX da MESMA fatura já trouxe: mesma empresa, mesmo mês, mesma descrição, mesmo valor.
-  // 🔴 A empresa e o mês fazem parte da chave. Sem eles a comparação era global e uma cobrança
-  // que se repete igual todo mês (assinatura de mesmo valor) era tratada como repetição e sumia:
-  // 195 lançamentos desapareceram assim, ex. Instituto abril entrou com 37 de 117.
-  const assinatura = {};
-  const chaveDup = function (it) {
-    return (it.empresa || '') + '|' + (it.competencia || '') + '|' +
-           String(it.descricao).toUpperCase().slice(0, 18) + '|' + it.valor;
-  };
-  itens.forEach(function (it) { assinatura[chaveDup(it)] = true; });
+  // Junta o que veio dos PDFs (lidos no navegador e guardados na aba própria).
+  // 🔴 UMA FONTE POR FATURA: se a fatura daquela empresa/mês já veio de um arquivo que o
+  // servidor leu (o XLSX que o banco exporta), o PDF dela é ignorado inteiro. Comparar
+  // lançamento a lançamento não funciona: as duas fontes escrevem a descrição diferente,
+  // e o que escapava entrava duas vezes (Paraser junho somava R$ 3.934 a mais que a fatura).
+  const faturaDeArquivo = {};
+  faturas.forEach(function (f) {
+    if (f.empresa && f.competencia) faturaDeArquivo[f.empresa + '|' + f.competencia] = true;
+  });
   const pdfsImportados = {};
   _cartaoItensDoPdf_().forEach(function (it) {
     pdfsImportados[it.arquivo] = true;
-    if (assinatura[chaveDup(it)]) return;
+    if (faturaDeArquivo[(it.empresa || '') + '|' + (it.competencia || '')]) return;
     itens.push(it);
     const jaTem = faturas.some(function (f) {
       return f.arquivo === it.arquivo ||
