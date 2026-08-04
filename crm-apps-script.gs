@@ -2279,7 +2279,8 @@ function handleCartaoFatura_() {
   const vistos = {};
   const itens = [];
   const faturas = [];
-  let nArq = 0, naoLidos = 0;
+  let nArq = 0;
+  const naoLidosArq = [];   // o servidor não abre PDF: quem lê PDF é o navegador
   while (files.hasNext()) {
     const f = files.next();
     const nome = f.getName();
@@ -2292,7 +2293,7 @@ function handleCartaoFatura_() {
         parsed = r.itens; cab = r;
       } catch (eX) { parsed = null; }
     }
-    if (!parsed || !parsed.length) { naoLidos++; continue; }
+    if (!parsed || !parsed.length) { naoLidosArq.push(nome); continue; }
     nArq++;
     const em = _cartaoEmpresaMes_(nome);
     let soma = 0, novos = 0;
@@ -2309,13 +2310,20 @@ function handleCartaoFatura_() {
                    lancamentos: novos });
   }
   // Junta o que veio dos PDFs (lidos no navegador e guardados na aba própria), sem repetir
-  // o que o XLSX da mesma fatura já trouxe: mesma descrição, mesmo valor, mesmo dia.
+  // o que o XLSX da MESMA fatura já trouxe: mesma empresa, mesmo mês, mesma descrição, mesmo valor.
+  // 🔴 A empresa e o mês fazem parte da chave. Sem eles a comparação era global e uma cobrança
+  // que se repete igual todo mês (assinatura de mesmo valor) era tratada como repetição e sumia:
+  // 195 lançamentos desapareceram assim, ex. Instituto abril entrou com 37 de 117.
   const assinatura = {};
-  itens.forEach(function (it) {
-    assinatura[String(it.descricao).toUpperCase().slice(0, 18) + '|' + it.valor] = true;
-  });
+  const chaveDup = function (it) {
+    return (it.empresa || '') + '|' + (it.competencia || '') + '|' +
+           String(it.descricao).toUpperCase().slice(0, 18) + '|' + it.valor;
+  };
+  itens.forEach(function (it) { assinatura[chaveDup(it)] = true; });
+  const pdfsImportados = {};
   _cartaoItensDoPdf_().forEach(function (it) {
-    if (assinatura[String(it.descricao).toUpperCase().slice(0, 18) + '|' + it.valor]) return;
+    pdfsImportados[it.arquivo] = true;
+    if (assinatura[chaveDup(it)]) return;
     itens.push(it);
     const jaTem = faturas.some(function (f) {
       return f.arquivo === it.arquivo ||
@@ -2328,6 +2336,9 @@ function handleCartaoFatura_() {
     if (f.origem !== 'pdf') return;
     f.lancamentos = itens.filter(function (i) { return i.arquivo === f.arquivo; }).length;
   });
+  // Só é "não lido" o arquivo que ninguém conseguiu ler. O PDF já importado pelo navegador
+  // estava sendo contado aqui pra sempre, e o aviso amarelo nunca saía da tela.
+  const naoLidos = naoLidosArq.filter(function (n) { return !pdfsImportados[n]; }).length;
 
   const porMes = {}, porPortador = {};
   itens.forEach(function(it) {
