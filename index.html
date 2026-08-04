@@ -15308,60 +15308,27 @@
         // O PDF do Itaú tem os lançamentos, só que como texto de duas colunas. O navegador lê
         // (pdf.js) e manda pro servidor guardar. Só grava se a soma dos lançamentos bater com
         // o total que a própria fatura declara: se não bater, alguma coisa foi lida errado.
-        // A fatura do cartão é impressa em DUAS COLUNAS. Juntar tudo numa linha só, como o
-        // leitor genérico faz, embaralha as seções: a mesma linha abre "compras e saques" do
-        // lado esquerdo e "compras parceladas" do direito, e aí não dá pra saber onde termina
-        // o gasto do mês. Aqui cada coluna é lida inteira, uma depois da outra.
-        async function _pdfTextoColunas(file) {
-            const lib = await _carregarPdfJs();
-            const doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
-            let txt = '';
-            for (let p = 1; p <= doc.numPages; p++) {
-                const pag = await doc.getPage(p);
-                const meio = pag.getViewport({ scale: 1 }).width / 2;
-                const c = await pag.getTextContent();
-                const colunas = [{}, {}];
-                c.items.forEach(it => {
-                    const x = it.transform[4], y = Math.round(it.transform[5]);
-                    const alvo = colunas[x < meio ? 0 : 1];
-                    (alvo[y] = alvo[y] || []).push({ x: x, s: it.str });
-                });
-                colunas.forEach(col => {
-                    Object.keys(col).sort((a, b) => b - a).forEach(y => {
-                        const linha = col[y].sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
-                        if (linha) txt += linha + '\n';
-                    });
-                    txt += '\n';   // separa uma coluna da outra
-                });
-            }
-            return txt;
-        }
-
         function _faturaPdfLer(txt) {
-            // 🔴 Nem cortar o texto nem separar as colunas funcionou: a fatura tem várias
-            // páginas, duas colunas e as seções se intercalam. O sinal que resiste ao layout
-            // é outro: TODO gasto do mês vem com a categoria logo abaixo (SAÚDE, VESTUÁRIO,
-            // ALIMENTAÇÃO...). Parcela de fatura futura aparece sem categoria nenhuma.
-            const CATEG = /SA[ÚU]DE|VESTU[ÁA]RIO|ALIMENTA[ÇC][ÃA]O|DIVERSOS|TURISMO|COMBUST[ÍI]VEL|SERVI[ÇC]OS|TRANSPORTE|EDUCA[ÇC][ÃA]O|SUPERMERCADO|FARM[ÁA]CIA|HOSPEDAGEM|AUTOMOTIVO|TELECOM/i;
-            const rx = /(\d{2}\/\d{2})(?!\/)\s+(.+?)\s+(-\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})(?=\s|$)/g;
-            const linhas = txt.split('\n');
+            // Depois dos lançamentos do mês vem "Compras parceladas - próximas faturas", que é
+            // gasto FUTURO. Somar aquilo dobrava o valor da fatura.
+            // 🔴 O corte tem que ser na seção de parcelas futuras. "Total dos lançamentos
+            // atuais" NÃO serve de marca: em algumas faturas ela aparece no resumo do TOPO,
+            // e cortar ali jogava fora dois terços dos lançamentos (FEV/PAR: 30 de 88).
+            let corte = txt.search(/Compras parceladas\s*[-–]\s*pr[óo]ximas faturas/i);
+            if (corte < 0) corte = txt.toLowerCase().lastIndexOf('total dos lan');
+            const corpo = corte > 0 ? txt.slice(0, corte) : txt;
             const itens = [];
-            linhas.forEach((linha, i) => {
-                // A categoria vem na linha de baixo (às vezes na mesma, quando o PDF junta).
-                const contexto = linha + ' ' + (linhas[i + 1] || '');
-                if (!CATEG.test(contexto)) return;
-                rx.lastIndex = 0;
-                let m;
-                while ((m = rx.exec(linha)) !== null) {
-                    const desc = m[2].trim();
-                    if (!desc || /^DATA\b/i.test(desc) || /LIMITE DE GASTOS|LIMITE RETIRADA|PAGAMENTO EFETUADO/i.test(desc)) continue;
-                    const valor = (m[3] ? -1 : 1) * Number(m[4].replace(/\./g, '').replace(',', '.'));
-                    if (!isFinite(valor) || valor === 0) continue;
-                    const mp = desc.match(/(\d{2})\/(\d{2})\s*$/);
-                    itens.push({ dia: m[1], descricao: desc.replace(/\s*\d{2}\/\d{2}\s*$/, '').trim(),
-                                 parcela: mp ? mp[1] + '/' + mp[2] : '', valor: valor });
-                }
-            });
+            const rx = /(\d{2}\/\d{2})(?!\/)\s+(.+?)\s+(-\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})(?=\s|$)/g;
+            let m;
+            while ((m = rx.exec(corpo)) !== null) {
+                const desc = m[2].trim();
+                if (!desc || /^DATA\b/i.test(desc) || /LIMITE DE GASTOS|LIMITE RETIRADA|PAGAMENTO EFETUADO/i.test(desc)) continue;
+                const valor = (m[3] ? -1 : 1) * Number(m[4].replace(/\./g, '').replace(',', '.'));
+                if (!isFinite(valor) || valor === 0) continue;
+                const mp = desc.match(/(\d{2})\/(\d{2})\s*$/);
+                itens.push({ dia: m[1], descricao: desc.replace(/\s*\d{2}\/\d{2}\s*$/, '').trim(),
+                             parcela: mp ? mp[1] + '/' + mp[2] : '', valor: valor });
+            }
             const t = (txt.match(/Total desta fatura\s+([\d.]+,\d{2})/) || [])[1];
             const venc = (txt.match(/Vencimento:\s*(\d{2}\/\d{2}\/\d{4})/) || [])[1] || '';
             return { itens: itens, total: t ? Number(t.replace(/\./g, '').replace(',', '.')) : null, vencimento: venc };
