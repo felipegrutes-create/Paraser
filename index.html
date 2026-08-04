@@ -15338,21 +15338,18 @@
         }
 
         function _faturaPdfLer(txt) {
-            // 🔴 Cortar o texto num ponto não funciona: a fatura tem várias páginas e as seções
-            // se intercalam (parcelas futuras no fim de uma página, mais lançamentos na
-            // seguinte). Então a leitura acompanha em que seção está, linha a linha, e só
-            // aceita lançamento enquanto estiver dentro de "compras e saques".
-            const ABRE  = /Lan[çc]amentos:\s*(compras e saques|produtos e servi[çc]os)|DATA\s+ESTABELECIMENTO/i;
-            const FECHA = /Compras parceladas|pr[óo]ximas faturas|Credi[áa]rio|Limites de cr[ée]dito|Encargos do pr[óo]ximo|Total dos lan[çc]amentos atuais/i;
+            // 🔴 Nem cortar o texto nem separar as colunas funcionou: a fatura tem várias
+            // páginas, duas colunas e as seções se intercalam. O sinal que resiste ao layout
+            // é outro: TODO gasto do mês vem com a categoria logo abaixo (SAÚDE, VESTUÁRIO,
+            // ALIMENTAÇÃO...). Parcela de fatura futura aparece sem categoria nenhuma.
+            const CATEG = /SA[ÚU]DE|VESTU[ÁA]RIO|ALIMENTA[ÇC][ÃA]O|DIVERSOS|TURISMO|COMBUST[ÍI]VEL|SERVI[ÇC]OS|TRANSPORTE|EDUCA[ÇC][ÃA]O|SUPERMERCADO|FARM[ÁA]CIA|HOSPEDAGEM|AUTOMOTIVO|TELECOM/i;
             const rx = /(\d{2}\/\d{2})(?!\/)\s+(.+?)\s+(-\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})(?=\s|$)/g;
+            const linhas = txt.split('\n');
             const itens = [];
-            let dentro = false;
-            txt.split('\n').forEach(linha => {
-                // A mesma linha pode abrir a seção do lado esquerdo e fechar do direito:
-                // por isso testa abertura primeiro e, só depois, fechamento.
-                if (ABRE.test(linha)) dentro = true;
-                else if (FECHA.test(linha)) dentro = false;
-                if (!dentro) return;
+            linhas.forEach((linha, i) => {
+                // A categoria vem na linha de baixo (às vezes na mesma, quando o PDF junta).
+                const contexto = linha + ' ' + (linhas[i + 1] || '');
+                if (!CATEG.test(contexto)) return;
                 rx.lastIndex = 0;
                 let m;
                 while ((m = rx.exec(linha)) !== null) {
@@ -15410,7 +15407,7 @@
                         if (!j.ok) throw new Error(j.error || 'não veio o arquivo');
                         const bin = atob(j.base64), u8 = new Uint8Array(bin.length);
                         for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
-                        const texto = await _pdfTextoColunas(new File([u8], nome, { type: 'application/pdf' }));
+                        const texto = await _pdfTexto(new File([u8], nome, { type: 'application/pdf' }));
                         const lido = _faturaPdfLer(texto);
                         const soma = lido.itens.reduce((s, x) => s + x.valor, 0);
                         // Confere com o total impresso na fatura. 1 centavo de folga por arredondamento.
