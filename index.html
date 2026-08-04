@@ -15305,18 +15305,50 @@
         }
 
         // ===== Faturas em PDF ============================================================
-        // O PDF do Itaú tem os lançamentos, só que como texto de duas colunas. O navegador lê
+        // O PDF do Itaú tem os lançamentos, só que impressos em DUAS COLUNAS. O navegador lê
         // (pdf.js) e manda pro servidor guardar. Só grava se a soma dos lançamentos bater com
         // o total que a própria fatura declara: se não bater, alguma coisa foi lida errado.
-        function _faturaPdfLer(txt) {
+        //
+        // 🔴 Ler linha inteira (as duas colunas juntas) é o que quebrava 9 das 11 faturas:
+        // a data de um lançamento da esquerda acabava emparelhada com o valor da direita, e
+        // o corte das parcelas futuras, que começa na coluna da DIREITA, caía no meio dos
+        // lançamentos do mês. Por isso o texto é montado coluna a coluna.
+        async function _pdfTextoFatura(file) {
+            const lib = await _carregarPdfJs();
+            const doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+            let colunas = '', cheio = '';
+            for (let p = 1; p <= doc.numPages; p++) {
+                const pag = await doc.getPage(p);
+                // A coluna da esquerda termina em ~340 e a da direita começa em 364 (página de
+                // 595). Cortar na METADE não serve: o valor da esquerda fica em ~310, ou seja,
+                // depois do meio, e o corte partia o lançamento no meio.
+                const corte = pag.getViewport({ scale: 1 }).width * 0.58;
+                const c = await pag.getTextContent();
+                const lado = [{}, {}], todos = {};
+                c.items.forEach(it => {
+                    const x = it.transform[4], y = Math.round(it.transform[5]);
+                    const l = lado[x < corte ? 0 : 1];
+                    (l[y] = l[y] || []).push({ x: x, s: it.str });
+                    (todos[y] = todos[y] || []).push({ x: x, s: it.str });
+                });
+                const junta = (mapa) => Object.keys(mapa).sort((a, b) => b - a)
+                    .map(y => mapa[y].sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim())
+                    .filter(l => l).join('\n');
+                colunas += junta(lado[0]) + '\n' + junta(lado[1]) + '\n';
+                cheio += junta(todos) + '\n';   // o resumo do topo é uma caixa que cruza as colunas
+            }
+            return { colunas: colunas, cheio: cheio };
+        }
+
+        function _faturaPdfLer(colunas, cheio) {
             // Depois dos lançamentos do mês vem "Compras parceladas - próximas faturas", que é
             // gasto FUTURO. Somar aquilo dobrava o valor da fatura.
             // 🔴 O corte tem que ser na seção de parcelas futuras. "Total dos lançamentos
             // atuais" NÃO serve de marca: em algumas faturas ela aparece no resumo do TOPO,
             // e cortar ali jogava fora dois terços dos lançamentos (FEV/PAR: 30 de 88).
-            let corte = txt.search(/Compras parceladas\s*[-–]\s*pr[óo]ximas faturas/i);
-            if (corte < 0) corte = txt.toLowerCase().lastIndexOf('total dos lan');
-            const corpo = corte > 0 ? txt.slice(0, corte) : txt;
+            let corte = colunas.search(/Compras parceladas\s*[-–]\s*pr[óo]ximas faturas/i);
+            if (corte < 0) corte = colunas.toLowerCase().lastIndexOf('total dos lan');
+            const corpo = corte > 0 ? colunas.slice(0, corte) : colunas;
             const itens = [];
             const rx = /(\d{2}\/\d{2})(?!\/)\s+(.+?)\s+(-\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})(?=\s|$)/g;
             let m;
@@ -15329,8 +15361,18 @@
                 itens.push({ dia: m[1], descricao: desc.replace(/\s*\d{2}\/\d{2}\s*$/, '').trim(),
                              parcela: mp ? mp[1] + '/' + mp[2] : '', valor: valor });
             }
-            const t = (txt.match(/Total desta fatura\s+([\d.]+,\d{2})/) || [])[1];
-            const venc = (txt.match(/Vencimento:\s*(\d{2}\/\d{2}\/\d{4})/) || [])[1] || '';
+            // O IOF das compras internacionais entra no total da fatura, mas vem numa linha
+            // sem data ("Repasse de IOF em R$ 67,02"), então a regra de lançamento não pega.
+            // Era o que faltava nas 5 faturas que sobraram depois do conserto das colunas.
+            const emis = (cheio.match(/Emiss[ãa]o:\s*(\d{2}\/\d{2})/) || [])[1] || '';
+            const rxIof = /Repasse de IOF em R\$\s*([\d.]+,\d{2})/gi;
+            let mi;
+            while ((mi = rxIof.exec(corpo)) !== null) {
+                const v = Number(mi[1].replace(/\./g, '').replace(',', '.'));
+                if (v) itens.push({ dia: emis, descricao: 'REPASSE DE IOF', parcela: '', valor: v });
+            }
+            const t = (cheio.match(/Total desta fatura\s+([\d.]+,\d{2})/) || [])[1];
+            const venc = (cheio.match(/Vencimento:\s*(\d{2}\/\d{2}\/\d{4})/) || [])[1] || '';
             return { itens: itens, total: t ? Number(t.replace(/\./g, '').replace(',', '.')) : null, vencimento: venc };
         }
 
@@ -15374,8 +15416,8 @@
                         if (!j.ok) throw new Error(j.error || 'não veio o arquivo');
                         const bin = atob(j.base64), u8 = new Uint8Array(bin.length);
                         for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
-                        const texto = await _pdfTexto(new File([u8], nome, { type: 'application/pdf' }));
-                        const lido = _faturaPdfLer(texto);
+                        const texto = await _pdfTextoFatura(new File([u8], nome, { type: 'application/pdf' }));
+                        const lido = _faturaPdfLer(texto.colunas, texto.cheio);
                         const soma = lido.itens.reduce((s, x) => s + x.valor, 0);
                         // Confere com o total impresso na fatura. 1 centavo de folga por arredondamento.
                         if (lido.total == null || Math.abs(soma - lido.total) > 0.01) {
