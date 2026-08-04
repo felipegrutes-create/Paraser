@@ -15308,6 +15308,35 @@
         // O PDF do Itaú tem os lançamentos, só que como texto de duas colunas. O navegador lê
         // (pdf.js) e manda pro servidor guardar. Só grava se a soma dos lançamentos bater com
         // o total que a própria fatura declara: se não bater, alguma coisa foi lida errado.
+        // A fatura do cartão é impressa em DUAS COLUNAS. Juntar tudo numa linha só, como o
+        // leitor genérico faz, embaralha as seções: a mesma linha abre "compras e saques" do
+        // lado esquerdo e "compras parceladas" do direito, e aí não dá pra saber onde termina
+        // o gasto do mês. Aqui cada coluna é lida inteira, uma depois da outra.
+        async function _pdfTextoColunas(file) {
+            const lib = await _carregarPdfJs();
+            const doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+            let txt = '';
+            for (let p = 1; p <= doc.numPages; p++) {
+                const pag = await doc.getPage(p);
+                const meio = pag.getViewport({ scale: 1 }).width / 2;
+                const c = await pag.getTextContent();
+                const colunas = [{}, {}];
+                c.items.forEach(it => {
+                    const x = it.transform[4], y = Math.round(it.transform[5]);
+                    const alvo = colunas[x < meio ? 0 : 1];
+                    (alvo[y] = alvo[y] || []).push({ x: x, s: it.str });
+                });
+                colunas.forEach(col => {
+                    Object.keys(col).sort((a, b) => b - a).forEach(y => {
+                        const linha = col[y].sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
+                        if (linha) txt += linha + '\n';
+                    });
+                    txt += '\n';   // separa uma coluna da outra
+                });
+            }
+            return txt;
+        }
+
         function _faturaPdfLer(txt) {
             // 🔴 Cortar o texto num ponto não funciona: a fatura tem várias páginas e as seções
             // se intercalam (parcelas futuras no fim de uma página, mais lançamentos na
@@ -15381,7 +15410,7 @@
                         if (!j.ok) throw new Error(j.error || 'não veio o arquivo');
                         const bin = atob(j.base64), u8 = new Uint8Array(bin.length);
                         for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
-                        const texto = await _pdfTexto(new File([u8], nome, { type: 'application/pdf' }));
+                        const texto = await _pdfTextoColunas(new File([u8], nome, { type: 'application/pdf' }));
                         const lido = _faturaPdfLer(texto);
                         const soma = lido.itens.reduce((s, x) => s + x.valor, 0);
                         // Confere com o total impresso na fatura. 1 centavo de folga por arredondamento.
