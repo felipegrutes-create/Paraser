@@ -14291,10 +14291,19 @@
             '684984': '2ª Tec Embrion 29/07 (Barbara Da Silva Coura) — feita, status não fechado no Feegow. Felipe 07/08/2026.'
         };
         function repInclui_(r) { return !!REP_INCLUI[String(r[_repCols.id])]; }
+        // Espelho do REP_INCLUI: agendamento que NÃO deve entrar no repasse mesmo que o
+        // status feche como Atendido (sessão não aconteceu, cobrança indevida, lançamento
+        // duplicado). Sem isto o item fica fora só por acidente — enquanto ninguém fecha o
+        // status — e volta a ser pago no dia em que a recepção arrumar o Feegow. Per-ID,
+        // versionado, com o motivo do lado. Tem prioridade sobre o REP_INCLUI.
+        const REP_EXCLUI = {
+            '684889': 'Pacote Paulus 23/07 (Gabriela Vilela Chaveiro Quinan) — não entra no repasse da Cris. Felipe 07/08/2026.'
+        };
         // Linhas ATENDIDAS de um médico num mês 'yyyy-mm'.
         function repLinhas_(chave, mes) {
             const C = _repCols;
             return _repRaw.filter(r => {
+                if (REP_EXCLUI[String(r[C.id])]) return false;
                 if (monthKey(r[C.data]) !== mes) return false;
                 if (!(repFeito_(r[C.sta]) || (REP_STATUS_EXTRA[chave] && repStatusExtraOk_(r[C.sta])) || REP_INCLUI[String(r[C.id])])) return false;
                 const prof = repNorm_(r[C.prof]);
