@@ -3878,10 +3878,14 @@ function handleLogUso(body) {
   return jsonOk({ ok: true });
 }
 
-// GET get_log_uso — relatório agregado de uso (só admin). ?usuario=&token=&dias=30
+// Quem pode ver o relatório de uso. É PESSOAL do Felipe: os outros admins
+// (sophia, bianca, rodolfo) não entram. Por isso trava por login, não por papel.
+const USO_DONOS = ['felipe'];
+
+// GET get_log_uso — relatório agregado de uso (só o dono). ?usuario=&token=&dias=30
 function handleGetLogUso(param) {
   const u = usuAutenticar_(param.usuario, param.token);
-  if (!u || u.papel !== 'admin') return jsonErr('acesso negado');
+  if (!u || USO_DONOS.indexOf(String(u.usuario || '').toLowerCase()) < 0) return jsonErr('acesso negado');
   const dias = Math.max(1, Math.min(180, Number(param.dias) || 30));
   const corte = new Date().getTime() - dias * 86400000;
   const sh = getOrCreateSheetGen_(LOG_USO_SHEET, LOGUSO_HEADERS);

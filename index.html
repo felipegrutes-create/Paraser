@@ -6768,10 +6768,16 @@
             'sec-exec': ['admin'], 'sec-estoque': ['admin','comercial'],   // comercial entra pra lançar as notas de compra
             'sec-marketing': ['admin'], 'sec-uso': ['admin'],  // sec-estrutura virou parte de sec-marketing (16/07)
         };
+        // 🔐 Uso do Sistema é pessoal do Felipe: nem os outros admins (sophia, bianca,
+        // rodolfo) entram. Trava por LOGIN, não por papel. O gate de verdade está no
+        // CRM (handleGetLogUso) — aqui é só pra não aparecer a aba.
+        const USO_DONOS = ['felipe'];
         function prSession() { return window.PR_SESSION || null; }
         function prPapel()   { return (prSession() || {}).papel || ''; }
+        function usoDono(s) { return !!s && USO_DONOS.indexOf(String(s.usuario || '').toLowerCase()) >= 0; }
         function areaAllowed(id) {
             const s = prSession(); if (!s) return true;      // sem sessão (ex: só-salas): não bloqueia
+            if (id === 'sec-uso') return usoDono(s);          // dono único, ignora o papel
             const allow = AREA_PERM[id];
             return !allow || allow.indexOf(s.papel) >= 0;
         }
@@ -6799,7 +6805,7 @@
             const s = prSession(); if (!s) return;
             injectUserBadge(s);
             const usoTab = document.getElementById('tab-uso');
-            if (usoTab) usoTab.style.display = (s.papel === 'admin') ? '' : 'none';
+            if (usoTab) usoTab.style.display = usoDono(s) ? '' : 'none';
             if (s.papel === 'admin') return; // admin vê tudo
             document.querySelectorAll('.tab, .tab-dropdown-item').forEach(function(btn){
                 const oc = btn.getAttribute('onclick') || '';
@@ -6848,7 +6854,7 @@
                 _cachedSections = null;
             }
             const s = prSession();
-            if (!s || s.papel !== 'admin') { sec.innerHTML = '<div style="padding:24px;color:var(--muted)">Acesso restrito.</div>'; return; }
+            if (!usoDono(s)) { sec.innerHTML = '<div style="padding:24px;color:var(--muted)">Acesso restrito.</div>'; return; }
             sec.innerHTML = '<div style="padding:8px 0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px">' +
                 '<h2 style="font-size:18px;color:var(--text)">🔐 Uso do Sistema</h2>' +
                 '<div style="display:flex;gap:6px">' + [7,30,90].map(function(d){ return '<button onclick="renderUso('+d+')" style="background:'+(_usoDias===d?'var(--accent)':'var(--surface)')+';color:'+(_usoDias===d?'#04121a':'var(--muted)')+';border:1px solid var(--border);border-radius:7px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:600">'+d+' dias</button>'; }).join('') + '</div>' +
