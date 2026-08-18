@@ -34,13 +34,41 @@ function sincronizarFeegow() {
   const properties = PropertiesService.getUserProperties();
   const cargaInicialConcluida = properties.getProperty('CARGA_INICIAL_CONCLUIDA');
 
-  if (cargaInicialConcluida !== 'true') {
-    Logger.log('FASE 1: Executando lote da Carga Inicial Massiva (baseada na Data de Criação).');
-    _executarLoteCargaInicial();
-  } else {
-    Logger.log('FASE 2: Executando Sincronização Horária de Rotina.');
-    _executarSincronizacaoHoraria();
+  // 18/08/2026 — BATIMENTO CARDÍACO. O acionador parou de disparar em 07/08 e
+  // ninguém viu por 11 dias: a aba congelou e as consultas de 1ª vez (as que são
+  // marcadas em cima da hora) sumiram do dashboard. Sem log de execução acessível
+  // por API, não dava pra provar se o acionador estava vivo. Agora toda rodada
+  // carimba a hora aqui; `?acao=status` responde e o dashboard avisa se envelhecer.
+  try {
+    if (cargaInicialConcluida !== 'true') {
+      Logger.log('FASE 1: Executando lote da Carga Inicial Massiva (baseada na Data de Criação).');
+      _executarLoteCargaInicial();
+    } else {
+      Logger.log('FASE 2: Executando Sincronização Horária de Rotina.');
+      _executarSincronizacaoHoraria();
+    }
+    properties.setProperty('ULTIMO_SYNC_OK', new Date().toISOString());
+    properties.deleteProperty('ULTIMO_SYNC_ERRO');
+  } catch (e) {
+    properties.setProperty('ULTIMO_SYNC_ERRO', new Date().toISOString() + ' | ' + e.message);
+    throw e;
   }
+}
+
+
+// =================================================================================
+// ACIONADOR — recriar do zero (18/08/2026)
+// =================================================================================
+// `ScriptApp.getProjectTriggers()` lista o acionador mesmo depois que o Google o
+// desativa por falhas repetidas, então "aparece na lista" NÃO é prova de que ele
+// dispara. Apagar e criar de novo é o único jeito de garantir um acionador vivo.
+function recriarAcionador() {
+  let apagados = 0;
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'sincronizarFeegow') { ScriptApp.deleteTrigger(t); apagados++; }
+  });
+  ScriptApp.newTrigger('sincronizarFeegow').timeBased().everyHours(1).create();
+  return { apagados: apagados, criados: 1 };
 }
 
 
@@ -280,6 +308,18 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({
       triggers: ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction() + ' (' + t.getEventType() + ')'),
       cargaInicialConcluida: PropertiesService.getUserProperties().getProperty('CARGA_INICIAL_CONCLUIDA')
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (p.acao === 'recriar') {
+    return ContentService.createTextOutput(JSON.stringify(recriarAcionador()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (p.acao === 'status') {
+    const pr = PropertiesService.getUserProperties();
+    return ContentService.createTextOutput(JSON.stringify({
+      ultimoSyncOk: pr.getProperty('ULTIMO_SYNC_OK') || null,
+      ultimoSyncErro: pr.getProperty('ULTIMO_SYNC_ERRO') || null,
+      triggers: ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction())
     })).setMimeType(ContentService.MimeType.JSON);
   }
   return ContentService.createTextOutput(JSON.stringify({ ok: false }))

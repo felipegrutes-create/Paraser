@@ -5393,6 +5393,10 @@
         // ===================== DATA LOAD =====================
         const AGEND_LOCAL_KEY = 'paraser_agendamentos_v1';
         let feegowStatus = 'ok'; // 'ok' | 'error' | 'stale'
+        // 18/08/2026 — data do agendamento mais NOVO que entrou na aba "Dados Diários".
+        // Se ela para de andar, o sync do Feegow morreu e a agenda congelou: quem some
+        // primeiro é a consulta de 1ª vez, que costuma ser marcada em cima da hora.
+        let agendaUltimaCriacao = null;
 
         function saveAgendLocal(rows) {
             try {
@@ -5499,6 +5503,13 @@
                 return !/^exclu[íi]do no feegow/i.test(String(r[C.sta] || '').trim());
             });
             _repRaw = raw; _repCols = C; // seção Repasses calcula em cima da agenda
+
+            // Agendamento mais novo que entrou na aba. Alimenta o aviso de agenda congelada.
+            agendaUltimaCriacao = null;
+            raw.forEach(r => {
+                const d = parseDate(r[C.dcri]);
+                if (d && (!agendaUltimaCriacao || d > agendaUltimaCriacao)) agendaUltimaCriacao = d;
+            });
 
             function sta(r) {
                 const s = (r[C.sta] || "").toLowerCase().trim();
@@ -19764,10 +19775,33 @@ GONAPEPTYL,56`;
                 banner.className = 'status-stale';
                 banner.style.display = 'flex';
                 banner.innerHTML = `⚠️ <strong>Dados parciais detectados</strong> — A API retornou menos dados que o esperado. Exibindo cache local como proteção. Dados do CRM e financeiro não foram afetados.`;
+            } else if (agendaCongeladaDias() >= 2) {
+                const dias = agendaCongeladaDias();
+                const ult  = agendaUltimaCriacao.toLocaleDateString('pt-BR');
+                banner.className = 'status-error';
+                banner.style.display = 'flex';
+                banner.innerHTML = `⚠️ <strong>Agenda congelada</strong> · o agendamento mais novo da planilha foi criado em ${ult}, há ${dias} dias úteis. O sync do Feegow provavelmente parou de rodar; as consultas de 1ª vez são as primeiras a sumir, porque são marcadas em cima da hora.`;
             } else {
                 banner.className = 'status-ok';
                 banner.style.display = 'none';
             }
+        }
+
+        // Dias ÚTEIS entre o último agendamento criado e hoje. Fim de semana não conta:
+        // numa segunda de manhã o mais novo ainda é o de sexta, e isso é normal. A partir
+        // de 2 dias úteis parados, o sync morreu (foi o que aconteceu em 07/08/2026 e
+        // ninguém viu por 11 dias, até a aba "1ª Vez" ficar visivelmente vazia).
+        function agendaCongeladaDias() {
+            if (!agendaUltimaCriacao) return 0;
+            const hoje = new Date(); hoje.setHours(0,0,0,0);
+            let dias = 0;
+            const d = new Date(agendaUltimaCriacao); d.setHours(0,0,0,0);
+            while (d < hoje) {
+                d.setDate(d.getDate() + 1);
+                const w = d.getDay();
+                if (w !== 0 && w !== 6) dias++;
+            }
+            return dias;
         }
 
         function crmSaveLocal() {
