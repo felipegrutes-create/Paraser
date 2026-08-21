@@ -358,6 +358,12 @@ function doPost(e) {
     // Nota lida do PDF (ou digitada à mão) e conferida na tela antes de salvar.
     if (action === 'add_nf_itens')  return handleAddNFItens(body);
 
+    // 🔴 20/08/2026: um robô mandou 658 chutes de senha em 2h30. Cada chute entrava na
+    // fila do lock e segurava por até 10s — ou seja, o ataque atrapalhava QUEM ESTAVA
+    // TRABALHANDO, não só o log. Login só lê a aba Usuarios e escreve uma linha no
+    // Log_Uso: não disputa nada com a sincronização. Fora da fila.
+    if (action === 'login') return handleLogin(body);
+
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
@@ -400,7 +406,7 @@ function doPost(e) {
       if (action === 'set_meta_dinheiro')    return handleSetMetaDinheiro(body);
       if (action === 'add_meta_dinheiro')    return handleAddMetaDinheiro(body);
       if (action === 'del_meta_dinheiro')    return handleDelMetaDinheiro(body);
-      if (action === 'login')                return handleLogin(body);
+      // 'login' é roteado ANTES do lock (ver comentário lá em cima).
       if (action === 'log_uso')              return handleLogUso(body);
       if (action === 'conferir_pix')         return handleConferirPix(body);
       if (action === 'add_entrada_manual')    return handleAddEntradaManual(body);
@@ -3857,17 +3863,93 @@ function logUso_(usuario, nome, papel, evento, area, detalhe) {
   } catch (e) {}
 }
 
+// TRAVA DE TENTATIVA DE LOGIN — 21/08/2026
+// Em 20/08 um robô mandou 658 chutes de senha em 2h30 (um a cada 9s), com lista pronta
+// de nome inventado: IDs de paciente em sequência e depois um dicionário alfabético.
+// Não entrou (ninguém acertou), mas testava de graça o dia inteiro e enchia o Log_Uso.
+//
+// São DUAS travas, de propósito:
+//  - por usuário: quem existe na aba Usuarios erra 5 vezes e fica 15 min de castigo.
+//    Protege a senha de quem realmente trabalha aqui contra chute em cima do nome certo.
+//  - por nome inventado: o robô nunca repete o mesmo nome, então a trava por usuário
+//    sozinha não pega ele. Passou de 25 nomes-que-não-existem em 15 min, recusa na
+//    entrada, SEM ler a planilha e SEM gravar linha no log.
+// A equipe continua entrando durante um ataque: o contador de nome inventado nunca
+// tranca quem existe na planilha.
+const LOGIN_MAX_USUARIO = 5;      // erros do mesmo usuário que existe
+const LOGIN_MAX_FANTASMA = 25;    // nomes que não existem, somados
+const LOGIN_JANELA_S = 900;       // 15 minutos (renova a cada tentativa nova)
+const LOGIN_K_FANTASMA = 'lg_fantasma';
+
+function loginCache_() { return CacheService.getScriptCache(); }
+function loginConta_(c, k) { return Number(c.get(k) || 0); }
+
+// Avisa no Slack quando a trava fecha. Cooldown de 1h: um ataque de 2h não vira
+// 600 mensagens. Canal: SLACK_SEGURANCA_WEBHOOK se existir, senão o do #comercial.
+function loginAvisaSlack_(motivo, usuario, n) {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    const url = p.getProperty('SLACK_SEGURANCA_WEBHOOK') || p.getProperty('SLACK_COMERCIAL_WEBHOOK');
+    if (!url) return;
+    const c = loginCache_();
+    if (c.get('lg_avisado')) return;
+    c.put('lg_avisado', '1', 3600);
+    const txt = motivo === 'fantasma'
+      ? '🚨 *Tentativa de invasão no app* · ' + n + ' logins com usuário que não existe nos últimos 15 min. '
+        + 'É robô chutando nome. Bloqueei novas tentativas por 15 min. Ninguém entrou; quem tem login continua entrando normal.'
+      : '🔒 *Login bloqueado* · o usuário *' + usuario + '* errou a senha ' + n + ' vezes seguidas e ficou 15 min bloqueado. '
+        + 'Se for alguém da equipe, é só esperar 15 min ou trocar a senha na aba Usuarios.';
+    UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json',
+      payload: JSON.stringify({ text: txt }), muteHttpExceptions: true });
+  } catch (e) {}
+}
+
 // POST login — {usuario, senha} → {ok, nome, papel, token} ou {ok:false}
 function handleLogin(body) {
   const usuario = String(body.usuario || '').trim().toLowerCase();
   const senha = String(body.senha || '');
+  const ctx = String(body.ctx || '');
+  const c = loginCache_();
+  const kUser = 'lg_u_' + usuario;
+  const ESPERE = 'Muitas tentativas erradas. Espere 15 minutos e tente de novo.';
+
+  // Usuário que existe e já estourou o limite: não adianta nem conferir a senha.
+  if (loginConta_(c, kUser) >= LOGIN_MAX_USUARIO) return jsonOk({ ok: false, erro: ESPERE });
+
   const u = usuBuscar_(usuario);
+
+  // Nome que não existe, em cima de uma enxurrada deles: porta fechada sem gastar log.
+  if (!u && loginConta_(c, LOGIN_K_FANTASMA) >= LOGIN_MAX_FANTASMA) {
+    return jsonOk({ ok: false, erro: ESPERE });
+  }
+
   if (!u || !u.ativo || wppHash_(senha) !== u.senha_hash) {
-    logUso_(usuario, u ? u.nome : '', u ? u.papel : '', 'login_falhou', '', '');
+    // Conta no balde certo: quem existe conta no próprio nome; nome inventado vai
+    // pro balde comum. Assim o robô não consegue trancar a Letícia chutando "leticia".
+    const chave = u ? kUser : LOGIN_K_FANTASMA;
+    const n = loginConta_(c, chave) + 1;
+    c.put(chave, String(n), LOGIN_JANELA_S);
+    // Guarda o user-agent também na falha: sem isso o log não diz nada sobre a origem
+    // (o Apps Script não enxerga IP, então o ctx é a única pista que dá pra ter).
+    logUso_(usuario, u ? u.nome : '', u ? u.papel : '', 'login_falhou', '', ctx);
+    if (u && n === LOGIN_MAX_USUARIO) loginAvisaSlack_('usuario', usuario, n);
+    if (!u && n === LOGIN_MAX_FANTASMA) loginAvisaSlack_('fantasma', usuario, n);
     return jsonOk({ ok: false, erro: 'usuário ou senha inválidos' });
   }
-  logUso_(u.usuario, u.nome, u.papel, 'login', '', String(body.ctx || ''));
+
+  // Acertou: zera o castigo dele. Quem sabe a senha não fica preso pelo erro de antes.
+  try { c.remove(kUser); } catch (e) {}
+  logUso_(u.usuario, u.nome, u.papel, 'login', '', ctx);
   return jsonOk({ ok: true, usuario: u.usuario, nome: u.nome, papel: u.papel, token: usuToken_(u.usuario, u.senha_hash) });
+}
+
+// Solta a trava na mão (se alguém da equipe ficar preso e não quiser esperar).
+// Rodar no editor: destravarLogin('leticia') ou destravarLogin() pra soltar tudo.
+function destravarLogin(usuario) {
+  const c = loginCache_();
+  if (usuario) c.remove('lg_u_' + String(usuario).trim().toLowerCase());
+  else c.removeAll(['lg_fantasma', 'lg_avisado']);
+  return 'destravado: ' + (usuario || 'robô/fantasma');
 }
 
 // POST log_uso — registra evento de uso (área aberta / ação). Exige usuario+token.
